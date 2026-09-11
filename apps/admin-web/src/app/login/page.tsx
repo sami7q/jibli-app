@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { JibliLogo, safeReturnPath } from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
 
@@ -17,12 +17,7 @@ import { ApiError, apiRequest } from '@/lib/api';
  * `useAdminSession`, which re-derives it on load.
  */
 export default function AdminLoginPage() {
-  return (
-    // useSearchParams needs a Suspense boundary to keep the route static.
-    <Suspense fallback={<LoginFrame><p className="auth__subtitle">جاري التحميل…</p></LoginFrame>}>
-      <LoginForm />
-    </Suspense>
-  );
+  return <LoginForm />;
 }
 
 function LoginFrame({ children }: { children: React.ReactNode }) {
@@ -51,7 +46,6 @@ const BACKOFF_SECONDS = 15;
 
 function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -125,12 +119,18 @@ function LoginForm() {
       }
 
       /*
-       * `next` comes from the URL, so it is attacker-controllable. It is
-       * reduced to a same-origin path before use — an open redirect on a login
-       * page is a phishing primitive, because the link really does start on
-       * this domain.
+       * `next` is attacker-controllable, so it is reduced to a same-origin path
+       * before use — an open redirect on a sign-in page is a phishing
+       * primitive, because the link really does start on this domain.
+       *
+       * Read from the live URL rather than useSearchParams: that hook forces
+       * the page into a Suspense boundary, so Next serves a loading
+       * placeholder instead of the form on the one screen every session
+       * starts at.
        */
-      const destination = safeReturnPath(searchParams.get('next'));
+      const destination = safeReturnPath(
+        new URLSearchParams(window.location.search).get('next'),
+      );
 
       // Replace, not push: the login page must not sit in the back stack of an
       // authenticated session.
