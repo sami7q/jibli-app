@@ -10,6 +10,7 @@ import { Icon } from '@/components/icon';
 import { adminApi, ApiError } from '@/lib/api';
 import { admin } from '@/lib/admin-endpoints';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Admin-created restaurant (plan §15.1).
@@ -82,11 +83,7 @@ export default function NewRestaurantPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   const phoneResult = tryToE164Iraq(form.owner_phone);

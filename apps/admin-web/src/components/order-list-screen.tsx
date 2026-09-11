@@ -20,6 +20,7 @@ import { ApiError } from '@/lib/api';
 import { admin, type AdminOrder } from '@/lib/admin-endpoints';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * The global order list, shared by three routes (plan §87).
@@ -62,11 +63,7 @@ export function OrderListScreen({
   });
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   return (

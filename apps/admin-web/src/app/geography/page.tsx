@@ -3,6 +3,7 @@
 import { AdminShell } from '@/components/shell';
 import { GeographyCoverage } from '@/components/geography-coverage';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * `المناطق والتغطية` (plan §8.8).
@@ -14,11 +15,7 @@ export default function GeographyPage() {
   const session = useAdminSession();
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   return (

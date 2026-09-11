@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { JibliLogo, RESTAURANT_NAV } from '@jibli/ui-web';
 import { Icon, type IconName } from './icon';
+import { SessionMenu } from './session-menu';
 import type { PortalRestaurant } from '@/hooks/use-session';
 
 /**
@@ -130,6 +131,8 @@ function Topbar({
       </div>
 
       <NotificationBell count={notificationCount ?? 0} />
+
+      <SessionMenu userName={userName} userRoleAr="فريق المطعم" />
 
       <RestaurantBadge
         restaurantName={restaurantName}

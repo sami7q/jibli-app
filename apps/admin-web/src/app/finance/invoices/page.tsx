@@ -5,6 +5,7 @@ import { AdminShell } from '@/components/shell';
 import { Card } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * `الفواتير` (plan §253).
@@ -25,11 +26,7 @@ export default function InvoicesPage() {
   const session = useAdminSession();
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   return (

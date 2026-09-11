@@ -15,6 +15,7 @@ import { LiveBoard } from '@/components/live-board';
 import { Icon, type IconName } from '@/components/icon';
 import { portal, type DashboardOverview } from '@/lib/portal-endpoints';
 import { useSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Restaurant dashboard (plan §131).
@@ -33,20 +34,7 @@ export default function DashboardPage() {
   }
 
   if (session.status === 'unauthenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>
-          {session.reason === 'NO_RESTAURANT_MEMBERSHIP'
-            ? 'حسابك غير مرتبط بأي مطعم'
-            : 'الرجاء تسجيل الدخول'}
-        </h1>
-        <p>
-          {session.reason === 'NO_RESTAURANT_MEMBERSHIP'
-            ? 'تواصل مع مالك المطعم ليضيفك إلى فريق العمل.'
-            : 'انتهت الجلسة أو لم يتم تسجيل الدخول بعد.'}
-        </p>
-      </div>
-    );
+    return <SignedOut reason={session.reason} />;
   }
 
   const auth = { accessToken: session.accessToken, restaurantId: session.restaurantId };

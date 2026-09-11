@@ -21,6 +21,7 @@ import { ErrorState, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminOverview } from '@/lib/admin-endpoints';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Admin dashboard (plan §130).
@@ -55,20 +56,7 @@ export default function AdminDashboardPage() {
   }
 
   if (session.status === 'unauthenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>
-          {session.reason === 'NOT_PLATFORM_STAFF'
-            ? 'هذا الحساب ليس ضمن فريق المنصة'
-            : 'الرجاء تسجيل الدخول'}
-        </h1>
-        <p>
-          {session.reason === 'NOT_PLATFORM_STAFF'
-            ? 'لوحة الأدمن مخصّصة لموظفي جيبلي. إن كنت شريكاً استخدم بوابة المطاعم.'
-            : 'انتهت الجلسة أو لم يتم تسجيل الدخول بعد.'}
-        </p>
-      </div>
-    );
+    return <SignedOut reason={session.reason} />;
   }
 
   const data = overview.data;

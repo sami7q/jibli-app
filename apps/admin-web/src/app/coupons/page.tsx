@@ -20,6 +20,7 @@ import { Card, ConfirmDialog, ErrorState, ForbiddenState, Skeleton } from '@/com
 import { ApiError } from '@/lib/api';
 import { admin, type AdminCoupon } from '@/lib/admin-endpoints';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Coupons (plan §60).
@@ -76,11 +77,7 @@ export default function CouponsPage() {
   }
 
   if (session.status === 'unauthenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   // Marketing holds coupon.manage without holding finance or operations.

@@ -7,6 +7,7 @@ import { AdminShell } from '@/components/shell';
 import { Card, DataTable, ErrorState, FilterBar, Select, Skeleton } from '@/components/ui';
 import { adminApi, ApiError, type AuditEntry } from '@/lib/api';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Audit trail (plan §64).
@@ -94,11 +95,7 @@ export default function AuditPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   return (

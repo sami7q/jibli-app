@@ -21,6 +21,7 @@ import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin } from '@/lib/admin-endpoints';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Settlement detail (plan §42, §44).
@@ -94,11 +95,7 @@ export default function SettlementDetailPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   const data = settlement.data;

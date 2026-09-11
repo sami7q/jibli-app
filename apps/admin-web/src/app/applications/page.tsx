@@ -15,6 +15,7 @@ import {
 import { Icon } from '@/components/icon';
 import { adminApi, ApiError, type RestaurantApplication } from '@/lib/api';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Restaurant onboarding review (plan §15.2, §69).
@@ -47,11 +48,7 @@ export default function ApplicationsPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   return (

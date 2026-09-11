@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminRestaurant } from '@/lib/admin-endpoints';
 import { useAdminSession } from '@/hooks/use-session';
+import { SignedOut } from '@/components/signed-out';
 
 /**
  * Cuisine categories (plan §130 `التصنيفات`).
@@ -29,11 +30,7 @@ export default function CategoriesPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return (
-      <div className="empty" style={{ minHeight: '100vh', justifyContent: 'center' }}>
-        <h1>الرجاء تسجيل الدخول</h1>
-      </div>
-    );
+    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
   }
 
   // The list endpoint does not project cuisine tags, so usage is derived from

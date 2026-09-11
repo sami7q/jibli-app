@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ADMIN_NAV, dateWithWeekdayAr, JibliLogo } from '@jibli/ui-web';
 import { Icon, type IconName } from './icon';
+import { SessionMenu } from './session-menu';
 
 /**
  * Admin shell (plan §130).
@@ -111,29 +112,8 @@ export function AdminShell({
             ) : null}
           </Link>
 
-          <div className="topbar__control">
-            <div
-              aria-hidden
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: 'var(--jibli-orange-100)',
-                display: 'grid',
-                placeItems: 'center',
-                color: 'var(--jibli-orange-700)',
-                fontWeight: 700,
-              }}
-            >
-              {userName.slice(0, 1)}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-              <strong style={{ fontSize: 'var(--text-sm)' }}>{userName}</strong>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                {userRoleAr}
-              </span>
-            </div>
-          </div>
+          <SessionMenu userName={userName} userRoleAr={userRoleAr} />
+
         </header>
 
         {children}
