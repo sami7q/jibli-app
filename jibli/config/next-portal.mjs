@@ -1,0 +1,137 @@
+/**
+ * Shared Next.js configuration for the two portals.
+ *
+ * Admin and Restaurant had byte-identical configs, which is exactly how a
+ * security header ends up on one portal and not the other. One module, imported
+ * by both, makes that impossible.
+ */
+
+/** @type {import('next').NextConfig} */
+export const portalNextConfig = {
+  reactStrictMode: true,
+
+  // Workspace packages ship TypeScript source; Next compiles them itself.
+  transpilePackages: ['@jibli/ui-web', '@jibli/contracts', '@jibli/money', '@jibli/validation'],
+
+  poweredByHeader: false,
+
+  webpack(config) {
+    /*
+     * The workspace packages are ESM TypeScript, so their internal imports are
+     * written as `./errors.js` — the specifier that will exist after `tsc`
+     * emits. Webpack resolves that literally and finds nothing, because on disk
+     * the file is still `errors.ts`.
+     *
+     * `extensionAlias` teaches it to try the TypeScript source for a `.js`
+     * specifier. Without it, every workspace package with more than one file
+     * fails to build, and the error names the missing `.js` rather than the
+     * cause.
+     */
+    config.resolve.extensionAlias = {
+      ...config.resolve.extensionAlias,
+      '.js': ['.ts', '.tsx', '.js'],
+      '.mjs': ['.mts', '.mjs'],
+    };
+    return config;
+  },
+
+  /**
+   * Proxy the API through this origin.
+   *
+   * On Vercel the portals sit on *.vercel.app and the API on another host
+   * entirely. A refresh cookie set by that host is third-party to the portal
+   * and modern browsers simply do not send it, so every session would die at
+   * page load.
+   *
+   * Rewriting /api/* through Next makes the browser talk only to its own
+   * origin: the cookie is first-party, CORS never enters the picture, and the
+   * CSP can stay at `connect-src 'self'`.
+   *
+   * The WebSocket is not proxied — Vercel does not forward upgrade requests —
+   * and does not need to be: it authenticates with the access token in the
+   * query string, not with the cookie, so it connects to the API directly.
+   */
+  async rewrites() {
+    const origin = process.env.API_ORIGIN;
+    if (!origin) return [];
+
+    return [{ source: '/api/:path*', destination: `${origin.replace(/\/$/, '')}/api/:path*` }];
+  },
+
+  async headers() {
+    /*
+     * Content-Security-Policy.
+     *
+     * The portals had every other security header and not this one, which is
+     * the header that actually contains an injected script. It is built here
+     * from the configured API origin so a deployment pointing at a different
+     * API does not silently have its own XHR blocked.
+     *
+     * `'unsafe-inline'` on script-src is the one concession: Next's App Router
+     * emits an inline bootstrap script, and removing it needs a per-request
+     * nonce, which in turn forces every route to render dynamically. These
+     * pages already send `Cache-Control: private, no-store`, so that would cost
+     * little — but the XSS surface here is small and worth stating plainly:
+     * no page uses dangerouslySetInnerHTML, and all rendered values come from
+     * our own API through React's escaping. What the policy still buys, even
+     * with that concession, is that an attacker cannot load script from another
+     * origin, cannot exfiltrate to one (connect-src), and cannot frame the
+     * portal (frame-ancestors).
+     */
+    const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+    const wsOrigin = apiOrigin.replace(/^http/, 'ws');
+    /*
+     * When the API is proxied through this origin, XHR is same-origin and only
+     * the WebSocket needs naming. Without the proxy, both do.
+     */
+    const httpConnect = process.env.API_ORIGIN ? '' : ` ${apiOrigin}`;
+
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      // React sets inline `style` attributes. No external stylesheet: the font
+      // is self-hosted by next/font, so no third-party origin is allowed here.
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self'",
+      "img-src 'self' data: blob:",
+      `connect-src 'self'${httpConnect} ${wsOrigin}`,
+      "object-src 'none'",
+      "base-uri 'none'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      'upgrade-insecure-requests',
+    ].join('; ');
+
+    return [
+      {
+        // Security headers (plan §82). Finance pages carry no third-party scripts.
+        source: '/:path*',
+        headers: [
+          { key: 'Content-Security-Policy', value: csp },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // Redundant with frame-ancestors, kept for browsers that predate it.
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          {
+            key: 'Permissions-Policy',
+            value:
+              'geolocation=(), microphone=(), camera=(), payment=(), usb=(), interest-cohort=()',
+          },
+          // Isolates the portal's browsing context group from anything it opens.
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
+          { key: 'X-DNS-Prefetch-Control', value: 'off' },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
+        ],
+      },
+      {
+        // Authenticated portal data must never enter a shared cache (plan §80).
+        source: '/((?!_next/static|_next/image|favicon.ico).*)',
+        headers: [{ key: 'Cache-Control', value: 'private, no-store, max-age=0' }],
+      },
+    ];
+  },
+};

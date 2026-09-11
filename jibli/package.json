@@ -1,0 +1,65 @@
+{
+  "name": "jibli",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jibli — Iraqi food delivery platform (customer app, driver mode, restaurant portal, admin portal)",
+  "engines": {
+    "node": ">=20.9.0",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" build && pnpm -r --filter \"./apps/**\" build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "db:generate": "pnpm --filter @jibli/db generate",
+    "db:migrate": "pnpm --filter @jibli/db migrate",
+    "db:seed": "pnpm --filter @jibli/db seed",
+    "db:reset": "pnpm --filter @jibli/db reset",
+    "dev:api": "pnpm --filter @jibli/api dev",
+    "dev:worker": "pnpm --filter @jibli/worker dev",
+    "dev:admin": "pnpm --filter @jibli/admin-web dev",
+    "dev:restaurant": "pnpm --filter @jibli/restaurant-web dev",
+    "dev:mobile": "pnpm --filter @jibli/mobile start",
+    "infra:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "bundle": "node scripts/bundle.mjs api && node scripts/bundle.mjs worker",
+    "deploy:migrate": "pnpm --filter @jibli/db migrate && pnpm --filter @jibli/db seed",
+    "deploy:check": "pnpm -r typecheck && pnpm lint && pnpm test && pnpm bundle"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@node-rs/argon2"
+    ],
+    "ignoredBuiltDependencies": [
+      "esbuild"
+    ],
+    "overrides": {
+      "@jibli/mobile>@types/react": "18.3.31",
+      "expo-router>@types/react": "18.3.31",
+      "react-helmet-async>@types/react": "18.3.31"
+    }
+  }
+}

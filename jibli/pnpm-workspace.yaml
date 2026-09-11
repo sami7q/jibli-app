@@ -1,0 +1,9 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Postinstall scripts are opt-in. esbuild's shells out to `node` in a way that
+# fails on Windows cmd.exe, and nothing here needs it to run at install time.
+ignoredBuiltDependencies:
+  - esbuild
+  - '@node-rs/argon2'

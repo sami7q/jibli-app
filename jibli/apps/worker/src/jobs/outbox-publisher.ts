@@ -1,0 +1,351 @@
+import { and, eq, inArray, lte, sql } from 'drizzle-orm';
+import {
+  channels,
+  EVENT_AUDIENCE,
+  type EventType,
+  type OrderEventPayload,
+  type DeliveryEventPayload,
+} from '@jibli/contracts';
+import { formatIqdArabic, iqd } from '@jibli/money';
+import { NOTIFICATION_TEMPLATES } from '@jibli/notifications';
+import { nextAttemptDelayMs, OUTBOX_MAX_ATTEMPTS } from '@jibli/domain';
+import {
+  deliveryAssignments,
+  drivers,
+  notificationDeliveries,
+  outboxEvents,
+  restaurantMembers,
+  userDevices,
+  uuidv7,
+  type OutboxEventRow,
+} from '@jibli/db';
+import type { WorkerContext } from '../context.js';
+
+/**
+ * Outbox publisher (plan §31).
+ *
+ *   worker reads outbox → realtime publish → push/browser notification → mark published
+ *
+ * If realtime is down the order stays safely stored and the event remains
+ * retryable. Client reconnection uses event IDs and order versions, so a
+ * duplicate delivery cannot duplicate an alert or a state transition.
+ */
+
+export interface PublishResult {
+  readonly claimed: number;
+  readonly published: number;
+  readonly failed: number;
+}
+
+export async function runOutboxPublisher(ctx: WorkerContext): Promise<PublishResult> {
+  const now = new Date();
+
+  /**
+   * Claim a batch atomically.
+   *
+   * `FOR UPDATE SKIP LOCKED` is what lets several worker replicas share the
+   * table without either double-publishing or blocking each other.
+   */
+  const claimed = await ctx.db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(outboxEvents)
+      .where(
+        and(
+          inArray(outboxEvents.status, ['PENDING', 'PUBLISHING']),
+          lte(outboxEvents.nextAttemptAt, now),
+        ),
+      )
+      .orderBy(outboxEvents.createdAt)
+      .limit(ctx.env.OUTBOX_BATCH_SIZE)
+      .for('update', { skipLocked: true });
+
+    if (rows.length === 0) return [];
+
+    await tx
+      .update(outboxEvents)
+      .set({ status: 'PUBLISHING', attemptCount: sql`${outboxEvents.attemptCount} + 1` })
+      .where(
+        inArray(
+          outboxEvents.id,
+          rows.map((r) => r.id),
+        ),
+      );
+
+    return rows;
+  });
+
+  let published = 0;
+  let failed = 0;
+
+  for (const event of claimed) {
+    try {
+      await publishEvent(ctx, event);
+      await ctx.db
+        .update(outboxEvents)
+        .set({ status: 'PUBLISHED', publishedAt: new Date(), lastError: null })
+        .where(eq(outboxEvents.id, event.id));
+      published += 1;
+    } catch (error) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      const attempts = event.attemptCount + 1;
+
+      // After the retry budget, park the row for a human rather than looping
+      // forever on what is probably a permanent error (plan §93).
+      const exhausted = attempts >= OUTBOX_MAX_ATTEMPTS;
+      await ctx.db
+        .update(outboxEvents)
+        .set({
+          status: exhausted ? 'FAILED' : 'PENDING',
+          lastError: message.slice(0, 500),
+          nextAttemptAt: new Date(Date.now() + nextAttemptDelayMs(attempts)),
+        })
+        .where(eq(outboxEvents.id, event.id));
+
+      ctx.logger[exhausted ? 'error' : 'warn'](
+        {
+          event: 'outbox.publish_failed',
+          outboxEventId: event.id,
+          eventType: event.eventType,
+          attempts,
+          exhausted,
+          err: message,
+        },
+        exhausted ? 'Outbox event exhausted its retries' : 'Outbox publish failed; will retry',
+      );
+    }
+  }
+
+  return { claimed: claimed.length, published, failed };
+}
+
+/** Fan one event out to realtime channels and push recipients. */
+async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<void> {
+  const eventType = event.eventType as EventType;
+  const audience = EVENT_AUDIENCE[eventType] ?? [];
+
+  // 1. Realtime. Published to Redis pub/sub; the gateway relays to subscribers
+  //    that passed authorization when they subscribed (plan §63).
+  const realtimeChannels = await resolveChannels(ctx, event, audience);
+  const message = JSON.stringify({
+    id: event.id,
+    type: event.eventType,
+    aggregateId: event.aggregateId,
+    aggregateVersion: event.aggregateVersion,
+    occurredAt: event.createdAt.toISOString(),
+    payload: event.payload,
+  });
+
+  for (const channel of realtimeChannels) {
+    await ctx.redis.publish(channel, message);
+  }
+
+  // 2. Push notifications.
+  const notifications = await buildNotifications(ctx, event, audience);
+  for (const notification of notifications) {
+    // The unique index on (event, recipient, channel) is what makes a retried
+    // batch safe: the second insert collides instead of alerting twice.
+    const inserted = await ctx.db
+      .insert(notificationDeliveries)
+      .values({
+        id: uuidv7(),
+        outboxEventId: event.id,
+        recipientUserId: notification.userId,
+        channel: 'PUSH',
+        titleAr: notification.titleAr,
+        bodyAr: notification.bodyAr,
+        dataJson: { orderId: event.aggregateId, eventType: event.eventType },
+        status: 'PENDING',
+      })
+      .onConflictDoNothing()
+      .returning({ id: notificationDeliveries.id });
+
+    if (inserted.length === 0) continue;
+
+    const devices = await ctx.db
+      .select({ pushToken: userDevices.pushToken })
+      .from(userDevices)
+      .where(and(eq(userDevices.userId, notification.userId), sql`${userDevices.revokedAt} IS NULL`));
+
+    if (devices.length === 0) {
+      await ctx.db
+        .update(notificationDeliveries)
+        .set({ status: 'SKIPPED', failureReason: 'NO_ACTIVE_DEVICE' })
+        .where(eq(notificationDeliveries.id, inserted[0]!.id));
+      continue;
+    }
+
+    const results = await ctx.push.sendMany(
+      devices.map((device) => ({
+        token: device.pushToken,
+        titleAr: notification.titleAr,
+        bodyAr: notification.bodyAr,
+        data: { orderId: event.aggregateId, eventType: event.eventType },
+        channelId: 'orders',
+      })),
+    );
+
+    // A provider reporting a permanently dead token means the app was
+    // uninstalled; disable it rather than retrying forever (plan §56).
+    for (const [index, result] of results.entries()) {
+      if (result.tokenInvalid) {
+        const token = devices[index]?.pushToken;
+        if (token) {
+          await ctx.db
+            .update(userDevices)
+            .set({ revokedAt: new Date(), revokedReason: 'PROVIDER_REPORTED_INVALID' })
+            .where(eq(userDevices.pushToken, token));
+        }
+      }
+    }
+
+    await ctx.db
+      .update(notificationDeliveries)
+      .set({
+        status: results.some((r) => r.ok) ? 'SENT' : 'FAILED',
+        sentAt: new Date(),
+      })
+      .where(eq(notificationDeliveries.id, inserted[0]!.id));
+  }
+}
+
+/** Which realtime channels an event belongs on. */
+async function resolveChannels(
+  ctx: WorkerContext,
+  event: OutboxEventRow,
+  audience: readonly string[],
+): Promise<string[]> {
+  const payload = event.payload as Record<string, unknown>;
+  const list: string[] = [];
+
+  if (audience.includes('restaurant') && typeof payload.restaurantId === 'string') {
+    list.push(channels.restaurantOrders(payload.restaurantId));
+    if (typeof payload.branchId === 'string') {
+      list.push(channels.branchOrders(payload.branchId));
+    }
+  }
+  if (audience.includes('customer')) {
+    if (typeof payload.orderId === 'string') list.push(channels.customerOrder(payload.orderId));
+    if (typeof payload.customerId === 'string') {
+      list.push(channels.customerOrders(payload.customerId));
+    }
+  }
+  if (audience.includes('driver') && typeof payload.driverId === 'string') {
+    list.push(channels.driverTasks(payload.driverId));
+  }
+  if (audience.includes('admin')) {
+    list.push(channels.adminOperations());
+  }
+
+  // An order.ready event tells whichever driver is already assigned.
+  if (event.eventType === 'order.ready' && typeof payload.orderId === 'string') {
+    const [assignment] = await ctx.db
+      .select({ driverId: deliveryAssignments.driverId })
+      .from(deliveryAssignments)
+      .where(
+        and(
+          eq(deliveryAssignments.orderId, payload.orderId),
+          inArray(deliveryAssignments.status, ['ASSIGNED', 'ACCEPTED']),
+        ),
+      )
+      .limit(1);
+    if (assignment) list.push(channels.driverTasks(assignment.driverId));
+  }
+
+  return [...new Set(list)];
+}
+
+interface PendingNotification {
+  readonly userId: string;
+  readonly titleAr: string;
+  readonly bodyAr: string;
+}
+
+/** Turn an event into the Arabic notifications its audience should receive. */
+async function buildNotifications(
+  ctx: WorkerContext,
+  event: OutboxEventRow,
+  audience: readonly string[],
+): Promise<PendingNotification[]> {
+  const payload = event.payload as Record<string, unknown>;
+  const out: PendingNotification[] = [];
+  const orderNumber = String(payload.publicOrderNumber ?? '');
+
+  const customerTemplate = customerTemplateFor(event.eventType as EventType, orderNumber);
+  if (customerTemplate && audience.includes('customer') && typeof payload.customerId === 'string') {
+    out.push({ userId: payload.customerId, ...customerTemplate });
+  }
+
+  if (event.eventType === 'order.placed' && typeof payload.restaurantId === 'string') {
+    const total = formatIqdArabic(iqd(Number(payload.customerTotalIqd ?? 0)));
+    const template = NOTIFICATION_TEMPLATES.newOrderForRestaurant(orderNumber, total);
+
+    // Everyone who can act on a live order gets the alert.
+    const members = await ctx.db
+      .select({ userId: restaurantMembers.userId })
+      .from(restaurantMembers)
+      .where(
+        and(
+          eq(restaurantMembers.restaurantId, payload.restaurantId),
+          eq(restaurantMembers.isActive, true),
+          inArray(restaurantMembers.role, ['OWNER', 'MANAGER', 'CASHIER']),
+        ),
+      );
+
+    for (const member of members) out.push({ userId: member.userId, ...template });
+  }
+
+  if (event.eventType === 'delivery.assigned' && typeof payload.driverId === 'string') {
+    const [driver] = await ctx.db
+      .select({ userId: drivers.userId })
+      .from(drivers)
+      .where(eq(drivers.id, payload.driverId))
+      .limit(1);
+    if (driver) {
+      out.push({ userId: driver.userId, ...NOTIFICATION_TEMPLATES.newAssignmentForDriver(orderNumber) });
+    }
+  }
+
+  if (event.eventType === 'delivery.reassigned' && typeof payload.driverId === 'string') {
+    const [driver] = await ctx.db
+      .select({ userId: drivers.userId })
+      .from(drivers)
+      .where(eq(drivers.id, payload.driverId))
+      .limit(1);
+    if (driver) {
+      out.push({ userId: driver.userId, ...NOTIFICATION_TEMPLATES.assignmentCancelled(orderNumber) });
+    }
+  }
+
+  return out;
+}
+
+function customerTemplateFor(
+  eventType: EventType,
+  orderNumber: string,
+): { titleAr: string; bodyAr: string } | null {
+  switch (eventType) {
+    case 'order.accepted':
+      return NOTIFICATION_TEMPLATES.orderAccepted(orderNumber);
+    case 'order.preparing':
+      return NOTIFICATION_TEMPLATES.orderPreparing(orderNumber);
+    case 'order.ready':
+      return NOTIFICATION_TEMPLATES.orderReady(orderNumber);
+    case 'order.out_for_delivery':
+      return NOTIFICATION_TEMPLATES.orderOutForDelivery(orderNumber);
+    case 'delivery.arrived':
+      return NOTIFICATION_TEMPLATES.orderArrived(orderNumber);
+    case 'order.delivered':
+    case 'order.completed':
+      return NOTIFICATION_TEMPLATES.orderDelivered(orderNumber);
+    case 'order.rejected':
+      return NOTIFICATION_TEMPLATES.orderRejected(orderNumber);
+    case 'order.cancelled':
+      return NOTIFICATION_TEMPLATES.orderCancelled(orderNumber);
+    default:
+      return null;
+  }
+}
+
+export type { OrderEventPayload, DeliveryEventPayload };

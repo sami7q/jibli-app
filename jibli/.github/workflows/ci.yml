@@ -1,0 +1,150 @@
+name: CI
+
+# Plan §139: lint, typecheck, unit tests, database integration tests and a
+# geography dataset validation gate must all pass before merge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10'
+
+jobs:
+  quality:
+    name: Lint, typecheck and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      # Financial and geography logic carry coverage thresholds; a drop fails
+      # the build rather than being noticed later (plan §144).
+      - name: Coverage thresholds
+        run: pnpm test:coverage
+
+  database:
+    name: Migrations, seed and integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: jibli
+          POSTGRES_PASSWORD: jibli_ci
+          POSTGRES_DB: jibli_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U jibli -d jibli_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://jibli:jibli_ci@localhost:5432/jibli_test
+      DATABASE_MIGRATION_URL: postgresql://jibli:jibli_ci@localhost:5432/jibli_test
+      REDIS_URL: redis://localhost:6379
+      APP_ENV: development
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Every migration must apply cleanly to an empty database. A migration
+      # that only works against a developer's existing schema is a failed deploy.
+      - name: Apply migrations
+        run: pnpm db:migrate
+
+      # Re-running must be a no-op: the runner refuses an edited migration and
+      # skips applied ones.
+      - name: Migrations are idempotent
+        run: pnpm db:migrate
+
+      - name: Seed geography and configuration
+        run: pnpm db:seed
+
+      # Re-seeding must not duplicate rows or reopen a closed city.
+      - name: Seed is idempotent
+        run: pnpm db:seed
+
+      - name: Verify geography seed integrity
+        run: pnpm --filter @jibli/db exec tsx src/scripts/verify-seed.ts
+
+      # End-to-end suite. These assert the invariants the plan calls
+      # production-blocking — duplicate commission, oversold stock, a settled
+      # order appearing twice — against real database constraints rather than
+      # mocks (plan §145, §146).
+      - name: End-to-end tests
+        run: pnpm test:e2e
+        env:
+          TEST_DATABASE_URL: postgresql://jibli:jibli_ci@localhost:5432/jibli_test
+
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Plan §259: security advisories are reviewed routinely, not only at
+      # feature-upgrade time. High and critical findings fail the build.
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high

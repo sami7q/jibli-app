@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM"],
+    "noEmit": true,
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      // React Native 0.76 is React 18 while the web portals are React 19.
+      // Pinning "react" here forces every type reference made from inside this
+      // project — including those in dependency .d.ts files — to resolve to the
+      // app's own React 18 typings. Without it the navigation stack resolves
+      // the workspace's React 19 copy, whose ReactNode admits bigint, and its
+      // JSX is reported as incompatible with the app's own. See .pnpmfile.cjs.
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
+    },
+    "types": ["react", "node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "app.config.ts"]
+}

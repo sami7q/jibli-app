@@ -1,0 +1,180 @@
+import {
+  AppError,
+  ERROR_CODES,
+  adminPermissionsFor,
+  requiresReauthentication,
+  restaurantPermissionsFor,
+  type AdminPermission,
+  type PlatformRole,
+  type RestaurantPermission,
+  type RestaurantRole,
+} from '@jibli/contracts';
+
+/**
+ * The authenticated principal and the guards that act on it.
+ *
+ * Plan §63: "Every restaurant request resolves membership from authenticated
+ * session. Submitted `restaurant_id` is never accepted as proof of access."
+ * That rule is enforced here, not in individual route handlers.
+ */
+
+export interface Principal {
+  readonly userId: string;
+  readonly sessionId: string;
+  readonly platformRoles: readonly PlatformRole[];
+  /** restaurantId → roles held there. The only source of restaurant authority. */
+  readonly restaurantRoles: Readonly<Record<string, RestaurantRole[]>>;
+  readonly driverId: string | null;
+  readonly profileCompleted: boolean;
+  /** When the principal last passed an MFA challenge, if ever. */
+  readonly mfaAt: Date | null;
+}
+
+/** How recently MFA must have happened to authorise a sensitive action. */
+export const MFA_FRESHNESS_SECONDS = 15 * 60;
+
+export function isPlatformStaff(principal: Principal): boolean {
+  return principal.platformRoles.length > 0;
+}
+
+export function isDriver(principal: Principal): boolean {
+  return principal.driverId !== null;
+}
+
+/** Restaurants this principal is a member of. */
+export function memberRestaurantIds(principal: Principal): string[] {
+  return Object.keys(principal.restaurantRoles);
+}
+
+// ── Platform authorization ───────────────────────────────────────────────────
+
+export function hasAdminPermission(principal: Principal, permission: AdminPermission): boolean {
+  return adminPermissionsFor(principal.platformRoles).has(permission);
+}
+
+export function assertAdminPermission(principal: Principal, permission: AdminPermission): void {
+  if (!hasAdminPermission(principal, permission)) {
+    throw new AppError(ERROR_CODES.FORBIDDEN, {
+      details: { requiredPermission: permission },
+    });
+  }
+  // Sensitive actions additionally demand a fresh MFA challenge (plan §88).
+  if (requiresReauthentication(permission) && !hasFreshMfa(principal)) {
+    throw new AppError(ERROR_CODES.REAUTHENTICATION_REQUIRED, {
+      details: { requiredPermission: permission },
+    });
+  }
+}
+
+export function hasFreshMfa(principal: Principal, now: Date = new Date()): boolean {
+  if (!principal.mfaAt) return false;
+  const ageSeconds = (now.getTime() - principal.mfaAt.getTime()) / 1000;
+  return ageSeconds >= 0 && ageSeconds <= MFA_FRESHNESS_SECONDS;
+}
+
+// ── Restaurant (tenant) authorization ────────────────────────────────────────
+
+export function rolesInRestaurant(principal: Principal, restaurantId: string): RestaurantRole[] {
+  return principal.restaurantRoles[restaurantId] ?? [];
+}
+
+export function isMemberOf(principal: Principal, restaurantId: string): boolean {
+  return rolesInRestaurant(principal, restaurantId).length > 0;
+}
+
+export function hasRestaurantPermission(
+  principal: Principal,
+  restaurantId: string,
+  permission: RestaurantPermission,
+): boolean {
+  const roles = rolesInRestaurant(principal, restaurantId);
+  if (roles.length === 0) return false;
+  return restaurantPermissionsFor(roles).has(permission);
+}
+
+/**
+ * The tenant-isolation gate.
+ *
+ * A non-member gets TENANT_MISMATCH rather than FORBIDDEN so support can tell
+ * "wrong restaurant" apart from "right restaurant, insufficient role" — and so
+ * the security tests in plan §154 can assert on the distinction.
+ */
+export function assertRestaurantPermission(
+  principal: Principal,
+  restaurantId: string,
+  permission: RestaurantPermission,
+): void {
+  if (!isMemberOf(principal, restaurantId)) {
+    throw new AppError(ERROR_CODES.TENANT_MISMATCH, {
+      details: { restaurantId, requiredPermission: permission },
+    });
+  }
+  if (!hasRestaurantPermission(principal, restaurantId, permission)) {
+    throw new AppError(ERROR_CODES.FORBIDDEN, {
+      details: { restaurantId, requiredPermission: permission },
+    });
+  }
+}
+
+/**
+ * Resolve the restaurant a portal request operates on.
+ *
+ * The caller passes whatever the client claimed; this function only returns it
+ * if the session actually carries membership. When the client claims nothing and
+ * the user belongs to exactly one restaurant, that one is used.
+ */
+export function resolveRestaurantScope(principal: Principal, claimedId?: string | null): string {
+  const memberships = memberRestaurantIds(principal);
+  if (memberships.length === 0) {
+    throw new AppError(ERROR_CODES.FORBIDDEN, { details: { reason: 'NO_RESTAURANT_MEMBERSHIP' } });
+  }
+  if (!claimedId) {
+    if (memberships.length === 1) return memberships[0] as string;
+    throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+      details: { field: 'restaurantId', reason: 'AMBIGUOUS_RESTAURANT_SCOPE' },
+    });
+  }
+  if (!memberships.includes(claimedId)) {
+    throw new AppError(ERROR_CODES.TENANT_MISMATCH, { details: { restaurantId: claimedId } });
+  }
+  return claimedId;
+}
+
+// ── Driver authorization ─────────────────────────────────────────────────────
+
+export function assertDriver(principal: Principal): string {
+  if (!principal.driverId) {
+    throw new AppError(ERROR_CODES.FORBIDDEN, { details: { reason: 'NOT_A_DRIVER' } });
+  }
+  return principal.driverId;
+}
+
+/**
+ * A driver may only act on their own assignment. Plan §71: "A driver who was
+ * removed or reassigned cannot continue using a previously opened screen to
+ * mutate the task."
+ */
+export function assertOwnsAssignment(principal: Principal, assignmentDriverId: string): void {
+  const driverId = assertDriver(principal);
+  if (driverId !== assignmentDriverId) {
+    throw new AppError(ERROR_CODES.DELIVERY_NOT_ASSIGNED_TO_DRIVER, {
+      details: { driverId },
+    });
+  }
+}
+
+// ── Customer guards ──────────────────────────────────────────────────────────
+
+/** Ordering requires a completed profile (plan §11, §27). */
+export function assertProfileComplete(principal: Principal): void {
+  if (!principal.profileCompleted) {
+    throw new AppError(ERROR_CODES.PROFILE_INCOMPLETE);
+  }
+}
+
+/** A customer may only read their own resources. */
+export function assertOwnsResource(principal: Principal, ownerUserId: string): void {
+  if (principal.userId !== ownerUserId) {
+    throw new AppError(ERROR_CODES.FORBIDDEN, { details: { reason: 'NOT_RESOURCE_OWNER' } });
+  }
+}

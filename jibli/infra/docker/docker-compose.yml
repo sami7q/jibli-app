@@ -1,0 +1,64 @@
+# Local development infrastructure.
+# Every environment uses a separate database, Redis namespace and storage
+# namespace (plan §7). This file is for Local only.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: jibli-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jibli
+      POSTGRES_PASSWORD: jibli_local_dev
+      POSTGRES_DB: jibli
+      # Arabic collation matters for ORDER BY on Arabic names.
+      LANG: C.UTF-8
+    ports:
+      - '5432:5432'
+    volumes:
+      - jibli-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U jibli -d jibli']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: jibli-redis
+    restart: unless-stopped
+    # Durability for queues; cache keys are expendable but jobs are not.
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - jibli-redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: jibli-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: jibli_local
+      MINIO_ROOT_PASSWORD: jibli_local_dev_secret
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - jibli-miniodata:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  jibli-pgdata:
+  jibli-redisdata:
+  jibli-miniodata:

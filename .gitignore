@@ -1,0 +1,13 @@
+# Repository root. The monorepo has its own .gitignore in jibli/ which covers
+# node_modules, build output and env files for everything inside it.
+
+# OS and editor noise at the top level.
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Never commit a real environment file, anywhere.
+.env
+.env.local
+.env.*.local
+!.env.example

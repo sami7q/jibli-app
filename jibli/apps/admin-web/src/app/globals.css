@@ -1,0 +1,758 @@
+/**
+ * Admin Portal styles.
+ *
+ * The reference design gives Admin a dark navigation rail on the inline-end
+ * edge against a light workspace — visually distinct from the Restaurant
+ * Portal, so staff working in both never mistake which system they are in.
+ *
+ * Layout uses logical properties throughout; RTL is the native direction
+ * (plan §130).
+ */
+
+/* ── Shell ──────────────────────────────────────────────────────────────── */
+
+.shell {
+  display: grid;
+  grid-template-columns: 1fr 264px;
+  min-height: 100vh;
+}
+
+.sidebar {
+  grid-column: 2;
+  background: var(--jibli-ink-900);
+  color: var(--jibli-ink-300);
+  padding: var(--space-5) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) 0 var(--space-5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand__name {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--jibli-orange-500);
+  letter-spacing: -0.02em;
+}
+
+.brand__tagline {
+  font-size: var(--text-xs);
+  color: var(--jibli-ink-500);
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.nav-group__title {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--jibli-ink-500);
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  letter-spacing: 0.02em;
+}
+
+.nav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--jibli-ink-300);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  min-height: var(--tap-target-min);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav__link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.nav__link--active {
+  background: var(--jibli-orange-500);
+  color: #fff;
+}
+
+.nav__icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.nav__badge {
+  margin-inline-start: auto;
+  background: var(--jibli-danger-500);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  min-width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  padding: 0 var(--space-1);
+}
+
+.sidebar__support {
+  margin-top: auto;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sidebar__support strong {
+  display: block;
+  color: #fff;
+  font-size: var(--text-sm);
+}
+
+.sidebar__support span {
+  font-size: var(--text-xs);
+  color: var(--jibli-ink-400);
+}
+
+.main {
+  grid-column: 1;
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.topbar__title h1 {
+  font-size: var(--text-2xl);
+}
+
+.topbar__title p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.topbar__spacer {
+  flex: 1;
+}
+
+.topbar__control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--tap-target-min);
+  font-size: var(--text-sm);
+}
+
+.topbar__control input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  min-width: 220px;
+}
+
+/* ── Cards, stats, tables (shared shapes with the restaurant portal) ─────── */
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.stat {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.stat__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.stat__icon--orange {
+  background: var(--jibli-orange-50);
+  color: var(--jibli-orange-600);
+}
+.stat__icon--blue {
+  background: var(--jibli-info-50);
+  color: var(--jibli-info-500);
+}
+.stat__icon--green {
+  background: var(--jibli-success-50);
+  color: var(--jibli-success-700);
+}
+.stat__icon--amber {
+  background: var(--jibli-warning-50);
+  color: var(--jibli-warning-700);
+}
+
+.stat__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stat__value {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.stat__delta {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.stat__delta--up {
+  color: var(--jibli-success-700);
+}
+.stat__delta--down {
+  color: var(--jibli-danger-700);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  text-align: start;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  position: sticky;
+  top: 0;
+  background: var(--surface-card);
+  z-index: 1;
+}
+
+.table tbody tr:hover {
+  background: var(--jibli-ink-50);
+}
+
+/* ── Coverage matrix ────────────────────────────────────────────────────── */
+
+/*
+ * Capability cells read as text first — "مفعّل" / "معطّل" — with colour as
+ * reinforcement only, so state is never communicated by colour alone
+ * (plan §134).
+ */
+.capability {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.capability--on {
+  background: var(--jibli-success-50);
+  color: var(--jibli-success-700);
+}
+
+.capability--off {
+  background: var(--jibli-ink-100);
+  color: var(--text-muted);
+}
+
+/* A city enabled under a disabled parent: true in its own row, false in effect. */
+.capability--blocked {
+  background: var(--jibli-warning-50);
+  color: var(--jibli-warning-700);
+}
+
+/* ── Buttons and badges ─────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target-min);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--jibli-orange-500);
+  color: #fff;
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--jibli-orange-600);
+}
+
+.btn--ghost {
+  background: var(--jibli-orange-50);
+  color: var(--jibli-orange-700);
+}
+
+.btn--danger {
+  background: var(--jibli-danger-50);
+  color: var(--jibli-danger-700);
+}
+
+.btn--outline {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.btn--block {
+  width: 100%;
+  justify-content: center;
+}
+
+.btn--sm {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.badge--warning {
+  background: var(--jibli-warning-50);
+  color: var(--jibli-warning-700);
+}
+.badge--danger {
+  background: var(--jibli-danger-50);
+  color: var(--jibli-danger-700);
+}
+.badge--success {
+  background: var(--jibli-success-50);
+  color: var(--jibli-success-700);
+}
+.badge--neutral {
+  background: var(--jibli-ink-100);
+  color: var(--text-secondary);
+}
+
+/* ── Destructive confirmation dialog (plan §114) ────────────────────────── */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 24, 29, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: var(--z-modal);
+  padding: var(--space-4);
+}
+
+.dialog {
+  background: var(--surface-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  max-width: 520px;
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.dialog h2 {
+  font-size: var(--text-xl);
+}
+
+.dialog__impact {
+  background: var(--jibli-warning-50);
+  border: 1px solid #fedf89;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.dialog__impact dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+}
+
+.dialog__impact dt {
+  color: var(--text-secondary);
+}
+
+.dialog__impact dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dialog__actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-start;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.field textarea,
+.field input,
+.field select {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  min-height: var(--tap-target-min);
+  resize: vertical;
+}
+
+.field__hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.field__error {
+  font-size: var(--text-xs);
+  color: var(--jibli-danger-700);
+  font-weight: 600;
+}
+
+/* ── States ─────────────────────────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-10);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.alert-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.alert-bar--danger {
+  background: var(--jibli-danger-50);
+  color: var(--jibli-danger-700);
+  border: 1px solid #fecdca;
+}
+
+.alert-bar--warning {
+  background: var(--jibli-warning-50);
+  color: var(--jibli-warning-700);
+  border: 1px solid #fedf89;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--jibli-ink-100) 25%,
+    var(--jibli-ink-200) 50%,
+    var(--jibli-ink-100) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 1024px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    grid-column: 1;
+    grid-row: 1;
+    position: static;
+    height: auto;
+  }
+
+  .main {
+    grid-row: 2;
+    padding: var(--space-4);
+  }
+}
+
+/* ── Topbar search, bell, footer ────────────────────────────────────────── */
+
+.kbd {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-page);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.bell:hover {
+  color: var(--jibli-orange-600);
+}
+
+/* Decorative: the count is in the link's accessible name. */
+.bell__badge {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--jibli-danger-500);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  margin-block-start: auto;
+  border-block-start: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.footer nav {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.footer a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--jibli-orange-600);
+  text-decoration: underline;
+}
+
+/* The dashboard's panel grid: three across on a desktop, folding down as the
+   viewport narrows without any hard breakpoint to maintain. */
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.panels--wide {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+}
+
+/* Rank chip in a leaderboard. Numeric, so the order survives a screen reader
+   and a monochrome print — the colour is decoration on top. */
+.rank {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--jibli-ink-100);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sign-in ────────────────────────────────────────────────────────────── */
+
+.auth {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--surface-page);
+}
+
+.auth__card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth__brand {
+  display: flex;
+  justify-content: center;
+  margin-block-end: var(--space-2);
+}
+
+.auth__card h1 {
+  font-size: var(--text-xl);
+  text-align: center;
+  margin: 0;
+}
+
+.auth__subtitle {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.auth__note {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  margin: 0;
+}

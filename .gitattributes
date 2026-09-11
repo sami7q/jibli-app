@@ -1,0 +1,28 @@
+# Normalise line endings.
+#
+# This repository is written on Windows and built on Linux (Vercel, Render,
+# Docker). Without this, CRLF leaks into files where it breaks things: a shell
+# script with CRLF fails with `bad interpreter`, and a Dockerfile RUN line
+# carries a stray \r into the command.
+#
+# `text=auto` stores everything as LF in the repository and checks out the
+# platform's native ending for editing.
+* text=auto
+
+# Always LF, even on a Windows checkout — these are executed by Linux.
+*.sh            text eol=lf
+Dockerfile*     text eol=lf
+*.mjs           text eol=lf
+*.yaml          text eol=lf
+*.yml           text eol=lf
+
+# Never touched: a byte changed here is a corrupted file.
+*.png           binary
+*.jpg           binary
+*.woff2         binary
+*.p12           binary
+*.keystore      binary
+
+# Generated. Collapsing these keeps a diff readable and keeps GitHub's language
+# statistics pointed at the code rather than the lockfile.
+pnpm-lock.yaml  linguist-generated=true -diff

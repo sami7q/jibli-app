@@ -1,0 +1,41 @@
+{
+  // VS Code's git extension walks every folder looking for repositories. While
+  // pnpm installs, it renames staging directories like
+  // `pino_tmp_7308_2` into place and removes them; the scanner resolves a path
+  // that has already moved and logs `ENOENT ... realpath`. Harmless, but it
+  // floods the Git output channel and slows the scan.
+  //
+  // Detecting repositories only from open editors stops the walk entirely.
+  "git.autoRepositoryDetection": "openEditors",
+
+  // node_modules under pnpm is a deep symlink tree. Watching and indexing it
+  // costs far more than it gives, and is what the scanner was tripping over.
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/build/**": true,
+    "**/dist/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/build": true,
+    "**/dist": true,
+    "**/pnpm-lock.yaml": true
+  },
+  "files.exclude": {
+    "**/.turbo": true,
+    "**/*.tsbuildinfo": true
+  },
+
+  // The repo is Arabic-first and RTL; keep the editor honest about direction
+  // markers and stray bidi characters rather than hiding them.
+  "editor.unicodeHighlight.invisibleCharacters": true,
+
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+}

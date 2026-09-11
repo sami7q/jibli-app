@@ -1,0 +1,101 @@
+# syntax=docker/dockerfile:1.7
+# =============================================================================
+# API and worker image.
+#
+# One Dockerfile for both: they share every dependency and differ only in which
+# entry point is bundled, so SERVICE selects the target.
+#
+#   docker build -f infra/docker/Dockerfile.service --build-arg SERVICE=api  -t jibli-api .
+#   docker build -f infra/docker/Dockerfile.service --build-arg SERVICE=worker -t jibli-worker .
+#
+# The build bundles the service into a single file (scripts/bundle.mjs), so the
+# runtime stage carries no workspace node_modules at all — only the one native
+# addon esbuild cannot inline.
+# =============================================================================
+
+ARG NODE_VERSION=20.18.1
+
+# ── Dependencies ─────────────────────────────────────────────────────────────
+FROM node:${NODE_VERSION}-slim AS deps
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+RUN corepack enable
+
+WORKDIR /repo
+
+# Only the manifests first: this layer is cached until a dependency actually
+# changes, so an ordinary source edit does not reinstall the world.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/api/package.json apps/api/
+COPY apps/worker/package.json apps/worker/
+COPY apps/admin-web/package.json apps/admin-web/
+COPY apps/restaurant-web/package.json apps/restaurant-web/
+COPY packages/auth/package.json packages/auth/
+COPY packages/config/package.json packages/config/
+COPY packages/contracts/package.json packages/contracts/
+COPY packages/db/package.json packages/db/
+COPY packages/domain/package.json packages/domain/
+COPY packages/geography/package.json packages/geography/
+COPY packages/logger/package.json packages/logger/
+COPY packages/money/package.json packages/money/
+COPY packages/notifications/package.json packages/notifications/
+COPY packages/test-utils/package.json packages/test-utils/
+COPY packages/ui-web/package.json packages/ui-web/
+COPY packages/validation/package.json packages/validation/
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
+
+# ── Build ────────────────────────────────────────────────────────────────────
+FROM deps AS build
+ARG SERVICE
+WORKDIR /repo
+COPY . .
+
+# Type errors must fail the image, not surface at runtime.
+RUN pnpm --filter "@jibli/${SERVICE}" exec tsc --noEmit
+RUN node scripts/bundle.mjs "${SERVICE}"
+
+# Resolve the one external dependency into a flat, copyable tree. pnpm's
+# isolated linker uses symlinks that do not survive a COPY between stages.
+RUN mkdir -p /runtime-deps \
+ && cd /runtime-deps \
+ && npm init -y >/dev/null 2>&1 \
+ && npm install --omit=dev --no-audit --no-fund \
+      "@node-rs/argon2@$(node -p "require('/repo/packages/auth/package.json').dependencies['@node-rs/argon2']")"
+
+# ── Runtime ──────────────────────────────────────────────────────────────────
+FROM node:${NODE_VERSION}-slim AS runtime
+ARG SERVICE
+ENV NODE_ENV=production
+ENV SERVICE_NAME=jibli-${SERVICE}
+
+# tini reaps zombies and forwards SIGTERM, so a rolling deploy actually reaches
+# the graceful-shutdown handler instead of being killed after the grace period.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tini ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Never root: a container escape should not start with UID 0.
+COPY --from=build --chown=node:node /runtime-deps/node_modules ./node_modules
+COPY --from=build --chown=node:node /repo/apps/${SERVICE}/build ./build
+
+# Migrations travel with the image so a deploy can apply them without a second
+# artifact that could be a different version from the running code.
+COPY --from=build --chown=node:node /repo/packages/db/migrations ./migrations
+
+USER node
+
+EXPOSE 4000
+
+# The API serves a liveness probe that touches no dependency; the worker has no
+# HTTP surface, so its health is judged by the process being alive.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "if (process.env.SERVICE_NAME !== 'jibli-api') process.exit(0); \
+fetch('http://127.0.0.1:' + (process.env.API_PORT || 4000) + '/health/live') \
+  .then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "build/index.js"]

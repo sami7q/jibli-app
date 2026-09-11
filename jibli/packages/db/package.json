@@ -1,0 +1,38 @@
+{
+  "name": "@jibli/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./migrate": "./src/migrate.ts",
+    "./seed": "./src/seed/geography.ts"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate.ts",
+    "seed": "tsx src/seed/run.ts",
+    "reset": "tsx src/scripts/reset.ts",
+    "studio": "drizzle-kit studio",
+    "bootstrap-admin": "tsx src/scripts/bootstrap-admin.ts"
+  },
+  "dependencies": {
+    "@jibli/auth": "workspace:*",
+    "@jibli/config": "workspace:*",
+    "@jibli/contracts": "workspace:*",
+    "@jibli/geography": "workspace:*",
+    "@jibli/logger": "workspace:*",
+    "@jibli/money": "workspace:*",
+    "@jibli/validation": "workspace:*",
+    "drizzle-orm": "^0.38.2",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.30.1"
+  }
+}
