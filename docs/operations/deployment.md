@@ -151,6 +151,7 @@ The bundler exists for that reason.
 ### Containers
 
 ```bash
+# Run from the repository root — the Dockerfile copies workspace manifests.
 docker build -f infra/docker/Dockerfile.service --build-arg SERVICE=api    -t jibli-api .
 docker build -f infra/docker/Dockerfile.service --build-arg SERVICE=worker -t jibli-worker .
 ```
@@ -296,13 +297,17 @@ Create **two** projects pointing at the same repository.
 
 | Setting | Admin | Restaurant |
 |---|---|---|
-| Root Directory | `jibli/apps/admin-web` | `jibli/apps/restaurant-web` |
+| Root Directory | `apps/admin-web` | `apps/restaurant-web` |
 | Framework | Next.js (auto) | Next.js (auto) |
 
-`git init` ran at the folder *above* the monorepo, so the Root Directory
-carries the `jibli/` prefix. If you re-initialise inside `jibli/` instead, drop
-it. The `installCommand` in each `vercel.json` does `cd ../..`, which reaches
-the pnpm workspace root either way.
+**Root Directory is not optional.** Leaving it empty makes Vercel build the
+repository root, find no framework there, and serve `404: NOT_FOUND` — the
+deployment succeeds and the site is empty. That is the single most common way
+this goes wrong.
+
+Vercel also needs *Settings → Build → Include source files outside of the Root
+Directory* switched **on**, because `installCommand` runs `cd ../..` to install
+from the pnpm workspace root.
 
 Environment variables — **all three, on both projects**:
 
