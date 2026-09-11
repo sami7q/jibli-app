@@ -1,9 +1,8 @@
-import { randomBytes } from 'node:crypto';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
-import { assertAdminPermission, hashPassword, checkPasswordPolicy } from '@jibli/auth';
+import { assertAdminPermission, generatePortalPassword, hashPassword } from '@jibli/auth';
 import {
   reasonSchema,
   suggestUsername,
@@ -24,30 +23,15 @@ import { revokeSessionChain } from '../../services/session-service.js';
 /**
  * Restaurant portal credentials, issued by Jibli staff (plan §69, §85, §1854).
  *
- * A restaurant cannot sign itself up for portal access: the account is created
- * here, by an operator who has already approved the restaurant, and handed over
- * out of band. That is why the password is generated rather than chosen — an
- * operator inventing passwords for fifty restaurants invents fifty variations
- * of the same one.
+ * A restaurant cannot sign itself up: the account is created here by an
+ * operator who has already approved it, and handed over out of band. The
+ * password is generated rather than chosen because an operator inventing
+ * passwords for fifty restaurants invents fifty variants of one.
  *
- * The generated password is shown **once**, at creation. It is stored only as
- * an Argon2id hash and is never retrievable afterwards; a lost password is
- * reset, not recovered. The account is flagged `must_change_password`, so the
- * owner has to replace it before doing anything — until they do, the credential
- * is known to whoever read it out.
+ * It is shown once, stored only as an Argon2id hash, and flagged
+ * must_change_password — until the owner replaces it, whoever read it out
+ * still knows it.
  */
-
-/**
- * A generated first password.
- *
- * base64url of 15 bytes: 120 bits of entropy, no characters that are ambiguous
- * when read aloud over a phone, and comfortably past the policy minimum without
- * the operator having to think about it.
- */
-function generatePassword(): string {
-  return `Jibli-${randomBytes(15).toString('base64url')}`;
-}
-
 export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppContext): void {
   /** Who can sign in to this restaurant's portal. */
   app.get(
@@ -171,15 +155,9 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
         })
         .parse(request.body);
 
-      const password = generatePassword();
-      // Belt and braces: a generated password must still satisfy the policy the
-      // owner will be held to when they replace it.
-      const policy = checkPasswordPolicy(password, { username: body.username });
-      if (!policy.ok) {
-        throw new AppError(ERROR_CODES.INTERNAL_ERROR, {
-          details: { reason: 'GENERATED_PASSWORD_REJECTED', problems: policy.problems },
-        });
-      }
+      // The generator validates against the same policy before returning, so
+      // there is nothing left to re-check here.
+      const password = generatePortalPassword({ username: body.username });
 
       const passwordHash = await hashPassword(password);
       const userId = uuidv7();
@@ -282,7 +260,7 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
       const { userId } = z.object({ userId: uuidSchema }).parse(request.params);
       const body = z.object({ reason: reasonSchema }).parse(request.body);
 
-      const password = generatePassword();
+      const password = generatePortalPassword();
       const passwordHash = await hashPassword(password);
 
       await ctx.db.transaction(async (tx) => {

@@ -1,25 +1,31 @@
-import { randomBytes } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { ADMIN_PASSWORD_MIN_LENGTH, checkPasswordPolicy, hashPassword } from '@jibli/auth';
+import {
+  ADMIN_PASSWORD_MIN_LENGTH,
+  checkPasswordPolicy,
+  generatePortalPassword,
+  hashPassword,
+} from '@jibli/auth';
 import { normalizeUsername, toE164Iraq } from '@jibli/validation';
 import { createDatabase } from '../client.js';
 import { shouldUseSsl } from '../ssl.js';
 import { users, userPlatformRoles } from '../schema/index.js';
 import { uuidv7 } from '../ids.js';
 
+
 /**
  * Create the first Super Admin.
  *
- * A freshly migrated database has geography and configuration but no human in
- * it, so nobody can sign into the Admin Portal — and roles can only be granted
- * from inside that portal. This breaks that circle exactly once.
+ * A freshly migrated database has geography and configuration but no humans in
+ * it, so nobody can sign into the Admin Portal — and platform roles can only be
+ * granted from inside that portal. This breaks that circle exactly once.
  *
  * Usage:
- *   pnpm --filter @jibli/db bootstrap-admin -- --phone 07701234567 --name "اسم المدير"
+ *   pnpm --filter @jibli/db bootstrap-admin --  *     --username sami --name "اسم المدير" [--phone 07701234567]
  *
- * The password is generated and printed once. It is never written to a log
- * file, never stored in plaintext, and the operator is expected to change it
- * and enrol MFA immediately (plan §88).
+ * The password is generated and printed once. It is never stored in plaintext,
+ * and the account is flagged must_change_password: a bootstrap password is read
+ * off a terminal and lands in shell history, so it is treated as exposed from
+ * the moment it exists.
  */
 
 interface Args {
@@ -56,17 +62,6 @@ function parseArgs(argv: string[]): Args {
   };
 }
 
-/**
- * A generated passphrase.
- *
- * Base64url of 18 random bytes: 144 bits of entropy, no ambiguous characters to
- * mistype, and long enough to satisfy the portal password policy without the
- * operator having to think about it.
- */
-function generatePassword(): string {
-  return `Jibli-${randomBytes(18).toString('base64url')}`;
-}
-
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
@@ -97,7 +92,9 @@ async function main(): Promise<void> {
     }
   }
 
-  const password = args.password ?? generatePassword();
+  const password =
+    args.password ??
+    generatePortalPassword({ minLength: ADMIN_PASSWORD_MIN_LENGTH, username: args.username });
   // Platform staff are held to the longer minimum (plan §1853).
   const policy = checkPasswordPolicy(password, {
     minLength: ADMIN_PASSWORD_MIN_LENGTH,
@@ -138,7 +135,13 @@ async function main(): Promise<void> {
           .set({
             passwordHash,
             fullName: existing.fullName ?? args.name,
+            username: args.username,
             status: 'ACTIVE',
+            mustChangePassword: true,
+            passwordChangedAt: new Date(),
+            // A reset is also the way out of a lockout.
+            failedLoginCount: 0,
+            lockedUntil: null,
             updatedAt: new Date(),
           })
           .where(eq(users.id, userId));
@@ -150,6 +153,12 @@ async function main(): Promise<void> {
           fullName: args.name,
           passwordHash,
           passwordChangedAt: new Date(),
+          /*
+           * A bootstrap password is read off a terminal, lands in shell
+           * history, and is usually pasted somewhere to be handed over. Treat
+           * it as already exposed and require replacement at first sign-in.
+           */
+          mustChangePassword: true,
           // Staff are trusted at creation: there is no OTP step for a portal
           // account, and the profile-completion flow is a customer concern.
           ...(phoneE164 ? { phoneVerifiedAt: new Date() } : {}),
@@ -200,9 +209,9 @@ async function main(): Promise<void> {
     }
 
     console.log('');
-    console.log('  Next: sign in to the Admin Portal, then enrol MFA from');
-    console.log('  Settings → Two-factor authentication. Plan §88 requires it');
-    console.log('  for Super Admin before any finance action.');
+    console.log('  Next, in order:');
+    console.log('    1. Sign in — you will be required to change this password');
+    console.log('    2. Enrol MFA. Plan §88 blocks every finance action until you do');
     console.log('');
   } finally {
     await client.end({ timeout: 5 });
