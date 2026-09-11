@@ -47,7 +47,7 @@ const BACKOFF_SECONDS = 15;
 function LoginForm() {
   const router = useRouter();
 
-  const [phone, setPhone] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
   const [stage, setStage] = useState<'CREDENTIALS' | 'MFA'>('CREDENTIALS');
@@ -59,10 +59,10 @@ function LoginForm() {
   const [lockedFor, setLockedFor] = useState(0);
 
   const mfaInput = useRef<HTMLInputElement>(null);
-  const phoneInput = useRef<HTMLInputElement>(null);
+  const usernameInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    phoneInput.current?.focus();
+    usernameInput.current?.focus();
   }, []);
 
   // Move focus to the code field the moment the second stage appears, so a
@@ -97,11 +97,13 @@ function LoginForm() {
     try {
       const response = await apiRequest<{
         mfa_required: boolean;
+        must_change_password?: boolean;
+        mfa_enrolment_required?: boolean;
         portal?: 'ADMIN' | 'RESTAURANT';
       }>('/api/v1/auth/login', {
         method: 'POST',
         body: {
-          phone: phone.trim(),
+          username: username.trim(),
           password,
           ...(stage === 'MFA' ? { mfa_code: mfaCode.trim() } : {}),
         },
@@ -134,6 +136,17 @@ function LoginForm() {
         new URLSearchParams(window.location.search).get('next'),
       );
 
+      /*
+       * A password someone else issued is a password someone else knows, so
+       * that has to be replaced before anything else — including before the
+       * page they were originally heading for.
+       */
+      if (response.must_change_password) {
+        router.replace(`/change-password?next=${encodeURIComponent(destination)}`);
+        return;
+      }
+
+
       // Replace, not push: the login page must not sit in the back stack of an
       // authenticated session.
       router.replace(destination);
@@ -160,7 +173,7 @@ function LoginForm() {
   const disabled =
     submitting ||
     lockedFor > 0 ||
-    (stage === 'CREDENTIALS' ? !phone.trim() || !password : mfaCode.trim().length < 6);
+    (stage === 'CREDENTIALS' ? !username.trim() || !password : mfaCode.trim().length < 6);
 
   return (
     <LoginFrame>
@@ -175,20 +188,21 @@ function LoginForm() {
         {stage === 'CREDENTIALS' ? (
           <>
             <div className="field">
-              <label htmlFor="login-phone">رقم الهاتف</label>
+              <label htmlFor="login-username">اسم المستخدم</label>
               <input
-                id="login-phone"
-                ref={phoneInput}
-                type="tel"
+                id="login-username"
+                ref={usernameInput}
+                type="text"
                 dir="ltr"
-                inputMode="tel"
                 autoComplete="username"
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="07701234567"
+                value={username}
+                // Lowercased as typed: the server compares case-insensitively,
+                // and showing the normalised form avoids "but I typed it right".
+                onChange={(event) => setUsername(event.target.value.toLowerCase().trim())}
+                placeholder="mataam-baghdad"
                 required
               />
             </div>

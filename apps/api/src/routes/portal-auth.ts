@@ -2,11 +2,30 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
-import { verifyPassword } from '@jibli/auth';
-import { toE164Iraq } from '@jibli/validation';
-import { restaurantMembers, users, userPlatformRoles } from '@jibli/db';
+import {
+  ADMIN_PASSWORD_MIN_LENGTH,
+  checkPasswordPolicy,
+  hashPassword,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PROBLEM_MESSAGES_AR,
+  verifyPassword,
+} from '@jibli/auth';
+import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
+import { loginIdentifierSchema } from '@jibli/validation';
+import {
+  loginAttempts,
+  restaurantMembers,
+  users,
+  userPlatformRoles,
+  uuidv7,
+} from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../lib/context.js';
-import { issueSession, loadCapabilities } from '../services/session-service.js';
+import {
+  issueSession,
+  loadCapabilities,
+  revokeSessionChain,
+} from '../services/session-service.js';
+import { requirePrincipal } from '../plugins/auth.js';
 import { verifyTotpForUser } from './mfa.js';
 
 /**
@@ -24,11 +43,25 @@ import { verifyTotpForUser } from './mfa.js';
  */
 
 const loginSchema = z.object({
-  phone: z.string().min(6).max(24),
+  username: loginIdentifierSchema,
   password: z.string().min(1).max(256),
   /** Present on the second leg, once MFA has been challenged. */
   mfa_code: z.string().min(6).max(10).optional(),
 });
+
+/**
+ * Per-account lockout.
+ *
+ * The Redis limiter caps attempts per IP per minute, which stops a flood but
+ * not a patient attacker rotating addresses against one known username. This
+ * counter lives on the account row and survives a restart.
+ *
+ * The window is deliberately short: the goal is to make an online guessing
+ * attack uneconomic, not to give anyone a way to lock a competitor out of
+ * their own portal for a day by typing the wrong password six times.
+ */
+const MAX_FAILED_LOGINS = 6;
+const LOCKOUT_MINUTES = 15;
 
 /**
  * Set the refresh cookie.
@@ -68,60 +101,109 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
     },
     async (request, reply) => {
       const body = loginSchema.parse(request.body);
+      const ip = clientIp(request);
+      const agent = userAgent(request);
 
-      /*
-       * Every failure below returns the same error and takes a comparable
-       * amount of time. Distinguishing "no such user" from "wrong password"
-       * turns this endpoint into a way to enumerate which phone numbers belong
-       * to staff (plan §78).
-       */
-      const invalid = () =>
-        new AppError(ERROR_CODES.INVALID_CREDENTIALS, { details: { reason: 'INVALID_LOGIN' } });
-
-      let phoneE164: string;
-      try {
-        phoneE164 = toE164Iraq(body.phone);
-      } catch {
-        // A malformed number is still just "bad credentials" to the caller.
-        throw invalid();
-      }
+      /** Record the attempt and build the uniform error; the caller throws it. */
+      const reject = async (reason: string, userId: string | null = null): Promise<AppError> => {
+        await recordAttempt(ctx, {
+          userId,
+          identifier: body.username,
+          succeeded: false,
+          failureReason: reason,
+          ip,
+          userAgent: agent,
+        });
+        return new AppError(ERROR_CODES.INVALID_CREDENTIALS, {
+          details: { reason: 'INVALID_LOGIN' },
+        });
+      };
 
       const [user] = await ctx.db
         .select({
           id: users.id,
+          username: users.username,
           passwordHash: users.passwordHash,
           status: users.status,
           mfaEnabledAt: users.mfaEnabledAt,
+          mustChangePassword: users.mustChangePassword,
+          failedLoginCount: users.failedLoginCount,
+          lockedUntil: users.lockedUntil,
         })
         .from(users)
-        .where(and(eq(users.phoneE164, phoneE164), isNull(users.deletedAt)))
+        // lower() matches the unique index, so a username typed in any case
+        // resolves to the one account that owns it.
+        .where(and(sql`lower(${users.username}) = ${body.username}`, isNull(users.deletedAt)))
         .limit(1);
 
       /*
-       * Verify against a dummy hash when the user does not exist or has no
-       * password. Returning early would make "unknown number" measurably faster
-       * than "wrong password", which is the timing oracle the uniform error
-       * above is meant to close.
+       * A locked account is refused before the password is even checked, so a
+       * lockout cannot be used as an oracle for whether the password was right.
+       */
+      if (user?.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+        await recordAttempt(ctx, {
+          userId: user.id,
+          identifier: body.username,
+          succeeded: false,
+          failureReason: 'LOCKED',
+          ip,
+          userAgent: agent,
+        });
+        throw new AppError(ERROR_CODES.RATE_LIMITED, {
+          details: {
+            reason: 'ACCOUNT_LOCKED',
+            retryAfterSeconds: Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000),
+          },
+        });
+      }
+
+      /*
+       * Verify against a dummy hash when the account does not exist or has no
+       * password. Returning early would make "unknown username" measurably
+       * faster than "wrong password" — a timing oracle that undoes the uniform
+       * error message (plan §78).
        */
       const digest = user?.passwordHash ?? DUMMY_ARGON2_HASH;
       const passwordOk = await verifyPassword(body.password, digest);
 
-      if (!user || !user.passwordHash || !passwordOk) throw invalid();
+      if (!user || !user.passwordHash) throw await reject('UNKNOWN_USER');
+
+      if (!passwordOk) {
+        const failures = user.failedLoginCount + 1;
+        const locked = failures >= MAX_FAILED_LOGINS;
+
+        await ctx.db
+          .update(users)
+          .set({
+            failedLoginCount: failures,
+            lockedUntil: locked ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000) : null,
+          })
+          .where(eq(users.id, user.id));
+
+        throw await reject('INVALID_PASSWORD', user.id);
+      }
 
       if (user.status !== 'ACTIVE') {
-        throw new AppError(ERROR_CODES.ACCOUNT_SUSPENDED, {
-          details: { status: user.status },
+        await recordAttempt(ctx, {
+          userId: user.id,
+          identifier: body.username,
+          succeeded: false,
+          failureReason: 'ACCOUNT_NOT_ACTIVE',
+          ip,
+          userAgent: agent,
         });
+        throw new AppError(ERROR_CODES.ACCOUNT_SUSPENDED, { details: { status: user.status } });
       }
 
       // A portal login must land somewhere. Someone with neither a platform
       // role nor a restaurant membership has no portal to enter.
       const capabilities = await loadCapabilities(ctx, user.id);
-      const hasPortalAccess =
-        capabilities.platformRoles.length > 0 ||
-        Object.keys(capabilities.restaurantRoles).length > 0;
+      const isPlatform = capabilities.platformRoles.length > 0;
+      const restaurantIds = Object.keys(capabilities.restaurantRoles);
 
-      if (!hasPortalAccess) throw invalid();
+      if (!isPlatform && restaurantIds.length === 0) {
+        throw await reject('NO_PORTAL_ACCESS', user.id);
+      }
 
       const mfaEnabled = user.mfaEnabledAt !== null;
 
@@ -129,8 +211,8 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         if (!body.mfa_code) {
           /*
            * The password was correct; say so, and ask for the second factor.
-           * This is not an enumeration leak: reaching here already required the
-           * right password for this account.
+           * Not an enumeration leak: reaching here already required the right
+           * password for this account.
            */
           return reply.status(200).send(
             success(
@@ -140,28 +222,52 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
           );
         }
 
-        // Throws on a wrong, reused or replayed code.
-        await verifyTotpForUser(ctx, {
-          userId: user.id,
-          code: body.mfa_code,
-          ip: clientIp(request),
-          userAgent: userAgent(request),
-        });
+        try {
+          // Throws on a wrong, reused or replayed code.
+          await verifyTotpForUser(ctx, {
+            userId: user.id,
+            code: body.mfa_code,
+            ip,
+            userAgent: agent,
+          });
+        } catch (error) {
+          await recordAttempt(ctx, {
+            userId: user.id,
+            identifier: body.username,
+            succeeded: false,
+            failureReason: 'MFA_FAILED',
+            ip,
+            userAgent: agent,
+          });
+          throw error;
+        }
       }
 
       const session = await issueSession(ctx, {
         userId: user.id,
-        userAgent: userAgent(request),
-        ip: clientIp(request),
+        userAgent: agent,
+        ip,
         // Only a completed challenge counts. A user without MFA gets a session
         // with no mfaAt, so every step-up-guarded action still refuses them.
         mfaVerified: mfaEnabled,
       });
 
+      // A successful sign-in clears the lockout counter. Leaving it would mean
+      // five old typos plus one new one locks an account that just proved it
+      // knows the password.
       await ctx.db
         .update(users)
-        .set({ lastLoginAt: new Date() })
+        .set({ lastLoginAt: new Date(), failedLoginCount: 0, lockedUntil: null })
         .where(eq(users.id, user.id));
+
+      await recordAttempt(ctx, {
+        userId: user.id,
+        identifier: body.username,
+        succeeded: true,
+        failureReason: null,
+        ip,
+        userAgent: agent,
+      });
 
       setRefreshCookie(reply, ctx, session.refreshToken);
 
@@ -173,13 +279,27 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
             mfa_required: false,
             user: {
               id: user.id,
+              username: user.username,
               platform_roles: capabilities.platformRoles,
-              restaurant_ids: Object.keys(capabilities.restaurantRoles),
+              restaurant_ids: restaurantIds,
               mfa_enabled: mfaEnabled,
             },
+            /*
+             * A password someone else chose is a password someone else knows.
+             * Staff issue the first one and read it out; until it is replaced
+             * the account is effectively shared, so the portal routes straight
+             * to the change form.
+             */
+            must_change_password: user.mustChangePassword,
+            /*
+             * Platform roles reach money and roles, so MFA is not optional
+             * (plan §88, §1853). The portal sends them to enrolment before
+             * anything else when this is true.
+             */
+            mfa_enrolment_required: isPlatform && !mfaEnabled,
             /* Where the browser should go. A user with both kinds of access is
              * sent to Admin, which is the more privileged surface. */
-            portal: capabilities.platformRoles.length > 0 ? 'ADMIN' : 'RESTAURANT',
+            portal: isPlatform ? 'ADMIN' : 'RESTAURANT',
           },
           { request_id: request.requestId },
         ),
@@ -248,14 +368,143 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
   });
 
   /**
+   * Change your own password.
+   *
+   * Requires the current one even though the session already proves identity:
+   * an unattended open session should not be enough to lock the real owner out
+   * of their own account.
+   *
+   * Every other session is revoked afterwards. If the reason for changing was
+   * that someone else knew the password, leaving their session alive achieves
+   * nothing.
+   */
+  app.post(
+    '/api/v1/auth/password',
+    {
+      preHandler: app.authenticate,
+      config: { rateLimit: { max: 5, timeWindow: '10 minutes' } },
+    },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      const body = z
+        .object({
+          current_password: z.string().min(1).max(256),
+          new_password: z.string().min(1).max(256),
+        })
+        .parse(request.body);
+
+      const [user] = await ctx.db
+        .select({
+          id: users.id,
+          username: users.username,
+          passwordHash: users.passwordHash,
+        })
+        .from(users)
+        .where(and(eq(users.id, principal.userId), isNull(users.deletedAt)))
+        .limit(1);
+
+      if (!user?.passwordHash) {
+        throw new AppError(ERROR_CODES.FORBIDDEN, { details: { reason: 'NO_PASSWORD_SET' } });
+      }
+
+      if (!(await verifyPassword(body.current_password, user.passwordHash))) {
+        throw new AppError(ERROR_CODES.INVALID_CREDENTIALS, {
+          details: { reason: 'CURRENT_PASSWORD_WRONG' },
+        });
+      }
+
+      /*
+       * Platform staff are held to a longer minimum: their credential reaches
+       * settlements, roles and every restaurant (plan §1853).
+       */
+      const isPlatformStaff = principal.platformRoles.length > 0;
+      const policy = checkPasswordPolicy(body.new_password, {
+        minLength: isPlatformStaff ? ADMIN_PASSWORD_MIN_LENGTH : PASSWORD_MIN_LENGTH,
+        ...(user.username ? { username: user.username } : {}),
+      });
+
+      if (!policy.ok) {
+        throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+          details: {
+            field: 'new_password',
+            problems: policy.problems,
+            messages_ar: policy.problems.map(
+              (problem) => PASSWORD_PROBLEM_MESSAGES_AR[problem] ?? problem,
+            ),
+          },
+        });
+      }
+
+      // Reusing the password defeats the point of changing it.
+      if (await verifyPassword(body.new_password, user.passwordHash)) {
+        throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+          details: { field: 'new_password', problems: ['PASSWORD_UNCHANGED'] },
+        });
+      }
+
+      await ctx.db
+        .update(users)
+        .set({
+          passwordHash: await hashPassword(body.new_password),
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+          failedLoginCount: 0,
+          lockedUntil: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+
+      await writeAudit(ctx.db, {
+        actorUserId: user.id,
+        action: AUDIT_ACTIONS.PASSWORD_CHANGE,
+        entityType: 'user',
+        entityId: user.id,
+        before: null,
+        after: { self: true },
+        reason: null,
+        ip: clientIp(request),
+        userAgent: userAgent(request),
+        requestId: request.requestId,
+      });
+
+      /*
+       * Revoke everything, then issue a fresh session for this browser. The
+       * alternative — keeping the current session alive — would mean the
+       * session that existed under the old password survives the change.
+       */
+      await revokeSessionChain(ctx, user.id, 'PASSWORD_CHANGED');
+
+      const session = await issueSession(ctx, {
+        userId: user.id,
+        userAgent: userAgent(request),
+        ip: clientIp(request),
+        mfaVerified: principal.mfaAt !== null,
+      });
+
+      setRefreshCookie(reply, ctx, session.refreshToken);
+
+      return reply.send(
+        success(
+          {
+            changed: true,
+            access_token: session.accessToken,
+            expires_in_seconds: session.expiresInSeconds,
+            note_ar: 'تم تغيير كلمة المرور، وأُنهيت كل الجلسات الأخرى.',
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
+  /**
    * Who is signed in, for the portal shell.
    *
    * Returns the display name and the memberships the shell needs, so the portal
    * does not have to call two endpoints before it can render a greeting.
    */
   app.get('/api/v1/auth/portal/me', { preHandler: app.authenticate }, async (request, reply) => {
-    const principal = request.principal;
-    if (!principal) throw new AppError(ERROR_CODES.UNAUTHENTICATED);
+    const principal = requirePrincipal(request);
 
     const capabilities = await loadCapabilities(ctx, principal.userId);
 
@@ -290,6 +539,38 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
       ),
     );
   });
+}
+
+/**
+ * Write one row to the sign-in log.
+ *
+ * Never throws: telemetry must not be able to turn a successful login into a
+ * 500, nor a failed one into a different error than the uniform message.
+ */
+async function recordAttempt(
+  ctx: AppContext,
+  params: {
+    userId: string | null;
+    identifier: string;
+    succeeded: boolean;
+    failureReason: string | null;
+    ip: string | null;
+    userAgent: string | null;
+  },
+): Promise<void> {
+  try {
+    await ctx.db.insert(loginAttempts).values({
+      id: uuidv7(),
+      userId: params.userId,
+      identifier: params.identifier,
+      succeeded: params.succeeded,
+      failureReason: params.failureReason,
+      ip: params.ip,
+      userAgent: params.userAgent,
+    });
+  } catch (error) {
+    ctx.logger.warn({ event: 'login_attempt.record_failed', err: error }, 'could not log attempt');
+  }
 }
 
 /**

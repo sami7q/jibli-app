@@ -367,6 +367,20 @@ export interface AdminCoupon {
   state: string;
 }
 
+export interface PortalUser {
+  member_id: string;
+  user_id: string;
+  username: string | null;
+  full_name: string | null;
+  role: string;
+  is_active: boolean;
+  must_change_password: boolean;
+  mfa_enabled: boolean;
+  locked_until: string | null;
+  last_login_at: string | null;
+  created_at: string;
+}
+
 export const admin = {
   /** Everything the home screen shows, in one round trip (plan §130). */
   overview: (token: string) =>
@@ -387,6 +401,43 @@ export const admin = {
 
   setCouponActive: (token: string, id: string, isActive: boolean, reason: string) =>
     apiRequest<{ updated: boolean }>(`/api/v1/admin/coupons/${id}`, {
+      accessToken: token,
+      method: 'PATCH',
+      body: { is_active: isActive, reason },
+    }),
+
+  // ── Restaurant portal credentials (plan §69, §1854) ─────────────────────
+  portalUsers: (token: string, restaurantId: string) =>
+    apiRequest<PortalUser[]>(
+      `/api/v1/admin/restaurants/${restaurantId}/portal-users`,
+      { accessToken: token },
+    ),
+
+  suggestUsername: (token: string, restaurantId: string) =>
+    apiRequest<{ username: string }>(
+      `/api/v1/admin/restaurants/${restaurantId}/portal-users/suggest`,
+      { accessToken: token },
+    ),
+
+  /** The password in the response is shown once and never retrievable again. */
+  createPortalUser: (
+    token: string,
+    restaurantId: string,
+    body: { username: string; full_name: string; role?: string },
+  ) =>
+    apiRequest<{ user_id: string; username: string; password: string; note_ar: string }>(
+      `/api/v1/admin/restaurants/${restaurantId}/portal-users`,
+      { accessToken: token, method: 'POST', body },
+    ),
+
+  resetPortalPassword: (token: string, userId: string, reason: string) =>
+    apiRequest<{ password: string; note_ar: string }>(
+      `/api/v1/admin/portal-users/${userId}/reset-password`,
+      { accessToken: token, method: 'POST', body: { reason } },
+    ),
+
+  setPortalUserActive: (token: string, userId: string, isActive: boolean, reason: string) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/admin/portal-users/${userId}`, {
       accessToken: token,
       method: 'PATCH',
       body: { is_active: isActive, reason },

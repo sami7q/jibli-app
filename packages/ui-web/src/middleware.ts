@@ -22,15 +22,25 @@ import { NextResponse, type NextRequest } from 'next/server';
 export interface PortalMiddlewareOptions {
   /** Cookie the API sets on sign-in. Must match SESSION_COOKIE_NAME. */
   readonly cookieName?: string;
-  /** Paths reachable while signed out. */
+  /**
+   * Reachable without a session.
+   *
+   * Distinct from `signedOutOnlyPaths`: /change-password is reachable while
+   * signed in — it is the *only* screen a user forced to replace an issued
+   * password can use — whereas /login must push a signed-in visitor away.
+   */
   readonly publicPaths?: readonly string[];
+  /** Redirected inward when a session already exists. Normally just /login. */
+  readonly signedOutOnlyPaths?: readonly string[];
 }
 
-const DEFAULT_PUBLIC_PATHS = ['/login'] as const;
+const DEFAULT_PUBLIC_PATHS = ['/login', '/change-password'] as const;
+const DEFAULT_SIGNED_OUT_ONLY = ['/login'] as const;
 
 export function createPortalMiddleware(options: PortalMiddlewareOptions = {}) {
   const cookieName = options.cookieName ?? 'jibli_session';
   const publicPaths = options.publicPaths ?? DEFAULT_PUBLIC_PATHS;
+  const signedOutOnly = options.signedOutOnlyPaths ?? DEFAULT_SIGNED_OUT_ONLY;
 
   return function middleware(request: NextRequest): NextResponse {
     const { pathname, search } = request.nextUrl;
@@ -51,19 +61,19 @@ export function createPortalMiddleware(options: PortalMiddlewareOptions = {}) {
       return NextResponse.next();
     }
 
-    const isPublic = publicPaths.some(
-      (path) => pathname === path || pathname.startsWith(`${path}/`),
-    );
+    const matches = (paths: readonly string[]) =>
+      paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 
+    const isPublic = matches(publicPaths);
     const hasSession = request.cookies.has(cookieName);
 
     /*
      * Already signed in and sitting on /login: send them inside. Leaving the
-     * login form reachable with a live session invites people to re-enter a
+     * sign-in form reachable with a live session invites people to re-enter a
      * password they did not need to, which trains exactly the habit phishing
      * relies on.
      */
-    if (isPublic && hasSession) {
+    if (matches(signedOutOnly) && hasSession) {
       const next = request.nextUrl.searchParams.get('next');
       const destination = new URL(safeReturnPath(next), request.url);
       return NextResponse.redirect(destination);

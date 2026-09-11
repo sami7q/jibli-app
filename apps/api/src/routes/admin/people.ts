@@ -96,7 +96,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         rows.map((row) => ({
           id: row.id,
           full_name: row.fullName,
-          phone: canUnmask ? row.phoneE164 : maskPhone(row.phoneE164),
+          phone: row.phoneE164 ? (canUnmask ? row.phoneE164 : maskPhone(row.phoneE164)) : null,
           phone_masked: !canUnmask,
           status: row.status,
           profile_completed: row.profileCompletedAt !== null,
@@ -288,7 +288,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         rows.map((row) => ({
           id: row.driverId,
           full_name: row.fullName,
-          phone: canUnmask ? row.phoneE164 : maskPhone(row.phoneE164),
+          phone: row.phoneE164 ? (canUnmask ? row.phoneE164 : maskPhone(row.phoneE164)) : null,
           phone_masked: !canUnmask,
           status: row.status,
           availability: row.availability,
@@ -432,7 +432,8 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
     interface StaffMember {
       user_id: string;
       full_name: string | null;
-      phone: string;
+      /** Null for a portal account created by staff before a phone was known. */
+  phone: string | null;
       status: string;
       mfa_enabled: boolean;
       roles: string[];
@@ -443,7 +444,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       const existing: StaffMember = byUser.get(row.userId) ?? {
         user_id: row.userId,
         full_name: row.fullName,
-        phone: maskPhone(row.phoneE164),
+        phone: row.phoneE164 ? maskPhone(row.phoneE164) : null,
         status: row.status,
         mfa_enabled: row.mfaEnabledAt !== null,
         roles: [],

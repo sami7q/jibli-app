@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
-import { hashPassword, checkPasswordPolicy } from '@jibli/auth';
-import { toE164Iraq } from '@jibli/validation';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { ADMIN_PASSWORD_MIN_LENGTH, checkPasswordPolicy, hashPassword } from '@jibli/auth';
+import { normalizeUsername, toE164Iraq } from '@jibli/validation';
 import { createDatabase } from '../client.js';
 import { shouldUseSsl } from '../ssl.js';
 import { users, userPlatformRoles } from '../schema/index.js';
@@ -23,8 +23,9 @@ import { uuidv7 } from '../ids.js';
  */
 
 interface Args {
-  phone: string;
+  username: string;
   name: string;
+  phone?: string;
   password?: string;
 }
 
@@ -34,18 +35,25 @@ function parseArgs(argv: string[]): Args {
     return index === -1 ? undefined : argv[index + 1];
   };
 
-  const phone = get('--phone');
+  const username = get('--username');
   const name = get('--name');
 
-  if (!phone || !name) {
+  if (!username || !name) {
     console.error(
-      'Usage: bootstrap-admin --phone <iraqi mobile> --name "<full name>" [--password <password>]',
+      'Usage: bootstrap-admin --username <username> --name "<full name>"' +
+        ' [--phone <iraqi mobile>] [--password <password>]',
     );
     process.exit(1);
   }
 
   const password = get('--password');
-  return password ? { phone, name, password } : { phone, name };
+  const phone = get('--phone');
+  return {
+    username: normalizeUsername(username),
+    name,
+    ...(phone ? { phone } : {}),
+    ...(password ? { password } : {}),
+  };
 }
 
 /**
@@ -68,23 +76,39 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  let phoneE164: string;
-  try {
-    phoneE164 = toE164Iraq(args.phone);
-  } catch (error) {
-    console.error(`Not a valid Iraqi mobile number: ${args.phone}`);
-    console.error(error instanceof Error ? error.message : String(error));
+  if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(args.username)) {
+    console.error(
+      `Not a valid username: ${args.username}` +
+        ' (lowercase letters, digits, . _ - ; 3-32 chars; must start alphanumeric)',
+    );
     process.exit(1);
   }
 
+  // Optional: a Super Admin signs in by username. A phone is only useful if
+  // they also use the mobile app.
+  let phoneE164: string | null = null;
+  if (args.phone) {
+    try {
+      phoneE164 = toE164Iraq(args.phone);
+    } catch (error) {
+      console.error(`Not a valid Iraqi mobile number: ${args.phone}`);
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  }
+
   const password = args.password ?? generatePassword();
-  const policy = checkPasswordPolicy(password);
+  // Platform staff are held to the longer minimum (plan §1853).
+  const policy = checkPasswordPolicy(password, {
+    minLength: ADMIN_PASSWORD_MIN_LENGTH,
+    username: args.username,
+  });
   if (!policy.ok) {
     console.error(`Password rejected: ${policy.problems.join(', ')}`);
     process.exit(1);
   }
 
-  const { db, sql } = createDatabase({
+  const { db, sql: client } = createDatabase({
     connectionString,
     maxConnections: 1,
     ssl: shouldUseSsl(connectionString, process.env.DATABASE_SSL),
@@ -97,7 +121,7 @@ async function main(): Promise<void> {
       const [existing] = await tx
         .select({ id: users.id, fullName: users.fullName })
         .from(users)
-        .where(and(eq(users.phoneE164, phoneE164), isNull(users.deletedAt)))
+        .where(and(sql`lower(${users.username}) = ${args.username}`, isNull(users.deletedAt)))
         .limit(1);
 
       /*
@@ -121,12 +145,14 @@ async function main(): Promise<void> {
       } else {
         await tx.insert(users).values({
           id: userId,
+          username: args.username,
           phoneE164,
           fullName: args.name,
           passwordHash,
+          passwordChangedAt: new Date(),
           // Staff are trusted at creation: there is no OTP step for a portal
           // account, and the profile-completion flow is a customer concern.
-          phoneVerifiedAt: new Date(),
+          ...(phoneE164 ? { phoneVerifiedAt: new Date() } : {}),
           profileCompletedAt: new Date(),
           status: 'ACTIVE',
         });
@@ -159,7 +185,8 @@ async function main(): Promise<void> {
     console.log('');
     console.log('  Super Admin ready');
     console.log('  ─────────────────────────────────────────────');
-    console.log(`  phone     ${phoneE164}`);
+    console.log(`  username  ${args.username}`);
+    if (phoneE164) console.log(`  phone     ${phoneE164}`);
     console.log(`  name      ${args.name}`);
     console.log(`  user id   ${result.userId}`);
     console.log(`  action    ${result.created ? 'created' : 'password reset on existing user'}`);
@@ -178,7 +205,7 @@ async function main(): Promise<void> {
     console.log('  for Super Admin before any finance action.');
     console.log('');
   } finally {
-    await sql.end({ timeout: 5 });
+    await client.end({ timeout: 5 });
   }
 }
 

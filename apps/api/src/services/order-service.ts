@@ -104,6 +104,19 @@ export async function placeOrder(
     if (customer.status !== 'ACTIVE') throw new AppError(ERROR_CODES.ACCOUNT_SUSPENDED);
     if (!customer.profileCompletedAt) throw new AppError(ERROR_CODES.PROFILE_INCOMPLETE);
 
+    /*
+     * A customer always has a phone — they authenticate by OTP, and the driver
+     * has to be able to call them. Only staff-created portal accounts lack one
+     * and those cannot place orders. Checking rather than asserting means an
+     * impossible state fails here, with a clear code, instead of violating the
+     * NOT NULL on the order's phone snapshot several statements later.
+     */
+    if (!customer.phoneE164) {
+      throw new AppError(ERROR_CODES.PROFILE_INCOMPLETE, {
+        details: { reason: 'NO_PHONE_ON_ACCOUNT' },
+      });
+    }
+
     // 2. Delivery address — must belong to this customer.
     const [address] = await tx
       .select()

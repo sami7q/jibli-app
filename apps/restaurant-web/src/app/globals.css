@@ -1029,3 +1029,30 @@
   z-index: calc(var(--z-modal) + 10);
   padding: var(--space-4);
 }
+
+/* Password requirement checklist. */
+.requirements {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-page);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.requirements li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Colour is supplementary: the tick changes shape too (plan §134). */
+.requirements li.is-met {
+  color: var(--jibli-success-700);
+  font-weight: 600;
+}

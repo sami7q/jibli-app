@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RESTAURANT_ROLE_LABELS, dateAr } from '@jibli/ui-web';
 import type { RestaurantRole } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
+import { PortalCredentials } from '@/components/portal-credentials';
 import {
   Badge,
   Card,
@@ -268,6 +269,17 @@ export default function RestaurantDetailPage() {
               <p className="empty">لا يوجد فرع مسجّل</p>
             )}
           </Card>
+
+          {/*
+            Portal credentials sit directly above the staff list: they are the
+            same subject seen from two sides — who can sign in, and who works
+            here.
+          */}
+          <PortalCredentials
+            token={token}
+            restaurantId={restaurantId}
+            restaurantName={data.display_name}
+          />
 
           <Card title="الموظفون" icon="staff">
             <DataTable

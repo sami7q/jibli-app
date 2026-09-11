@@ -244,7 +244,12 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
     const principal = requirePrincipal(request);
 
     const [user] = await ctx.db
-      .select({ mfaEnabledAt: users.mfaEnabledAt, phoneE164: users.phoneE164 })
+      .select({
+        mfaEnabledAt: users.mfaEnabledAt,
+        phoneE164: users.phoneE164,
+        username: users.username,
+        id: users.id,
+      })
       .from(users)
       .where(eq(users.id, principal.userId))
       .limit(1);
@@ -277,7 +282,12 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
           // The portal renders this as a QR code.
           otpauth_uri: buildTotpUri({
             secretBase32: secret,
-            accountName: user.phoneE164,
+            /*
+             * The label shown inside the authenticator app. Username first: a
+             * portal account created by staff may have no phone, and the
+             * username is what the person actually signs in with.
+             */
+            accountName: user.username ?? user.phoneE164 ?? user.id,
             issuer: 'Jibli',
           }),
           expires_in_seconds: PENDING_ENROLMENT_TTL_MS / 1000,

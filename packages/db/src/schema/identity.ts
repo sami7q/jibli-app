@@ -22,8 +22,17 @@ export const users = pgTable(
   'users',
   {
     id: primaryId(),
-    /** Always E.164. Normalisation happens before this value is ever written. */
-    phoneE164: text('phone_e164').notNull(),
+    /**
+     * Always E.164 when present. Null for a portal account created by staff
+     * before anyone at the restaurant has been reached — a CHECK constraint
+     * requires at least one of phone or username (migration 0005).
+     */
+    phoneE164: text('phone_e164'),
+    /**
+     * Portal login name. Lowercase ASCII, unique case-insensitively.
+     * Customers and drivers authenticate by OTP and have none.
+     */
+    username: text('username'),
     phoneVerifiedAt: utcTimestamp('phone_verified_at'),
     fullName: text('full_name'),
 
@@ -40,6 +49,12 @@ export const users = pgTable(
 
     /** Web credentials for portal users. Customers and drivers authenticate by OTP only. */
     passwordHash: text('password_hash'),
+    /** Set when staff issued the password, cleared once the owner replaces it. */
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
+    passwordChangedAt: utcTimestamp('password_changed_at'),
+    /** Per-account lockout, which survives a restart unlike the Redis limiter. */
+    failedLoginCount: integer('failed_login_count').notNull().default(0),
+    lockedUntil: utcTimestamp('locked_until'),
     mfaSecretEncrypted: text('mfa_secret_encrypted'),
     mfaEnabledAt: utcTimestamp('mfa_enabled_at'),
     /** Highest TOTP counter already spent — blocks replay inside one window. */
@@ -56,6 +71,8 @@ export const users = pgTable(
   (table) => [
     // One identity per phone. A customer who later becomes a driver reuses it (plan §45).
     uniqueIndex('users_phone_key').on(table.phoneE164),
+    // Case-insensitive in the database (migration 0005 indexes lower(username)).
+    uniqueIndex('users_username_key').on(table.username),
     index('users_status_idx').on(table.status),
     index('users_profile_city_idx').on(table.profileCityId),
   ],
@@ -314,3 +331,36 @@ export const mfaAttempts = pgTable(
 
 export type MfaRecoveryCodeRow = typeof mfaRecoveryCodes.$inferSelect;
 export type MfaAttemptRow = typeof mfaAttempts.$inferSelect;
+
+/**
+ * Every portal sign-in attempt (migration 0005).
+ *
+ * Kept apart from audit_logs because a failed login changes no entity and so
+ * has nothing to audit — but it is exactly what answers "is someone spraying
+ * passwords across our restaurant accounts". Different volume, different
+ * retention, different question.
+ *
+ * The password never appears here in any form (plan §1512).
+ */
+export const loginAttempts = pgTable(
+  'login_attempts',
+  {
+    id: primaryId(),
+    /** Null when the username matched nothing — the attempt still matters. */
+    userId: fk('user_id').references(() => users.id, { onDelete: 'set null' }),
+    /** What was typed. Not a secret, and needed to spot a spray. */
+    identifier: text('identifier').notNull(),
+    succeeded: boolean('succeeded').notNull(),
+    failureReason: text('failure_reason'),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('login_attempts_user_idx').on(table.userId, table.createdAt),
+    index('login_attempts_identifier_idx').on(table.identifier, table.createdAt),
+    index('login_attempts_ip_idx').on(table.ip, table.createdAt),
+  ],
+);
+
+export type LoginAttemptRow = typeof loginAttempts.$inferSelect;
