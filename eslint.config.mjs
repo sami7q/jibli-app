@@ -47,7 +47,15 @@ export default tseslint.config(
   {
     // Build-time config runs in Node, where `process` is a real global.
     files: ['config/**/*.mjs', 'scripts/**/*.mjs', '**/next.config.mjs', '**/*.config.mjs'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        // Web-standard globals Node has had since 10/18 respectively.
+        URL: 'readonly',
+        fetch: 'readonly',
+      },
+    },
   },
   {
     // .cjs files run in CommonJS under Node — `module`, `require` and friends
