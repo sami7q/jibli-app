@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { RestaurantPermission, RestaurantRole } from '@jibli/contracts';
 import { apiRequest, ApiError } from '@/lib/api';
 
@@ -88,12 +88,20 @@ interface LoadedSession {
   restaurants: PortalRestaurant[];
 }
 
-export function useSession(): SessionState {
+/**
+ * One session per tab, not one per page — see the admin portal's provider for
+ * the full account. In short: `/auth/session/refresh` rotates the refresh
+ * token, presenting a superseded one is treated as replay and revokes every
+ * session the user has, and a hook called from several components ran one
+ * refresh per mount. Navigating signed people out.
+ */
+function useSessionState(active: boolean): SessionState {
   const [loaded, setLoaded] = useState<LoadedSession | null>(null);
   const [failure, setFailure] = useState<{ reason?: string } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!active) return undefined;
     let cancelled = false;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -148,7 +156,7 @@ export function useSession(): SessionState {
       cancelled = true;
       if (refreshTimer) clearTimeout(refreshTimer);
     };
-  }, []);
+  }, [active]);
 
   const switchRestaurant = useCallback((restaurantId: string) => {
     writeSelected(restaurantId);
@@ -184,4 +192,41 @@ export function useSession(): SessionState {
       switchRestaurant,
     };
   }, [failure, loaded, selectedId, switchRestaurant]);
+}
+
+interface SessionContextValue {
+  readonly state: SessionState;
+  readonly start: () => void;
+}
+
+const SessionContext = createContext<SessionContextValue | null>(null);
+
+export function SessionProvider({ children }: { children: React.ReactNode }) {
+  const [active, setActive] = useState(false);
+  const started = useRef(false);
+  const state = useSessionState(active);
+
+  /*
+   * Started on first use rather than on mount: the sign-in page sits inside
+   * this provider too, and asking for a session it does not have yet costs a
+   * round trip to an API that may be asleep.
+   */
+  const start = (): void => {
+    if (started.current) return;
+    started.current = true;
+    setActive(true);
+  };
+
+  return <SessionContext.Provider value={{ state, start }}>{children}</SessionContext.Provider>;
+}
+
+export function useSession(): SessionState {
+  const context = useContext(SessionContext);
+
+  useEffect(() => {
+    context?.start();
+  }, [context]);
+
+  if (!context) throw new Error('useSession must be used inside <SessionProvider>');
+  return context.state;
 }

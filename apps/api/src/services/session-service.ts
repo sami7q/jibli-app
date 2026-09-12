@@ -34,6 +34,8 @@ export interface SessionCapabilities {
   readonly profileCompleted: boolean;
   /** Null until the profile-completion step runs (plan §11). */
   readonly fullName: string | null;
+  /** Portal sign-in name. Null for a phone-only customer or driver. */
+  readonly username: string | null;
   /** Which app modes the client should offer (plan §47). */
   readonly modes: ('CUSTOMER' | 'DRIVER')[];
 }
@@ -46,7 +48,11 @@ export async function loadCapabilities(
   const [user] = await ctx.db
     // fullName rides along on a row already being read: the portals greet the
     // user by name, and a second round trip for one column is waste.
-    .select({ profileCompletedAt: users.profileCompletedAt, fullName: users.fullName })
+    .select({
+      profileCompletedAt: users.profileCompletedAt,
+      fullName: users.fullName,
+      username: users.username,
+    })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
@@ -84,6 +90,7 @@ export async function loadCapabilities(
     driverId,
     profileCompleted: user?.profileCompletedAt !== null && user?.profileCompletedAt !== undefined,
     fullName: user?.fullName ?? null,
+    username: user?.username ?? null,
     modes,
   };
 }

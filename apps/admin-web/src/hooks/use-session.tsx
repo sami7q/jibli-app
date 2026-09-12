@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { PLATFORM_ROLE_LABELS } from '@jibli/ui-web';
 import { adminPermissionsFor, type AdminPermission, type PlatformRole } from '@jibli/contracts';
 import { apiRequest, ApiError } from '@/lib/api';
@@ -43,10 +43,46 @@ interface RefreshResponse {
 
 const REFRESH_MARGIN_SECONDS = 60;
 
-export function useAdminSession(): AdminSessionState {
+/**
+ * One session per tab, not one per page.
+ *
+ * This used to be a plain hook, and all eighteen authenticated pages called it.
+ * Every page mount therefore ran its own `POST /auth/session/refresh`, and that
+ * endpoint *rotates* the refresh token: the old one is marked superseded, and
+ * presenting a superseded token is treated as replay and revokes every session
+ * the user has. Legitimate navigation looked exactly like an attack, so moving
+ * between pages signed people out.
+ *
+ * The provider owns the single refresh loop. The hook below reads it, and asks
+ * the provider to start on first use — which is what keeps the sign-in page
+ * from requesting a session it does not have yet, over a link to a free-tier
+ * API that may take a minute to wake.
+ *
+ * A second browser tab still holds a second owner. That is inherent to rotating
+ * refresh tokens and needs a cross-tab lock to solve; it is rare, where a
+ * navigation was constant.
+ */
+interface AdminSessionContextValue {
+  readonly state: AdminSessionState;
+  readonly start: () => void;
+}
+
+const AdminSessionContext = createContext<AdminSessionContextValue | null>(null);
+
+export function AdminSessionProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AdminSessionState>({ status: 'loading' });
+  const [active, setActive] = useState(false);
+  const started = useRef(false);
+
+  const start = (): void => {
+    if (started.current) return;
+    started.current = true;
+    setActive(true);
+  };
 
   useEffect(() => {
+    if (!active) return undefined;
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -108,7 +144,23 @@ export function useAdminSession(): AdminSessionState {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [active]);
 
-  return state;
+  return (
+    <AdminSessionContext.Provider value={{ state, start }}>{children}</AdminSessionContext.Provider>
+  );
+}
+
+export function useAdminSession(): AdminSessionState {
+  const context = useContext(AdminSessionContext);
+
+  useEffect(() => {
+    context?.start();
+    // The provider guards re-entry, so this is safe to call on every mount.
+  }, [context]);
+
+  if (!context) {
+    throw new Error('useAdminSession must be used inside <AdminSessionProvider>');
+  }
+  return context.state;
 }

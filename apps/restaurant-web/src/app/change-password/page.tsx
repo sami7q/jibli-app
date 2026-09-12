@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { JibliLogo, safeReturnPath } from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
+import { useSession } from '@/hooks/use-session';
 
 /**
  * Change your own password.
@@ -53,8 +54,8 @@ export default function ChangePasswordPage() {
   const [reveal, setReveal] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [username, setUsername] = useState('');
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const session = useSession();
   const [problems, setProblems] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const currentInput = useRef<HTMLInputElement>(null);
@@ -64,43 +65,29 @@ export default function ChangePasswordPage() {
   }, []);
 
   /*
-   * Both calls on this page need a bearer token, and this page is reached by a
-   * redirect that carries none: the access token lives in memory in the portal
-   * shell, and a full navigation throws that away. The HttpOnly refresh cookie
-   * is what survives, so it is exchanged for a token here.
-   *
-   * Without this the page was unusable in a way nothing surfaced: the username
-   * lookup 401'd and was swallowed, silently disabling the "password must not
-   * contain your username" rule, and the submit 401'd with "please sign in" on
-   * the one screen a new account cannot get past. Every portal account, admin
-   * and restaurant alike, is forced here on first sign-in.
+   * The token comes from the one session owner, not from a refresh of our own.
+   * Two refreshes race, and a superseded refresh token is treated as replay —
+   * which revokes every session the user has.
    */
+  const accessToken = session.status === 'authenticated' ? session.accessToken : null;
+
   useEffect(() => {
+    if (!accessToken) return undefined;
     let cancelled = false;
 
-    void (async () => {
-      try {
-        const refreshed = await apiRequest<{ access_token: string }>(
-          '/api/v1/auth/session/refresh',
-          { method: 'POST' },
-        );
-        if (cancelled) return;
-        setAccessToken(refreshed.access_token);
-
-        // Only used to check the new password does not contain it.
-        const me = await apiRequest<{ username: string | null }>('/api/v1/auth/portal/me', {
-          accessToken: refreshed.access_token,
-        });
+    // Only used to check the new password does not contain it.
+    void apiRequest<{ username: string | null }>('/api/v1/auth/portal/me', { accessToken })
+      .then((me) => {
         if (!cancelled) setUsername(me.username ?? '');
-      } catch {
-        if (!cancelled) setAccessToken(null);
-      }
-    })();
+      })
+      .catch(() => {
+        if (!cancelled) setUsername('');
+      });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [accessToken]);
 
   const trackCapsLock = (event: React.KeyboardEvent<HTMLInputElement>) => {
     setCapsLock(event.getModifierState?.('CapsLock') ?? false);

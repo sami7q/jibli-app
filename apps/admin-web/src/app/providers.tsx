@@ -1,6 +1,7 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AdminSessionProvider } from '@/hooks/use-session';
 import { useState } from 'react';
 import { ApiError } from '@/lib/api';
 
@@ -37,5 +38,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* Mounted once, above every page: see AdminSessionProvider for why one
+          refresh loop per tab is not a detail but a correctness requirement. */}
+      <AdminSessionProvider>{children}</AdminSessionProvider>
+    </QueryClientProvider>
+  );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SessionProvider } from '@/hooks/use-session';
 import { useState } from 'react';
 import { ApiError } from '@/lib/api';
 
@@ -37,5 +38,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* One refresh loop per tab. See SessionProvider for why that is a
+          correctness requirement and not a tidiness one. */}
+      <SessionProvider>{children}</SessionProvider>
+    </QueryClientProvider>
+  );
 }

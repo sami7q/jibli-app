@@ -539,6 +539,12 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         {
           user_id: principal.userId,
           full_name: capabilities.fullName,
+          /*
+           * The change-password screen needs it: the policy refuses a password
+           * containing the username, and it cannot check what it was never told.
+           * The field was absent, so that rule silently never ran.
+           */
+          username: capabilities.username,
           platform_roles: capabilities.platformRoles,
           restaurant_roles: capabilities.restaurantRoles,
           restaurant_count: Number(membershipCount?.count ?? 0),

@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { money, moneyCompact } from './format.js';
+import { axisTicks, niceCeiling } from './chart-scale.js';
 
 /**
  * Charts, drawn as plain SVG.
@@ -23,13 +24,6 @@ export interface SeriesPoint {
   readonly value: number;
 }
 
-function niceCeiling(max: number): number {
-  if (max <= 0) return 1;
-  const magnitude = 10 ** Math.floor(Math.log10(max));
-  const normalized = max / magnitude;
-  const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-  return step * magnitude;
-}
 
 /** The hidden table every chart pairs with, so the data is never colour-only. */
 function DataTableFallback({
@@ -150,11 +144,6 @@ export function BarChart({
  * Only a handful of axis labels are drawn: thirty date labels would overlap
  * into an unreadable smear at this width.
  */
-/**
- * Where gridlines sit and what the value axis names. Zero is included so the
- * baseline is labelled rather than left to be inferred.
- */
-const AXIS_FRACTIONS = [0, 0.25, 0.5, 0.75, 1] as const;
 
 /** "12.5 مليون د.ع" -> "12.5 مليون". */
 function compactAxisTick(value: number): string {
@@ -186,6 +175,7 @@ export function AreaChart({
   }
 
   const max = niceCeiling(Math.max(...points.map((point) => point.value)));
+  const ticks = axisTicks(max);
   const plotHeight = height - 20;
   const stepX = 100 / (points.length - 1);
 
@@ -225,8 +215,8 @@ export function AreaChart({
             flexShrink: 0,
           }}
         >
-          {AXIS_FRACTIONS.map((fraction) => (
-            <span key={fraction}>{axisFormat(max * fraction)}</span>
+          {ticks.map(({ fraction, value }) => (
+            <span key={fraction}>{axisFormat(value)}</span>
           ))}
         </div>
 
@@ -245,7 +235,7 @@ export function AreaChart({
           </linearGradient>
         </defs>
 
-        {AXIS_FRACTIONS.map((fraction) => (
+        {ticks.map(({ fraction }) => (
           <line
             key={fraction}
             x1="0"
