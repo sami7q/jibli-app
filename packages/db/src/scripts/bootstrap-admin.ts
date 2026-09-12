@@ -33,6 +33,8 @@ interface Args {
   name: string;
   phone?: string;
   password?: string;
+  /** Skip the forced change at first sign-in. Off unless asked for. */
+  keepPassword: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -47,15 +49,24 @@ function parseArgs(argv: string[]): Args {
   if (!username || !name) {
     console.error(
       'Usage: bootstrap-admin --username <username> --name "<full name>"' +
-        ' [--phone <iraqi mobile>] [--password <password>]',
+        ' [--phone <iraqi mobile>] [--password <password>] [--keep-password]',
     );
     process.exit(1);
   }
 
   const password = get('--password');
+
+  /*
+   * `--keep-password` exists for the one case the default gets wrong: an
+   * operator setting a password for their own account, which nobody else ever
+   * saw. The default stays on, because a password handed to someone is a
+   * password someone else knows.
+   */
+  const keepPassword = argv.includes('--keep-password');
   const phone = get('--phone');
   return {
     username: normalizeUsername(username),
+    keepPassword,
     name,
     ...(phone ? { phone } : {}),
     ...(password ? { password } : {}),
@@ -137,7 +148,7 @@ async function main(): Promise<void> {
             fullName: existing.fullName ?? args.name,
             username: args.username,
             status: 'ACTIVE',
-            mustChangePassword: true,
+            mustChangePassword: !args.keepPassword,
             passwordChangedAt: new Date(),
             // A reset is also the way out of a lockout.
             failedLoginCount: 0,
@@ -158,7 +169,7 @@ async function main(): Promise<void> {
            * history, and is usually pasted somewhere to be handed over. Treat
            * it as already exposed and require replacement at first sign-in.
            */
-          mustChangePassword: true,
+          mustChangePassword: !args.keepPassword,
           // Staff are trusted at creation: there is no OTP step for a portal
           // account.
           ...(phoneE164 ? { phoneVerifiedAt: new Date() } : {}),
