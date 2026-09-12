@@ -15,6 +15,7 @@ import { LiveBoard } from '@/components/live-board';
 import { Icon, type IconName } from '@/components/icon';
 import { portal, type DashboardOverview } from '@/lib/portal-endpoints';
 import { useSession } from '@/hooks/use-session';
+import { ReadinessCard } from '@/components/readiness-card';
 import { SignedOut } from '@/components/signed-out';
 
 /**
@@ -79,6 +80,13 @@ function DashboardShell({
       onSwitchRestaurant={session.switchRestaurant}
       notificationCount={data?.new_orders ?? 0}
     >
+      {/*
+        Above the board on purpose: a restaurant that is not live yet has an
+        empty board, and this is the only thing on the page it can act on. It
+        renders nothing once the restaurant is trading.
+      */}
+      <ReadinessCard auth={auth} canWrite={session.can('settings.write')} />
+
       <SummaryRow data={data} isLoading={overview.isLoading} />
 
       {/* The board comes before every chart, by design and by plan §131. */}

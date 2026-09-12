@@ -7,12 +7,12 @@ import { reasonSchema, uuidSchema } from '@jibli/validation';
 import {
   AUDIT_ACTIONS,
   enqueueOutboxEvent,
-  evaluateReadiness,
   writeAudit,
 } from '@jibli/domain';
-import { auditLogs, branchWorkingHours, cities, governorates, menuItems, providers, restaurantApplications, restaurantBranches, restaurantCommissionConfigs, restaurantDrivers, restaurantMembers, restaurants, users, uuidv7 } from '@jibli/db';
+import { auditLogs, cities, governorates, providers, restaurantApplications, restaurantBranches, restaurantCommissionConfigs, restaurantMembers, restaurants, users, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
+import { computeReadiness } from '../../services/readiness-service.js';
 import {
   cityCoverageImpact,
   effectiveCapabilitySql,
@@ -614,97 +614,12 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
       assertAdminPermission(requirePrincipal(request), 'restaurant.read');
       const { restaurantId } = z.object({ restaurantId: uuidSchema }).parse(request.params);
 
-
-      const [restaurant] = await ctx.db
-        .select()
-        .from(restaurants)
-        .where(eq(restaurants.id, restaurantId))
-        .limit(1);
-
-      if (!restaurant) {
-        throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'restaurant' } });
-      }
-
-      const [branch] = await ctx.db
-        .select({
-          id: restaurantBranches.id,
-          latitude: restaurantBranches.latitude,
-          longitude: restaurantBranches.longitude,
-          cityOrderingEnabled: effectiveCapabilitySql('ordering'),
-        })
-        .from(restaurantBranches)
-        .innerJoin(cities, eq(restaurantBranches.cityId, cities.id))
-        .innerJoin(governorates, eq(cities.governorateId, governorates.id))
-        .where(eq(restaurantBranches.restaurantId, restaurantId))
-        .limit(1);
-
-      const [hoursCount] = await ctx.db
-        .select({ value: sql<number>`COUNT(*)` })
-        .from(branchWorkingHours)
-        .where(eq(branchWorkingHours.branchId, branch?.id ?? ''));
-
-      const [itemCount] = await ctx.db
-        .select({ value: sql<number>`COUNT(*)` })
-        .from(menuItems)
-        .where(and(eq(menuItems.restaurantId, restaurantId), eq(menuItems.isActive, true)));
-
-      const [commissionCount] = await ctx.db
-        .select({ value: sql<number>`COUNT(*)` })
-        .from(restaurantCommissionConfigs)
-        .where(eq(restaurantCommissionConfigs.restaurantId, restaurantId));
-
-      const [driverCount] = await ctx.db
-        .select({ value: sql<number>`COUNT(*)` })
-        .from(restaurantDrivers)
-        .where(
-          and(eq(restaurantDrivers.restaurantId, restaurantId), eq(restaurantDrivers.isActive, true)),
-        );
-
-      const [ownerCount] = await ctx.db
-        .select({ value: sql<number>`COUNT(*)` })
-        .from(restaurantMembers)
-        .where(
-          and(
-            eq(restaurantMembers.restaurantId, restaurantId),
-            eq(restaurantMembers.role, 'OWNER'),
-            eq(restaurantMembers.isActive, true),
-          ),
-        );
-
-      const readiness = evaluateReadiness({
-        applicationApproved: restaurant.onboardingStatus === 'APPROVED',
-        cityOrderingEnabled: Boolean(branch?.cityOrderingEnabled),
-        ownerActive: Number(ownerCount?.value ?? 0) > 0,
-        branchLocationValid: Boolean(branch?.latitude && branch?.longitude),
-        workingHoursConfigured: Number(hoursCount?.value ?? 0) > 0,
-        hasActiveMenuItem: Number(itemCount?.value ?? 0) > 0,
-        commissionConfigured: Number(commissionCount?.value ?? 0) > 0,
-        settlementPolicyConfigured: Number(commissionCount?.value ?? 0) > 0,
-        deliveryConfigured: true,
-        hasActiveDriver: Number(driverCount?.value ?? 0) > 0,
-        orderAlertAcknowledged: true,
-        requiredDocumentsPresent: true,
-      });
-
-      return reply.send(
-        success(
-          {
-            ready: readiness.ready,
-            checks: readiness.checks.map((check) => ({
-              key: check.key,
-              label_ar: check.labelAr,
-              passed: check.passed,
-              blocking: check.blocking,
-            })),
-            blocking_failures: readiness.blockingFailures.map((c) => c.key),
-          },
-          { request_id: request.requestId },
-        ),
-      );
+      // Shared with the restaurant's own view of the same checklist.
+      const readiness = await computeReadiness(ctx, restaurantId);
+      return reply.send(success(readiness, { request_id: request.requestId }));
     },
   );
 
-  /** Audit trail (plan §64). */
   app.get('/api/v1/admin/audit-logs', { preHandler: app.authenticate }, async (request, reply) => {
     assertAdminPermission(requirePrincipal(request), 'audit.read');
     const query = z

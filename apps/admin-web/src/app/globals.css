@@ -1497,3 +1497,65 @@ html {
   color: var(--text-muted);
   line-height: 1.7;
 }
+
+/* ── Credential handover ─────────────────────────────────────────────────── */
+
+.handover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 46rem;
+}
+
+.handover__warning {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--jibli-warning-50);
+  color: var(--jibli-warning-700);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.handover__grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+}
+
+.handover__grid dt {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.handover__grid dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* The value is the point of the screen, so it is set to be read aloud. */
+.handover__grid code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-lg);
+  letter-spacing: 0.02em;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  direction: ltr;
+  unicode-bidi: isolate;
+  user-select: all;
+}
+
+.handover__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.7;
+}

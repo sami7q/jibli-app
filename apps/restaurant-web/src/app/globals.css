@@ -1194,3 +1194,106 @@
   color: var(--jibli-danger-700);
   font-weight: 500;
 }
+
+/* ── Readiness ───────────────────────────────────────────────────────────── */
+
+.readiness {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.readiness__count {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--jibli-orange-600);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A request already sent is the answer to "what do I do now?", so it sits
+   above the list rather than under it. */
+.readiness__sent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--jibli-success-50);
+  color: var(--jibli-success-700);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+.readiness__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-2);
+}
+
+.readiness__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+}
+
+.readiness__item--done {
+  color: var(--text-muted);
+}
+
+.readiness__mark {
+  flex-shrink: 0;
+  inline-size: 1.1rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--border-strong);
+}
+
+.readiness__item--done .readiness__mark {
+  color: var(--jibli-success-500);
+}
+
+.readiness__label {
+  min-width: 0;
+}
+
+.readiness__optional {
+  margin-inline-start: auto;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.readiness__submit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  max-width: 34rem;
+}
+
+.readiness__submit .field {
+  width: 100%;
+}
+
+.readiness__pending,
+.readiness__error {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.readiness__pending {
+  color: var(--text-muted);
+}
+
+.readiness__error {
+  color: var(--jibli-danger-700);
+  font-weight: 500;
+}

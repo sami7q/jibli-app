@@ -32,6 +32,9 @@ export default function NewRestaurantPage() {
   const router = useRouter();
   const [needsMfa, setNeedsMfa] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     display_name: '',
@@ -42,6 +45,8 @@ export default function NewRestaurantPage() {
     address_text: '',
     logo_asset_id: null as string | null,
     cuisine_tags: [] as string[],
+    create_access: true,
+    portal_username: '',
     settlement_policy: 'HALF_MONTH' as 'HALF_MONTH' | 'MONTHLY',
     minimum_order_iqd: 0,
     delivery_fee_iqd: 2000,
@@ -97,7 +102,39 @@ export default function NewRestaurantPage() {
         cuisine_tags: form.cuisine_tags,
         ...(form.logo_asset_id ? { logo_asset_id: form.logo_asset_id } : {}),
       }),
-    onSuccess: (result) => router.push(`/restaurants/${result.restaurant_id}`),
+    onSuccess: async (result) => {
+      if (!form.create_access) {
+        router.push(`/restaurants/${result.restaurant_id}`);
+        return;
+      }
+
+      /*
+       * Credentials are issued after the restaurant exists, because the
+       * username falls back to its partner code — which is minted during
+       * creation. A failure here leaves a usable restaurant with no access
+       * rather than no restaurant, and the page says so instead of pretending
+       * nothing happened.
+       */
+      try {
+        const username =
+          form.portal_username.trim() ||
+          (await admin.suggestUsername(token, result.restaurant_id)).username;
+
+        const created = await admin.createPortalUser(token, result.restaurant_id, {
+          username,
+          full_name: form.owner_name.trim(),
+          role: 'OWNER',
+        });
+
+        setIssued({ username: created.username, password: created.password });
+        setCreatedId(result.restaurant_id);
+      } catch (error) {
+        setAccessError(
+          error instanceof ApiError ? error.messageAr : 'أُنشئ المطعم، وتعذّر إنشاء حساب الدخول',
+        );
+        setCreatedId(result.restaurant_id);
+      }
+    },
     onError: (error: unknown) => {
       if (error instanceof ApiError && error.needsReauth) setNeedsMfa(true);
     },
@@ -107,9 +144,79 @@ export default function NewRestaurantPage() {
     return <SessionGate session={session} />;
   }
 
+  /*
+   * The whole screen, not a toast. The password exists in exactly one place —
+   * this response — and nothing can retrieve it afterwards, so it must not be
+   * possible to navigate past it by accident.
+   */
+  if (issued || accessError) {
+    return (
+      <AdminShell
+        title="تم إنشاء المطعم"
+        userName={session.userName || 'مدير'}
+        userRoleAr={session.roleAr}
+      >
+        {issued ? (
+          <Card title="بيانات دخول المطعم" icon="roles">
+            <div className="handover">
+              <p className="handover__warning" role="alert">
+                انسخ كلمة المرور الآن — لن تظهر مرة أخرى. لا تُخزَّن إلا كتجزئة، ولا يمكن
+                استرجاعها. وإن ضاعت، أعِد تعيينها من صفحة المطعم.
+              </p>
+
+              <dl className="handover__grid">
+                <dt>اسم المستخدم</dt>
+                <dd>
+                  <code>{issued.username}</code>
+                  <CopyButton value={issued.username} label="نسخ اسم المستخدم" />
+                </dd>
+
+                <dt>كلمة المرور</dt>
+                <dd>
+                  <code>{issued.password}</code>
+                  <CopyButton value={issued.password} label="نسخ كلمة المرور" />
+                </dd>
+              </dl>
+
+              <p className="handover__note">
+                سيُطلب من المالك تغييرها عند أول دخول. سلّمها عبر قناة يثق بها الطرفان، ولا
+                ترسلها في رسالة تبقى محفوظة.
+              </p>
+            </div>
+          </Card>
+        ) : (
+          <div className="alert-bar alert-bar--danger" role="alert">
+            <Icon name="alert" className="nav__icon" aria-hidden />
+            <span>{accessError} — أنشئ الحساب من صفحة المطعم.</span>
+          </div>
+        )}
+
+        <div className="form-actions">
+          <Link className="btn btn--primary" href={`/restaurants/${createdId}`}>
+            الذهاب إلى صفحة المطعم
+          </Link>
+          <Link className="btn btn--outline" href="/restaurants">
+            قائمة المطاعم
+          </Link>
+        </div>
+      </AdminShell>
+    );
+  }
+
   const phoneResult = tryToE164Iraq(form.owner_phone);
   const selectedCity = (cities.data ?? []).find((city) => city.id === form.city_id);
   const cityClosed = Boolean(selectedCity && !selectedCity.restaurant_onboarding_enabled);
+
+  /*
+   * Checked here as well as on the server so the mistake is caught before a
+   * restaurant is created: the credential call happens second, and a username
+   * rejected at that point leaves a restaurant with no access.
+   */
+  const typedUsername = form.portal_username.trim();
+  const usernameProblem =
+    form.create_access && typedUsername.length > 0 && !/^[a-z0-9][a-z0-9._-]{2,31}$/.test(typedUsername)
+      ? 'أحرف إنجليزية صغيرة وأرقام و . _ - فقط، ويبدأ بحرف أو رقم، من ٣ إلى ٣٢ حرفاً'
+      : null;
 
   const canSubmit =
     form.display_name.trim().length >= 2 &&
@@ -119,6 +226,7 @@ export default function NewRestaurantPage() {
     form.city_id !== '' &&
     form.address_text.trim().length >= 5 &&
     (!cityClosed || (form.override_coverage && form.reason.trim().length >= 5)) &&
+    !usernameProblem &&
     !create.isPending;
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
@@ -235,6 +343,52 @@ export default function NewRestaurantPage() {
                   </span>
                 )}
               </div>
+            </div>
+          </Card>
+
+          <Card title="دخول المطعم" icon="roles">
+            <div className="form-grid">
+              {/*
+                Issued here rather than as a separate errand afterwards: a
+                restaurant that exists but cannot sign in is a restaurant nobody
+                is setting up, and the step most likely to be forgotten is the
+                one on its own screen.
+              */}
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={form.create_access}
+                  onChange={(event) => set('create_access', event.target.checked)}
+                />
+                إنشاء حساب دخول لمالك المطعم
+              </label>
+
+              {form.create_access ? (
+                <div className="field">
+                  <label htmlFor="portal_username">اسم المستخدم</label>
+                  <input
+                    id="portal_username"
+                    className="ltr-input"
+                    value={form.portal_username}
+                    onChange={(event) =>
+                      set('portal_username', event.target.value.toLowerCase())
+                    }
+                    placeholder="mandi-hadramout"
+                    autoComplete="off"
+                  />
+                  <span className="field__hint">
+                    أحرف إنجليزية صغيرة وأرقام و<span className="ltr-inline"> . _ - </span>فقط،
+                    من ٣ إلى ٣٢ حرفاً. اتركه فارغاً ليُولَّد تلقائياً من رمز الشريك.
+                  </span>
+                  {usernameProblem ? (
+                    <span className="field__error">{usernameProblem}</span>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="field__hint" style={{ margin: 0 }}>
+                  يمكن إنشاء الحساب لاحقاً من صفحة المطعم.
+                </p>
+              )}
             </div>
           </Card>
 
@@ -457,5 +611,35 @@ export default function NewRestaurantPage() {
         <MfaChallenge onVerified={() => setNeedsMfa(false)} onCancel={() => setNeedsMfa(false)} />
       ) : null}
     </AdminShell>
+  );
+}
+
+/**
+ * Copy to clipboard, with the result said out loud rather than implied.
+ *
+ * A handover screen that silently does nothing when the clipboard is blocked —
+ * an insecure origin, a denied permission — is how a password gets lost between
+ * two people who both believed it was copied.
+ */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [state, setState] = useState<'idle' | 'done' | 'failed'>('idle');
+
+  return (
+    <button
+      type="button"
+      className="btn btn--ghost btn--sm"
+      aria-label={label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setState('done');
+          setTimeout(() => setState('idle'), 2000);
+        } catch {
+          setState('failed');
+        }
+      }}
+    >
+      {state === 'done' ? 'نُسخ' : state === 'failed' ? 'انسخه يدوياً' : 'نسخ'}
+    </button>
   );
 }

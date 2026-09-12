@@ -65,6 +65,13 @@ export const restaurants = pgTable(
     coverAssetId: fk('cover_asset_id'),
     cuisineTags: jsonb('cuisine_tags').$type<string[]>().notNull().default([]),
 
+    /**
+     * The restaurant's own request to go live (migration 0007). Set when it
+     * submits from its portal, cleared when Admin activates or it withdraws.
+     */
+    activationRequestedAt: utcTimestamp('activation_requested_at'),
+    activationRequestNote: text('activation_request_note'),
+
     /** Denormalised rating; recomputed from reviews, never edited by hand. */
     ratingAverage: doublePrecision('rating_average'),
     ratingCount: integer('rating_count').notNull().default(0),

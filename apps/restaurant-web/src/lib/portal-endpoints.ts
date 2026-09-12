@@ -184,6 +184,15 @@ export interface WorkingHour {
   is_overnight: boolean;
 }
 
+export interface PortalReadiness {
+  ready: boolean;
+  checks: { key: string; label_ar: string; passed: boolean; blocking: boolean }[];
+  blocking_failures: string[];
+  operational_status: string;
+  activation_requested_at: string | null;
+  activation_request_note: string | null;
+}
+
 export interface PortalSettings {
   restaurant: {
     /** Ready to render; the portal shows it, it does not resolve it. */
@@ -564,6 +573,22 @@ export const portal = {
       ...scoped(auth),
       method: 'POST',
       body: { ...body, restaurant_id: auth.restaurantId },
+    }),
+
+  /** The same checklist Admin reads, for this restaurant. */
+  readiness: (auth: Auth) =>
+    apiRequest<PortalReadiness>('/api/v1/restaurant-portal/readiness', scoped(auth)),
+
+  requestActivation: (auth: Auth, note?: string) =>
+    apiRequest<{ requested_at: string; note_ar: string }>(
+      '/api/v1/restaurant-portal/activation-request',
+      { ...scoped(auth), method: 'POST', body: { ...(note ? { note } : {}) } },
+    ),
+
+  withdrawActivation: (auth: Auth) =>
+    apiRequest<{ withdrawn: boolean }>('/api/v1/restaurant-portal/activation-request', {
+      ...scoped(auth),
+      method: 'DELETE',
     }),
 
   settings: (auth: Auth) =>

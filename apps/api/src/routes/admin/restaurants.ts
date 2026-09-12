@@ -99,6 +99,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         id: restaurants.id,
         displayName: restaurants.displayName,
         cuisineTags: restaurants.cuisineTags,
+        activationRequestedAt: restaurants.activationRequestedAt,
         partnerCode: restaurants.partnerCode,
         onboardingStatus: restaurants.onboardingStatus,
         operationalStatus: restaurants.operationalStatus,
@@ -148,6 +149,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           id: row.id,
           display_name: row.displayName,
           cuisine_tags: row.cuisineTags,
+          activation_requested_at: row.activationRequestedAt?.toISOString() ?? null,
           partner_code: row.partnerCode,
           onboarding_status: row.onboardingStatus,
           operational_status: row.operationalStatus,
@@ -638,6 +640,9 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           .update(restaurants)
           .set({
             operationalStatus: 'ACTIVE',
+            /* The request has been answered; leaving it set keeps a queue that never empties. */
+            activationRequestedAt: null,
+            activationRequestNote: null,
             suspendedAt: null,
             suspendedReason: null,
             updatedAt: new Date(),

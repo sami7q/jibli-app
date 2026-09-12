@@ -40,6 +40,8 @@ export const EVENT_TYPES = {
   RESTAURANT_REJECTED: 'restaurant.rejected',
   RESTAURANT_INFO_REQUESTED: 'restaurant.info_requested',
   RESTAURANT_SUSPENDED: 'restaurant.suspended',
+  /** The restaurant says it is ready to trade; Admin decides (plan §122). */
+  RESTAURANT_ACTIVATION_REQUESTED: 'restaurant.activation_requested',
 
   GEOGRAPHY_CAPABILITY_CHANGED: 'geography.capability_changed',
 
@@ -215,6 +217,8 @@ export const EVENT_AUDIENCE: Record<EventType, readonly ('customer' | 'restauran
   'restaurant.rejected': ['restaurant', 'admin'],
   'restaurant.info_requested': ['restaurant'],
   'restaurant.suspended': ['restaurant', 'admin'],
+  // Admin decides; the restaurant already knows it asked.
+  'restaurant.activation_requested': ['admin'],
   'geography.capability_changed': ['admin'],
   'driver.invited': ['driver'],
   'driver.suspended': ['driver', 'restaurant'],
