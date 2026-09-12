@@ -57,8 +57,17 @@ COPY packages/test-utils/package.json packages/test-utils/
 COPY packages/ui-web/package.json packages/ui-web/
 COPY packages/validation/package.json packages/validation/
 
+# Everything except the mobile app.
+#
+# Expo and React Native are a very large tree, and nothing in the API or the
+# worker imports any of it. Installing them costs build minutes and adds
+# failure modes — native toolchains, platform binaries — to a build that has
+# no use for the result.
+#
+# The manifest is still copied above: pnpm needs every workspace package.json
+# present to resolve the graph, even for a package it will not install.
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts
+    pnpm install --frozen-lockfile --ignore-scripts --filter "!@jibli/mobile"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 FROM deps AS build
