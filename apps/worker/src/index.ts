@@ -84,7 +84,6 @@ async function main(): Promise<void> {
   const db = getDatabase({
     connectionString: env.DATABASE_URL,
     maxConnections: env.DATABASE_POOL_MAX,
-    ssl: env.DATABASE_SSL,
     applicationName: `${env.SERVICE_NAME}-worker`,
   });
 
