@@ -9,42 +9,65 @@ import pino, { type Logger, type LoggerOptions } from 'pino';
  */
 
 /**
- * Paths pino removes before serialisation. Wildcards cover nested request and
- * response objects, so a payload logged at any depth is still scrubbed.
+ * Field names that must never reach a log line, wherever they appear.
+ *
+ * Listed once and expanded below into the path forms pino needs.
+ */
+const SENSITIVE_KEYS = [
+  'password',
+  'passwordHash',
+  'otp',
+  'otpCode',
+  'code_hash',
+  'codeHash',
+  'deliveryPin',
+  'delivery_pin',
+  'deliveryPinHash',
+  'pin',
+  'accessToken',
+  'refreshToken',
+  'refreshTokenHash',
+  'token',
+  'authorization',
+  'mfaSecret',
+  'mfaSecretEncrypted',
+  'secret',
+  // Full phone numbers and precise addresses (plan §84, §107).
+  'phoneE164',
+  'phone_e164',
+  'customerPhoneSnapshot',
+  'deliveryAddressSnapshotJson',
+  'delivery_address_snapshot_json',
+  'latitude',
+  'longitude',
+];
+
+/**
+ * Paths pino removes before serialisation.
+ *
+ * Redaction is configured here rather than left to each call site, because a
+ * single forgotten log line is a data leak.
+ *
+ * Each key is listed twice, and the reason is a trap worth stating plainly:
+ * pino's `*` matches exactly **one** level of nesting. `*.password` covers
+ * `{ user: { password } }` and does *not* cover `{ password }` — so an earlier
+ * version of this list, which carried only the wildcard forms, let
+ * `logger.info({ password })` through in full. It was caught by a test, not by
+ * review.
+ *
+ * What this still does not cover is depth beyond one level:
+ * `{ req: { body: { password } } }` is not redacted, because fast-redact has
+ * no recursive wildcard. Keep logged payloads shallow, and prefer logging an
+ * ID over an object.
  */
 export const REDACTED_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',
   'req.headers["x-api-key"]',
   'res.headers["set-cookie"]',
-  '*.password',
-  '*.passwordHash',
-  '*.otp',
-  '*.otpCode',
-  '*.code_hash',
-  '*.codeHash',
-  '*.deliveryPin',
-  '*.delivery_pin',
-  '*.deliveryPinHash',
-  '*.pin',
-  '*.accessToken',
-  '*.refreshToken',
-  '*.refreshTokenHash',
-  '*.token',
-  '*.authorization',
-  '*.mfaSecret',
-  '*.mfaSecretEncrypted',
-  '*.secret',
-  // Full phone numbers and precise addresses (plan §84, §107).
-  '*.phoneE164',
-  '*.phone_e164',
-  '*.customerPhoneSnapshot',
-  '*.deliveryAddressSnapshotJson',
-  '*.delivery_address_snapshot_json',
-  '*.latitude',
-  '*.longitude',
+  ...SENSITIVE_KEYS,
+  ...SENSITIVE_KEYS.map((key) => `*.${key}`),
 ];
-
 export interface CreateLoggerOptions {
   readonly serviceName: string;
   readonly environment: string;

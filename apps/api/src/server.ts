@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -35,12 +35,40 @@ export interface BuiltServer {
 
 export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
   const app = Fastify({
-    logger: ctx.logger,
+    /*
+     * `loggerInstance`, not `logger`.
+     *
+     * Fastify 5 split the option in two: `logger` takes pino *options* and
+     * builds a logger from them, `loggerInstance` takes one already built.
+     * Handing our configured pino instance to `logger` throws
+     * FST_ERR_LOG_INVALID_LOGGER_CONFIG at boot — the server never listens.
+     *
+     * TypeScript does not catch the mistake: pino's `Logger` is structurally
+     * assignable to `PinoLoggerOptions`, because every field of the options
+     * type is optional. Only `server.test.ts` catches it, which is why that
+     * file exists.
+     *
+     * And it must be the instance, not options: the redaction paths in
+     * @jibli/logger are what keep tokens, OTPs, phone numbers and addresses
+     * out of the request log. A logger Fastify built for itself would carry
+     * none of them, and every request line would leak.
+     *
+     * The cast is not a shortcut. Fastify carries its logger as a generic
+     * parameter, and inferring it from pino's concrete `Logger` makes every
+     * `registerX(app, ctx)` below reject the instance: the plugin signatures
+     * take `FastifyInstance<..., FastifyBaseLogger, ...>`, and the two are not
+     * mutually assignable (pino's type requires `msgPrefix`; Fastify's does
+     * not). Widening here pins the generic to the interface the rest of the
+     * codebase speaks, which pino satisfies.
+     */
+    loggerInstance: ctx.logger as FastifyBaseLogger,
     // Only honour X-Forwarded-* where a trusted proxy actually terminates TLS;
     // otherwise a client could spoof its own IP past the rate limiter.
     trustProxy: ctx.env.TRUST_PROXY,
     bodyLimit: ctx.env.REQUEST_BODY_LIMIT_BYTES,
-    disableRequestLogging: false,
+    // `disableRequestLogging` is not set: false is already the default, and
+    // passing it at all raises FSTDEP023 — Fastify 6 removes the top-level
+    // option in favour of `logController`.
     genReqId: () => randomUUID(),
   });
 
