@@ -11,6 +11,8 @@ import { apiRequest } from './api';
 export interface AdminRestaurant {
   id: string;
   display_name: string;
+  /** Keys from CUISINES. Free text on rows created before the vocabulary existed. */
+  cuisine_tags: string[];
   partner_code: string;
   onboarding_status: string;
   operational_status: string;

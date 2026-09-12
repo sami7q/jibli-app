@@ -1,23 +1,28 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
+import { CUISINES, cuisineLabelAr, isKnownCuisine } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
-import { Card, DataTable, ErrorState, Skeleton } from '@/components/ui';
+import { Card, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
-import { admin, type AdminRestaurant } from '@/lib/admin-endpoints';
+import { admin } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 
 /**
  * Cuisine categories (plan §130 `التصنيفات`).
  *
- * Categories are not their own entity in Release 1 — they are free-form tags on
- * a restaurant, which is what the schema stores (`restaurants.cuisine_tags`).
- * Rather than invent a management CRUD for something the domain does not model,
- * this screen reports how the tags are actually being used, so Operations can
- * see drift ("مشاوي" vs "مشويات") before it becomes a customer-facing filter
- * that misses half the restaurants.
+ * The platform now ships a fixed vocabulary (`@jibli/contracts` → CUISINES),
+ * which is what a restaurant is tagged with and what the customer app will
+ * filter discovery by. This page is the map between that list and reality: how
+ * many restaurants sit in each category, and which categories are still empty.
+ *
+ * It also surfaces tags that are not in the list at all. Restaurants created
+ * before the vocabulary existed carry free text, and a filter that matches
+ * nothing is invisible from the customer's side — this is where it becomes
+ * visible from ours.
  */
 export default function CategoriesPage() {
   const session = useAdminSession();
@@ -33,10 +38,18 @@ export default function CategoriesPage() {
     return <SessionGate session={session} />;
   }
 
-  // The list endpoint does not project cuisine tags, so usage is derived from
-  // what is available. When a dedicated categories endpoint exists this becomes
-  // a straight read.
   const rows = restaurants.data ?? [];
+
+  const counts = new Map<string, number>();
+  for (const restaurant of rows) {
+    for (const tag of restaurant.cuisine_tags ?? []) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  const unknown = [...counts.keys()].filter((tag) => !isKnownCuisine(tag)).sort();
+  const untagged = rows.filter((restaurant) => (restaurant.cuisine_tags ?? []).length === 0).length;
+  const busiest = Math.max(1, ...CUISINES.map((cuisine) => counts.get(cuisine.key) ?? 0));
 
   return (
     <AdminShell
@@ -44,15 +57,27 @@ export default function CategoriesPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >
-      <div className="alert-bar alert-bar--warning">
-        <Icon name="alert" className="nav__icon" aria-hidden />
-        <span>
-          التصنيفات في الإصدار الأول وسوم حرّة على المطعم وليست كياناً مستقلاً. تُضبط من صفحة
-          المطعم، وتظهر هنا للمراجعة فقط.
-        </span>
-      </div>
+      {untagged > 0 ? (
+        <div className="alert-bar alert-bar--warning">
+          <Icon name="alert" className="nav__icon" aria-hidden />
+          <span>
+            {untagged} مطعم بلا تصنيف — لن يظهر لعميل يتصفّح حسب النوع. التصنيف يُضبط من صفحة
+            المطعم.
+          </span>
+        </div>
+      ) : null}
 
-      <Card title="المطاعم وتصنيفاتها" icon="categories">
+      {unknown.length > 0 ? (
+        <div className="alert-bar alert-bar--danger">
+          <Icon name="alert" className="nav__icon" aria-hidden />
+          <span>
+            تصنيفات خارج القائمة المعتمدة: {unknown.join('، ')} — لن يطابقها بحث العملاء. عدّلها من
+            صفحة المطعم.
+          </span>
+        </div>
+      ) : null}
+
+      <Card title="تصنيفات المنصة" icon="categories">
         {restaurants.isError ? (
           <ErrorState
             message={
@@ -63,35 +88,64 @@ export default function CategoriesPage() {
             onRetry={() => void restaurants.refetch()}
           />
         ) : restaurants.isLoading ? (
-          <Skeleton height={280} />
+          <Skeleton height={320} />
         ) : (
-          <DataTable<AdminRestaurant>
-            caption="تصنيفات المطاعم"
-            rows={rows}
-            keyOf={(row) => row.id}
-            emptyMessage="لا توجد مطاعم"
-            columns={[
-              { key: 'name', header: 'المطعم', render: (row) => row.display_name },
-              {
-                key: 'city',
-                header: 'المدينة',
-                render: (row) => row.city_name_ar ?? '—',
-              },
-              {
-                key: 'status',
-                header: 'الحالة',
-                render: (row) => (row.operational_status === 'ACTIVE' ? 'نشط' : 'غير نشط'),
-              },
-              {
-                key: 'orders',
-                header: 'طلبات 7 أيام',
-                numeric: true,
-                render: (row) => row.orders_7d,
-              },
-            ]}
-          />
+          <>
+            <ul className="cuisine-grid">
+              {CUISINES.map((cuisine) => {
+                const count = counts.get(cuisine.key) ?? 0;
+                return (
+                  <li
+                    key={cuisine.key}
+                    className={`cuisine${count === 0 ? ' cuisine--empty' : ''}`}
+                  >
+                    <span className="cuisine__emoji" aria-hidden>
+                      {cuisine.emoji}
+                    </span>
+                    <span className="cuisine__body">
+                      <strong>{cuisine.labelAr}</strong>
+                      <span className="cuisine__meta">
+                        {count === 0 ? 'لا مطاعم بعد' : `${count} مطعم`}
+                      </span>
+                      {/*
+                        The bar is relative to the busiest category, not to the
+                        total: it answers "where are the restaurants?", which is
+                        the question an operator opening this page has.
+                      */}
+                      <span className="cuisine__bar" aria-hidden>
+                        <span style={{ inlineSize: `${(count / busiest) * 100}%` }} />
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p className="cuisine-note">
+              قائمة ثابتة تتشاركها لوحة الإدارة وبوابة المطاعم وتطبيق العملاء. يُختار التصنيف عند{' '}
+              <Link href="/restaurants/new">إضافة مطعم</Link> أو من صفحة المطعم لاحقاً.
+            </p>
+          </>
         )}
       </Card>
+
+      {unknown.length > 0 ? (
+        <Card title="وسوم قديمة خارج القائمة" icon="alert">
+          <ul className="cuisine-grid">
+            {unknown.map((tag) => (
+              <li key={tag} className="cuisine cuisine--stray">
+                <span className="cuisine__emoji" aria-hidden>
+                  ⚠️
+                </span>
+                <span className="cuisine__body">
+                  <strong>{cuisineLabelAr(tag)}</strong>
+                  <span className="cuisine__meta">{counts.get(tag)} مطعم</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </AdminShell>
   );
 }

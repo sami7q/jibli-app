@@ -1,13 +1,7 @@
 import { and, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import {
-  AppError,
-  ERROR_CODES,
-  EVENT_TYPES,
-  OPERATIONAL_STATUSES,
-  success,
-} from '@jibli/contracts';
+import { AppError, CUISINE_KEYS, ERROR_CODES, EVENT_TYPES, OPERATIONAL_STATUSES, success } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
 import { bpsPercent } from '@jibli/money';
 import { displayNameSchema, iraqiPhoneSchema, reasonSchema, uuidSchema } from '@jibli/validation';
@@ -68,7 +62,15 @@ const createSchema = z.object({
   settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']).default('HALF_MONTH'),
   minimum_order_iqd: z.number().int().min(0).default(0),
   delivery_fee_iqd: z.number().int().min(0).default(0),
-  cuisine_tags: z.array(z.string().max(40)).max(10).default([]),
+  /*
+   * Validated against the shipped vocabulary rather than accepting free text.
+   * Free text is how "دجاج" and "الدجاج" became two categories, and how the
+   * customer app's filters end up matching nothing.
+   */
+  cuisine_tags: z
+    .array(z.enum(CUISINE_KEYS as [string, ...string[]]))
+    .max(4)
+    .default([]),
   /** Required when the target city is not open for onboarding (plan §15.1). */
   override_coverage: z.boolean().default(false),
   reason: reasonSchema.optional(),
@@ -96,6 +98,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       .select({
         id: restaurants.id,
         displayName: restaurants.displayName,
+        cuisineTags: restaurants.cuisineTags,
         partnerCode: restaurants.partnerCode,
         onboardingStatus: restaurants.onboardingStatus,
         operationalStatus: restaurants.operationalStatus,
@@ -144,6 +147,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         rows.map((row) => ({
           id: row.id,
           display_name: row.displayName,
+          cuisine_tags: row.cuisineTags,
           partner_code: row.partnerCode,
           onboarding_status: row.onboardingStatus,
           operational_status: row.operationalStatus,

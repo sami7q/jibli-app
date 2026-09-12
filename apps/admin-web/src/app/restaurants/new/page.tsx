@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { LogoUpload } from '@jibli/ui-web';
+import { CUISINES } from '@jibli/contracts';
 import { normalizeDigits, tryToE164Iraq } from '@jibli/validation';
 import { AdminShell } from '@/components/shell';
 import { Card, MfaChallenge } from '@/components/ui';
@@ -40,6 +41,7 @@ export default function NewRestaurantPage() {
     city_id: '',
     address_text: '',
     logo_asset_id: null as string | null,
+    cuisine_tags: [] as string[],
     settlement_policy: 'HALF_MONTH' as 'HALF_MONTH' | 'MONTHLY',
     minimum_order_iqd: 0,
     delivery_fee_iqd: 2000,
@@ -92,6 +94,7 @@ export default function NewRestaurantPage() {
         delivery_fee_iqd: form.delivery_fee_iqd,
         override_coverage: form.override_coverage,
         reason: form.reason || undefined,
+        cuisine_tags: form.cuisine_tags,
         ...(form.logo_asset_id ? { logo_asset_id: form.logo_asset_id } : {}),
       }),
     onSuccess: (result) => router.push(`/restaurants/${result.restaurant_id}`),
@@ -153,6 +156,52 @@ export default function NewRestaurantPage() {
                 />
                 <span className="field__hint">الاسم الذي يظهر للعملاء في التطبيق.</span>
               </div>
+
+              {/*
+                Chosen from a fixed list, not typed. Free text is how the same
+                category ends up spelled three ways, and the customer app filters
+                on exactly these keys.
+              */}
+              <fieldset className="chips">
+                <legend className="chips__legend">
+                  التصنيف
+                  <span className="chips__count">
+                    {form.cuisine_tags.length > 0
+                      ? `${form.cuisine_tags.length} من ٤`
+                      : 'اختر حتى ٤'}
+                  </span>
+                </legend>
+
+                <div className="chips__list">
+                  {CUISINES.map((cuisine) => {
+                    const selected = form.cuisine_tags.includes(cuisine.key);
+                    const full = form.cuisine_tags.length >= 4 && !selected;
+                    return (
+                      <button
+                        key={cuisine.key}
+                        type="button"
+                        className={`chip${selected ? ' chip--on' : ''}`}
+                        aria-pressed={selected}
+                        disabled={full}
+                        onClick={() =>
+                          set(
+                            'cuisine_tags',
+                            selected
+                              ? form.cuisine_tags.filter((tag) => tag !== cuisine.key)
+                              : [...form.cuisine_tags, cuisine.key],
+                          )
+                        }
+                      >
+                        <span aria-hidden>{cuisine.emoji}</span>
+                        {cuisine.labelAr}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="field__hint">
+                  يحدّد أين يظهر المطعم عند تصفّح العملاء. يمكن تعديله لاحقاً.
+                </span>
+              </fieldset>
             </div>
           </Card>
 
@@ -360,6 +409,13 @@ export default function NewRestaurantPage() {
               </div>
               <div className="preview__text">
                 <strong>{form.display_name.trim() || 'اسم المطعم'}</strong>
+                <span>
+                  {form.cuisine_tags.length > 0
+                    ? CUISINES.filter((cuisine) => form.cuisine_tags.includes(cuisine.key))
+                        .map((cuisine) => cuisine.labelAr)
+                        .join('، ')
+                    : selectedCity?.name_ar ?? 'المدينة'}
+                </span>
                 <span>
                   {selectedCity?.name_ar ?? 'المدينة'}
                   {form.delivery_fee_iqd > 0

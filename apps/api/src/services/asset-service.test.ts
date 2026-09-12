@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectImageType, MAX_ASSET_BYTES } from './asset-service.js';
+import { detectImageType, DEFAULT_MAX_ASSET_BYTES } from './asset-service.js';
 
 /**
  * The upload path decides what a file is from its bytes, not from what the
@@ -69,14 +69,13 @@ describe('detectImageType()', () => {
   });
 });
 
-describe('MAX_ASSET_BYTES', () => {
-  it('stays inside the request body limit once base64 has inflated it', () => {
+describe('DEFAULT_MAX_ASSET_BYTES', () => {
+  it('matches the platform upload ceiling rather than a number of its own', () => {
     /*
-     * base64 costs about a third on top. The API's default body limit is 1 MB,
-     * so a cap that ignored the encoding would be rejected by the server before
-     * the friendly message about file size could ever be produced.
+     * `UPLOAD_MAX_BYTES` has been 5 MB in the environment schema all along, and
+     * this module used to hard-code 512 KB — so the platform refused photos it
+     * was configured to accept. The two must not drift again.
      */
-    const encodedSize = Math.ceil(MAX_ASSET_BYTES / 3) * 4;
-    expect(encodedSize).toBeLessThan(1024 * 1024);
+    expect(DEFAULT_MAX_ASSET_BYTES).toBe(5 * 1024 * 1024);
   });
 });

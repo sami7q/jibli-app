@@ -1338,3 +1338,162 @@ html {
     position: static;
   }
 }
+
+/* ── Category chips ──────────────────────────────────────────────────────── */
+
+/*
+ * A fieldset of toggles, not a multi-select. Twenty-two categories in a native
+ * multi-select is a scroll box nobody reads to the end of; as chips they are
+ * scannable, and the emoji does the work of telling them apart at a glance.
+ */
+.chips {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.chips__legend {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.chips__count {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.chips__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.chip:hover:not(:disabled):not(.chip--on) {
+  border-color: var(--jibli-orange-500);
+  color: var(--jibli-orange-600);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--jibli-orange-500);
+  outline-offset: 2px;
+}
+
+/* Selected is the accent; everything unselected stays quiet so the chosen
+   few are readable at a glance across twenty-two options. */
+.chip--on {
+  background: var(--jibli-orange-500);
+  border-color: var(--jibli-orange-500);
+  color: #fff;
+  font-weight: 600;
+}
+
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Cuisine coverage ────────────────────────────────────────────────────── */
+
+.cuisine-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-2);
+}
+
+.cuisine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+/* An empty category is information, not an error: it fades rather than shouts. */
+.cuisine--empty {
+  background: var(--surface-sunken);
+}
+.cuisine--empty .cuisine__emoji {
+  opacity: 0.45;
+}
+
+.cuisine--stray {
+  border-color: var(--jibli-danger-500);
+}
+
+.cuisine__emoji {
+  font-size: 1.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cuisine__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cuisine__body strong {
+  font-size: var(--text-sm);
+}
+
+.cuisine__meta {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.cuisine__bar {
+  display: block;
+  block-size: 4px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.cuisine--empty .cuisine__bar {
+  background: var(--border-subtle);
+}
+
+.cuisine__bar > span {
+  display: block;
+  block-size: 100%;
+  background: var(--jibli-orange-500);
+  border-radius: inherit;
+}
+
+.cuisine-note {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.7;
+}

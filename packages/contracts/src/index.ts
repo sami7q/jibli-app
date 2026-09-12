@@ -1,4 +1,5 @@
 export * from './enums.js';
+export * from './cuisines.js';
 export * from './errors.js';
 export * from './envelope.js';
 export * from './permissions.js';

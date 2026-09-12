@@ -310,7 +310,7 @@ function ProfileCard({
           setLogoAssetId(assetId);
           setLogoPreview(previewUrl);
         }}
-        hint="PNG أو JPG أو WebP، حتى ٥١٢ كيلوبايت. يظهر للعملاء في التطبيق وعلى الفاتورة."
+        hint="PNG أو JPG أو WebP، حتى ٥ ميغابايت. تُصغّر تلقائياً قبل الرفع."
       />
 
       <div className="split">

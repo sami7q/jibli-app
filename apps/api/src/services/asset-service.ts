@@ -32,8 +32,22 @@ const ACCEPTED = {
 
 export type AcceptedContentType = keyof typeof ACCEPTED;
 
-/** 512 KB. A logo that needs more than this needs resizing, not more storage. */
-export const MAX_ASSET_BYTES = 512 * 1024;
+/**
+ * The ceiling, and a floor under the ceiling.
+ *
+ * `UPLOAD_MAX_BYTES` already existed in the environment schema at 5 MB and this
+ * file ignored it, hard-coding 512 KB — so a phone photo was refused by a
+ * platform configured to accept it. The env value is the source of truth now.
+ *
+ * It is rarely reached: the browser downscales before uploading, so a 4 MB
+ * camera photo arrives as a few tens of kilobytes. This limit is what stops a
+ * client that skips that step, not what the person choosing a file runs into.
+ */
+export const DEFAULT_MAX_ASSET_BYTES = 5 * 1024 * 1024;
+
+export function maxAssetBytes(ctx: AppContext): number {
+  return ctx.env.UPLOAD_MAX_BYTES ?? DEFAULT_MAX_ASSET_BYTES;
+}
 
 function startsWith(buffer: Buffer, signature: readonly number[]): boolean {
   if (buffer.length < signature.length) return false;
@@ -95,10 +109,11 @@ export async function storeAsset(
     });
   }
 
-  if (buffer.byteLength > MAX_ASSET_BYTES) {
+  const limit = maxAssetBytes(ctx);
+  if (buffer.byteLength > limit) {
     throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
-      details: { reason: 'FILE_TOO_LARGE', max_bytes: MAX_ASSET_BYTES },
-      messageAr: 'حجم الصورة أكبر من 512 كيلوبايت',
+      details: { reason: 'FILE_TOO_LARGE', max_bytes: limit },
+      messageAr: `حجم الصورة أكبر من ${Math.round(limit / (1024 * 1024))} ميغابايت`,
     });
   }
 

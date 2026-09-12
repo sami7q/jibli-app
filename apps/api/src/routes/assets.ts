@@ -4,7 +4,7 @@ import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { uuidSchema } from '@jibli/validation';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
-import { MAX_ASSET_BYTES, readAsset, storeAsset } from '../services/asset-service.js';
+import { maxAssetBytes, readAsset, storeAsset } from '../services/asset-service.js';
 
 /**
  * Image upload and delivery.
@@ -17,10 +17,19 @@ import { MAX_ASSET_BYTES, readAsset, storeAsset } from '../services/asset-servic
 
 const uploadSchema = z.object({
   /** Data URL or bare base64; the service tolerates either. */
-  data: z.string().min(16).max(Math.ceil((MAX_ASSET_BYTES / 3) * 4) + 1024),
+  data: z.string().min(16),
   purpose: z.enum(['RESTAURANT_LOGO', 'RESTAURANT_COVER']).default('RESTAURANT_LOGO'),
   restaurant_id: uuidSchema.optional(),
 });
+
+/**
+ * base64 costs a third on top, and Fastify rejects an oversized body before any
+ * handler runs — so a limit that ignored the encoding would answer a 4 MB photo
+ * with a bare 413 instead of the message that says what to do about it.
+ */
+function encodedLimit(rawBytes: number): number {
+  return Math.ceil((rawBytes / 3) * 4) + 64 * 1024;
+}
 
 export function registerAssetRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post(
@@ -33,6 +42,8 @@ export function registerAssetRoutes(app: FastifyInstance, ctx: AppContext): void
        * just CPU.
        */
       config: { rateLimit: { max: 30, timeWindow: '10 minutes' } },
+      // Larger than the global body limit, and only here.
+      bodyLimit: encodedLimit(maxAssetBytes(ctx)),
     },
     async (request, reply) => {
       const principal = requirePrincipal(request);
