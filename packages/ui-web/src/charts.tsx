@@ -150,16 +150,34 @@ export function BarChart({
  * Only a handful of axis labels are drawn: thirty date labels would overlap
  * into an unreadable smear at this width.
  */
+/**
+ * Where gridlines sit and what the value axis names. Zero is included so the
+ * baseline is labelled rather than left to be inferred.
+ */
+const AXIS_FRACTIONS = [0, 0.25, 0.5, 0.75, 1] as const;
+
+/** "12.5 مليون د.ع" -> "12.5 مليون". */
+function compactAxisTick(value: number): string {
+  return moneyCompact(value).replace(/\s*د\.ع$/, '');
+}
+
 export function AreaChart({
   points,
   height = 190,
   caption,
   format = moneyCompact,
+  axisFormat = compactAxisTick,
 }: {
   points: readonly SeriesPoint[];
   height?: number;
   caption: string;
   format?: (value: number) => string;
+  /**
+   * Tick text. Defaults to the value formatter with the currency dropped — an
+   * axis repeating "د.ع" on every tick spends width the plot needs, and the
+   * panel heading already says what the numbers are.
+   */
+  axisFormat?: (value: number) => string;
 }) {
   const gradientId = useId();
 
@@ -187,6 +205,32 @@ export function AreaChart({
 
   return (
     <div dir="ltr" style={{ width: '100%' }}>
+      {/*
+        The value axis is HTML, not SVG text. The plot uses
+        `preserveAspectRatio="none"` so its viewBox stretches horizontally to
+        whatever width it is given, and any glyph inside would stretch with it.
+      */}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
+        <div
+          aria-hidden
+          style={{
+            display: 'flex',
+            flexDirection: 'column-reverse',
+            justifyContent: 'space-between',
+            height: plotHeight,
+            fontSize: 'var(--text-xs)',
+            lineHeight: 1,
+            color: 'var(--text-muted)',
+            textAlign: 'end',
+            flexShrink: 0,
+          }}
+        >
+          {AXIS_FRACTIONS.map((fraction) => (
+            <span key={fraction}>{axisFormat(max * fraction)}</span>
+          ))}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
       <svg
         viewBox={`0 0 100 ${height}`}
         preserveAspectRatio="none"
@@ -201,7 +245,7 @@ export function AreaChart({
           </linearGradient>
         </defs>
 
-        {[0.5, 1].map((fraction) => (
+        {AXIS_FRACTIONS.map((fraction) => (
           <line
             key={fraction}
             x1="0"
@@ -240,6 +284,8 @@ export function AreaChart({
           .map((point) => (
             <span key={point.label}>{point.label}</span>
           ))}
+      </div>
+        </div>
       </div>
 
       <DataTableFallback caption={caption} points={points} format={format} />

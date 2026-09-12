@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { dateTimeAr, relativeAr } from '@jibli/ui-web';
+import { AUDIT_ACTION_LABELS, dateTimeAr, relativeAr } from '@jibli/ui-web';
 import { AdminShell } from '@/components/shell';
 import { Card, DataTable, ErrorState, FilterBar, Select, Skeleton } from '@/components/ui';
 import { adminApi, ApiError, type AuditEntry } from '@/lib/api';
@@ -23,36 +23,6 @@ import { SignedOut } from '@/components/signed-out';
  */
 
 /** Arabic labels for the action codes, grouped as an operator thinks of them. */
-const ACTION_LABELS: Record<string, string> = {
-  'geography.governorate.update': 'تعديل تغطية محافظة',
-  'geography.city.update': 'تعديل تغطية مدينة',
-  'restaurant.create': 'إنشاء مطعم',
-  'restaurant.approve': 'اعتماد مطعم',
-  'restaurant.reject': 'رفض طلب انضمام',
-  'restaurant.request_info': 'طلب معلومات إضافية',
-  'restaurant.suspend': 'إيقاف مطعم',
-  'restaurant.reactivate': 'تفعيل مطعم',
-  'restaurant.commission.update': 'تعديل نسبة عمولة',
-  'restaurant.location_change.approve': 'اعتماد نقل موقع مطعم',
-  'roles.grant': 'منح دور',
-  'roles.revoke': 'سحب دور',
-  'staff.invite': 'دعوة موظف',
-  'staff.deactivate': 'إيقاف موظف',
-  'finance.settlement.generate': 'توليد تسوية',
-  'finance.settlement.issue': 'إصدار كشف عمولة',
-  'finance.settlement.void': 'إلغاء كشف عمولة',
-  'finance.payment.record': 'تسجيل دفعة',
-  'finance.adjustment.create': 'إنشاء تعديل مالي',
-  'order.override': 'تدخل إداري على طلب',
-  'delivery.pin.override': 'تجاوز رمز التسليم',
-  'driver.create': 'إنشاء سائق',
-  'driver.suspend': 'إيقاف سائق',
-  'customer.block': 'حظر عميل',
-  'customer.phone.unmask': 'إظهار رقم هاتف عميل',
-  'config.update': 'تعديل إعداد منصة',
-  'inventory.adjust': 'تعديل مخزون',
-  'export.create': 'تصدير بيانات',
-};
 
 /** Actions that move money or grant power — highlighted in the list. */
 const HIGH_RISK = new Set([
@@ -119,7 +89,7 @@ export default function AuditPage() {
             onChange={setAction}
             label="نوع الإجراء"
             allLabel="كل الإجراءات"
-            options={Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))}
+            options={Object.entries(AUDIT_ACTION_LABELS).map(([value, label]) => ({ value, label }))}
           />
         </FilterBar>
 
@@ -144,7 +114,7 @@ export default function AuditPage() {
                 render: (row) => (
                   <span style={{ fontWeight: HIGH_RISK.has(row.action) ? 700 : 400 }}>
                     {HIGH_RISK.has(row.action) ? '🔒 ' : ''}
-                    {ACTION_LABELS[row.action] ?? row.action}
+                    {AUDIT_ACTION_LABELS[row.action] ?? row.action}
                   </span>
                 ),
               },

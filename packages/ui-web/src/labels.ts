@@ -234,3 +234,82 @@ export const COUPON_STATE_LABELS: Record<string, string> = {
   DISABLED: 'موقوف',
   EXHAUSTED: 'استُنفد',
 };
+
+/**
+ * Audit actions, in Arabic.
+ *
+ * Keyed by the value stored in `audit_logs.action` — the dotted string, not the
+ * constant's name. The dashboard had its own copy keyed by the *name*, so every
+ * row on the main screen rendered the raw `restaurant.create` instead of
+ * Arabic, and the audit page had a second copy that was correct but covered
+ * fewer than half the actions.
+ *
+ * One map, here, covering every action the domain can write. A new action added
+ * without a label shows its raw value, which is the visible reminder to add one.
+ */
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  'config.update': 'تعديل إعدادات المنصة',
+
+  'coupon.create': 'إنشاء كوبون',
+  'coupon.update': 'تعديل كوبون',
+
+  'customer.block': 'حظر عميل',
+  'customer.phone.unmask': 'كشف رقم هاتف عميل',
+
+  'delivery.pin.override': 'تجاوز رمز التسليم',
+
+  'driver.create': 'إضافة مندوب',
+  'driver.suspend': 'إيقاف مندوب',
+
+  'export.create': 'تصدير بيانات',
+
+  'geography.governorate.update': 'تعديل تغطية محافظة',
+  'geography.city.update': 'تعديل تغطية مدينة',
+
+  'inventory.adjust': 'تسوية مخزون',
+
+  'order.override': 'تدخّل إداري في طلب',
+
+  'password.change': 'تغيير كلمة مرور',
+
+  'portal_user.create': 'إنشاء حساب بوابة',
+  'portal_user.reset_password': 'إعادة تعيين كلمة مرور حساب بوابة',
+  'portal_user.suspend': 'إيقاف حساب بوابة',
+  'portal_user.reactivate': 'إعادة تفعيل حساب بوابة',
+
+  'restaurant.create': 'إضافة مطعم',
+  'restaurant.approve': 'اعتماد مطعم',
+  'restaurant.reject': 'رفض طلب انضمام',
+  'restaurant.request_info': 'طلب معلومات إضافية',
+  'restaurant.suspend': 'إيقاف مطعم',
+  'restaurant.reactivate': 'إعادة تفعيل مطعم',
+  'restaurant.commission.update': 'تعديل نسبة عمولة',
+  'restaurant.location_change.approve': 'اعتماد تغيير موقع مطعم',
+
+  'roles.grant': 'منح صلاحية',
+  'roles.revoke': 'سحب صلاحية',
+
+  'staff.invite': 'دعوة موظف',
+  'staff.deactivate': 'إيقاف موظف',
+
+  'finance.settlement.generate': 'توليد كشف تسوية',
+  'finance.settlement.issue': 'إصدار كشف تسوية',
+  'finance.settlement.void': 'إلغاء كشف تسوية',
+  'finance.adjustment.create': 'إضافة تسوية مالية',
+  'finance.payment.record': 'تسجيل دفعة',
+};
+
+/**
+ * Which family an audit action belongs to, for colouring it in a feed.
+ * Derived from the prefix so a new action is classified without a code change.
+ */
+export function auditActionTone(
+  action: string,
+): 'positive' | 'negative' | 'money' | 'neutral' {
+  if (/\.(approve|reactivate|create|grant|invite)$/.test(action)) return 'positive';
+  if (/\.(reject|suspend|void|block|deactivate|revoke|override|unmask)$/.test(action)) {
+    return 'negative';
+  }
+  if (action.startsWith('finance.')) return 'money';
+  return 'neutral';
+}

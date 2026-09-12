@@ -5,9 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AreaChart,
   BarChart,
+  AUDIT_ACTION_LABELS,
+  auditActionTone,
   DonutChart,
   money,
   moneyCompact,
+  moneyDigits,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_TONE,
   percentDelta,
@@ -145,7 +148,7 @@ function StatRow({ data, isLoading }: { data: AdminOverview | undefined; isLoadi
         icon="cash"
         tone="amber"
         label="إجمالي المبيعات اليوم"
-        value={data ? moneyCompact(data.sales_today_iqd) : '—'}
+        value={data ? money(data.sales_today_iqd) : '—'}
         delta={data?.sales_delta ?? null}
         comparison="مقارنةً بالأمس"
       />
@@ -153,7 +156,7 @@ function StatRow({ data, isLoading }: { data: AdminOverview | undefined; isLoadi
         icon="orders"
         tone="green"
         label="طلبات اليوم"
-        value={data ? String(data.orders_today) : '—'}
+        value={data ? new Intl.NumberFormat('en-US').format(data.orders_today) : '—'}
         delta={data?.orders_delta ?? null}
         comparison="مقارنةً بالأمس"
       />
@@ -169,7 +172,7 @@ function StatRow({ data, isLoading }: { data: AdminOverview | undefined; isLoadi
         icon="restaurants"
         tone="orange"
         label="مطاعم نشطة"
-        value={data ? String(data.active_restaurants) : '—'}
+        value={data ? new Intl.NumberFormat('en-US').format(data.active_restaurants) : '—'}
         delta={data?.restaurants_delta ?? null}
         comparison="نمو الانضمام مقارنةً بالشهر الماضي"
       />
@@ -207,14 +210,20 @@ function StatTile({
           infinity or a fabricated number (plan §112).
         */}
         {delta === null ? (
-          <span className="stat__delta" style={{ color: 'var(--text-muted)' }}>
-            لا توجد فترة سابقة للمقارنة
-          </span>
+          <span className="stat__comparison">لا توجد فترة سابقة للمقارنة</span>
         ) : (
-          <span className={`stat__delta stat__delta--${delta >= 0 ? 'up' : 'down'}`}>
-            <span aria-hidden>{delta >= 0 ? '↑' : '↓'}</span>
-            {percentDelta(delta)}
-            <span>{comparison}</span>
+          <span className="stat__trend">
+            {/*
+              The movement is a chip and the period is quiet text beside it.
+              Rendered as one green span they ran together into
+              "↑+12%نمو الانضمام مقارنةً بالشهر الماضي", which reads as a single
+              unparseable number-word.
+            */}
+            <span className={`stat__delta stat__delta--${delta >= 0 ? 'up' : 'down'}`}>
+              <span aria-hidden>{delta >= 0 ? '↑' : '↓'}</span>
+              {percentDelta(delta)}
+            </span>
+            <span className="stat__comparison">{comparison}</span>
           </span>
         )}
       </div>
@@ -458,7 +467,9 @@ function RecentOrdersPanel({ data }: { data: AdminOverview }) {
                 <th scope="col">المطعم</th>
                 <th scope="col">العميل</th>
                 <th scope="col" className="numeric">
-                  المبلغ
+                  {/* Unit in the header, digits in the cells: six columns do not
+                      fit in a third of the page with "د.ع" repeated on each row. */}
+                  المبلغ (د.ع)
                 </th>
                 <th scope="col">الحالة</th>
                 <th scope="col">الوقت</th>
@@ -470,9 +481,13 @@ function RecentOrdersPanel({ data }: { data: AdminOverview }) {
                   <td>
                     <span className="ltr-inline">{order.public_order_number}</span>
                   </td>
-                  <td>{order.restaurant_name}</td>
-                  <td>{order.customer_name}</td>
-                  <td className="numeric">{money(order.total_iqd)}</td>
+                  <td className="truncate" title={order.restaurant_name}>
+                    {order.restaurant_name}
+                  </td>
+                  <td className="truncate" title={order.customer_name}>
+                    {order.customer_name}
+                  </td>
+                  <td className="numeric">{moneyDigits(order.total_iqd)}</td>
                   <td>
                     <span
                       className={`badge badge--${ORDER_STATUS_TONE[order.status as OrderStatus] ?? 'done'}`}
@@ -538,6 +553,13 @@ function CommissionPanel({ data }: { data: AdminOverview }) {
   );
 }
 
+const ACTIVITY_ICONS: Record<ReturnType<typeof auditActionTone>, IconName> = {
+  positive: 'check',
+  negative: 'close',
+  money: 'cash',
+  neutral: 'audit',
+};
+
 function ActivityPanel({ data }: { data: AdminOverview }) {
   return (
     <Panel title="الأنشطة الأخيرة" icon="audit" action={{ href: '/audit', label: 'عرض الكل' }}>
@@ -556,7 +578,12 @@ function ActivityPanel({ data }: { data: AdminOverview }) {
                 borderBlockEnd: '1px solid var(--border-subtle)',
               }}
             >
-              <Icon name="audit" className="nav__icon" aria-hidden />
+              <span
+                className={`activity__icon activity__icon--${auditActionTone(entry.action)}`}
+                aria-hidden
+              >
+                <Icon name={ACTIVITY_ICONS[auditActionTone(entry.action)]} className="nav__icon" />
+              </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 'var(--text-sm)' }}>
                   {AUDIT_ACTION_LABELS[entry.action] ?? entry.action}
@@ -580,22 +607,6 @@ function ActivityPanel({ data }: { data: AdminOverview }) {
  * action type appearing untranslated is a visible prompt to add it, whereas a
  * silently dropped row would hide activity from the people auditing it.
  */
-const AUDIT_ACTION_LABELS: Record<string, string> = {
-  RESTAURANT_CREATE: 'تمت إضافة مطعم جديد',
-  RESTAURANT_APPROVE: 'تم قبول طلب انضمام',
-  RESTAURANT_REJECT: 'تم رفض طلب انضمام',
-  RESTAURANT_SUSPEND: 'تم إيقاف مطعم',
-  COMMISSION_UPDATE: 'تم تعديل نسبة عمولة',
-  ORDER_CANCEL: 'تم إلغاء طلب',
-  SETTLEMENT_ISSUE: 'تم إصدار كشف تسوية',
-  SETTLEMENT_VOID: 'تم إلغاء كشف تسوية',
-  PAYMENT_RECORD: 'تم تسجيل دفعة',
-  INVENTORY_ADJUST: 'تمت تسوية مخزون',
-  GEOGRAPHY_UPDATE: 'تم تعديل تغطية جغرافية',
-  ROLE_ASSIGN: 'تم تعديل صلاحيات مستخدم',
-  PHONE_UNMASK: 'تم كشف رقم هاتف عميل',
-};
-
 function TopRestaurantsPanel({ data }: { data: AdminOverview }) {
   return (
     <Panel
