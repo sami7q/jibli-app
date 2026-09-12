@@ -356,8 +356,31 @@ These are stated so nobody discovers them during a pilot:
 | `PUSH_PROVIDER=console` — no FCM/APNs | No order notifications on phones |
 | No upload endpoint | `assets` table and FKs exist; no restaurant logos or dish photos anywhere |
 | Mobile app has no customer ordering flow | Discovery, cart, checkout and tracking screens are not built |
-| Migration `0004` never applied anywhere | Written and type-checked; no database was reachable from the development machine |
 | E2E suite never executed | 13 tests written; needs Docker, which was unavailable |
+| No automated test touches a database | The five 500s fixed in `2e64bed` reached production because nothing in CI runs a query. `raw-sql.test.ts` refuses the two shapes that failed; it cannot prove a query runs |
 
 The two portals are complete and build for production. The API is complete for
 everything they use.
+
+## 9a. Live as of 2026-09-12
+
+All five migrations are applied to Neon and the stack is serving:
+
+| Component | Where | State |
+|---|---|---|
+| API | Render `jibli-api`, Frankfurt | Live. `/health/ready` reports database and Redis both up |
+| Worker | Render `jibli-worker` | Deployed |
+| Cache | Render `jibli-cache` (Valkey 8, free) | Available |
+| Database | Neon, eu-central-1 | 19 governorates, 115 cities, 0 enabled |
+| Admin portal | Vercel `jibli-app` | Live, signs in against the API through the `/api` rewrite |
+| Restaurant portal | Vercel `jibli-partner` | Live |
+
+Sign-in is verified end to end: `sami` authenticates as SUPER_ADMIN and the
+response carries `must_change_password` and `mfa_enrolment_required`.
+
+Two notes for whoever runs this next:
+
+  - The Render free instance sleeps after 15 minutes. The first request then
+    takes 15-50 seconds. Move to a paid instance before real customers.
+  - No city has ordering enabled, which is why the public geography endpoints
+    return an empty list. That is the gated rollout working, not a fault.
