@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, notInArray } from 'drizzle-orm';
 import { CITIES, GOVERNORATES, SOURCE_VERSION, validateDataset } from '@jibli/geography';
 import type { Database } from '../client.js';
 import { cities, governorates } from '../schema/geography.js';
@@ -137,10 +137,26 @@ export async function seedGeography(db: Database): Promise<GeographySeedResult> 
     // Rows in the database but no longer in the dataset are reported, never
     // deleted — historical orders may reference them (plan §8.2).
     const knownCodes = CITIES.map((c) => c.code);
-    const orphans = await tx
-      .select({ code: cities.code })
-      .from(cities)
-      .where(sql`${cities.code} <> ALL(${knownCodes})`);
+
+    /*
+     * `notInArray`, not a raw `<> ALL(...)`.
+     *
+     * Interpolating a JavaScript array into a `sql` template binds it as one
+     * scalar parameter, and Postgres answers "op ANY/ALL (array) requires array
+     * on right side". Drizzle's helper expands it into a proper list instead.
+     *
+     * The empty guard matters because `NOT IN ()` is a syntax error: with no
+     * canonical cities every existing row would be an orphan, and reporting
+     * that is more useful than failing the whole seed.
+     */
+    const orphans =
+      knownCodes.length === 0
+        ? await tx.select({ code: cities.code }).from(cities)
+        : await tx
+            .select({ code: cities.code })
+            .from(cities)
+            .where(notInArray(cities.code, knownCodes));
+
     result.orphanedCityCodes = orphans.map((o) => o.code);
   });
 

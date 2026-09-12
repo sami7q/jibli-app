@@ -31,3 +31,7 @@ ios/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+.vercel
+
+.vercel
+.env*

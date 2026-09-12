@@ -196,8 +196,15 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
           passwordHash,
           mustChangePassword: true,
           passwordChangedAt: new Date(),
-          // A portal account skips the customer profile flow entirely.
-          profileCompletedAt: new Date(),
+          /*
+           * Deliberately NOT setting profile_completed_at.
+           *
+           * It is a customer-flow marker, and users_profile_geography_complete
+           * requires a completed profile to carry a governorate and a city —
+           * a discovery geography a portal account has no reason to hold. The
+           * flag is only ever read when placing an order, which a portal
+           * account never does (plan §11).
+           */
           status: 'ACTIVE',
         });
 

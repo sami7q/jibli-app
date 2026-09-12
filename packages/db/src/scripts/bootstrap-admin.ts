@@ -160,9 +160,17 @@ async function main(): Promise<void> {
            */
           mustChangePassword: true,
           // Staff are trusted at creation: there is no OTP step for a portal
-          // account, and the profile-completion flow is a customer concern.
+          // account.
           ...(phoneE164 ? { phoneVerifiedAt: new Date() } : {}),
-          profileCompletedAt: new Date(),
+          /*
+           * Deliberately NOT setting profile_completed_at.
+           *
+           * It is a customer-flow marker, and users_profile_geography_complete
+           * requires a completed profile to carry a governorate and a city —
+           * a discovery geography a portal account has no reason to hold. The
+           * flag is only ever read when placing an order, which a portal
+           * account never does (plan §11).
+           */
           status: 'ACTIVE',
         });
       }
