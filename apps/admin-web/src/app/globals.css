@@ -12,6 +12,22 @@
 /* ── Shell ──────────────────────────────────────────────────────────────── */
 
 /*
+ * Density.
+ *
+ * Every size token is in `rem`, so the root is the one lever that moves type,
+ * spacing and radii together and keeps their relationships intact. Admin is a
+ * console that is read all day across many panels at once, not a page to be
+ * browsed; a 15px root fits noticeably more on screen without the ransom-note
+ * effect of shrinking pieces individually.
+ *
+ * Scoped to this portal. The restaurant portal is operated on a tablet at
+ * arm's length in a kitchen and wants the larger root it has.
+ */
+html {
+  font-size: 15px;
+}
+
+/*
  * The rail sits in the FIRST column, and in RTL that is the right-hand edge.
  *
  * It was the second column, and that was two bugs in one declaration. The
@@ -228,18 +244,21 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
 }
 
 .stat {
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-3);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
+  /* Without this the row stretches every tile to match the tallest label. */
+  align-self: start;
 }
 
 .stat__icon {
@@ -266,6 +285,10 @@
 .stat__icon--amber {
   background: var(--jibli-warning-50);
   color: var(--jibli-warning-700);
+}
+.stat__icon--violet {
+  background: var(--jibli-violet-50);
+  color: var(--jibli-violet-700);
 }
 
 .stat__body {
@@ -1020,4 +1043,298 @@
 .requirements li.is-met {
   color: var(--jibli-success-700);
   font-weight: 600;
+}
+
+/* ── Logo upload ─────────────────────────────────────────────────────────── */
+
+/*
+ * The well is a button, not a div with a click handler: choosing a file is an
+ * action, and it should be reachable by keyboard and announce itself as one.
+ */
+.logo-upload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.logo-upload__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.logo-upload__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.logo-upload__well {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.logo-upload__well:hover:not(:disabled) {
+  border-color: var(--jibli-orange-500);
+  color: var(--jibli-orange-600);
+}
+
+.logo-upload__well:focus-visible {
+  outline: 2px solid var(--jibli-orange-500);
+  outline-offset: 2px;
+}
+
+.logo-upload__well:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Once there is an image the dashed invitation has done its job. */
+.logo-upload__well--filled {
+  border-style: solid;
+  border-color: var(--border-subtle);
+  background: var(--surface-card);
+}
+
+.logo-upload__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-upload__placeholder {
+  display: grid;
+  place-items: center;
+}
+
+.logo-upload__busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(255 255 255 / 0.82);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.logo-upload__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 14rem;
+}
+
+.logo-upload__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.logo-upload__remove {
+  color: var(--jibli-danger-700);
+}
+
+.logo-upload__hint,
+.logo-upload__error {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.logo-upload__hint {
+  color: var(--text-muted);
+  max-width: 34ch;
+}
+
+.logo-upload__error {
+  color: var(--jibli-danger-700);
+  font-weight: 500;
+}
+
+/* ── Form layout ─────────────────────────────────────────────────────────── */
+
+/*
+ * Form on one side, the thing being built on the other. The aside sticks
+ * because the submit lives there: a long form whose only button is at the
+ * bottom makes the operator scroll back to act.
+ */
+.form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.form-layout__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.form-layout__aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: sticky;
+  top: var(--space-4);
+}
+
+.form-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.form-grid--pair {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.ltr-input {
+  direction: ltr;
+  text-align: left;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* A value that comes from somewhere else, shown so it is not a surprise. */
+.inherited {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+}
+
+.inherited__value {
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 800;
+  color: var(--jibli-orange-600);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.inherited__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inherited__body strong {
+  font-size: var(--text-sm);
+}
+
+.inherited__body span {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── Listing preview ─────────────────────────────────────────────────────── */
+
+.preview {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.preview__eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.preview__card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.preview__logo {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.preview__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.preview__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.preview__text strong {
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview__text span {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.preview__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+@media (max-width: 1024px) {
+  .form-layout {
+    grid-template-columns: 1fr;
+  }
+  .form-layout__aside {
+    position: static;
+  }
 }

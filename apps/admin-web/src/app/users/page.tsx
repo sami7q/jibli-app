@@ -20,9 +20,9 @@ import {
 } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminCustomer } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Customer directory (plan §84, §87).
@@ -80,13 +80,12 @@ export default function UsersPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   return (
     <AdminShell
       title="المستخدمون"
-      subtitle="عملاء جيبلي المسجّلون"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >

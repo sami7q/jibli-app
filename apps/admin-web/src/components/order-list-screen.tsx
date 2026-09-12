@@ -18,9 +18,9 @@ import {
 } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminOrder } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * The global order list, shared by three routes (plan §87).
@@ -39,7 +39,7 @@ export function OrderListScreen({
 }: {
   scope: 'all' | 'live' | 'cancelled';
   title: string;
-  subtitle: string;
+  subtitle?: string;
 }) {
   const session = useAdminSession();
   const [search, setSearch] = useState('');
@@ -63,13 +63,13 @@ export function OrderListScreen({
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   return (
     <AdminShell
       title={title}
-      subtitle={subtitle}
+      {...(subtitle ? { subtitle } : {})}
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       liveOrders={scope === 'live' ? (orders.data?.length ?? 0) : 0}

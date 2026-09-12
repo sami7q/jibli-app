@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BUSY_MODES, BUSY_MODE_EXTRA_MINUTES, type BusyMode } from '@jibli/contracts';
-import { money } from '@jibli/ui-web';
+import { LogoUpload, money } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
@@ -266,6 +266,8 @@ function ProfileCard({
   onChanged: () => void;
 }) {
   const [description, setDescription] = useState(data.restaurant.description_ar ?? '');
+  const [logoAssetId, setLogoAssetId] = useState<string | null | undefined>(undefined);
+  const [logoPreview, setLogoPreview] = useState<string | null>(data.restaurant.logo_url);
   const [minimumOrder, setMinimumOrder] = useState(data.restaurant.minimum_order_iqd);
   const [deliveryFee, setDeliveryFee] = useState(data.branch.delivery_fee_iqd);
   const [prepMinutes, setPrepMinutes] = useState(data.branch.base_preparation_minutes);
@@ -279,6 +281,8 @@ function ProfileCard({
     mutationFn: () =>
       portal.updateSettings(auth, {
         description_ar: description.trim(),
+        // `undefined` leaves the logo untouched; `null` clears it.
+        ...(logoAssetId !== undefined ? { logo_asset_id: logoAssetId } : {}),
         minimum_order_iqd: minimumOrder,
         delivery_fee_iqd: deliveryFee,
         base_preparation_minutes: prepMinutes,
@@ -298,6 +302,17 @@ function ProfileCard({
 
   return (
     <Card title="بيانات المطعم" subtitle="ما يراه العميل وما يحكم استقبال الطلبات">
+      <LogoUpload
+        value={logoPreview}
+        disabled={!canWrite}
+        upload={(dataUrl) => portal.uploadImage(auth, { data: dataUrl, purpose: 'RESTAURANT_LOGO' })}
+        onChange={(assetId, previewUrl) => {
+          setLogoAssetId(assetId);
+          setLogoPreview(previewUrl);
+        }}
+        hint="PNG أو JPG أو WebP، حتى ٥١٢ كيلوبايت. يظهر للعملاء في التطبيق وعلى الفاتورة."
+      />
+
       <div className="split">
         <div className="field">
           <label htmlFor="set-min">الحد الأدنى للطلب (دينار)</label>

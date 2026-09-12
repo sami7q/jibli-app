@@ -13,7 +13,7 @@ import type {
   NotificationChannel,
   OutboxStatus,
 } from '@jibli/contracts';
-import { createdAt, fk, money, primaryId, updatedAt, utcTimestamp } from './_shared.js';
+import { bytea, createdAt, fk, money, primaryId, updatedAt, utcTimestamp } from './_shared.js';
 import { users } from './identity.js';
 import { restaurants } from './restaurants.js';
 
@@ -229,6 +229,20 @@ export const assets = pgTable(
     index('assets_restaurant_idx').on(table.restaurantId),
   ],
 );
+
+/**
+ * The bytes behind an asset (migration 0006).
+ *
+ * A separate table on purpose: `select *` on `assets` must never drag image
+ * data across the wire. Only the route that serves an image reads from here.
+ */
+export const assetBytes = pgTable('asset_bytes', {
+  assetId: fk('asset_id')
+    .primaryKey()
+    .references(() => assets.id, { onDelete: 'cascade' }),
+  data: bytea('data').notNull(),
+  createdAt: createdAt(),
+});
 
 /** Distributed locks for scheduled jobs (plan §94). DB-backed so it survives a Redis flush. */
 export const jobLocks = pgTable(

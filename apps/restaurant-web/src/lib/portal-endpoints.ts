@@ -186,6 +186,8 @@ export interface WorkingHour {
 
 export interface PortalSettings {
   restaurant: {
+    /** Ready to render; the portal shows it, it does not resolve it. */
+    logo_url: string | null;
     id: string;
     display_name: string;
     description_ar: string | null;
@@ -556,6 +558,14 @@ export const portal = {
     }),
 
   // ── Settings ────────────────────────────────────────────────────────────
+  /** Posts a data URL and returns the stored asset. Same contract as Admin. */
+  uploadImage: (auth: Auth, body: { data: string; purpose?: 'RESTAURANT_LOGO' }) =>
+    apiRequest<{ asset_id: string; url: string }>('/api/v1/uploads', {
+      ...scoped(auth),
+      method: 'POST',
+      body: { ...body, restaurant_id: auth.restaurantId },
+    }),
+
   settings: (auth: Auth) =>
     apiRequest<PortalSettings>('/api/v1/restaurant-portal/settings', scoped(auth)),
 

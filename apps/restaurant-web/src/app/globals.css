@@ -1073,3 +1073,124 @@
   color: var(--jibli-success-700);
   font-weight: 600;
 }
+
+/* ── Logo upload ─────────────────────────────────────────────────────────── */
+
+/*
+ * The well is a button, not a div with a click handler: choosing a file is an
+ * action, and it should be reachable by keyboard and announce itself as one.
+ */
+.logo-upload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.logo-upload__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.logo-upload__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.logo-upload__well {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.logo-upload__well:hover:not(:disabled) {
+  border-color: var(--jibli-orange-500);
+  color: var(--jibli-orange-600);
+}
+
+.logo-upload__well:focus-visible {
+  outline: 2px solid var(--jibli-orange-500);
+  outline-offset: 2px;
+}
+
+.logo-upload__well:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Once there is an image the dashed invitation has done its job. */
+.logo-upload__well--filled {
+  border-style: solid;
+  border-color: var(--border-subtle);
+  background: var(--surface-card);
+}
+
+.logo-upload__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-upload__placeholder {
+  display: grid;
+  place-items: center;
+}
+
+.logo-upload__busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(255 255 255 / 0.82);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.logo-upload__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 14rem;
+}
+
+.logo-upload__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.logo-upload__remove {
+  color: var(--jibli-danger-700);
+}
+
+.logo-upload__hint,
+.logo-upload__error {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.logo-upload__hint {
+  color: var(--text-muted);
+  max-width: 34ch;
+}
+
+.logo-upload__error {
+  color: var(--jibli-danger-700);
+  font-weight: 500;
+}

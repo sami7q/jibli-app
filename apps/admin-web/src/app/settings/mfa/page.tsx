@@ -8,8 +8,8 @@ import { Badge, Card, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * MFA enrolment (plan §88).
@@ -55,7 +55,7 @@ export default function MfaPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   const mfa = status.data;

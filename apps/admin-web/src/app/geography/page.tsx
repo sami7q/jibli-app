@@ -2,8 +2,8 @@
 
 import { AdminShell } from '@/components/shell';
 import { GeographyCoverage } from '@/components/geography-coverage';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * `المناطق والتغطية` (plan §8.8).
@@ -15,13 +15,13 @@ export default function GeographyPage() {
   const session = useAdminSession();
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   return (
     <AdminShell
       title="المناطق والتغطية"
-      subtitle="تحكّم مركزي في تسجيل العملاء وانضمام المطاعم وتفعيل الطلبات لكل محافظة ومدينة"
+      subtitle="مفتاح لكل مدينة: تسجيل العملاء، انضمام المطاعم، الطلبات"
       userName={session.userName}
       userRoleAr={session.roleAr}
     >

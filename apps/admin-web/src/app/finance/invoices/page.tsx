@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { AdminShell } from '@/components/shell';
 import { Card } from '@/components/ui';
 import { Icon } from '@/components/icon';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * `الفواتير` (plan §253).
@@ -26,13 +26,12 @@ export default function InvoicesPage() {
   const session = useAdminSession();
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   return (
     <AdminShell
       title="الفواتير"
-      subtitle="حالة المستندات المالية الرسمية"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >

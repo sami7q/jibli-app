@@ -96,6 +96,10 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
               id: row.restaurant.id,
               display_name: row.restaurant.displayName,
               description_ar: row.restaurant.descriptionAr,
+              /* URL rather than the raw id: the portal renders it, it does not look it up. */
+              logo_url: row.restaurant.logoAssetId
+                ? `/api/v1/assets/${row.restaurant.logoAssetId}`
+                : null,
               partner_code: row.restaurant.partnerCode,
               operational_status: row.restaurant.operationalStatus,
               cuisine_tags: row.restaurant.cuisineTags,
@@ -364,6 +368,8 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
       const body = z
         .object({
           description_ar: z.string().max(300).optional(),
+          /** Asset id from POST /api/v1/uploads. Null clears the logo. */
+          logo_asset_id: uuidSchema.nullable().optional(),
           minimum_order_iqd: z.number().int().min(0).max(1_000_000).optional(),
           delivery_fee_iqd: z.number().int().min(0).max(1_000_000).optional(),
           base_preparation_minutes: z.number().int().min(5).max(240).optional(),
@@ -382,6 +388,7 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
             .update(restaurants)
             .set({
               ...(body.description_ar !== undefined ? { descriptionAr: body.description_ar } : {}),
+              ...(body.logo_asset_id !== undefined ? { logoAssetId: body.logo_asset_id } : {}),
               ...(body.minimum_order_iqd !== undefined
                 ? { minimumOrderIqd: body.minimum_order_iqd }
                 : {}),

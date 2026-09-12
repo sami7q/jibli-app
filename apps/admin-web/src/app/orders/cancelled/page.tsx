@@ -14,7 +14,7 @@ export default function CancelledOrdersPage() {
     <OrderListScreen
       scope="cancelled"
       title="الطلبات الملغاة"
-      subtitle="الطلبات الملغاة والمرفوضة — راجع الأسباب لرصد مشاكل متكررة"
+      subtitle="راجع الأسباب لرصد مشاكل متكررة"
     />
   );
 }

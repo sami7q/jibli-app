@@ -20,8 +20,8 @@ import {
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin, type CommissionConfigView } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Restaurant detail (plan §18, §24, §122).
@@ -73,7 +73,7 @@ export default function RestaurantDetailPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   const data = restaurant.data;

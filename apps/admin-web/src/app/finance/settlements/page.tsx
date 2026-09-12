@@ -21,8 +21,8 @@ import {
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminSettlement } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Commission statements (plan §41, §42, §44).
@@ -78,7 +78,7 @@ export default function SettlementsPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   const failedChecks = (summary.data?.reconciliation ?? []).filter((check) => !check.passed);

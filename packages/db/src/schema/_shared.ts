@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, numeric, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, customType, numeric, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * Column builders shared by every table.
@@ -41,3 +41,14 @@ export const version = () =>
   bigint('version', { mode: 'number' })
     .notNull()
     .default(0);
+
+/**
+ * Raw bytes.
+ *
+ * drizzle-orm has no `bytea` builder, and the driver hands the column back as a
+ * Node Buffer either way, so the type is declared here once rather than cast at
+ * every call site.
+ */
+export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});

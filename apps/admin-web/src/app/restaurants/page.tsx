@@ -8,9 +8,9 @@ import { AdminShell } from '@/components/shell';
 import { Badge, Card, DataTable, ErrorState, FilterBar, SearchInput, Select, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminRestaurant } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Restaurant directory (plan §87).
@@ -49,13 +49,12 @@ export default function RestaurantsPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   return (
     <AdminShell
       title="المطاعم"
-      subtitle="جميع المطاعم المسجّلة في المنصة وحالتها التشغيلية"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={

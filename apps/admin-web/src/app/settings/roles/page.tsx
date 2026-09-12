@@ -18,8 +18,8 @@ import {
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin, type StaffMember } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Roles and permissions (plan §85, §86, §87, §88).
@@ -68,7 +68,7 @@ export default function RolesPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   const members = staff.data ?? [];
@@ -77,7 +77,6 @@ export default function RolesPage() {
   return (
     <AdminShell
       title="الأدوار والصلاحيات"
-      subtitle="من يملك أي صلاحية على المنصة"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >

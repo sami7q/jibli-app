@@ -7,8 +7,8 @@ import { Badge, Card, ErrorState, Money, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Financial reports (plan §39, §95, §129, §130).
@@ -41,7 +41,7 @@ export default function FinanceReportsPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   const data = summary.data;

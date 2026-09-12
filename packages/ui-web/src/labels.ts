@@ -123,7 +123,6 @@ export const ADMIN_NAV = [
     group: 'إدارة المطاعم',
     items: [
       { href: '/restaurants', labelAr: 'المطاعم', icon: 'restaurants' },
-      { href: '/restaurants/new', labelAr: 'إضافة مطعم', icon: 'add' },
       { href: '/applications', labelAr: 'طلبات الانضمام', icon: 'applications' },
       { href: '/categories', labelAr: 'التصنيفات', icon: 'categories' },
     ],

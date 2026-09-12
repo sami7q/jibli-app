@@ -6,8 +6,8 @@ import { Card, DataTable, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminRestaurant } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Cuisine categories (plan §130 `التصنيفات`).
@@ -30,7 +30,7 @@ export default function CategoriesPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   // The list endpoint does not project cuisine tags, so usage is derived from
@@ -41,7 +41,6 @@ export default function CategoriesPage() {
   return (
     <AdminShell
       title="التصنيفات"
-      subtitle="تصنيفات المطاعم المستخدمة فعلياً في المنصة"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >

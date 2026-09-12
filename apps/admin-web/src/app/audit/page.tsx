@@ -6,8 +6,8 @@ import { AUDIT_ACTION_LABELS, dateTimeAr, relativeAr } from '@jibli/ui-web';
 import { AdminShell } from '@/components/shell';
 import { Card, DataTable, ErrorState, FilterBar, Select, Skeleton } from '@/components/ui';
 import { adminApi, ApiError, type AuditEntry } from '@/lib/api';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Audit trail (plan §64).
@@ -65,7 +65,7 @@ export default function AuditPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   return (

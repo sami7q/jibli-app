@@ -67,7 +67,6 @@ export default function AdminDashboardPage() {
   return (
     <AdminShell
       title={`مرحباً ${session.userName || 'بك'} 👋`}
-      subtitle="هنا نظرة سريعة على أداء المنصة اليوم"
       userName={session.userName}
       userRoleAr={session.roleAr}
       pendingApplications={data?.open_applications ?? 0}
@@ -139,7 +138,7 @@ function StatRow({ data, isLoading }: { data: AdminOverview | undefined; isLoadi
       <StatTile
         icon="commissions"
         tone="orange"
-        label="إيرادات المنصة (عمولة مستحقة اليوم)"
+        label="عمولة مستحقة اليوم"
         value={data ? money(data.commission_today_iqd) : '—'}
         delta={data?.commission_delta ?? null}
         comparison="مقارنةً بالأمس"
@@ -147,7 +146,7 @@ function StatRow({ data, isLoading }: { data: AdminOverview | undefined; isLoadi
       <StatTile
         icon="cash"
         tone="amber"
-        label="إجمالي المبيعات اليوم"
+        label="مبيعات اليوم"
         value={data ? money(data.sales_today_iqd) : '—'}
         delta={data?.sales_delta ?? null}
         comparison="مقارنةً بالأمس"
@@ -170,7 +169,7 @@ function StatRow({ data, isLoading }: { data: AdminOverview | undefined; isLoadi
       />
       <StatTile
         icon="restaurants"
-        tone="orange"
+        tone="violet"
         label="مطاعم نشطة"
         value={data ? new Intl.NumberFormat('en-US').format(data.active_restaurants) : '—'}
         delta={data?.restaurants_delta ?? null}
@@ -189,7 +188,7 @@ function StatTile({
   comparison,
 }: {
   icon: IconName;
-  tone: 'orange' | 'blue' | 'green' | 'amber';
+  tone: 'orange' | 'blue' | 'green' | 'amber' | 'violet';
   label: string;
   value: string;
   delta: number | null;
@@ -209,9 +208,13 @@ function StatTile({
           and the tile says there is nothing to compare, instead of printing an
           infinity or a fabricated number (plan §112).
         */}
-        {delta === null ? (
-          <span className="stat__comparison">لا توجد فترة سابقة للمقارنة</span>
-        ) : (
+        {/*
+          No comparison means no line. It used to print "لا توجد فترة سابقة
+          للمقارنة" on all five tiles at once — the same sentence, five
+          times, saying only that there is nothing to say. A tile with no
+          movement to report reports none.
+        */}
+        {delta === null ? null : (
           <span className="stat__trend">
             {/*
               The movement is a chip and the period is quiet text beside it.

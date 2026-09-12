@@ -8,8 +8,8 @@ import { Badge, Card, ErrorState, MfaChallenge, Skeleton } from '@/components/ui
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin, type ConfigEntry } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Platform configuration (plan §118).
@@ -60,7 +60,7 @@ export default function SettingsPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   const entries = config.data ?? [];

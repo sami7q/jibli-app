@@ -171,6 +171,16 @@ export type CapabilityPatch = Partial<Record<`${GeographyCapability}_enabled` | 
 // ── Endpoints ──────────────────────────────────────────────────────────────
 
 export const adminApi = {
+  /** Posts a data URL and returns the stored asset. Shared shape with the restaurant portal. */
+  uploadImage: (
+    token: string,
+    body: { data: string; purpose?: 'RESTAURANT_LOGO' | 'RESTAURANT_COVER'; restaurant_id?: string },
+  ) =>
+    apiRequest<{ asset_id: string; url: string; content_type: string; byte_size: number }>(
+      '/api/v1/uploads',
+      { method: 'POST', accessToken: token, body },
+    ),
+
   governorates: (token: string) =>
     apiRequest<AdminGovernorate[]>('/api/v1/admin/geography/governorates', {
       accessToken: token,

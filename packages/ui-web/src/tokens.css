@@ -49,6 +49,12 @@
   --jibli-info-50: #eff8ff;
   --jibli-info-500: #2e90fa;
 
+  /* The fifth headline tile. Five tiles and four tones meant two of them
+     shared orange, so the row read as four categories, not five. */
+  --jibli-violet-50: #f4f3ff;
+  --jibli-violet-500: #7a5af8;
+  --jibli-violet-700: #5925dc;
+
   /* ── Surfaces ───────────────────────────────────────────────────────── */
   --surface-page: var(--jibli-ink-50);
   --surface-card: #ffffff;

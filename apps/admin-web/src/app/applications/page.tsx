@@ -14,8 +14,8 @@ import {
 } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { adminApi, ApiError, type RestaurantApplication } from '@/lib/api';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Restaurant onboarding review (plan §15.2, §69).
@@ -48,13 +48,12 @@ export default function ApplicationsPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   return (
     <AdminShell
       title="طلبات الانضمام"
-      subtitle="مراجعة طلبات المطاعم الراغبة بالانضمام إلى جيبلي"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       pendingApplications={applications.data?.length ?? 0}

@@ -20,9 +20,9 @@ import {
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminDriver } from '@/lib/admin-endpoints';
+import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
-import { SignedOut } from '@/components/signed-out';
 
 /**
  * Driver oversight (plan §45, §54, §87).
@@ -82,7 +82,7 @@ export default function DriversPage() {
   });
 
   if (session.status !== 'authenticated') {
-    return <SignedOut reason={session.status === 'unauthenticated' ? session.reason : undefined} />;
+    return <SessionGate session={session} />;
   }
 
   const rows = drivers.data ?? [];
@@ -91,7 +91,7 @@ export default function DriversPage() {
   return (
     <AdminShell
       title="المندوبون"
-      subtitle="سائقو التوصيل التابعون للمطاعم وعهدهم النقدية"
+      subtitle="مندوبو المطاعم وعهدهم النقدية"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >

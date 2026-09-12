@@ -28,6 +28,7 @@ import {
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import { effectiveCapabilitySql } from '../../services/geography-service.js';
+import { getConfig } from '../../services/config-service.js';
 
 /**
  * Admin restaurant management (plan §15.1, §69, §87).
@@ -55,7 +56,15 @@ const createSchema = z.object({
   address_text: z.string().min(5).max(300),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
-  commission_rate_bps: z.number().int().min(0).max(10_000).default(1500),
+  /*
+   * Optional, and normally absent. The commission is one platform-wide number
+   * set in Admin > Settings; typing it again for each restaurant is how two
+   * restaurants silently end up on different rates. It stays accepted so a
+   * negotiated exception can still be recorded deliberately.
+   */
+  commission_rate_bps: z.number().int().min(0).max(10_000).optional(),
+  /** Asset id from POST /api/v1/uploads. */
+  logo_asset_id: uuidSchema.optional(),
   settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']).default('HALF_MONTH'),
   minimum_order_iqd: z.number().int().min(0).default(0),
   delivery_fee_iqd: z.number().int().min(0).default(0),
@@ -332,6 +341,14 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       }
 
       const providerId = uuidv7();
+      /*
+       * Resolved before the transaction opens, and falling back to the platform
+       * default rather than to a number compiled into this file: an operator who
+       * changes the rate in Settings expects the next restaurant to get it.
+       */
+      const commissionRateBps =
+        body.commission_rate_bps ?? (await getConfig(ctx, 'default_commission_rate_bps', 1500));
+
       const restaurantId = uuidv7();
       const branchId = uuidv7();
       const now = new Date();
@@ -355,6 +372,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         minimumOrderIqd: body.minimum_order_iqd,
         approvedAt: now,
         approvedBy: principal.userId,
+        ...(body.logo_asset_id ? { logoAssetId: body.logo_asset_id } : {}),
       });
 
       await tx.insert(restaurantBranches).values({
@@ -384,7 +402,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       await tx.insert(restaurantCommissionConfigs).values({
         id: uuidv7(),
         restaurantId,
-        commissionRateBps: body.commission_rate_bps,
+        commissionRateBps,
         settlementPolicy: body.settlement_policy,
         effectiveFrom: now,
         createdBy: principal.userId,
@@ -398,7 +416,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         after: {
           displayName: body.display_name,
           cityId: body.city_id,
-          commissionRateBps: body.commission_rate_bps,
+          commissionRateBps,
           coverageOverridden: !geo.onboardingEnabled,
         },
         reason: body.reason ?? null,
