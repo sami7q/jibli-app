@@ -2,13 +2,16 @@
 # =============================================================================
 # API and worker image.
 #
-# One Dockerfile for both: they share every dependency and differ only in which
-# entry point is bundled, so SERVICE selects the target.
+# One image carrying both bundles, with the command choosing which to run:
 #
-#   docker build -f infra/docker/Dockerfile.service --build-arg SERVICE=api  -t jibli-api .
-#   docker build -f infra/docker/Dockerfile.service --build-arg SERVICE=worker -t jibli-worker .
+#   node build/api/index.js
+#   node build/worker/index.js
 #
-# The build bundles the service into a single file (scripts/bundle.mjs), so the
+# Not two images. They share every dependency and differ only in an entry
+# point, so building twice would double the build minutes to produce two
+# near-identical layers — and let the two drift to different commits.
+#
+# The build bundles each service into a single file (scripts/bundle.mjs), so the
 # runtime stage carries no workspace node_modules at all — only the one native
 # addon esbuild cannot inline.
 # =============================================================================
@@ -30,6 +33,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/worker/package.json apps/worker/
 COPY apps/admin-web/package.json apps/admin-web/
 COPY apps/restaurant-web/package.json apps/restaurant-web/
+COPY apps/mobile/package.json apps/mobile/
 COPY packages/auth/package.json packages/auth/
 COPY packages/config/package.json packages/config/
 COPY packages/contracts/package.json packages/contracts/
@@ -48,13 +52,15 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 
 # ── Build ────────────────────────────────────────────────────────────────────
 FROM deps AS build
-ARG SERVICE
 WORKDIR /repo
 COPY . .
 
-# Type errors must fail the image, not surface at runtime.
-RUN pnpm --filter "@jibli/${SERVICE}" exec tsc --noEmit
-RUN node scripts/bundle.mjs "${SERVICE}"
+# Type errors fail the image rather than surfacing at runtime.
+RUN pnpm --filter @jibli/api exec tsc --noEmit
+RUN pnpm --filter @jibli/worker exec tsc --noEmit
+
+RUN node scripts/bundle.mjs api
+RUN node scripts/bundle.mjs worker
 
 # Resolve the one external dependency into a flat, copyable tree. pnpm's
 # isolated linker uses symlinks that do not survive a COPY between stages.
@@ -66,9 +72,7 @@ RUN mkdir -p /runtime-deps \
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS runtime
-ARG SERVICE
 ENV NODE_ENV=production
-ENV SERVICE_NAME=jibli-${SERVICE}
 
 # tini reaps zombies and forwards SIGTERM, so a rolling deploy actually reaches
 # the graceful-shutdown handler instead of being killed after the grace period.
@@ -78,24 +82,25 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Never root: a container escape should not start with UID 0.
+# Never root: a container escape should not begin with UID 0.
 COPY --from=build --chown=node:node /runtime-deps/node_modules ./node_modules
-COPY --from=build --chown=node:node /repo/apps/${SERVICE}/build ./build
+COPY --from=build --chown=node:node /repo/apps/api/build ./build/api
+COPY --from=build --chown=node:node /repo/apps/worker/build ./build/worker
 
-# Migrations travel with the image so a deploy can apply them without a second
-# artifact that could be a different version from the running code.
+# Migrations travel with the image so a deploy applies the schema from the same
+# artifact as the code, never a separately-versioned one.
 COPY --from=build --chown=node:node /repo/packages/db/migrations ./migrations
 
 USER node
 
 EXPOSE 4000
 
-# The API serves a liveness probe that touches no dependency; the worker has no
-# HTTP surface, so its health is judged by the process being alive.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "if (process.env.SERVICE_NAME !== 'jibli-api') process.exit(0); \
-fetch('http://127.0.0.1:' + (process.env.API_PORT || 4000) + '/health/live') \
+# Liveness only, and it touches no dependency: a probe that queried the
+# database would restart a healthy API during a brief database blip.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.API_PORT || 4000) + '/health/live') \
   .then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["node", "build/index.js"]
+# Overridden to build/worker/index.js for the worker service.
+CMD ["node", "build/api/index.js"]

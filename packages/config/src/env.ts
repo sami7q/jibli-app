@@ -83,9 +83,21 @@ const storageSchema = z.object({
   UPLOAD_MAX_BYTES: z.coerce.number().int().default(5 * 1024 * 1024),
 });
 
+/**
+ * The port a container host assigns.
+ *
+ * Render, Railway, Fly and Heroku all inject PORT and route to whatever the
+ * process binds. A service that ignores it binds to 4000, receives no traffic,
+ * and fails its health check — with logs that say the server started happily.
+ *
+ * API_PORT still wins when set explicitly, so local development and
+ * docker-compose are unaffected.
+ */
+const hostAssignedPort = process.env.PORT ? Number(process.env.PORT) : 4000;
+
 const apiSchema = z.object({
   API_HOST: z.string().default('0.0.0.0'),
-  API_PORT: port.default(4000),
+  API_PORT: port.default(hostAssignedPort),
   API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
   /** Comma-separated browser origins allowed to send credentialed requests. */
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3001'),

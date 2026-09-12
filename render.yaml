@@ -1,5 +1,5 @@
 # =============================================================================
-# API and worker.
+# API, worker and Key Value.
 #
 # These cannot run on Vercel, and the reason is structural rather than a
 # configuration detail:
@@ -11,12 +11,38 @@
 #     every second, plus scheduled settlement and reconciliation jobs
 #
 # Vercel hosts the two Next.js portals, which is what it is good at. This file
-# provisions everything else. Render is used here because one blueprint covers
-# both services and Redis; Railway and Fly.io work identically from the same
-# Dockerfile.
+# provisions everything else.
 #
-# Deploy:  Render dashboard → New → Blueprint → point at this repository
+# Deploy:  Render dashboard → Blueprints → New Blueprint Instance
 # =============================================================================
+
+# Secrets both services must share. The worker verifies nothing, but env
+# validation is common to both, and a token the API signs must verify with the
+# same secret wherever it is read — so they are generated once, here, rather
+# than twice with two different values.
+envVarGroups:
+  - name: jibli-secrets
+    envVars:
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      # Kept out of the database on purpose: it is what stops someone holding a
+      # dump from brute-forcing stored OTP and delivery-PIN hashes.
+      - key: OTP_HASH_PEPPER
+        generateValue: true
+
+      # Neon. The POOLED string (its host contains `-pooler`): the API opens a
+      # connection per request burst, and the pooler is what keeps that inside
+      # the project's connection limit.
+      - key: DATABASE_URL
+        sync: false
+      # Migrations need the DIRECT string. The pooler runs in transaction mode,
+      # which does not support the session-level statements DDL relies on.
+      # Pointing both at the pooled string is the mistake to avoid: migrations
+      # then fail with errors that read like a permissions problem.
+      - key: DATABASE_MIGRATION_URL
+        sync: false
 
 services:
   # ── API ────────────────────────────────────────────────────────────────────
@@ -25,63 +51,45 @@ services:
     runtime: docker
     dockerfilePath: ./infra/docker/Dockerfile.service
     dockerContext: .
-    plan: starter
+    dockerCommand: node build/api/index.js
+    # `free` spins down after 15 minutes idle and takes about a minute to wake.
+    # Fine for a pilot; move to a paid instance before real customers, or the
+    # first order of the morning waits for a cold start.
+    plan: free
     region: frankfurt
     healthCheckPath: /health/live
-    dockerBuildArgs:
-      SERVICE: api
     envVars:
+      - fromGroup: jibli-secrets
+
       - key: NODE_ENV
         value: production
-      # `staging` until a real SMS provider exists. `production` refuses to
-      # boot with OTP_PROVIDER=console, which is the correct guard: nobody can
-      # sign into the mobile app without one. The portals use passwords and are
-      # unaffected.
+      # `staging`, not `production`, and deliberately: production refuses to
+      # boot with OTP_PROVIDER=console, which is the correct guard — nobody can
+      # sign into the mobile app without a real SMS gateway. The portals use
+      # passwords and are unaffected.
       - key: APP_ENV
         value: staging
+
       - key: API_HOST
         value: 0.0.0.0
+      # Render provides PORT; the app reads API_PORT, so they are aligned here.
       - key: API_PORT
         value: '4000'
 
-      # Neon. Use the POOLED connection string here (the host containing
-      # `-pooler`): the API opens a connection per request burst and Neon's
-      # pooler is what keeps that within the project's connection limit.
-      - key: DATABASE_URL
-        sync: false
-      # Migrations need the DIRECT string. The pooler runs in transaction mode,
-      # which does not support the session-level statements DDL relies on.
-      - key: DATABASE_MIGRATION_URL
-        sync: false
-
       - key: REDIS_URL
         fromService:
-          type: redis
-          name: jibli-redis
+          type: keyvalue
+          name: jibli-cache
           property: connectionString
 
-      # Generate each separately: openssl rand -base64 48
-      - key: JWT_ACCESS_SECRET
-        generateValue: true
-      - key: JWT_REFRESH_SECRET
-        generateValue: true
-      - key: OTP_HASH_PEPPER
-        generateValue: true
-
-      # Both portal origins. The browser only talks to its own Vercel origin
-      # because /api/* is rewritten there, so this covers the WebSocket
-      # handshake and any direct call.
+      # Both portal origins, comma-separated. Filled after the Vercel URLs
+      # exist. The browser normally talks only to its own origin — /api is
+      # rewritten there — so this covers the WebSocket handshake.
       - key: CORS_ALLOWED_ORIGINS
         sync: false
 
-      # Required so the refresh cookie is accepted by the portals. See
-      # docs/operations/deployment.md — without a shared parent domain the
-      # cookie is third-party and every session dies at page load.
-      - key: SESSION_COOKIE_DOMAIN
-        sync: false
-
       # Render terminates TLS in front of the container, so the client IP the
-      # rate limiter keys on comes from X-Forwarded-For.
+      # rate limiter keys on arrives in X-Forwarded-For.
       - key: TRUST_PROXY
         value: 'true'
 
@@ -91,59 +99,53 @@ services:
         value: console
 
   # ── Worker ─────────────────────────────────────────────────────────────────
+  #
+  # Render has no free tier for background workers, so this is the one line in
+  # the file that costs money. What it does:
+  #
+  #   - publishes the transactional outbox, which is what pushes live order
+  #     events to the board and to phones
+  #   - generates settlements and runs reconciliation on a schedule
+  #
+  # Without it the portals still work: the order board polls as a fallback, and
+  # settlements can be generated by hand from Admin. Comment this service out to
+  # start free, and add it before the first real settlement period closes.
   - type: worker
     name: jibli-worker
     runtime: docker
     dockerfilePath: ./infra/docker/Dockerfile.service
     dockerContext: .
-    plan: starter
+    dockerCommand: node build/worker/index.js
+    plan: 0.5c-512mb
     region: frankfurt
-    dockerBuildArgs:
-      SERVICE: worker
     envVars:
+      - fromGroup: jibli-secrets
       - key: NODE_ENV
         value: production
       - key: APP_ENV
         value: staging
-      # Same pooled string as the API.
-      - key: DATABASE_URL
-        sync: false
       - key: REDIS_URL
         fromService:
-          type: redis
-          name: jibli-redis
+          type: keyvalue
+          name: jibli-cache
           property: connectionString
-      # The worker signs nothing, but env validation is shared and demands
-      # these. They must match the API's or a token it issues will not verify.
-      - key: JWT_ACCESS_SECRET
-        fromService:
-          type: web
-          name: jibli-api
-          envVarKey: JWT_ACCESS_SECRET
-      - key: JWT_REFRESH_SECRET
-        fromService:
-          type: web
-          name: jibli-api
-          envVarKey: JWT_REFRESH_SECRET
-      - key: OTP_HASH_PEPPER
-        fromService:
-          type: web
-          name: jibli-api
-          envVarKey: OTP_HASH_PEPPER
       - key: PUSH_PROVIDER
         value: console
 
-# ── Redis ────────────────────────────────────────────────────────────────────
-# Rate-limit state and the realtime pub/sub channel. It is a cache and a
-# transport: every invariant lives in PostgreSQL, so losing Redis costs live
-# updates, never data.
-#
-# `noeviction` matters. Under memory pressure Redis would otherwise drop keys,
-# and silently evicting a rate-limit counter turns a limiter into a no-op.
-databases:
-  - name: jibli-redis
-    type: redis
-    plan: starter
+  # ── Key Value ──────────────────────────────────────────────────────────────
+  #
+  # Rate-limit state and the realtime pub/sub channel. It is a cache and a
+  # transport: every invariant lives in PostgreSQL, so losing it costs live
+  # updates and rate-limit counters, never data. That is what makes the free
+  # plan — which keeps data in memory only and drops it on restart —
+  # survivable here.
+  #
+  # `noeviction` matters. Under memory pressure Redis would otherwise drop
+  # keys, and silently evicting a rate-limit counter turns a limiter into a
+  # no-op exactly when it is under load.
+  - type: keyvalue
+    name: jibli-cache
+    plan: free
     region: frankfurt
     maxmemoryPolicy: noeviction
     ipAllowList: []
