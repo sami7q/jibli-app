@@ -51,7 +51,7 @@ services:
     runtime: docker
     dockerfilePath: ./infra/docker/Dockerfile.service
     dockerContext: .
-    dockerCommand: node build/api/index.js
+    dockerCommand: node build/api/index.mjs
     # `free` spins down after 15 minutes idle and takes about a minute to wake.
     # Fine for a pilot; move to a paid instance before real customers, or the
     # first order of the morning waits for a cold start.
@@ -115,7 +115,7 @@ services:
     runtime: docker
     dockerfilePath: ./infra/docker/Dockerfile.service
     dockerContext: .
-    dockerCommand: node build/worker/index.js
+    dockerCommand: node build/worker/index.mjs
     plan: 0.5c-512mb
     region: frankfurt
     envVars:

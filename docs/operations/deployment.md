@@ -139,8 +139,8 @@ The portals do not need SMS: staff sign in with a password, which is why
 node scripts/bundle.mjs api
 node scripts/bundle.mjs worker
 
-node apps/api/build/index.js
-node apps/worker/build/index.js
+node apps/api/build/index.mjs
+node apps/worker/build/index.mjs
 ```
 
 `tsc -b` alone does **not** produce something Node can run: the emitted

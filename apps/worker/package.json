@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "node build/index.js",
+    "start": "node build/index.mjs",
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
     "bundle": "node ../../scripts/bundle.mjs worker"

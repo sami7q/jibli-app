@@ -4,8 +4,8 @@
 #
 # One image carrying both bundles, with the command choosing which to run:
 #
-#   node build/api/index.js
-#   node build/worker/index.js
+#   node build/api/index.mjs
+#   node build/worker/index.mjs
 #
 # Not two images. They share every dependency and differ only in an entry
 # point, so building twice would double the build minutes to produce two
@@ -136,5 +136,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   .then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# Overridden to build/worker/index.js for the worker service.
-CMD ["node", "build/api/index.js"]
+# Overridden to build/worker/index.mjs for the worker service.
+CMD ["node", "build/api/index.mjs"]

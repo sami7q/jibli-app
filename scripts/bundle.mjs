@@ -4,6 +4,13 @@ import { rm } from 'node:fs/promises';
 /**
  * Bundle a service into one runnable file.
  *
+ * The output is `.mjs`, not `.js`, and that matters. The bundle is ESM, and
+ * Node decides how to parse a `.js` file by walking up for the nearest
+ * package.json `type` field. Under apps/api that says "module" and it works;
+ * copied into a container at /app/build/api it finds nothing, defaults to
+ * CommonJS, and dies on the first import — a failure that cannot be reproduced
+ * by running the bundle where it was built.
+ *
  * `tsc -b` alone does not produce something Node can run here: the emitted
  * `dist/index.js` still imports `@jibli/db`, whose package `main` points at
  * TypeScript source. Node then fails with ERR_UNKNOWN_FILE_EXTENSION on the
@@ -48,7 +55,7 @@ await rm(outdir, { recursive: true, force: true });
 
 const result = await build({
   entryPoints: [`apps/${target}/src/index.ts`],
-  outfile: `${outdir}/index.js`,
+  outfile: `${outdir}/index.mjs`,
   bundle: true,
   platform: 'node',
   // Matches the engines field and the container's Node version.
@@ -82,4 +89,4 @@ const bytes = Object.values(result.metafile.outputs).reduce(
   (total, output) => total + output.bytes,
   0,
 );
-console.log(`\n${target}: ${(bytes / 1024).toFixed(0)} kB → ${outdir}/index.js`);
+console.log(`\n${target}: ${(bytes / 1024).toFixed(0)} kB → ${outdir}/index.mjs`);
