@@ -1297,3 +1297,194 @@
   color: var(--jibli-danger-700);
   font-weight: 500;
 }
+
+/* ── Apply to join ───────────────────────────────────────────────────────── */
+
+/*
+ * Separated by a rule, not by a margin: the sign-in form answers "I have an
+ * account", and this answers "I am not on the platform at all". Two journeys
+ * sharing a card need a visible seam or they read as one long paragraph.
+ */
+.auth__apply {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.apply {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  background: var(--surface-page);
+}
+
+.apply__card {
+  width: 100%;
+  max-width: 44rem;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.apply__card--done {
+  max-width: 30rem;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.apply__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--border-subtle);
+}
+
+.apply__head h1,
+.apply__card--done h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+}
+
+.apply__head p,
+.apply__card--done p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.8;
+  max-width: 40ch;
+}
+
+.apply__muted {
+  font-size: var(--text-xs) !important;
+}
+
+.apply__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+}
+
+.apply__closed {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--jibli-warning-50);
+  color: var(--jibli-warning-700);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+.apply__error {
+  margin: 0;
+  color: var(--jibli-danger-700);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.apply__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+.ltr-input {
+  direction: ltr;
+  text-align: left;
+}
+
+/* ── Category chips ──────────────────────────────────────────────────────── */
+
+/*
+ * A fieldset of toggles, not a multi-select. Twenty-two categories in a native
+ * multi-select is a scroll box nobody reads to the end of; as chips they are
+ * scannable, and the emoji does the work of telling them apart at a glance.
+ */
+.chips {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.chips__legend {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.chips__count {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.chips__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.chip:hover:not(:disabled):not(.chip--on) {
+  border-color: var(--jibli-orange-500);
+  color: var(--jibli-orange-600);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--jibli-orange-500);
+  outline-offset: 2px;
+}
+
+/* Selected is the accent; everything unselected stays quiet so the chosen
+   few are readable at a glance across twenty-two options. */
+.chip--on {
+  background: var(--jibli-orange-500);
+  border-color: var(--jibli-orange-500);
+  color: #fff;
+  font-weight: 600;
+}
+
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

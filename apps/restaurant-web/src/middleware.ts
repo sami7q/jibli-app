@@ -11,6 +11,12 @@ import { createPortalMiddleware } from '@jibli/ui-web/middleware';
  */
 export default createPortalMiddleware({
   cookieName: process.env.NEXT_PUBLIC_SESSION_COOKIE_NAME ?? 'jibli_session',
+  /*
+   * `/apply` is for a restaurant that has no account and is asking for one.
+   * Left out of this list it would be guarded like the rest of the portal and
+   * redirect the exact visitor it exists for to a sign-in form they cannot use.
+   */
+  publicPaths: ['/login', '/change-password', '/apply'],
 });
 
 /*

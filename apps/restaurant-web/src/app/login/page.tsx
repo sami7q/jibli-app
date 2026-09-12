@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { JibliLogo, safeReturnPath } from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
@@ -307,6 +308,20 @@ function LoginForm() {
         <p className="auth__note">
           إن لم يكن لديك حساب، اطلب من مالك المطعم إضافتك من صفحة الموظفين.
         </p>
+
+        {/*
+          Two different people reach this screen with no account: a member of
+          staff, who needs their own owner to add them, and a restaurant that
+          has never heard of us. The note above answers the first. Everything
+          below answers the second, and it is separated by a rule because it is
+          a different journey, not a second sentence about the same one.
+        */}
+        <div className="auth__apply">
+          <span>مطعم جديد ولا تملك حساباً؟</span>
+          <Link className="btn btn--outline" href="/apply">
+            تقديم طلب انضمام
+          </Link>
+        </div>
       </form>
     </LoginFrame>
   );

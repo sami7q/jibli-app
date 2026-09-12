@@ -19,6 +19,7 @@ import { registerGeographyRoutes } from './routes/geography.js';
 import { registerProfileRoutes } from './routes/profile.js';
 import { registerCatalogRoutes } from './routes/catalog.js';
 import { registerAssetRoutes } from './routes/assets.js';
+import { registerPublicApplicationRoutes } from './routes/applications.js';
 import { registerOrderRoutes } from './routes/orders.js';
 import { registerDriverRoutes } from './routes/driver.js';
 import { registerRestaurantPortalRoutes } from './routes/restaurant/index.js';
@@ -220,6 +221,7 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
   registerProfileRoutes(app, ctx);
   registerCatalogRoutes(app, ctx);
   registerAssetRoutes(app, ctx);
+  registerPublicApplicationRoutes(app, ctx);
   registerOrderRoutes(app, ctx);
   registerDriverRoutes(app, ctx);
   registerRestaurantPortalRoutes(app, ctx);

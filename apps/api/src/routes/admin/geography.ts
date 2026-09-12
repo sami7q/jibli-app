@@ -377,6 +377,10 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
             id: row.application.id,
             display_name: row.application.displayName,
             contact_phone: row.application.contactPhoneE164,
+            // Present on self-service applications; null on rows Admin created.
+            applicant_name: row.application.applicantName,
+            applicant_note: row.application.applicantNote,
+            cuisine_tags: row.application.cuisineTags,
             governorate_name_ar: row.governorateNameAr,
             city_name_ar: row.cityNameAr,
             address_text: row.application.addressText,
@@ -493,10 +497,56 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
           acceptsOrders: false,
         });
 
+        /*
+         * Who owns this restaurant.
+         *
+         * An application created by Admin carries the applicant; a self-service
+         * one carries only a phone number, because requiring an account to ask
+         * for an account is the loop the public form exists to break.
+         *
+         * Resolved by phone, with the same rule the restaurant portal applies
+         * when it adds a driver: one number is one person. A restaurant owner
+         * who already orders from Jibli keeps the identity they have.
+         */
+        let ownerUserId = application.applicantUserId;
+
+        if (!ownerUserId) {
+          const [existing] = await tx
+            .select({ id: users.id, fullName: users.fullName, status: users.status })
+            .from(users)
+            .where(eq(users.phoneE164, application.contactPhoneE164))
+            .limit(1);
+
+          if (existing) {
+            if (existing.status !== 'ACTIVE') {
+              throw new AppError(ERROR_CODES.CONFLICT, {
+                details: { reason: 'APPLICANT_ACCOUNT_SUSPENDED' },
+                messageAr: 'الرقم المرتبط بالطلب يعود لحساب موقوف',
+              });
+            }
+            ownerUserId = existing.id;
+            // Only fills a gap; a name the person chose is never overwritten.
+            if (!existing.fullName && application.applicantName) {
+              await tx
+                .update(users)
+                .set({ fullName: application.applicantName, updatedAt: new Date() })
+                .where(eq(users.id, ownerUserId));
+            }
+          } else {
+            ownerUserId = uuidv7();
+            await tx.insert(users).values({
+              id: ownerUserId,
+              phoneE164: application.contactPhoneE164,
+              fullName: application.applicantName,
+              status: 'ACTIVE',
+            });
+          }
+        }
+
         await tx.insert(restaurantMembers).values({
           id: uuidv7(),
           restaurantId,
-          userId: application.applicantUserId,
+          userId: ownerUserId,
           role: 'OWNER',
           isActive: true,
           invitedBy: principal.userId,
@@ -543,7 +593,7 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
           payload: {
             restaurantId,
             displayName: application.displayName,
-            ownerUserId: application.applicantUserId,
+            ownerUserId,
           },
         });
 

@@ -223,9 +223,15 @@ export const restaurantApplications = pgTable(
     id: primaryId(),
     /** Populated once approved and a restaurant record is created. */
     restaurantId: fk('restaurant_id').references(() => restaurants.id, { onDelete: 'set null' }),
-    applicantUserId: fk('applicant_user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+    /**
+     * The applicant, when they already had an account (migration 0009 made it
+     * optional). Null for a self-service application — requiring an account to
+     * ask for one is the loop the public form exists to break. The owner is
+     * then resolved from `contactPhoneE164` at approval.
+     */
+    applicantUserId: fk('applicant_user_id').references(() => users.id, {
+      onDelete: 'restrict',
+    }),
     displayName: text('display_name').notNull(),
     contactPhoneE164: text('contact_phone_e164').notNull(),
     governorateId: fk('governorate_id')
@@ -239,6 +245,14 @@ export const restaurantApplications = pgTable(
     longitude: doublePrecision('longitude'),
     cuisineTags: jsonb('cuisine_tags').$type<string[]>().notNull().default([]),
     documentsJson: jsonb('documents_json').$type<Record<string, unknown>>(),
+
+    /**
+     * The applicant's own name (migration 0008). The phone was already here as
+     * `contactPhoneE164`; this is the person attached to it, which a
+     * self-service application needs and an Admin-created one never carried.
+     */
+    applicantName: text('applicant_name'),
+    applicantNote: text('applicant_note'),
 
     status: text('status').$type<OnboardingStatus>().notNull().default('UNDER_REVIEW'),
     reviewedBy: fk('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
