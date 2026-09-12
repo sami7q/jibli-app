@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { fullNameSchema, iraqCoordinatesSchema, uuidSchema } from '@jibli/validation';
 import { sanitizeDisplayText } from '@jibli/validation';
-import { cities, governorates, userAddresses, users, uuidv7 } from '@jibli/db';
+import { cities, governorates, userAddresses, userDevices, users, uuidv7 } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { assertSelectableGeography, resolveCity } from '../services/geography-service.js';
@@ -310,5 +310,47 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
     }
 
     return reply.send(success({ deleted: true }, { request_id: request.requestId }));
+  });
+
+  /**
+   * Push device registration (plan §68).
+   *
+   * Deliberately not under /driver: the table is keyed on the user, and a
+   * customer needs push for "your order was accepted" exactly as a driver needs
+   * it for a new assignment. It lived at /api/v1/driver/devices, which would
+   * have forced the customer app to call a driver-named route — and broken the
+   * day that route was correctly narrowed to drivers only.
+   */
+  app.post('/api/v1/devices', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
+    const body = z
+      .object({
+        platform: z.enum(['IOS', 'ANDROID', 'WEB']),
+        push_token: z.string().min(10).max(512),
+        app_version: z.string().max(20).optional(),
+      })
+      .parse(request.body);
+
+    /*
+     * Conflict on the token, not the user: one person may carry two phones, and
+     * a phone handed on to someone else must follow the token to its new owner
+     * rather than keep pushing another user's orders to it.
+     */
+    await ctx.db
+      .insert(userDevices)
+      .values({
+        id: uuidv7(),
+        userId: principal.userId,
+        platform: body.platform,
+        pushToken: body.push_token,
+        appVersion: body.app_version ?? null,
+        lastSeenAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: userDevices.pushToken,
+        set: { userId: principal.userId, lastSeenAt: new Date(), revokedAt: null },
+      });
+
+    return reply.send(success({ registered: true }, { request_id: request.requestId }));
   });
 }

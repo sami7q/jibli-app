@@ -6,13 +6,7 @@ import {
   startOfBusinessDay,
   type ReconciliationResult,
 } from '@jibli/domain';
-import {
-  driverCashEvents,
-  ledgerEntries,
-  orders,
-  reconciliationRuns,
-  uuidv7,
-} from '@jibli/db';
+import { cities, driverCashEvents, governorates, ledgerEntries, orders, reconciliationRuns, restaurantBranches, users, uuidv7 } from '@jibli/db';
 import type { WorkerContext } from '../context.js';
 import { withJobLock } from './job-lock.js';
 
@@ -202,7 +196,6 @@ export async function runDailyReconciliation(
  */
 export async function runGeographyIntegrityCheck(ctx: WorkerContext): Promise<string[]> {
   const problems: string[] = [];
-  const { cities, governorates, restaurantBranches, users } = await import('@jibli/db');
 
   const orphanCities = await ctx.db
     .select({ id: cities.id, code: cities.code })

@@ -17,26 +17,8 @@ import {
   uuidSchema,
 } from '@jibli/validation';
 import { bpsPercent } from '@jibli/money';
-import {
-  claimIdempotencyKey,
-  completeIdempotencyKey,
-  computeCustody,
-  failIdempotencyKey,
-  IDEMPOTENCY_SCOPES,
-  startOfBusinessDay,
-} from '@jibli/domain';
-import {
-  driverCashEvents,
-  drivers,
-  orderItems,
-  orders,
-  restaurantExpenses,
-  settlementLines,
-  settlementPayments,
-  settlements,
-  users,
-  uuidv7,
-} from '@jibli/db';
+import { assertHandoverAllowed, claimIdempotencyKey, completeIdempotencyKey, computeCustody, failIdempotencyKey, IDEMPOTENCY_SCOPES, startOfBusinessDay } from '@jibli/domain';
+import { driverCashEvents, driverCashHandovers, drivers, orderItems, orders, restaurantExpenses, settlementLines, settlementPayments, settlements, users, uuidv7 } from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
 
@@ -548,8 +530,6 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
         });
       }
 
-      const { driverCashHandovers } = await import('@jibli/db');
-      const { assertHandoverAllowed } = await import('@jibli/domain');
 
       let handoverId: string;
       try {

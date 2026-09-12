@@ -10,17 +10,7 @@ import {
   evaluateReadiness,
   writeAudit,
 } from '@jibli/domain';
-import {
-  auditLogs,
-  cities,
-  governorates,
-  restaurantApplications,
-  restaurantBranches,
-  restaurantCommissionConfigs,
-  restaurants,
-  users,
-  uuidv7,
-} from '@jibli/db';
+import { auditLogs, branchWorkingHours, cities, governorates, menuItems, providers, restaurantApplications, restaurantBranches, restaurantCommissionConfigs, restaurantDrivers, restaurantMembers, restaurants, users, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import {
@@ -468,7 +458,6 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
         const restaurantId = uuidv7();
         const branchId = uuidv7();
 
-        const { providers, restaurantMembers } = await import('@jibli/db');
 
         await tx.insert(providers).values({
           id: providerId,
@@ -625,12 +614,6 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
       assertAdminPermission(requirePrincipal(request), 'restaurant.read');
       const { restaurantId } = z.object({ restaurantId: uuidSchema }).parse(request.params);
 
-      const {
-        branchWorkingHours,
-        menuItems,
-        restaurantDrivers,
-        restaurantMembers,
-      } = await import('@jibli/db');
 
       const [restaurant] = await ctx.db
         .select()

@@ -129,6 +129,14 @@ describe('buildServer()', () => {
     expect(app.hasRoute({ method: 'POST', url: '/api/v1/auth/login' })).toBe(true);
     expect(app.hasRoute({ method: 'POST', url: '/api/v1/auth/session/refresh' })).toBe(true);
     expect(app.hasRoute({ method: 'GET', url: '/health/ready' })).toBe(true);
+
+    /*
+     * Push registration is not under /driver. The customer app needs it for
+     * "your order was accepted" exactly as the driver app needs it for a new
+     * assignment, and the table is keyed on the user either way.
+     */
+    expect(app.hasRoute({ method: 'POST', url: '/api/v1/devices' })).toBe(true);
+    expect(app.hasRoute({ method: 'POST', url: '/api/v1/driver/devices' })).toBe(false);
   });
 
   it('keeps redacting through the logger Fastify derives from ours', async () => {

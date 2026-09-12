@@ -20,11 +20,7 @@ import {
   uuidv7,
 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../lib/context.js';
-import {
-  issueSession,
-  loadCapabilities,
-  revokeSessionChain,
-} from '../services/session-service.js';
+import { issueSession, loadCapabilities, refreshSession, revokeSessionByRefreshToken, revokeSessionChain } from '../services/session-service.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { verifyTotpForUser } from './mfa.js';
 
@@ -323,7 +319,6 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
       });
     }
 
-    const { refreshSession } = await import('../services/session-service.js');
 
     let session;
     try {
@@ -358,7 +353,6 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
     clearRefreshCookie(reply, ctx);
 
     if (token) {
-      const { revokeSessionByRefreshToken } = await import('../services/session-service.js');
       // Best effort: the cookie is already cleared, so a failure here must not
       // leave the user looking signed in.
       await revokeSessionByRefreshToken(ctx, token).catch(() => undefined);

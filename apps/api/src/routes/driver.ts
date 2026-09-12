@@ -14,14 +14,8 @@ import {
 } from '@jibli/contracts';
 import { assertDriver, assertOwnsAssignment } from '@jibli/auth';
 import { deliveryPinSchema, idempotencyKeySchema, uuidSchema } from '@jibli/validation';
-import { buildNavigationLinks, enqueueOutboxEvent } from '@jibli/domain';
-import {
-  deliveryAssignments,
-  drivers,
-  orders,
-  restaurants,
-  uuidv7,
-} from '@jibli/db';
+import { buildNavigationLinks, computeCustody, enqueueOutboxEvent } from '@jibli/domain';
+import { deliveryAssignments, driverCashEvents, drivers, orders, restaurants } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { confirmDelivery } from '../services/delivery-service.js';
@@ -411,8 +405,6 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
   app.get('/api/v1/driver/cash', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
     const driverId = assertDriver(principal);
-    const { driverCashEvents } = await import('@jibli/db');
-    const { computeCustody } = await import('@jibli/domain');
 
     const events = await ctx.db
       .select({
@@ -441,33 +433,4 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
   });
 
   /** Register a push token (plan §56). */
-  app.post('/api/v1/driver/devices', { preHandler: app.authenticate }, async (request, reply) => {
-    const principal = requirePrincipal(request);
-    const body = z
-      .object({
-        platform: z.enum(['IOS', 'ANDROID', 'WEB']),
-        push_token: z.string().min(10).max(512),
-        app_version: z.string().max(20).optional(),
-      })
-      .parse(request.body);
-
-    const { userDevices } = await import('@jibli/db');
-
-    await ctx.db
-      .insert(userDevices)
-      .values({
-        id: uuidv7(),
-        userId: principal.userId,
-        platform: body.platform,
-        pushToken: body.push_token,
-        appVersion: body.app_version ?? null,
-        lastSeenAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: userDevices.pushToken,
-        set: { userId: principal.userId, lastSeenAt: new Date(), revokedAt: null },
-      });
-
-    return reply.send(success({ registered: true }, { request_id: request.requestId }));
-  });
 }
