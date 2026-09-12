@@ -1,0 +1,40 @@
+# What must never enter the build context.
+#
+# Without this, `COPY . .` ships the host's node_modules into the image — on
+# pnpm that is a symlink farm pointing at paths which do not exist inside the
+# container, so the build either bloats by hundreds of megabytes or resolves a
+# dependency to a broken link.
+
+node_modules
+**/node_modules
+
+# Build output. The image builds its own; copying a host build in would let a
+# stale artifact win over the one just compiled.
+.next
+**/.next
+build
+**/build
+dist
+**/dist
+*.tsbuildinfo
+
+# History is not needed to compile, and it is usually the largest thing in the
+# checkout.
+.git
+.github
+
+# Secrets must never be baked into an image layer, where they survive deletion.
+.env
+.env.*
+!.env.example
+
+# Local tooling.
+.vscode
+.vercel
+coverage
+.expo
+docs/design
+
+*.log
+.DS_Store
+Thumbs.db

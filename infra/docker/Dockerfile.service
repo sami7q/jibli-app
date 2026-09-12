@@ -20,15 +20,25 @@ ARG NODE_VERSION=20.18.1
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS deps
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
-
 WORKDIR /repo
 
-# Only the manifests first: this layer is cached until a dependency actually
+COPY package.json ./
+
+# Install pnpm directly rather than through corepack.
+#
+# Corepack bundled with Node 20.x carries npm registry signing keys that the
+# registry has since rotated, so it fails with "Cannot find matching keyid"
+# before it installs anything. It also ignored the pinned `packageManager` here
+# and went looking for the latest stable, which is what triggered the fetch in
+# the first place.
+#
+# The version is read from package.json, so `packageManager` stays the single
+# source of truth and this cannot drift from what developers run locally.
+RUN npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+
+# The rest of the manifests. This layer is cached until a dependency actually
 # changes, so an ordinary source edit does not reinstall the world.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/
 COPY apps/worker/package.json apps/worker/
 COPY apps/admin-web/package.json apps/admin-web/
@@ -98,7 +108,7 @@ EXPOSE 4000
 # Liveness only, and it touches no dependency: a probe that queried the
 # database would restart a healthy API during a brief database blip.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:' + (process.env.API_PORT || 4000) + '/health/live') \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || process.env.API_PORT || 4000) + '/health/live') \
   .then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
