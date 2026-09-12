@@ -21,6 +21,13 @@ import { Icon } from './icon';
 
 type Capability = 'customer_signup' | 'restaurant_onboarding' | 'ordering';
 
+/**
+ * What a single change can be about. `active` is `is_enabled` — the master
+ * switch that gates all three capabilities, and the one the table never
+ * offered, which is what made turning anything on impossible.
+ */
+type ChangeTarget = Capability | 'active';
+
 const CAPABILITY_LABELS: Record<Capability, string> = {
   customer_signup: 'تسجيل العملاء',
   restaurant_onboarding: 'انضمام المطاعم',
@@ -33,11 +40,24 @@ const CAPABILITY_FIELD: Record<Capability, keyof AdminGovernorate> = {
   ordering: 'ordering_enabled',
 };
 
+/** The request body field each target writes. */
+const PATCH_FIELD: Record<ChangeTarget, string> = {
+  active: 'is_enabled',
+  customer_signup: 'customer_signup_enabled',
+  restaurant_onboarding: 'restaurant_onboarding_enabled',
+  ordering: 'ordering_enabled',
+};
+
+const TARGET_LABELS: Record<ChangeTarget, string> = {
+  ...CAPABILITY_LABELS,
+  active: 'تفعيل المنطقة',
+};
+
 interface PendingChange {
   readonly scope: 'governorate' | 'city';
   readonly id: string;
   readonly nameAr: string;
-  readonly capability: Capability;
+  readonly capability: ChangeTarget;
   readonly nextValue: boolean;
 }
 
@@ -66,7 +86,7 @@ export function GeographyCoverage({ token }: { token: string }) {
   const applyChange = useMutation({
     mutationFn: async (change: PendingChange & { reason?: string }) => {
       const patch = {
-        [CAPABILITY_FIELD[change.capability]]: change.nextValue,
+        [PATCH_FIELD[change.capability]]: change.nextValue,
         ...(change.reason ? { reason: change.reason } : {}),
       };
       return change.scope === 'governorate'
@@ -117,6 +137,14 @@ export function GeographyCoverage({ token }: { token: string }) {
                 <tr>
                   <th scope="col">المحافظة</th>
                   <th scope="col">الرمز</th>
+                  {/*
+                    The master switch, and the reason this table was a dead end
+                    before it appeared: every capability is read as
+                    `is_enabled && flag`, so with the master off an operator
+                    could turn a capability on, see it stay grey, and press it
+                    again forever. The flag was changing; nothing could show it.
+                  */}
+                  <th scope="col">المحافظة مفعّلة</th>
                   {(Object.keys(CAPABILITY_LABELS) as Capability[]).map((capability) => (
                     <th scope="col" key={capability}>
                       {CAPABILITY_LABELS[capability]}
@@ -132,14 +160,36 @@ export function GeographyCoverage({ token }: { token: string }) {
                       {governorate.name_ar}
                     </th>
                     <td className="ltr-inline">{governorate.code}</td>
+                    <td>
+                      <CapabilityToggle
+                        enabled={governorate.is_enabled}
+                        label="تفعيل المحافظة"
+                        entityName={governorate.name_ar}
+                        onToggle={() =>
+                          requestChange({
+                            scope: 'governorate',
+                            id: governorate.id,
+                            nameAr: governorate.name_ar,
+                            capability: 'active',
+                            nextValue: !governorate.is_enabled,
+                          })
+                        }
+                        disabled={applyChange.isPending}
+                      />
+                    </td>
                     {(Object.keys(CAPABILITY_LABELS) as Capability[]).map((capability) => {
-                      const enabled =
-                        governorate.is_enabled &&
-                        Boolean(governorate[CAPABILITY_FIELD[capability]]);
+                      // The row's own flag, shown as itself. Whether it is in
+                      // force is the master's business, and said separately.
+                      const ownFlag = Boolean(governorate[CAPABILITY_FIELD[capability]]);
                       return (
                         <td key={capability}>
                           <CapabilityToggle
-                            enabled={enabled}
+                            enabled={ownFlag}
+                            blockedReason={
+                              governorate.is_enabled
+                                ? undefined
+                                : 'المحافظة غير مفعّلة، فالقدرة لا تسري'
+                            }
                             label={CAPABILITY_LABELS[capability]}
                             entityName={governorate.name_ar}
                             onToggle={() =>
@@ -148,7 +198,7 @@ export function GeographyCoverage({ token }: { token: string }) {
                                 id: governorate.id,
                                 nameAr: governorate.name_ar,
                                 capability,
-                                nextValue: !enabled,
+                                nextValue: !ownFlag,
                               })
                             }
                             disabled={applyChange.isPending}
@@ -231,6 +281,7 @@ function CityTable({
           <tr>
             <th scope="col">المدينة</th>
             <th scope="col">الرمز</th>
+            <th scope="col">المدينة مفعّلة</th>
             {(Object.keys(CAPABILITY_LABELS) as Capability[]).map((capability) => (
               <th scope="col" key={capability}>
                 {CAPABILITY_LABELS[capability]}
@@ -245,20 +296,48 @@ function CityTable({
                 {city.name_ar}
               </th>
               <td className="ltr-inline">{city.code}</td>
+              <td>
+                <CapabilityToggle
+                  enabled={city.is_enabled}
+                  blockedReason={
+                    parent?.is_enabled ? undefined : 'المحافظة غير مفعّلة'
+                  }
+                  label="تفعيل المدينة"
+                  entityName={city.name_ar}
+                  onToggle={() =>
+                    onToggle({
+                      scope: 'city',
+                      id: city.id,
+                      nameAr: city.name_ar,
+                      capability: 'active',
+                      nextValue: !city.is_enabled,
+                    })
+                  }
+                  disabled={busy}
+                />
+              </td>
               {(Object.keys(CAPABILITY_LABELS) as Capability[]).map((capability) => {
                 const field = CAPABILITY_FIELD[capability];
-                const ownFlag = city.is_enabled && Boolean(city[field]);
+                const ownFlag = Boolean(city[field]);
                 const parentAllows = Boolean(parent?.is_enabled && parent[field]);
-                // Effective state: the parent override made visible, so an
-                // operator is never told a city is open when it is not.
-                const effective = ownFlag && parentAllows;
-                const blockedByParent = ownFlag && !parentAllows;
+                /*
+                 * Three separate reasons a flag may be on without being in
+                 * force, said one at a time. "It is not working" is not an
+                 * answer an operator can act on; "the governorate is off" is.
+                 */
+                const blockedReason = !city.is_enabled
+                  ? 'المدينة غير مفعّلة'
+                  : !parent?.is_enabled
+                    ? 'المحافظة غير مفعّلة'
+                    : !parentAllows
+                      ? 'القدرة معطّلة على مستوى المحافظة'
+                      : undefined;
 
                 return (
                   <td key={capability}>
                     <CapabilityToggle
-                      enabled={effective}
-                      blockedByParent={blockedByParent}
+                      enabled={ownFlag}
+                      blockedReason={blockedReason}
                       label={CAPABILITY_LABELS[capability]}
                       entityName={city.name_ar}
                       onToggle={() =>
@@ -285,21 +364,27 @@ function CityTable({
 
 function CapabilityToggle({
   enabled,
-  blockedByParent,
+  blockedReason,
   label,
   entityName,
   onToggle,
   disabled,
 }: {
+  /** The row's own flag, regardless of what gates it. */
   enabled: boolean;
-  blockedByParent?: boolean;
+  /**
+   * Why the flag is on but not in force. Shown instead of a plain "on", so an
+   * operator is never told a city is open when it is not.
+   */
+  blockedReason?: string | undefined;
   label: string;
   entityName: string;
   onToggle: () => void;
   disabled: boolean;
 }) {
-  const stateText = blockedByParent ? 'معطّل بالمحافظة' : enabled ? 'مفعّل' : 'معطّل';
-  const className = blockedByParent
+  const blocked = enabled && Boolean(blockedReason);
+  const stateText = blocked ? 'لا يسري' : enabled ? 'مفعّل' : 'معطّل';
+  const className = blocked
     ? 'capability capability--blocked'
     : enabled
       ? 'capability capability--on'
@@ -314,12 +399,10 @@ function CapabilityToggle({
       style={{ border: 'none', cursor: disabled ? 'not-allowed' : 'pointer' }}
       // The full sentence is what a screen reader announces; the colour is
       // decoration (plan §134).
-      aria-label={`${label} في ${entityName}: ${stateText}. اضغط للتغيير`}
-      title={
-        blockedByParent
-          ? 'المدينة مفعّلة لكن المحافظة معطّلة، لذلك القدرة غير فعّالة'
-          : undefined
-      }
+      aria-label={`${label} في ${entityName}: ${stateText}${
+        blocked ? ` — ${blockedReason}` : ''
+      }. اضغط للتغيير`}
+      title={blocked ? blockedReason : undefined}
     >
       <Icon name={enabled ? 'check' : 'close'} className="nav__icon" aria-hidden />
       {stateText}
@@ -368,7 +451,7 @@ function DisableDialog({
     >
       <div className="dialog">
         <h2 id="disable-dialog-title">
-          تعطيل {CAPABILITY_LABELS[change.capability]} في {change.nameAr}
+          تعطيل {TARGET_LABELS[change.capability]} في {change.nameAr}
         </h2>
 
         <div className="dialog__impact">
