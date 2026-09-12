@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 /**
  * Shared Next.js configuration for the two portals.
  *
@@ -6,9 +8,22 @@
  * by both, makes that impossible.
  */
 
+/**
+ * The monorepo root.
+ *
+ * Next infers it by walking up for a lockfile, and picks the wrong one when
+ * another lockfile exists higher in the filesystem — on a developer machine
+ * that is often a stray package-lock.json in the home directory. Stating it
+ * removes the guess, and with it a warning that differs between machines and
+ * CI.
+ */
+const workspaceRoot = fileURLToPath(new URL('..', import.meta.url));
+
 /** @type {import('next').NextConfig} */
 export const portalNextConfig = {
   reactStrictMode: true,
+
+  outputFileTracingRoot: workspaceRoot,
 
   // Workspace packages ship TypeScript source; Next compiles them itself.
   transpilePackages: ['@jibli/ui-web', '@jibli/contracts', '@jibli/money', '@jibli/validation'],
