@@ -36,9 +36,24 @@ COPY package.json ./
 # source of truth and this cannot drift from what developers run locally.
 RUN npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 
-# The rest of the manifests. This layer is cached until a dependency actually
-# changes, so an ordinary source edit does not reinstall the world.
-COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+# Every root file pnpm reads before installing. All five, not four:
+#
+#   package.json         the workspace root manifest
+#   pnpm-lock.yaml       the resolution to reproduce
+#   pnpm-workspace.yaml  which directories are packages
+#   .npmrc               linker and hoisting settings
+#   .pnpmfile.cjs        install hooks
+#
+# The last one is the trap. pnpm records a checksum of .pnpmfile.cjs *in the
+# lockfile*, so leaving it out makes a frozen install fail with
+# ERR_PNPM_LOCKFILE_CONFIG_MISMATCH — a message about configuration that gives
+# no hint a file is simply absent. It is required even though what it does
+# (pinning React 18 typings for the mobile app) is irrelevant here: the
+# checksum is compared before anything is evaluated.
+#
+# This layer is cached until a dependency actually changes, so an ordinary
+# source edit does not reinstall the world.
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc .pnpmfile.cjs ./
 COPY apps/api/package.json apps/api/
 COPY apps/worker/package.json apps/worker/
 COPY apps/admin-web/package.json apps/admin-web/
