@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import { EVENT_TYPES, type SettlementPolicy } from '@jibli/contracts';
 import { addIqd, iqd, type Iqd } from '@jibli/money';
 import {
@@ -226,7 +226,10 @@ async function generateForRestaurant(
         .update(settlementAdjustments)
         .set({ settlementId })
         .where(
-          sql`${settlementAdjustments.id} = ANY(${adjustments.map((a) => a.id)})`,
+          inArray(
+            settlementAdjustments.id,
+            adjustments.map((a) => a.id),
+          ),
         );
     }
 

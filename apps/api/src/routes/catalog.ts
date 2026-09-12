@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
@@ -330,12 +330,12 @@ async function loadHours(ctx: AppContext, branchIds: string[]) {
   const rules = await ctx.db
     .select()
     .from(branchWorkingHours)
-    .where(sql`${branchWorkingHours.branchId} = ANY(${branchIds})`);
+    .where(inArray(branchWorkingHours.branchId, branchIds));
 
   const exceptions = await ctx.db
     .select()
     .from(branchHourExceptions)
-    .where(sql`${branchHourExceptions.branchId} = ANY(${branchIds})`);
+    .where(inArray(branchHourExceptions.branchId, branchIds));
 
   for (const id of branchIds) map.set(id, { rules: [], exceptions: [] });
 

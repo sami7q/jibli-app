@@ -334,7 +334,7 @@ export function registerAdminOrderRoutes(app: FastifyInstance, ctx: AppContext):
         total: count(),
         completed: sql<number>`COUNT(*) FILTER (WHERE ${orders.status} = 'COMPLETED')`,
         cancelled: sql<number>`COUNT(*) FILTER (WHERE ${orders.status} IN ('CANCELLED','REJECTED'))`,
-        live: sql<number>`COUNT(*) FILTER (WHERE ${orders.status} = ANY(${[...LIVE_ORDER_STATUSES]}))`,
+        live: sql<number>`COUNT(*) FILTER (WHERE ${inArray(orders.status, [...LIVE_ORDER_STATUSES])})`,
         gmv: sql<number>`COALESCE(SUM(${orders.customerTotalIqd}) FILTER (WHERE ${orders.status} = 'COMPLETED'), 0)`,
         commission: sql<number>`COALESCE(SUM(${orders.commissionAmountIqd}) FILTER (WHERE ${orders.status} = 'COMPLETED'), 0)`,
         serviceFees: sql<number>`COALESCE(SUM(${orders.platformServiceFeeIqd}) FILTER (WHERE ${orders.status} = 'COMPLETED'), 0)`,

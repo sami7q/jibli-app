@@ -240,7 +240,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         activeAssignments: sql<number>`(
           SELECT COUNT(*) FROM ${deliveryAssignments}
           WHERE ${deliveryAssignments.driverId} = ${drivers.id}
-            AND ${deliveryAssignments.status} = ANY(${[...ACTIVE_DELIVERY_STATUSES]})
+            AND ${inArray(deliveryAssignments.status, [...ACTIVE_DELIVERY_STATUSES])}
         )`,
         completedDeliveries: sql<number>`(
           SELECT COUNT(*) FROM ${deliveryAssignments}

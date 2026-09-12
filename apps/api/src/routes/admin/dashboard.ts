@@ -89,8 +89,8 @@ export function registerAdminDashboardRoutes(app: FastifyInstance, ctx: AppConte
       const [restaurantCounts] = await ctx.db
         .select({
           active: sql<number>`COUNT(*) FILTER (WHERE ${restaurants.operationalStatus} = 'ACTIVE')`,
-          addedThisMonth: sql<number>`COUNT(*) FILTER (WHERE ${restaurants.createdAt} >= ${monthAgo})`,
-          addedPrevMonth: sql<number>`COUNT(*) FILTER (WHERE ${restaurants.createdAt} >= ${prevMonthStart} AND ${restaurants.createdAt} < ${monthAgo})`,
+          addedThisMonth: sql<number>`COUNT(*) FILTER (WHERE ${gte(restaurants.createdAt, monthAgo)})`,
+          addedPrevMonth: sql<number>`COUNT(*) FILTER (WHERE ${and(gte(restaurants.createdAt, prevMonthStart), lt(restaurants.createdAt, monthAgo))})`,
         })
         .from(restaurants)
         .where(isNull(restaurants.deletedAt));
@@ -98,8 +98,8 @@ export function registerAdminDashboardRoutes(app: FastifyInstance, ctx: AppConte
       const [userCounts] = await ctx.db
         .select({
           active: sql<number>`COUNT(*) FILTER (WHERE ${users.status} = 'ACTIVE')`,
-          joinedThisMonth: sql<number>`COUNT(*) FILTER (WHERE ${users.createdAt} >= ${monthAgo})`,
-          joinedPrevMonth: sql<number>`COUNT(*) FILTER (WHERE ${users.createdAt} >= ${prevMonthStart} AND ${users.createdAt} < ${monthAgo})`,
+          joinedThisMonth: sql<number>`COUNT(*) FILTER (WHERE ${gte(users.createdAt, monthAgo)})`,
+          joinedPrevMonth: sql<number>`COUNT(*) FILTER (WHERE ${and(gte(users.createdAt, prevMonthStart), lt(users.createdAt, monthAgo))})`,
         })
         .from(users)
         .where(isNull(users.deletedAt));

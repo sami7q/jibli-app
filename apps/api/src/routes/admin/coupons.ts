@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -127,13 +127,13 @@ export function registerAdminCouponRoutes(app: FastifyInstance, ctx: AppContext)
     if (query.status === 'active') {
       conditions.push(
         eq(coupons.isActive, true),
-        sql`${coupons.startsAt} <= ${now}`,
-        or(isNull(coupons.endsAt), sql`${coupons.endsAt} > ${now}`),
+        lte(coupons.startsAt, now),
+        or(isNull(coupons.endsAt), gt(coupons.endsAt, now)),
       );
     } else if (query.status === 'scheduled') {
-      conditions.push(eq(coupons.isActive, true), sql`${coupons.startsAt} > ${now}`);
+      conditions.push(eq(coupons.isActive, true), gt(coupons.startsAt, now));
     } else if (query.status === 'expired') {
-      conditions.push(sql`${coupons.endsAt} IS NOT NULL AND ${coupons.endsAt} <= ${now}`);
+      conditions.push(and(isNotNull(coupons.endsAt), lte(coupons.endsAt, now)));
     } else if (query.status === 'disabled') {
       conditions.push(eq(coupons.isActive, false));
     }

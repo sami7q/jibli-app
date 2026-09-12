@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -91,7 +91,10 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
         .where(
           and(
             eq(orders.restaurantId, restaurantId),
-            sql`(${orders.status} = ANY(${[...LIVE_ORDER_STATUSES]}) OR ${orders.completedAt} >= ${since})`,
+            or(
+              inArray(orders.status, [...LIVE_ORDER_STATUSES]),
+              gte(orders.completedAt, since),
+            ),
           ),
         )
         .orderBy(desc(orders.placedAt))
@@ -280,7 +283,7 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
           activeAssignments: sql<number>`(
             SELECT COUNT(*) FROM ${deliveryAssignments}
             WHERE ${deliveryAssignments.driverId} = ${drivers.id}
-              AND ${deliveryAssignments.status} = ANY(${[...ACTIVE_DELIVERY_STATUSES]})
+              AND ${inArray(deliveryAssignments.status, [...ACTIVE_DELIVERY_STATUSES])}
           )`,
         })
         .from(restaurantDrivers)
