@@ -110,8 +110,16 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
           ip,
           userAgent: agent,
         });
+        /*
+         * The shared message for this code names the phone, because the mobile
+         * app signs in with one. The portals sign in with a username, and a
+         * failed portal login telling someone their *phone* is wrong is simply
+         * false. Still deliberately ambiguous between the two fields: saying
+         * which one was wrong confirms that an account exists.
+         */
         return new AppError(ERROR_CODES.INVALID_CREDENTIALS, {
           details: { reason: 'INVALID_LOGIN' },
+          messageAr: 'اسم المستخدم أو كلمة المرور غير صحيحة',
         });
       };
 
@@ -402,8 +410,15 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
       }
 
       if (!(await verifyPassword(body.current_password, user.passwordHash))) {
+        /*
+         * Named precisely, and safely: the caller is already authenticated, so
+         * there is nothing left to leak by saying which field was wrong — and
+         * this is the forced first-password-change screen, where a vague error
+         * leaves someone stuck with no idea what to correct.
+         */
         throw new AppError(ERROR_CODES.INVALID_CREDENTIALS, {
           details: { reason: 'CURRENT_PASSWORD_WRONG' },
+          messageAr: 'كلمة المرور الحالية غير صحيحة',
         });
       }
 

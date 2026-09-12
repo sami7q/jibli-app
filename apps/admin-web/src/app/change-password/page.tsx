@@ -51,6 +51,7 @@ export default function ChangePasswordPage() {
   const [reveal, setReveal] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [username, setUsername] = useState('');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -60,11 +61,43 @@ export default function ChangePasswordPage() {
     currentInput.current?.focus();
   }, []);
 
-  // Used only to check the password does not contain it.
+  /*
+   * Both calls on this page need a bearer token, and this page is reached by a
+   * redirect that carries none: the access token lives in memory in the portal
+   * shell, and a full navigation throws that away. The HttpOnly refresh cookie
+   * is what survives, so it is exchanged for a token here.
+   *
+   * Without this the page was unusable in a way nothing surfaced: the username
+   * lookup 401'd and was swallowed, silently disabling the "password must not
+   * contain your username" rule, and the submit 401'd with "please sign in" on
+   * the one screen a new account cannot get past. Every portal account, admin
+   * and restaurant alike, is forced here on first sign-in.
+   */
   useEffect(() => {
-    void apiRequest<{ username: string | null }>('/api/v1/auth/portal/me')
-      .then((me) => setUsername(me.username ?? ''))
-      .catch(() => setUsername(''));
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const refreshed = await apiRequest<{ access_token: string }>(
+          '/api/v1/auth/session/refresh',
+          { method: 'POST' },
+        );
+        if (cancelled) return;
+        setAccessToken(refreshed.access_token);
+
+        // Only used to check the new password does not contain it.
+        const me = await apiRequest<{ username: string | null }>('/api/v1/auth/portal/me', {
+          accessToken: refreshed.access_token,
+        });
+        if (!cancelled) setUsername(me.username ?? '');
+      } catch {
+        if (!cancelled) setAccessToken(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const trackCapsLock = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -73,7 +106,8 @@ export default function ChangePasswordPage() {
 
   const unmet = REQUIREMENTS.filter((requirement) => !requirement.met(next, username));
   const mismatch = confirm.length > 0 && next !== confirm;
-  const disabled = submitting || !current || unmet.length > 0 || mismatch || !confirm;
+  const disabled =
+    submitting || !accessToken || !current || unmet.length > 0 || mismatch || !confirm;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -87,6 +121,7 @@ export default function ChangePasswordPage() {
       await apiRequest('/api/v1/auth/password', {
         method: 'POST',
         body: { current_password: current, new_password: next },
+        ...(accessToken ? { accessToken } : {}),
       });
 
       /*
