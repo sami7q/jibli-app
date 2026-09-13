@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
 import { createdAt, fk, primaryId, updatedAt, utcTimestamp } from './_shared.js';
 import { users } from './identity.js';
@@ -138,7 +139,15 @@ export const adminNotifications = pgTable(
   },
   (table) => [
     index('admin_notifications_created_idx').on(table.createdAt),
-    uniqueIndex('admin_notifications_dedupe_key').on(table.dedupeKey),
+    /*
+     * Partial, and it has to be declared as partial here too: most
+     * notifications carry no dedupe key, a plain unique index would make every
+     * one of those collide with the last, and an upsert targeting a partial
+     * index that this file describes as total builds SQL Postgres refuses.
+     */
+    uniqueIndex('admin_notifications_dedupe_key')
+      .on(table.dedupeKey)
+      .where(sql`${table.dedupeKey} IS NOT NULL`),
   ],
 );
 

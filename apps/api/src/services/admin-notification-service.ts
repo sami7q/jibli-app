@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import {
   adminNotificationReads,
   adminNotifications,
@@ -62,23 +62,40 @@ export async function notifyAdmins(
 ): Promise<void> {
   try {
     const notificationId = uuidv7();
+    const values = {
+      id: notificationId,
+      kind: input.kind,
+      severity: input.severity ?? 'INFO',
+      titleAr: input.titleAr,
+      bodyAr: input.bodyAr ?? null,
+      linkPath: input.linkPath ?? null,
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
+      restaurantId: input.restaurantId ?? null,
+      dedupeKey: input.dedupeKey ?? null,
+    };
+
+    /*
+     * Two paths, because the unique index is partial — it covers only rows
+     * that carry a key. Most notifications do not: an application and a
+     * one-star review are each their own event, and pointing an upsert at a
+     * column that is null on both would ask Postgres to treat every keyless
+     * notification as a repeat of the last.
+     */
+    if (!input.dedupeKey) {
+      await executor.insert(adminNotifications).values(values);
+      return;
+    }
 
     const [row] = await executor
       .insert(adminNotifications)
-      .values({
-        id: notificationId,
-        kind: input.kind,
-        severity: input.severity ?? 'INFO',
-        titleAr: input.titleAr,
-        bodyAr: input.bodyAr ?? null,
-        linkPath: input.linkPath ?? null,
-        entityType: input.entityType ?? null,
-        entityId: input.entityId ?? null,
-        restaurantId: input.restaurantId ?? null,
-        dedupeKey: input.dedupeKey ?? null,
-      })
+      .values(values)
       .onConflictDoUpdate({
         target: adminNotifications.dedupeKey,
+        // The index predicate, restated. Without it Postgres answers "no
+        // unique or exclusion constraint matching the ON CONFLICT
+        // specification" and the notification is silently lost.
+        targetWhere: isNotNull(adminNotifications.dedupeKey),
         set: {
           titleAr: input.titleAr,
           bodyAr: input.bodyAr ?? null,
@@ -91,8 +108,7 @@ export async function notifyAdmins(
     /*
      * A repeat that updated an existing row must become unread again. Without
      * this, the second message on a thread an operator had already dismissed
-     * would never raise the bell — which is the one case where a repeat
-     * matters most.
+     * would never raise the bell — the one case where a repeat matters most.
      */
     if (row && row.id !== notificationId) {
       await executor
@@ -105,6 +121,16 @@ export async function notifyAdmins(
       { event: 'admin_notification.write_failed', kind: input.kind, err: String(error) },
       'Could not record an Admin notification',
     );
+
+    /*
+     * Except under test, where swallowing is the wrong trade.
+     *
+     * This rule is not hypothetical: the first version of the upsert above
+     * targeted a partial index without restating its predicate, Postgres
+     * refused every write, and the only symptom was a bell that stayed at
+     * zero. Silence is right in production and useless in a test suite.
+     */
+    if (process.env.NODE_ENV === 'test') throw error;
   }
 }
 
