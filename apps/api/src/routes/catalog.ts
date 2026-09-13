@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
@@ -100,7 +100,15 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
       .innerJoin(cities, eq(restaurantBranches.cityId, cities.id))
       .innerJoin(governorates, eq(cities.governorateId, governorates.id))
       .where(and(...conditions))
-      .orderBy(desc(restaurants.ratingAverage), asc(restaurants.displayName))
+      /*
+       * NULLS LAST is the whole point of writing this as a fragment.
+       *
+       * Postgres sorts NULLs *first* on DESC, so `desc(ratingAverage)` put
+       * every unrated restaurant above every rated one — a partner approved
+       * this morning outranked a 4.9 with three hundred reviews, on the first
+       * screen of the app.
+       */
+      .orderBy(sql`${restaurants.ratingAverage} DESC NULLS LAST`, asc(restaurants.displayName))
       .limit(query.limit)
       .offset(query.offset);
 
@@ -109,7 +117,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
     const branchIds = rows.map((r) => r.branchId);
     const hoursByBranch = await loadHours(ctx, branchIds);
 
-    const data = rows.map((row) => {
+    const cards = rows.map((row) => {
       const hours = hoursByBranch.get(row.branchId) ?? { rules: [], exceptions: [] };
       const openState = evaluateOpenState({
         rules: hours.rules,
@@ -137,6 +145,24 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
         city_name_ar: row.cityNameAr,
       };
     });
+
+    /*
+     * Open restaurants first.
+     *
+     * Whether a branch is open cannot be expressed in the WHERE clause — it
+     * comes out of the working-hours evaluation above — so it is applied here,
+     * to the page that was fetched. Within each group the SQL order is kept,
+     * so rating still decides.
+     *
+     * The honest limitation: this sorts the page, not the city. With the
+     * default page of 20 and a pilot city of a few dozen restaurants that is
+     * the same thing; it stops being so the day a city outgrows one page, and
+     * the fix then is a generated `accepts_orders` column rather than a bigger
+     * page.
+     */
+    const data = [...cards].sort(
+      (left, right) => Number(right.accepts_orders) - Number(left.accepts_orders),
+    );
 
     return reply.send(
       success(data, {

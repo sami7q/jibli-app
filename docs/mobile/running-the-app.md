@@ -144,6 +144,8 @@ Both platforms bundle: **1224 modules (iOS), 1220 (Android)**.
 | Home says «اختر منطقتك» and lists nothing | No delivery area chosen yet. Tap the location row in the header. If an area is chosen and the list is still empty, see §8. |
 | Sign-in never arrives | No SMS gateway on staging. §3. |
 | Metro cannot resolve a module after pulling | `pnpm install`, then `pnpm dev:mobile --clear`. |
+| `CommandError: No Android connected device found` | You pressed **a** with no device or emulator attached. Nothing is wrong: scan the QR with Expo Go instead, or press **w** for the browser (§9). An emulator needs Android Studio. |
+| Expo warns a package version is wrong | `pnpm --filter @jibli/mobile exec expo install --fix`, then restart Metro. Worth doing: `expo-splash-screen` was once pinned to a version from a *later* SDK, whose native API differs. |
 | Arabic renders left-to-right on a fresh install | RTL is forced at startup and Android applies it after one restart. Close and reopen. |
 
 ---
@@ -216,27 +218,33 @@ accepting orders. Any one of those being off yields `[]`.
 
 ## 9. Seeing the screens without a phone
 
+Two terminals:
+
 ```bash
-pnpm --filter @jibli/mobile web
+pnpm --filter @jibli/mobile proxy      # terminal 1
+pnpm --filter @jibli/mobile web        # terminal 2  → http://localhost:8081
 ```
 
-This runs the same app through React Native Web and opens it in a browser at
-`http://localhost:8081`. It is a review tool, not a target: RNW is a different
-renderer, and two things differ in ways worth knowing.
+This runs the same app through React Native Web. Both terminals are needed, and
+each solves a problem that only exists in a browser:
 
-- **RTL is not forced.** `I18nManager.forceRTL` is a no-op on web, so the
-  preview lays out left-to-right unless you set `dir="rtl"` on the document
-  (DevTools → `document.documentElement.dir = 'rtl'`). Without that, every
-  header looks mirrored from what a device shows.
-- **CORS applies.** The browser sends an `Origin` header, and the API's
-  allowlist does not include `localhost`. Point the app at a local API, or run a
-  proxy, if you want the data screens to load.
+- **The proxy exists because of CORS.** A phone is a native client: it sends no
+  `Origin` header, and the API's CORS callback admits exactly that. Chrome sends
+  `Origin: http://localhost:8081`, which is not on the allowlist, so without the
+  proxy every request fails and every screen renders empty. The proxy is
+  development-only; nothing like it exists in production, and the production
+  allowlist was not widened to include a laptop.
+- **RTL is handled.** `I18nManager.forceRTL` is a no-op on web, so `enforceRtl()`
+  sets `dir="rtl"` on the document as well. Without it the preview would lay out
+  left-to-right and every header would look mirrored from what a device shows.
 
-Used properly it earns its keep: six real defects were found this way — English
-cuisine keys leaking into Arabic cards, a blank grey block where a restaurant
-has no cover photo, text glyphs standing in for icons, category names truncated
-mid-word, badges on the wrong edge under RTL, and a sign-in button disabled for
-a reason that had nothing to do with signing in.
+It is a review tool, not a target — React Native Web is a different renderer, so
+fonts, safe areas and gestures are all approximations. But it earns its keep:
+six real defects were found this way — English cuisine keys leaking into Arabic
+cards, a blank grey block where a restaurant has no cover photo, text glyphs
+standing in for icons, category names truncated mid-word, badges on the wrong
+edge under RTL, and a sign-in button disabled for a reason that had nothing to
+do with signing in.
 
 ---
 

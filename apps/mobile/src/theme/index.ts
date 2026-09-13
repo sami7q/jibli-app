@@ -129,6 +129,24 @@ export function enforceRtl(): void {
     I18nManager.allowRTL(true);
     I18nManager.forceRTL(true);
   }
+
+  /*
+   * The browser needs telling separately.
+   *
+   * React Native Web's I18nManager is a stub: `forceRTL` sets a flag nothing
+   * reads, so `expo start --web` lays the app out left-to-right while every
+   * device lays it out right-to-left. That makes the web preview actively
+   * misleading — headers mirrored, chevrons pointing the wrong way — which is
+   * worse than not having one.
+   *
+   * Setting `dir` on the document is what CSS actually reads: it reverses
+   * every `flex-direction: row`, which is the same thing the native layout
+   * does. One line, and the preview tells the truth.
+   */
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    document.documentElement.setAttribute('dir', 'rtl');
+    document.documentElement.setAttribute('lang', 'ar');
+  }
 }
 
 /** True once the native layer is actually laying out RTL. */

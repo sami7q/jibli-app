@@ -49,11 +49,19 @@ export default tseslint.config(
   },
   {
     // Build-time config runs in Node, where `process` is a real global.
-    files: ['config/**/*.mjs', 'scripts/**/*.mjs', '**/next.config.mjs', '**/*.config.mjs'],
+    files: [
+      'config/**/*.mjs',
+      // `**/` so an app's own scripts directory is covered too, not only the
+      // one at the repository root.
+      '**/scripts/**/*.mjs',
+      '**/next.config.mjs',
+      '**/*.config.mjs',
+    ],
     languageOptions: {
       globals: {
         process: 'readonly',
         console: 'readonly',
+        Buffer: 'readonly',
         // Web-standard globals Node has had since 10/18 respectively.
         URL: 'readonly',
         fetch: 'readonly',

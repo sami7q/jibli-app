@@ -11,10 +11,44 @@ import { clearSession, loadSession, updateTokens } from './secure-session';
  *     original request is replayed
  */
 
+/**
+ * Where requests go.
+ *
+ * `EXPO_PUBLIC_API_URL` wins when it is set, then the value baked into
+ * `app.config.ts`, then localhost as a last resort.
+ *
+ * The one special case is the browser preview. `expo start --web` runs the app
+ * in Chrome, which sends an `Origin` header, and the API's CORS allowlist
+ * contains the two portals and not a developer's laptop — so every request
+ * from the preview is blocked and every screen renders empty. A phone never
+ * hits this: a native client sends no `Origin` at all, which the API's CORS
+ * callback explicitly admits.
+ *
+ * So a development browser, and only a development browser, defaults to the
+ * local proxy (`pnpm --filter @jibli/mobile proxy`). Setting
+ * EXPO_PUBLIC_API_URL overrides it, and a production web build never takes
+ * this branch.
+ */
+const WEB_DEV_PROXY = 'http://localhost:4010';
+
+/**
+ * A browser, checked without importing `react-native`.
+ *
+ * `Platform.OS === 'web'` would say the same thing, but importing
+ * `react-native` here pulls its Flow-typed source into the unit tests, which
+ * cannot parse it — and this module holds the single-flight token refresh,
+ * which is the last thing that should lose its tests to a convenience import.
+ * `document` exists in exactly one of the three environments this runs in.
+ */
+const isBrowser = typeof document !== 'undefined';
+const isDevelopment = typeof __DEV__ !== 'undefined' && __DEV__;
+
 const API_BASE =
-  (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
   process.env.EXPO_PUBLIC_API_URL ??
-  'http://localhost:4000';
+  (isBrowser && isDevelopment
+    ? WEB_DEV_PROXY
+    : ((Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
+      'http://localhost:4000'));
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
