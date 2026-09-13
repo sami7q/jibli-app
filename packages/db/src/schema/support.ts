@@ -161,7 +161,12 @@ export const adminNotificationReads = pgTable(
     userId: fk('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    readAt: createdAt(),
+    /*
+     * Spelled out rather than `createdAt()`: that helper names the column
+     * `created_at`, and this one is `read_at`. The two disagreeing is what made
+     * every mark-as-read return 500 while the bell sat there refusing to clear.
+     */
+    readAt: utcTimestamp('read_at').notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('admin_notification_reads_unique').on(table.notificationId, table.userId),

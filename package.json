@@ -20,6 +20,7 @@
     "test:coverage": "vitest run --coverage",
     "db:generate": "pnpm --filter @jibli/db generate",
     "db:migrate": "pnpm --filter @jibli/db migrate",
+    "db:verify": "pnpm --filter @jibli/db verify",
     "db:seed": "pnpm --filter @jibli/db seed",
     "db:reset": "pnpm --filter @jibli/db reset",
     "dev:api": "pnpm --filter @jibli/api dev",
