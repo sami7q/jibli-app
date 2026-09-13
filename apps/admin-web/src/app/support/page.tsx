@@ -20,6 +20,7 @@ import { admin, type SupportThreadSummary } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
+import { THREAD_STATUS_LABELS, TOPIC_LABELS } from '@/lib/support-labels';
 
 /**
  * Support inbox.
@@ -29,21 +30,6 @@ import { useDebounced } from '@/hooks/use-debounced';
  * obvious default — buries the message from three days ago that nobody
  * answered under the one that arrived a minute ago and is already handled.
  */
-
-export const TOPIC_LABELS: Record<string, string> = {
-  ORDERS: 'الطلبات',
-  MENU: 'المنيو',
-  FINANCE: 'المالية',
-  ACCOUNT: 'الحساب',
-  TECHNICAL: 'مشكلة تقنية',
-  OTHER: 'أخرى',
-};
-
-export const STATUS_LABELS: Record<string, string> = {
-  OPEN: 'بانتظار ردّنا',
-  ANSWERED: 'بانتظار المطعم',
-  RESOLVED: 'منتهية',
-};
 
 export default function SupportPage() {
   const session = useAdminSession();
@@ -91,7 +77,7 @@ export default function SupportPage() {
             allLabel="كل المحادثات"
             options={(['OPEN', 'ANSWERED', 'RESOLVED'] as const).map((value) => ({
               value,
-              label: STATUS_LABELS[value] as string,
+              label: THREAD_STATUS_LABELS[value] as string,
             }))}
           />
         </FilterBar>
@@ -158,7 +144,7 @@ export default function SupportPage() {
                           : 'success'
                     }
                   >
-                    {STATUS_LABELS[row.status] ?? row.status}
+                    {THREAD_STATUS_LABELS[row.status] ?? row.status}
                   </Badge>
                 ),
               },

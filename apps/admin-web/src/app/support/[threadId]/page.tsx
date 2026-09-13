@@ -11,7 +11,7 @@ import { ApiError } from '@/lib/api';
 import { admin } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
-import { STATUS_LABELS, TOPIC_LABELS } from '../page';
+import { THREAD_STATUS_LABELS, TOPIC_LABELS } from '@/lib/support-labels';
 
 /**
  * One conversation with a restaurant.
@@ -104,7 +104,7 @@ export default function SupportThreadPage() {
                       : 'success'
                 }
               >
-                {STATUS_LABELS[data.status] ?? data.status}
+                {THREAD_STATUS_LABELS[data.status] ?? data.status}
               </Badge>
               {data.priority === 'URGENT' ? <Badge tone="danger">عاجل</Badge> : null}
               <Link href={`/restaurants/${data.restaurant_id}`} className="btn btn--ghost btn--sm">

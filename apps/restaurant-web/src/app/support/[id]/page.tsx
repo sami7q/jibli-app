@@ -9,7 +9,7 @@ import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { portal } from '@/lib/portal-endpoints';
-import { THREAD_STATUS_LABELS, TOPICS } from '../page';
+import { THREAD_STATUS_LABELS, TOPICS } from '@/lib/support-labels';
 
 /**
  * One conversation, from the restaurant's side.

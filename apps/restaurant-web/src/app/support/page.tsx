@@ -9,6 +9,7 @@ import { Card, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { portal, type SupportThreadSummary } from '@/lib/portal-endpoints';
+import { THREAD_STATUS_LABELS, TOPICS } from '@/lib/support-labels';
 
 /**
  * Talking to Jibli.
@@ -23,21 +24,6 @@ import { portal, type SupportThreadSummary } from '@/lib/portal-endpoints';
  * support to owners is how a problem at nine in the evening waits until
  * morning.
  */
-
-export const TOPICS = [
-  { key: 'ORDERS', labelAr: 'الطلبات', hint: 'طلب متأخر، إلغاء، مشكلة مع عميل' },
-  { key: 'MENU', labelAr: 'المنيو', hint: 'أصناف، أسعار، صور' },
-  { key: 'FINANCE', labelAr: 'المالية', hint: 'عمولة، كشف، تسوية' },
-  { key: 'ACCOUNT', labelAr: 'الحساب', hint: 'دخول، صلاحيات، موظفون' },
-  { key: 'TECHNICAL', labelAr: 'مشكلة تقنية', hint: 'شيء لا يعمل كما يجب' },
-  { key: 'OTHER', labelAr: 'أخرى', hint: '' },
-] as const;
-
-export const THREAD_STATUS_LABELS: Record<string, string> = {
-  OPEN: 'بانتظار ردّ جيبلي',
-  ANSWERED: 'وصلك ردّ',
-  RESOLVED: 'منتهية',
-};
 
 export default function SupportPage() {
   return <PortalPage>{({ auth }) => <SupportScreen auth={auth} />}</PortalPage>;

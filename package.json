@@ -33,7 +33,7 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "bundle": "node scripts/bundle.mjs api && node scripts/bundle.mjs worker",
     "deploy:migrate": "pnpm --filter @jibli/db migrate && pnpm --filter @jibli/db seed",
-    "deploy:check": "pnpm -r typecheck && pnpm lint && pnpm test && pnpm bundle"
+    "deploy:check": "pnpm -r typecheck && pnpm lint && pnpm test && pnpm build && pnpm bundle"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
