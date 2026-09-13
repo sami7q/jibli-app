@@ -1,4 +1,4 @@
-import { and, arrayContains, asc, count, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
@@ -9,6 +9,7 @@ import { appBanners, appCategories, restaurants, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import { getConfig } from '../../services/config-service.js';
+import { jsonbArrayContains, jsonbArrayContainsColumn } from '../../lib/jsonb.js';
 
 /**
  * How the customer app looks: its categories, its banners, their order.
@@ -52,15 +53,12 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
          * fine at one restaurant and a page-sized download at a thousand.
          *
          * Correlated rather than joined, because a restaurant carries several
-         * tags and a join would multiply the category rows by them. `@>` is
-         * array containment — the same test `arrayContains` builds elsewhere
-         * in this file, written out only because the left side here is another
-         * table's column rather than a value.
+         * tags and a join would multiply the category rows by them.
          */
         restaurantCount: sql<number>`(
           SELECT COUNT(*) FROM ${restaurants}
           WHERE ${restaurants.deletedAt} IS NULL
-            AND ${restaurants.cuisineTags} @> ARRAY[${appCategories.key}]
+            AND ${jsonbArrayContainsColumn(restaurants.cuisineTags, appCategories.key)}
         )`,
       })
       .from(appCategories)
@@ -230,7 +228,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
         .from(restaurants)
         .where(
           and(
-            arrayContains(restaurants.cuisineTags, [category.key]),
+            jsonbArrayContains(restaurants.cuisineTags, category.key),
             isNull(restaurants.deletedAt),
           ),
         );

@@ -1,4 +1,4 @@
-import { and, arrayContains, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, CUISINE_KEYS, ERROR_CODES, EVENT_TYPES, OPERATIONAL_STATUSES, success } from '@jibli/contracts';
@@ -22,6 +22,7 @@ import {
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import { effectiveCapabilitySql } from '../../services/geography-service.js';
+import { jsonbArrayContains } from '../../lib/jsonb.js';
 import { getConfig } from '../../services/config-service.js';
 
 /**
@@ -92,12 +93,9 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
     }
     if (query.city_id) conditions.push(eq(restaurantBranches.cityId, query.city_id));
     if (query.cuisine) {
-      /*
-       * `arrayContains`, not a hand-written `= ANY(...)`: the operator knows
-       * the column's element type, and a bare interpolated value on the other
-       * side of ANY is the shape that produced five 500s once already.
-       */
-      conditions.push(arrayContains(restaurants.cuisineTags, [query.cuisine]));
+      // `cuisine_tags` is jsonb, not text[]; see lib/jsonb.ts for why that
+      // distinction costs a helper.
+      conditions.push(jsonbArrayContains(restaurants.cuisineTags, query.cuisine) as never);
     }
     if (query.q) {
       conditions.push(
