@@ -1241,6 +1241,11 @@ html {
   flex-shrink: 0;
 }
 
+.inherited__unit {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
 .inherited__body {
   display: flex;
   flex-direction: column;

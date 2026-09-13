@@ -23,8 +23,8 @@ import { restaurantBranches, restaurants } from './restaurants.js';
 /**
  * Effective-dated commission configuration (plan §24).
  *
- * The current rate is the row whose [effective_from, effective_to) window covers
- * now. Orders snapshot the rate, so changing this never rewrites history.
+ * The current fee is the row whose [effective_from, effective_to) window covers
+ * now. Orders snapshot the fee, so changing this never rewrites history.
  */
 export const restaurantCommissionConfigs = pgTable(
   'restaurant_commission_configs',
@@ -33,8 +33,12 @@ export const restaurantCommissionConfigs = pgTable(
     restaurantId: fk('restaurant_id')
       .notNull()
       .references(() => restaurants.id, { onDelete: 'cascade' }),
-    /** Basis points: 12% = 1200. Constrained to 0..10000 by a check constraint. */
-    commissionRateBps: integer('commission_rate_bps').notNull(),
+    /**
+     * A flat fee per order, in IQD — not a percentage. Defaults to the
+     * platform-wide `commission_flat_iqd` setting; a row here is a deal struck
+     * with this one restaurant.
+     */
+    commissionFlatIqd: money('commission_flat_iqd').notNull(),
     settlementPolicy: text('settlement_policy').$type<SettlementPolicy>().notNull().default('HALF_MONTH'),
     /** Days after a statement is issued before it becomes overdue. */
     paymentTermDays: integer('payment_term_days').notNull().default(7),
@@ -121,7 +125,7 @@ export const settlementLines = pgTable(
       .references(() => orders.id, { onDelete: 'restrict' }),
     /** Copied from the order's immutable snapshot, never recomputed from current config. */
     commissionBaseIqd: money('commission_base_iqd').notNull(),
-    commissionRateBpsSnapshot: integer('commission_rate_bps_snapshot').notNull(),
+    commissionFlatIqdSnapshot: money('commission_flat_iqd_snapshot').notNull(),
     commissionAmountIqd: money('commission_amount_iqd').notNull(),
     orderCompletedAt: utcTimestamp('order_completed_at').notNull(),
     createdAt: createdAt(),

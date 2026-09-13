@@ -23,15 +23,16 @@ export interface AdminRestaurant {
   branch_active: boolean;
   accepts_orders: boolean;
   city_ordering_enabled: boolean;
-  commission_rate_bps: number | null;
+  has_portal_user: boolean;
+  commission_flat_iqd: number | null;
   commission_display: string | null;
   orders_7d: number;
   created_at: string;
 }
 
 export interface CommissionConfigView {
-  rate_bps: number;
-  rate_display: string;
+  flat_iqd: number;
+  commission_display: string;
   settlement_policy: string;
   payment_term_days: number;
   effective_from: string;
@@ -95,7 +96,7 @@ export interface AdminOrderDetail extends AdminOrder {
   platform_service_fee_iqd: number;
   discount_total_iqd: number;
   commission_base_iqd: number;
-  commission_rate_bps: number;
+  commission_flat_iqd: number;
   restaurant_net_iqd: number;
   customer_notes: string | null;
   cancellation_reason: string | null;
@@ -202,7 +203,7 @@ export interface AdminSettlementDetail extends AdminSettlement {
     order_id: string;
     public_order_number: string;
     commission_base_iqd: number;
-    rate_bps: number;
+    commission_flat_iqd: number;
     commission_amount_iqd: number;
     completed_at: string;
   }[];
@@ -476,7 +477,7 @@ export const admin = {
   updateCommission: (
     token: string,
     id: string,
-    body: { commission_rate_bps: number; reason: string },
+    body: { commission_flat_iqd: number; reason: string },
   ) =>
     apiRequest<{ updated: boolean; note_ar: string }>(
       `/api/v1/admin/restaurants/${id}/commission`,

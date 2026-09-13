@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, CUISINE_KEYS, ERROR_CODES, EVENT_TYPES, OPERATIONAL_STATUSES, success } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
-import { bpsPercent } from '@jibli/money';
+import { commissionFeeDisplay } from '@jibli/money';
 import { displayNameSchema, iraqiPhoneSchema, reasonSchema, uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, enqueueOutboxEvent, writeAudit } from '@jibli/domain';
 import {
@@ -30,7 +30,7 @@ import { getConfig } from '../../services/config-service.js';
  * Every mutation is a named command with its own permission and audit action.
  * Suspension, commission changes and activation are distinct operations because
  * they carry different risk — a generic "update restaurant" endpoint would let
- * an Onboarding role change a commission rate.
+ * an Onboarding role change the commission.
  */
 
 const listQuerySchema = z.object({
@@ -53,10 +53,10 @@ const createSchema = z.object({
   /*
    * Optional, and normally absent. The commission is one platform-wide number
    * set in Admin > Settings; typing it again for each restaurant is how two
-   * restaurants silently end up on different rates. It stays accepted so a
+   * restaurants silently end up on different fees. It stays accepted so a
    * negotiated exception can still be recorded deliberately.
    */
-  commission_rate_bps: z.number().int().min(0).max(10_000).optional(),
+  commission_flat_iqd: z.number().int().min(0).max(100_000).optional(),
   /** Asset id from POST /api/v1/uploads. */
   logo_asset_id: uuidSchema.optional(),
   settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']).default('HALF_MONTH'),
@@ -112,7 +112,22 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         branchActive: restaurantBranches.isActive,
         acceptsOrders: restaurantBranches.acceptsOrders,
         cityOrderingEnabled: effectiveCapabilitySql('ordering'),
-        commissionRateBps: restaurantCommissionConfigs.commissionRateBps,
+        commissionFlatIqd: restaurantCommissionConfigs.commissionFlatIqd,
+        /*
+         * Whether anyone at this restaurant can actually sign in.
+         *
+         * A restaurant with no portal account is approved and invisible to its
+         * own owner: it cannot set a menu, cannot see an order, cannot do
+         * anything. That is not a detail of the detail screen — it belongs in
+         * the row, next to the other reasons a restaurant is not trading.
+         */
+        hasPortalUser: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${restaurantMembers}
+          JOIN ${users} ON ${users.id} = ${restaurantMembers.userId}
+          WHERE ${restaurantMembers.restaurantId} = ${restaurants.id}
+            AND ${users.username} IS NOT NULL
+            AND ${users.deletedAt} IS NULL
+        )`,
         // Completed orders in the last 7 days — the number that says whether
         // this restaurant is actually trading.
         orders7d: sql<number>`(
@@ -161,8 +176,10 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           accepts_orders: row.acceptsOrders,
           // Surfaced so an operator can see why an ACTIVE restaurant is invisible.
           city_ordering_enabled: row.cityOrderingEnabled,
-          commission_rate_bps: row.commissionRateBps,
-          commission_display: row.commissionRateBps ? bpsPercent(row.commissionRateBps) : null,
+          has_portal_user: row.hasPortalUser,
+          commission_flat_iqd: row.commissionFlatIqd,
+          commission_display:
+            row.commissionFlatIqd === null ? null : commissionFeeDisplay(row.commissionFlatIqd),
           orders_7d: Number(row.orders7d),
           created_at: row.createdAt.toISOString(),
         })),
@@ -249,8 +266,8 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
               : null,
             city_ordering_enabled: row.cityOrderingEnabled,
             commission_history: commissionHistory.map((config) => ({
-              rate_bps: config.commissionRateBps,
-              rate_display: bpsPercent(config.commissionRateBps),
+              flat_iqd: config.commissionFlatIqd,
+              commission_display: commissionFeeDisplay(config.commissionFlatIqd),
               settlement_policy: config.settlementPolicy,
               payment_term_days: config.paymentTermDays,
               effective_from: config.effectiveFrom.toISOString(),
@@ -350,10 +367,10 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       /*
        * Resolved before the transaction opens, and falling back to the platform
        * default rather than to a number compiled into this file: an operator who
-       * changes the rate in Settings expects the next restaurant to get it.
+       * changes the commission in Settings expects the next restaurant to get it.
        */
-      const commissionRateBps =
-        body.commission_rate_bps ?? (await getConfig(ctx, 'default_commission_rate_bps', 1500));
+      const commissionFlatIqd =
+        body.commission_flat_iqd ?? (await getConfig(ctx, 'commission_flat_iqd', 500));
 
       const restaurantId = uuidv7();
       const branchId = uuidv7();
@@ -408,7 +425,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       await tx.insert(restaurantCommissionConfigs).values({
         id: uuidv7(),
         restaurantId,
-        commissionRateBps,
+        commissionFlatIqd,
         settlementPolicy: body.settlement_policy,
         effectiveFrom: now,
         createdBy: principal.userId,
@@ -422,7 +439,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         after: {
           displayName: body.display_name,
           cityId: body.city_id,
-          commissionRateBps,
+          commissionFlatIqd,
           coverageOverridden: !geo.onboardingEnabled,
         },
         reason: body.reason ?? null,
@@ -447,10 +464,10 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
   });
 
   /**
-   * Change the commission rate (plan §24).
+   * Change the commission (plan §24).
    *
    * Effective-dated: the current config is closed and a new one opened, so
-   * historical orders keep the rate they were placed under. Requires a fresh
+   * historical orders keep the fee they were placed under. Requires a fresh
    * MFA challenge (plan §88).
    */
   app.patch(
@@ -465,7 +482,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       const { restaurantId } = z.object({ restaurantId: uuidSchema }).parse(request.params);
       const body = z
         .object({
-          commission_rate_bps: z.number().int().min(0).max(10_000),
+          commission_flat_iqd: z.number().int().min(0).max(100_000),
           settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']).optional(),
           payment_term_days: z.number().int().min(0).max(90).optional(),
           reason: reasonSchema,
@@ -499,7 +516,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         await tx.insert(restaurantCommissionConfigs).values({
           id: uuidv7(),
           restaurantId,
-          commissionRateBps: body.commission_rate_bps,
+          commissionFlatIqd: body.commission_flat_iqd,
           settlementPolicy: body.settlement_policy ?? current?.settlementPolicy ?? 'HALF_MONTH',
           paymentTermDays: body.payment_term_days ?? current?.paymentTermDays ?? 7,
           effectiveFrom: now,
@@ -512,8 +529,8 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           action: AUDIT_ACTIONS.RESTAURANT_COMMISSION_UPDATE,
           entityType: 'restaurant',
           entityId: restaurantId,
-          before: current ? { commissionRateBps: current.commissionRateBps } : null,
-          after: { commissionRateBps: body.commission_rate_bps },
+          before: current ? { commissionFlatIqd: current.commissionFlatIqd } : null,
+          after: { commissionFlatIqd: body.commission_flat_iqd },
           reason: body.reason,
           ip: clientIp(request),
           userAgent: userAgent(request),
@@ -526,7 +543,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           {
             updated: true,
             // Stated back so the UI can reassure the operator (plan §24).
-            note_ar: 'الطلبات السابقة تحتفظ بنسبة العمولة التي سُجّلت عليها ولا تتأثر بهذا التغيير.',
+            note_ar: 'الطلبات السابقة تحتفظ بقيمة العمولة التي سُجّلت عليها ولا تتأثر بهذا التغيير.',
           },
           { request_id: request.requestId },
         ),

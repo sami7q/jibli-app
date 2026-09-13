@@ -4,7 +4,7 @@ import {
   assertAddressServiceable,
   assertOrderable,
   buildQuote,
-  resolveCommissionRate,
+  resolveCommissionFee,
   type CatalogItem,
   type Quote,
   type RequestedLine,
@@ -231,7 +231,7 @@ export async function quoteOrder(
 
   const commissionConfigs = await ctx.db
     .select({
-      commissionRateBps: restaurantCommissionConfigs.commissionRateBps,
+      commissionFlatIqd: restaurantCommissionConfigs.commissionFlatIqd,
       effectiveFrom: restaurantCommissionConfigs.effectiveFrom,
       effectiveTo: restaurantCommissionConfigs.effectiveTo,
     })
@@ -244,7 +244,7 @@ export async function quoteOrder(
     catalog,
     deliveryFeeIqd: branchRow.branch.deliveryFeeIqd,
     platformServiceFeeIqd,
-    commissionRateBps: resolveCommissionRate(commissionConfigs, new Date()),
+    commissionFlatIqd: resolveCommissionFee(commissionConfigs, new Date()),
     minimumOrderIqd: branchRow.restaurant.minimumOrderIqd,
   });
 

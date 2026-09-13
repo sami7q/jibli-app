@@ -144,7 +144,7 @@ function SettlementDetail({
 
       <Card
         title="تفصيل الطلبات"
-        subtitle="أساس العمولة لكل طلب والنسبة التي طُبّقت عليه وقت اكتماله"
+        subtitle="أساس العمولة لكل طلب وقيمة العمولة التي طُبّقت عليه وقت اكتماله"
       >
         {data.lines.length === 0 ? (
           <p className="empty">لا توجد أسطر في هذا الكشف</p>
@@ -157,9 +157,6 @@ function SettlementDetail({
                   <th scope="col">تاريخ الاكتمال</th>
                   <th scope="col" className="numeric">
                     أساس العمولة
-                  </th>
-                  <th scope="col" className="numeric">
-                    النسبة
                   </th>
                   <th scope="col" className="numeric">
                     العمولة
@@ -176,16 +173,13 @@ function SettlementDetail({
                       <span className="ltr-inline">{formatDateTime(line.completed_at)}</span>
                     </td>
                     <td className="numeric">{money(line.commission_base_iqd)}</td>
-                    <td className="numeric">
-                      <span className="ltr-inline">{line.rate_display}</span>
-                    </td>
                     <td className="numeric">{money(line.commission_amount_iqd)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr style={{ fontWeight: 700 }}>
-                  <td colSpan={4}>مجموع العمولة</td>
+                  <td colSpan={3}>مجموع العمولة</td>
                   <td className="numeric">{money(data.commission_total_iqd)}</td>
                 </tr>
               </tfoot>
@@ -205,8 +199,8 @@ function SettlementDetail({
             color: 'var(--text-muted)',
           }}
         >
-          النسبة المعروضة لكل سطر هي النسبة المسجّلة وقت اكتمال الطلب، ولا تتغيّر إذا عُدّلت نسبة
-          العقد لاحقاً. أجور التوصيل ليست جزءاً من أساس العمولة.
+          العمولة المعروضة لكل سطر هي القيمة المسجّلة وقت اكتمال الطلب، ولا تتغيّر إذا عُدّلت
+          عمولة العقد لاحقاً. أجور التوصيل ليست جزءاً من أساس العمولة.
         </p>
       </Card>
 

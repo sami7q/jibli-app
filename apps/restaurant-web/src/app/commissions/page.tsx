@@ -47,10 +47,14 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
   if (open.isLoading || !open.data) return <Skeleton height={420} />;
 
   const data = open.data;
-  const averageRate =
-    data.commission_base_total_iqd > 0
-      ? (data.commission_total_iqd / data.commission_base_total_iqd) * 100
-      : 0;
+  /*
+   * The commission is a flat fee, so the figure worth showing is what it costs
+   * per order — not a percentage. It equals the configured fee except on an
+   * order too small to carry it, where the fee is capped at what the restaurant
+   * earned; averaging makes that visible instead of hiding it.
+   */
+  const feePerOrder =
+    data.order_count > 0 ? Math.round(data.commission_total_iqd / data.order_count) : 0;
 
   return (
     <>
@@ -86,10 +90,8 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
             <span className="figure__value">{money(data.restaurant_net_iqd)}</span>
           </div>
           <div className="figure">
-            <span className="figure__label">متوسط النسبة الفعلية</span>
-            <span className="figure__value">
-              <span className="ltr-inline">{averageRate.toFixed(2)}%</span>
-            </span>
+            <span className="figure__label">العمولة لكل طلب</span>
+            <span className="figure__value">{money(feePerOrder)}</span>
           </div>
           <div className="figure">
             <span className="figure__label">نظام التسوية</span>
@@ -104,7 +106,7 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
 
       <Card
         title="تفصيل الطلبات"
-        subtitle="أساس العمولة لكل طلب والنسبة المسجّلة عليه وقت الاكتمال"
+        subtitle="أساس العمولة لكل طلب وقيمة العمولة المسجّلة عليه وقت الاكتمال"
       >
         {data.orders.length === 0 ? (
           <div className="empty">
@@ -131,9 +133,6 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
                       أساس العمولة
                     </th>
                     <th scope="col" className="numeric">
-                      النسبة
-                    </th>
-                    <th scope="col" className="numeric">
                       العمولة
                     </th>
                     <th scope="col" className="numeric">
@@ -155,9 +154,6 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
                       <td className="numeric">{money(order.customer_total_iqd)}</td>
                       <td className="numeric">{money(order.delivery_fee_iqd)}</td>
                       <td className="numeric">{money(order.commission_base_iqd)}</td>
-                      <td className="numeric">
-                        <span className="ltr-inline">{order.rate_display}</span>
-                      </td>
                       <td className="numeric" style={{ color: 'var(--jibli-danger-700)' }}>
                         {money(order.commission_amount_iqd)}
                       </td>
@@ -197,8 +193,9 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
             color: 'var(--text-muted)',
           }}
         >
-          العمولة تُحتسب على أساس قيمة الأصناف بعد الخصومات التي يموّلها المطعم، ولا تشمل أجرة
-          التوصيل. النسبة المطبّقة على كل طلب هي المسجّلة وقته ولا تتغيّر بعد ذلك.
+          العمولة قيمة ثابتة عن كل طلب، لا تزيد بزيادة قيمة الطلب. وهي لا تتجاوز أساس العمولة —
+          قيمة الأصناف بعد الخصومات التي يموّلها المطعم، دون أجرة التوصيل. القيمة المطبّقة على
+          كل طلب هي المسجّلة وقته ولا تتغيّر بعد ذلك.
         </p>
       </Card>
     </>

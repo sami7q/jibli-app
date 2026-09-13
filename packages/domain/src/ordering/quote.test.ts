@@ -3,7 +3,7 @@ import { expectAppError } from '@jibli/test-utils';
 import {
   assertQuoteUnchanged,
   buildQuote,
-  resolveCommissionRate,
+  resolveCommissionFee,
   type CatalogItem,
 } from './quote.js';
 
@@ -66,7 +66,7 @@ const baseInput = {
   catalog,
   deliveryFeeIqd: 2_000,
   platformServiceFeeIqd: 1_000,
-  commissionRateBps: 2_000,
+  commissionFlatIqd: 500,
   minimumOrderIqd: 0,
 };
 
@@ -106,13 +106,13 @@ describe('buildQuote() — server-side pricing', () => {
     expect(line?.modifiers[0]?.groupNameArSnapshot).toBe('الحجم');
   });
 
-  it('computes commission from the items subtotal, excluding fees', () => {
+  it('bases commission on the items subtotal, excluding fees', () => {
     const quote = buildQuote({
       ...baseInput,
       requestedLines: [{ menuItemId: 'item-dolma', quantity: 1, modifierIds: [] }],
     });
     expect(quote.totals.commissionBaseIqd).toBe(6_000);
-    expect(quote.totals.commissionAmountIqd).toBe(1_200); // 20% of 6,000
+    expect(quote.totals.commissionAmountIqd).toBe(500); // the flat fee, not a share
   });
 });
 
@@ -281,38 +281,38 @@ describe('assertQuoteUnchanged() — price tampering and drift', () => {
   });
 });
 
-describe('resolveCommissionRate() — effective dating (plan §24)', () => {
+describe('resolveCommissionFee() — effective dating (plan §24)', () => {
   const configs = [
     {
-      commissionRateBps: 1_200,
+      commissionFlatIqd: 500,
       effectiveFrom: new Date('2025-01-01T00:00:00Z'),
       effectiveTo: new Date('2025-06-01T00:00:00Z'),
     },
     {
-      commissionRateBps: 2_000,
+      commissionFlatIqd: 750,
       effectiveFrom: new Date('2025-06-01T00:00:00Z'),
       effectiveTo: null,
     },
   ];
 
-  it('picks the rate in force at the given moment', () => {
-    expect(resolveCommissionRate(configs, new Date('2025-03-01T00:00:00Z'))).toBe(1_200);
-    expect(resolveCommissionRate(configs, new Date('2025-08-01T00:00:00Z'))).toBe(2_000);
+  it('picks the fee in force at the given moment', () => {
+    expect(resolveCommissionFee(configs, new Date('2025-03-01T00:00:00Z'))).toBe(500);
+    expect(resolveCommissionFee(configs, new Date('2025-08-01T00:00:00Z'))).toBe(750);
   });
 
   it('treats effectiveTo as exclusive', () => {
-    expect(resolveCommissionRate(configs, new Date('2025-06-01T00:00:00Z'))).toBe(2_000);
+    expect(resolveCommissionFee(configs, new Date('2025-06-01T00:00:00Z'))).toBe(750);
   });
 
   it('treats effectiveFrom as inclusive', () => {
-    expect(resolveCommissionRate(configs, new Date('2025-01-01T00:00:00Z'))).toBe(1_200);
+    expect(resolveCommissionFee(configs, new Date('2025-01-01T00:00:00Z'))).toBe(500);
   });
 
-  it('fails loudly when no rate is configured rather than defaulting to zero', () => {
-    expect(() => resolveCommissionRate(configs, new Date('2024-01-01T00:00:00Z'))).toThrow(
+  it('fails loudly when no fee is configured rather than defaulting to zero', () => {
+    expect(() => resolveCommissionFee(configs, new Date('2024-01-01T00:00:00Z'))).toThrow(
       expect.objectContaining({ code: 'COMMISSION_CONFIG_MISSING' }),
     );
-    expect(() => resolveCommissionRate([], new Date())).toThrow(
+    expect(() => resolveCommissionFee([], new Date())).toThrow(
       expect.objectContaining({ code: 'COMMISSION_CONFIG_MISSING' }),
     );
   });

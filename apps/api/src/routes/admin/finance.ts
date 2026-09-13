@@ -164,7 +164,7 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
           orderId: settlementLines.orderId,
           publicOrderNumber: orders.publicOrderNumber,
           commissionBaseIqd: settlementLines.commissionBaseIqd,
-          rateBps: settlementLines.commissionRateBpsSnapshot,
+          commissionFlatIqd: settlementLines.commissionFlatIqdSnapshot,
           commissionAmountIqd: settlementLines.commissionAmountIqd,
           completedAt: settlementLines.orderCompletedAt,
         })
@@ -240,7 +240,7 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
               order_id: line.orderId,
               public_order_number: line.publicOrderNumber,
               commission_base_iqd: line.commissionBaseIqd,
-              rate_bps: line.rateBps,
+              commission_flat_iqd: line.commissionFlatIqd,
               commission_amount_iqd: line.commissionAmountIqd,
               completed_at: line.completedAt.toISOString(),
             })),

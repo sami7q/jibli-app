@@ -206,7 +206,7 @@ export async function confirmDelivery(
       idempotencyKey: `commission:${order.id}`,
       metadata: {
         commissionBaseIqd: order.commissionBaseIqd,
-        commissionRateBpsSnapshot: order.commissionRateBpsSnapshot,
+        commissionFlatIqdSnapshot: order.commissionFlatIqdSnapshot,
       },
     });
 

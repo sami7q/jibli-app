@@ -2,7 +2,7 @@ import { and, desc, eq, gte, isNotNull, lt, lte, notInArray, sql } from 'drizzle
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { ORDER_STATUSES, success, type OrderStatus } from '@jibli/contracts';
-import { bpsPercent } from '@jibli/money';
+import { commissionFeeDisplay } from '@jibli/money';
 import { assertRestaurantPermission } from '@jibli/auth';
 import { maskPhone } from '@jibli/validation';
 import {
@@ -206,7 +206,7 @@ export function registerRestaurantHistoryRoutes(app: FastifyInstance, ctx: AppCo
           publicOrderNumber: orders.publicOrderNumber,
           completedAt: orders.completedAt,
           commissionBaseIqd: orders.commissionBaseIqd,
-          rateBps: orders.commissionRateBpsSnapshot,
+          commissionFlatIqd: orders.commissionFlatIqdSnapshot,
           commissionAmountIqd: orders.commissionAmountIqd,
           customerTotalIqd: orders.customerTotalIqd,
           deliveryFeeIqd: orders.deliveryFeeIqd,
@@ -248,8 +248,8 @@ export function registerRestaurantHistoryRoutes(app: FastifyInstance, ctx: AppCo
               public_order_number: row.publicOrderNumber,
               completed_at: row.completedAt?.toISOString() ?? null,
               commission_base_iqd: row.commissionBaseIqd,
-              rate_bps: row.rateBps,
-              rate_display: bpsPercent(row.rateBps),
+              commission_flat_iqd: row.commissionFlatIqd,
+              commission_display: commissionFeeDisplay(row.commissionFlatIqd),
               commission_amount_iqd: row.commissionAmountIqd,
               customer_total_iqd: row.customerTotalIqd,
               delivery_fee_iqd: row.deliveryFeeIqd,

@@ -32,9 +32,9 @@ const DEFAULTS: readonly ConfigSeed[] = [
     isSensitive: true,
   },
   {
-    key: 'default_commission_rate_bps',
-    value: 1500,
-    descriptionAr: 'نسبة العمولة الافتراضية للمطاعم الجديدة (نقطة أساس: 1500 = 15%)',
+    key: 'commission_flat_iqd',
+    value: 500,
+    descriptionAr: 'العمولة التي يتقاضاها جيبلي عن كل طلب (دينار عراقي)',
     isSensitive: true,
   },
   {

@@ -51,7 +51,7 @@ satisfied from code alone.
 
 ### Money and finance arithmetic
 
-- `@jibli/money` — integer IQD, basis-point commission, one half-up rounding
+- `@jibli/money` — integer IQD, flat per-order commission (ADR 0006), one half-up rounding
   policy, exact allocation. **42 tests**, including the plan's Appendix E worked
   example and a proof that a later rate change cannot alter a snapshot.
 - Settlement periods — half-open `[start, end)` ranges in `Asia/Baghdad`.

@@ -124,7 +124,7 @@ export interface PortalSettlementDetail extends PortalSettlement {
   lines: {
     public_order_number: string;
     commission_base_iqd: number;
-    rate_display: string;
+    commission_display: string;
     commission_amount_iqd: number;
     completed_at: string;
   }[];
@@ -274,8 +274,8 @@ export interface OpenCommissions {
     public_order_number: string;
     completed_at: string | null;
     commission_base_iqd: number;
-    rate_bps: number;
-    rate_display: string;
+    commission_flat_iqd: number;
+    commission_display: string;
     commission_amount_iqd: number;
     customer_total_iqd: number;
     delivery_fee_iqd: number;
@@ -316,7 +316,7 @@ export interface DashboardOverview {
     open_commission_iqd: number;
     open_order_count: number;
     estimated_net_iqd: number | null;
-    commission_rate_bps: number | null;
+    commission_flat_iqd: number | null;
     period_label_ar: string;
     period_end: string;
     days_until_settlement: number;

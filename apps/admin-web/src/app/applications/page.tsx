@@ -21,8 +21,9 @@ import { useAdminSession } from '@/hooks/use-session';
  * Restaurant onboarding review (plan §15.2, §69).
  *
  * Approval is a command, not a status flip: it creates the restaurant, branch,
- * owner membership and commission config. The screen therefore collects the
- * commission rate up front rather than leaving it to be set later and forgotten.
+ * owner membership and commission config. The commission itself is not asked
+ * for here — it is one platform-wide amount, set in Settings, and the approved
+ * restaurant starts on it.
  */
 export default function ApplicationsPage() {
   const session = useAdminSession();
@@ -185,7 +186,6 @@ function ApproveDialog({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [commissionPercent, setCommissionPercent] = useState(15);
   const [policy, setPolicy] = useState<'HALF_MONTH' | 'MONTHLY'>('HALF_MONTH');
   const [overrideCoverage, setOverrideCoverage] = useState(false);
   const [reason, setReason] = useState('');
@@ -193,9 +193,11 @@ function ApproveDialog({
   const approve = useMutation({
     mutationFn: () =>
       adminApi.approveApplication(token, application.id, {
-        // Basis points on the wire; percent in the UI, because that is how the
-        // contract with the restaurant is written.
-        commission_rate_bps: Math.round(commissionPercent * 100),
+        /*
+         * No commission on the wire: it is one platform-wide amount, and the
+         * API falls back to it. Typing a number here per application is how
+         * two restaurants end up on terms nobody chose.
+         */
         settlement_policy: policy,
         override_coverage: overrideCoverage,
         reason: reason || undefined,
@@ -235,22 +237,6 @@ function ApproveDialog({
             </label>
           </div>
         ) : null}
-
-        <div className="field">
-          <label htmlFor="commission">نسبة العمولة (%)</label>
-          <input
-            id="commission"
-            type="number"
-            min={0}
-            max={100}
-            step={0.5}
-            value={commissionPercent}
-            onChange={(event) => setCommissionPercent(Number(event.target.value))}
-          />
-          <span className="field__hint">
-            تُسجَّل هذه النسبة على كل طلب عند إنشائه ولا تتغيّر أثراً رجعياً عند تعديلها لاحقاً.
-          </span>
-        </div>
 
         <div className="field">
           <label htmlFor="policy">دورة التسوية</label>

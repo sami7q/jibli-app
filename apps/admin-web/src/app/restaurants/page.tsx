@@ -2,10 +2,21 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { OPERATIONAL_STATUSES, type OperationalStatus } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
-import { Badge, Card, DataTable, ErrorState, FilterBar, SearchInput, Select, Skeleton } from '@/components/ui';
+import { IssuePortalAccess } from '@/components/portal-credentials';
+import {
+  Badge,
+  Card,
+  DataTable,
+  ErrorState,
+  FilterBar,
+  Money,
+  SearchInput,
+  Select,
+  Skeleton,
+} from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminRestaurant } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
@@ -30,8 +41,11 @@ const STATUS_LABELS: Record<OperationalStatus, string> = {
 
 export default function RestaurantsPage() {
   const session = useAdminSession();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<OperationalStatus | ''>('');
+  /** The restaurant whose owner is being given a username and password. */
+  const [issuingFor, setIssuingFor] = useState<AdminRestaurant | null>(null);
 
   // Debounced so typing does not fire a request per keystroke (plan §74).
   const debouncedSearch = useDebounced(search, 350);
@@ -146,10 +160,31 @@ export default function RestaurantsPage() {
                 render: (row) => <OrderabilityCell row={row} />,
               },
               {
+                key: 'access',
+                header: 'حساب الدخول',
+                render: (row) =>
+                  row.has_portal_user ? (
+                    <Badge tone="success">موجود</Badge>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--outline btn--sm"
+                      onClick={() => setIssuingFor(row)}
+                    >
+                      إنشاء حساب
+                    </button>
+                  ),
+              },
+              {
                 key: 'commission',
                 header: 'العمولة',
                 numeric: true,
-                render: (row) => row.commission_display ?? '—',
+                render: (row) =>
+                  row.commission_flat_iqd === null ? (
+                    '—'
+                  ) : (
+                    <Money amount={row.commission_flat_iqd} />
+                  ),
               },
               {
                 key: 'orders',
@@ -168,6 +203,19 @@ export default function RestaurantsPage() {
           />
         )}
       </Card>
+
+      {issuingFor ? (
+        <IssuePortalAccess
+          token={token}
+          restaurantId={issuingFor.id}
+          restaurantName={issuingFor.display_name}
+          onIssued={() => {
+            void queryClient.invalidateQueries({ queryKey: ['admin-restaurants'] });
+            void queryClient.invalidateQueries({ queryKey: ['portal-users', issuingFor.id] });
+          }}
+          onClose={() => setIssuingFor(null)}
+        />
+      ) : null}
     </AdminShell>
   );
 }

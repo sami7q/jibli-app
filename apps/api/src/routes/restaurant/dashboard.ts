@@ -269,13 +269,14 @@ async function buildFinanceSummary(
   canSeeProfit: boolean,
 ) {
   /*
-   * The rate is effective-dated, so "the current rate" is the config whose
-   * window contains now — not a column on the restaurant. Reading it any other
-   * way would show a rate that a future-dated change had already replaced.
+   * The commission is effective-dated, so "the current commission" is the
+   * config whose window contains now — not a column on the restaurant. Reading
+   * it any other way would show a fee that a future-dated change had already
+   * replaced.
    */
   const [config] = await ctx.db
     .select({
-      rateBps: restaurantCommissionConfigs.commissionRateBps,
+      flatIqd: restaurantCommissionConfigs.commissionFlatIqd,
       policy: restaurantCommissionConfigs.settlementPolicy,
     })
     .from(restaurantCommissionConfigs)
@@ -324,7 +325,7 @@ async function buildFinanceSummary(
     open_order_count: Number(open?.orderCount ?? 0),
     // Net is margin-adjacent, so it follows the profit permission.
     estimated_net_iqd: canSeeProfit ? Number(open?.netIqd ?? 0) : null,
-    commission_rate_bps: config?.rateBps ?? null,
+    commission_flat_iqd: config?.flatIqd ?? null,
     period_label_ar: period.labelAr,
     period_end: period.end.toISOString(),
     days_until_settlement: daysUntilClose,

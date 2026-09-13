@@ -232,7 +232,7 @@ export function registerAdminOrderRoutes(app: FastifyInstance, ctx: AppContext):
           discount_total_iqd: order.order.discountTotalIqd,
           customer_total_iqd: order.order.customerTotalIqd,
           commission_base_iqd: order.order.commissionBaseIqd,
-          commission_rate_bps: order.order.commissionRateBpsSnapshot,
+          commission_flat_iqd: order.order.commissionFlatIqdSnapshot,
           commission_amount_iqd: order.order.commissionAmountIqd,
           restaurant_net_iqd: order.order.restaurantNetSnapshotIqd,
           customer_notes: order.order.customerNotes,

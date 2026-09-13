@@ -22,7 +22,7 @@ import { useAdminSession } from '@/hooks/use-session';
 const KEY_LABELS: Record<string, string> = {
   global_checkout_enabled: 'تفعيل الطلبات على مستوى المنصة',
   platform_service_fee_iqd: 'رسوم الخدمة (د.ع)',
-  default_commission_rate_bps: 'نسبة العمولة الافتراضية (نقطة أساس)',
+  commission_flat_iqd: 'العمولة (د.ع لكل طلب)',
   default_settlement_policy: 'دورة التسوية الافتراضية',
   default_payment_term_days: 'مهلة السداد (أيام)',
   delivery_pin_enabled: 'طلب رمز التسليم',

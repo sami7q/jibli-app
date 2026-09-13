@@ -3,6 +3,7 @@ import {
   applyBps,
   clampNonNegative,
   iqd,
+  minIqd,
   MoneyError,
   subtractIqd,
   ZERO_IQD,
@@ -15,7 +16,12 @@ import {
  * the commission formula; every caller — quote endpoint, PlaceOrder transaction,
  * settlement generation, reports and exports — routes through here.
  *
- * Worked example from plan Appendix E:
+ * Jibli's commission is a flat fee per order, not a percentage: the platform
+ * charges the same amount whether the order is 5,000 or 50,000, because the
+ * work it does for the restaurant — the listing, the order, the settlement — is
+ * the same either way. The amount is one number in Admin settings.
+ *
+ * Worked example:
  *
  *   Items subtotal          30,000
  *   Restaurant discount     -2,000
@@ -24,7 +30,11 @@ import {
  *   Customer total          31,000
  *
  *   Commission base = 30,000 - 2,000 = 28,000
- *   Commission @ 1200 bps = 3,360
+ *   Commission = 500 (the flat fee, unchanged by the base)
+ *
+ * The base still matters, for one rule: the commission is capped at it. A flat
+ * fee larger than the order would otherwise make the restaurant's net negative
+ * — arithmetic should not depend on the minimum-order policy holding.
  */
 
 /**
@@ -56,7 +66,8 @@ export interface OrderTotalsInput {
   readonly discounts?: readonly DiscountInput[];
   readonly deliveryFeeIqd: Iqd;
   readonly platformServiceFeeIqd: Iqd;
-  readonly commissionRateBps: Bps;
+  /** Jibli's flat fee for this order, frozen onto it at placement. */
+  readonly commissionFlatIqd: Iqd;
   readonly deliveryFeeBeneficiary?: DeliveryFeeBeneficiary;
 }
 
@@ -69,8 +80,10 @@ export interface OrderTotals {
   readonly platformServiceFeeIqd: Iqd;
   /** What the customer pays, and for COD exactly what the driver collects in cash. */
   readonly customerTotalIqd: Iqd;
+  /** What the restaurant earns before commission; the commission is capped at it. */
   readonly commissionBaseIqd: Iqd;
-  readonly commissionRateBpsSnapshot: Bps;
+  readonly commissionFlatIqdSnapshot: Iqd;
+  /** The flat fee, or the base when the base is smaller. */
   readonly commissionAmountIqd: Iqd;
   /** What the restaurant keeps from this order once Jibli's commission is deducted. */
   readonly restaurantNetIqd: Iqd;
@@ -114,6 +127,9 @@ export function calculateOrderTotals(input: OrderTotalsInput): OrderTotals {
   if (input.deliveryFeeIqd < 0 || input.platformServiceFeeIqd < 0) {
     throw new MoneyError('Fees cannot be negative');
   }
+  if (input.commissionFlatIqd < 0) {
+    throw new MoneyError('Commission cannot be negative');
+  }
 
   const itemsSubtotalIqd = addIqd(...input.lines.map(lineTotal));
 
@@ -136,7 +152,7 @@ export function calculateOrderTotals(input: OrderTotalsInput): OrderTotals {
   const commissionBaseIqd = clampNonNegative(
     subtractIqd(itemsSubtotalIqd, restaurantFundedDiscountIqd),
   );
-  const commissionAmountIqd = applyBps(commissionBaseIqd, input.commissionRateBps);
+  const commissionAmountIqd = minIqd(input.commissionFlatIqd, commissionBaseIqd);
 
   const customerTotalIqd = clampNonNegative(
     iqd(
@@ -170,7 +186,7 @@ export function calculateOrderTotals(input: OrderTotalsInput): OrderTotals {
     platformServiceFeeIqd: input.platformServiceFeeIqd,
     customerTotalIqd,
     commissionBaseIqd,
-    commissionRateBpsSnapshot: input.commissionRateBps,
+    commissionFlatIqdSnapshot: input.commissionFlatIqd,
     commissionAmountIqd,
     restaurantNetIqd,
     platformRevenueIqd,
@@ -180,13 +196,13 @@ export function calculateOrderTotals(input: OrderTotalsInput): OrderTotals {
 /**
  * Re-derive commission from an immutable order snapshot.
  *
- * Settlement generation must never re-read the restaurant's *current* rate
- * (plan §24, §224) — it reads the rate frozen onto the order. This helper exists
+ * Settlement generation must never re-read the restaurant's *current* fee
+ * (plan §24, §224) — it reads the fee frozen onto the order. This helper exists
  * so that rule is expressed in code rather than left to each caller's discipline.
  */
 export function commissionFromSnapshot(snapshot: {
   commissionBaseIqd: Iqd;
-  commissionRateBpsSnapshot: Bps;
+  commissionFlatIqdSnapshot: Iqd;
 }): Iqd {
-  return applyBps(snapshot.commissionBaseIqd, snapshot.commissionRateBpsSnapshot);
+  return minIqd(snapshot.commissionFlatIqdSnapshot, snapshot.commissionBaseIqd);
 }

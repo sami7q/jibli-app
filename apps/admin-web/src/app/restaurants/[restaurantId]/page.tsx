@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RESTAURANT_ROLE_LABELS, dateAr } from '@jibli/ui-web';
@@ -173,29 +174,32 @@ export default function RestaurantDetailPage() {
             )}
           </Card>
 
-          <Card title="العمولة" icon="commissions">
-            <div className="card__header" style={{ marginBottom: 'var(--space-3)' }}>
-              <div />
+          <Card
+            title="العمولة"
+            icon="commissions"
+            subtitle="قيمة ثابتة عن كل طلب، لا تتغيّر بحجم الطلب"
+            actions={
               <button
                 type="button"
                 className="btn btn--outline btn--sm"
                 onClick={() => setEditingCommission(true)}
               >
-                تعديل النسبة
+                تعديل العمولة
               </button>
-            </div>
+            }
+          >
 
             <DataTable<CommissionConfigView>
-              caption="سجل نسب العمولة"
+              caption="سجل قيم العمولة"
               rows={data.commission_history}
               keyOf={(row) => row.effective_from}
-              emptyMessage="لم تُضبط نسبة عمولة بعد"
+              emptyMessage="لم تُضبط عمولة بعد"
               columns={[
                 {
-                  key: 'rate',
-                  header: 'النسبة',
+                  key: 'amount',
+                  header: 'العمولة',
                   numeric: true,
-                  render: (row) => <strong>{row.rate_display}</strong>,
+                  render: (row) => <strong>{row.commission_display}</strong>,
                 },
                 {
                   key: 'policy',
@@ -225,8 +229,8 @@ export default function RestaurantDetailPage() {
                 color: 'var(--text-muted)',
               }}
             >
-              كل طلب يحتفظ بالنسبة التي كانت سارية لحظة إنشائه. تعديل النسبة لا يؤثر على الطلبات
-              أو الكشوف السابقة.
+              كل طلب يحتفظ بقيمة العمولة التي كانت سارية لحظة إنشائه. تعديل العمولة لا يؤثر على
+              الطلبات أو الكشوف السابقة.
             </p>
           </Card>
 
@@ -376,13 +380,13 @@ function CommissionDialog({
   onNeedsMfa: () => void;
   onCancel: () => void;
 }) {
-  const [percent, setPercent] = useState(current ? current.rate_bps / 100 : 15);
+  const [amountIqd, setAmountIqd] = useState(current?.flat_iqd ?? 500);
   const [reason, setReason] = useState('');
 
   const update = useMutation({
     mutationFn: () =>
       admin.updateCommission(token, restaurantId, {
-        commission_rate_bps: Math.round(percent * 100),
+        commission_flat_iqd: amountIqd,
         reason,
       }),
     onSuccess: onDone,
@@ -394,30 +398,34 @@ function CommissionDialog({
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="commission-title">
       <div className="dialog">
-        <h2 id="commission-title">تعديل نسبة العمولة</h2>
+        <h2 id="commission-title">تعديل عمولة هذا المطعم</h2>
 
         {current ? (
           <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-            النسبة الحالية: <strong>{current.rate_display}</strong>
+            العمولة الحالية: <strong>{current.commission_display}</strong>
           </p>
         ) : null}
 
         <div className="field">
-          <label htmlFor="commission-percent">النسبة الجديدة (%)</label>
+          <label htmlFor="commission-amount">العمولة الجديدة (د.ع لكل طلب)</label>
           <input
-            id="commission-percent"
+            id="commission-amount"
             type="number"
             min={0}
-            max={100}
-            step={0.5}
-            value={percent}
-            onChange={(event) => setPercent(Number(event.target.value))}
+            max={100000}
+            step={250}
+            value={amountIqd}
+            onChange={(event) => setAmountIqd(Math.round(Number(event.target.value)))}
           />
+          <span className="field__hint">
+            استثناء لهذا المطعم وحده. العمولة الموحّدة لكل المطاعم تُضبط من{' '}
+            <Link href="/settings">إعدادات المنصة</Link>.
+          </span>
         </div>
 
         <div className="dialog__impact">
           <p style={{ margin: 0 }}>
-            تسري النسبة الجديدة على الطلبات الجديدة فقط. الطلبات والكشوف السابقة تحتفظ بالنسبة
+            تسري القيمة الجديدة على الطلبات الجديدة فقط. الطلبات والكشوف السابقة تحتفظ بالقيمة
             التي سُجّلت عليها — هذا يمنع تغيّر الفواتير الصادرة بأثر رجعي.
           </p>
         </div>
@@ -442,10 +450,10 @@ function CommissionDialog({
           <button
             type="button"
             className="btn btn--primary"
-            disabled={reason.trim().length < 5 || update.isPending}
+            disabled={reason.trim().length < 5 || amountIqd < 0 || update.isPending}
             onClick={() => update.mutate()}
           >
-            {update.isPending ? 'جاري الحفظ…' : 'حفظ النسبة'}
+            {update.isPending ? 'جاري الحفظ…' : 'حفظ العمولة'}
           </button>
           <button type="button" className="btn btn--outline" onClick={onCancel}>
             إلغاء

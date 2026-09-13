@@ -19,6 +19,52 @@ import { admin, type PortalUser } from '@/lib/admin-endpoints';
  * hash, so there is no screen anywhere that can show it again — which is why
  * the dialog below makes copying it deliberately hard to skip.
  */
+/**
+ * Issue a portal account, start to finish.
+ *
+ * Two dialogs in sequence — the form, then the one and only sighting of the
+ * password — kept together because they are one act: an operator who closes
+ * the second without copying has to reset, so nothing may come between them.
+ *
+ * Exported because the restaurants list issues credentials too. A restaurant
+ * with no account is the most common reason a newly created one does nothing,
+ * and making the operator find the detail screen first is how it gets
+ * forgotten.
+ */
+export function IssuePortalAccess({
+  token,
+  restaurantId,
+  restaurantName,
+  onIssued,
+  onClose,
+}: {
+  token: string;
+  restaurantId: string;
+  restaurantName: string;
+  /** Fired when the account exists, so the caller can refresh its own list. */
+  onIssued?: () => void;
+  onClose: () => void;
+}) {
+  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
+
+  if (issued) {
+    return <IssuedDialog issued={issued} onClose={onClose} />;
+  }
+
+  return (
+    <CreateDialog
+      token={token}
+      restaurantId={restaurantId}
+      restaurantName={restaurantName}
+      onIssued={(result) => {
+        setIssued(result);
+        onIssued?.();
+      }}
+      onCancel={onClose}
+    />
+  );
+}
+
 export function PortalCredentials({
   token,
   restaurantId,

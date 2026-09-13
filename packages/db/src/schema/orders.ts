@@ -63,8 +63,8 @@ export const orders = pgTable(
 
     // ── Commission snapshot (plan §24) ───────────────────────────────────────
     commissionBaseIqd: money('commission_base_iqd').notNull(),
-    /** Frozen rate. A later rate change cannot rewrite this order. */
-    commissionRateBpsSnapshot: integer('commission_rate_bps_snapshot').notNull(),
+    /** Frozen flat fee. A later change to the fee cannot rewrite this order. */
+    commissionFlatIqdSnapshot: money('commission_flat_iqd_snapshot').notNull(),
     commissionAmountIqd: money('commission_amount_iqd').notNull(),
     restaurantNetSnapshotIqd: money('restaurant_net_snapshot_iqd').notNull(),
 

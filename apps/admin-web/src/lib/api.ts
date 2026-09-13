@@ -227,7 +227,7 @@ export const adminApi = {
     token: string,
     applicationId: string,
     payload: {
-      commission_rate_bps?: number;
+      commission_flat_iqd?: number;
       settlement_policy?: 'HALF_MONTH' | 'MONTHLY';
       override_coverage?: boolean;
       reason?: string;

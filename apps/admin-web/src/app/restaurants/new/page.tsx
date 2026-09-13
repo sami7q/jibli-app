@@ -24,7 +24,7 @@ import { adminApi, ApiError } from '@/lib/api';
  * built — an operator setting a logo should see the card the customer will see,
  * not a filename.
  *
- * The commission rate is deliberately absent; see the note in the terms
+ * The commission is deliberately absent; see the note in the terms
  * section.
  */
 export default function NewRestaurantPage() {
@@ -70,8 +70,8 @@ export default function NewRestaurantPage() {
   });
 
   /*
-   * Read so the rate can be *shown* here, not edited here. An operator who
-   * remembers typing a commission on this screen needs to be told where it
+   * Read so the commission can be *shown* here, not edited here. An operator
+   * who remembers typing a commission on this screen needs to be told where it
    * moved, and what it is now.
    */
   const config = useQuery({
@@ -81,8 +81,8 @@ export default function NewRestaurantPage() {
     staleTime: 5 * 60_000,
   });
 
-  const commissionBps = Number(
-    config.data?.find((entry) => entry.key === 'default_commission_rate_bps')?.value ?? 1500,
+  const commissionIqd = Number(
+    config.data?.find((entry) => entry.key === 'commission_flat_iqd')?.value ?? 500,
   );
 
   const create = useMutation({
@@ -485,19 +485,20 @@ export default function NewRestaurantPage() {
               {/*
                 The commission used to be an input here. It is one platform-wide
                 number, and typing it per restaurant is how two restaurants end
-                up on different rates that nobody chose. Shown, not editable —
+                up on different terms that nobody chose. Shown, not editable —
                 an operator who remembers the field needs to know where it went.
               */}
               <div className="inherited">
                 <div className="inherited__value">
-                  {(commissionBps / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%
+                  {commissionIqd.toLocaleString('en-US')}
+                  <span className="inherited__unit"> د.ع</span>
                 </div>
                 <div className="inherited__body">
-                  <strong>نسبة العمولة</strong>
+                  <strong>العمولة لكل طلب</strong>
                   <span>
-                    موحّدة على مستوى المنصة. لتغييرها لكل المطاعم:{' '}
-                    <Link href="/settings">إعدادات المنصة</Link>. ولاستثناء مطعم واحد، عدّلها من
-                    صفحته بعد الإنشاء.
+                    قيمة ثابتة لا تتغيّر بحجم الطلب، وموحّدة على مستوى المنصة. لتغييرها لكل
+                    المطاعم: <Link href="/settings">إعدادات المنصة</Link>. ولاستثناء مطعم واحد،
+                    عدّلها من صفحته بعد الإنشاء.
                   </span>
                 </div>
               </div>

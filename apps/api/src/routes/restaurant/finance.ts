@@ -16,7 +16,7 @@ import {
   reasonSchema,
   uuidSchema,
 } from '@jibli/validation';
-import { bpsPercent } from '@jibli/money';
+import { commissionFeeDisplay } from '@jibli/money';
 import { assertHandoverAllowed, claimIdempotencyKey, completeIdempotencyKey, computeCustody, failIdempotencyKey, IDEMPOTENCY_SCOPES, startOfBusinessDay } from '@jibli/domain';
 import { driverCashEvents, driverCashHandovers, drivers, orderItems, orders, restaurantExpenses, settlementLines, settlementPayments, settlements, users, uuidv7 } from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
@@ -314,7 +314,7 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
         .select({
           publicOrderNumber: orders.publicOrderNumber,
           commissionBaseIqd: settlementLines.commissionBaseIqd,
-          rateBps: settlementLines.commissionRateBpsSnapshot,
+          commissionFlatIqd: settlementLines.commissionFlatIqdSnapshot,
           commissionAmountIqd: settlementLines.commissionAmountIqd,
           completedAt: settlementLines.orderCompletedAt,
         })
@@ -362,7 +362,7 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
             lines: lines.map((line) => ({
               public_order_number: line.publicOrderNumber,
               commission_base_iqd: line.commissionBaseIqd,
-              rate_display: bpsPercent(line.rateBps),
+              commission_display: commissionFeeDisplay(line.commissionFlatIqd),
               commission_amount_iqd: line.commissionAmountIqd,
               completed_at: line.completedAt.toISOString(),
             })),

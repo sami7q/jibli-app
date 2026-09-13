@@ -155,7 +155,7 @@ async function buildFixture(): Promise<Fixture> {
   await db.insert(restaurantCommissionConfigs).values({
     id: uuidv7(),
     restaurantId,
-    commissionRateBps: 1200, // 12%, matching the plan's worked example
+    commissionFlatIqd: 500, // the platform default: a flat fee per order
     settlementPolicy: 'HALF_MONTH',
     effectiveFrom: new Date(Date.now() - 86_400_000),
   });
@@ -262,7 +262,7 @@ describeWithDb('order lifecycle (end to end)', () => {
 
   it('places an order with a correct commission snapshot', async () => {
     // 30,000 items + 2,000 delivery + 1,000 service = 33,000 customer total.
-    // Commission base 30,000 at 12% = 3,600 (plan Appendix E arithmetic).
+    // Commission base 30,000, flat fee 500 — the fee does not scale with it.
     const orderId = uuidv7();
 
     await fx.db.insert(orders).values({
@@ -279,9 +279,9 @@ describeWithDb('order lifecycle (end to end)', () => {
       discountTotalIqd: 0,
       customerTotalIqd: 33_000,
       commissionBaseIqd: 30_000,
-      commissionRateBpsSnapshot: 1_200,
-      commissionAmountIqd: 3_600,
-      restaurantNetSnapshotIqd: 28_400,
+      commissionFlatIqdSnapshot: 500,
+      commissionAmountIqd: 500,
+      restaurantNetSnapshotIqd: 31_500,
       customerNameSnapshot: 'محمد علي',
       customerPhoneSnapshot: '+9647712345678',
       deliveryAddressSnapshotJson: { cityId: fx.cityId },
@@ -290,7 +290,7 @@ describeWithDb('order lifecycle (end to end)', () => {
 
     const [stored] = await fx.db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
 
-    expect(stored?.commissionAmountIqd).toBe(3_600);
+    expect(stored?.commissionAmountIqd).toBe(500);
     expect(stored?.customerTotalIqd).toBe(33_000);
   });
 
@@ -310,9 +310,9 @@ describeWithDb('order lifecycle (end to end)', () => {
         discountTotalIqd: 0,
         customerTotalIqd: 1, // deliberately wrong
         commissionBaseIqd: 30_000,
-        commissionRateBpsSnapshot: 1_200,
-        commissionAmountIqd: 3_600,
-        restaurantNetSnapshotIqd: 28_400,
+        commissionFlatIqdSnapshot: 500,
+        commissionAmountIqd: 500,
+        restaurantNetSnapshotIqd: 31_500,
         customerNameSnapshot: 'x',
         customerPhoneSnapshot: '+9647712345678',
         deliveryAddressSnapshotJson: {},
@@ -336,7 +336,7 @@ describeWithDb('order lifecycle (end to end)', () => {
         discountTotalIqd: 0,
         customerTotalIqd: 10_000,
         commissionBaseIqd: 10_000,
-        commissionRateBpsSnapshot: 1_200,
+        commissionFlatIqdSnapshot: 99_000,
         commissionAmountIqd: 99_000, // exceeds the base
         restaurantNetSnapshotIqd: 0,
         customerNameSnapshot: 'x',
@@ -363,9 +363,9 @@ describeWithDb('order lifecycle (end to end)', () => {
         discountTotalIqd: 0,
         customerTotalIqd: 10_000,
         commissionBaseIqd: 10_000,
-        commissionRateBpsSnapshot: 1_200,
-        commissionAmountIqd: 1_200,
-        restaurantNetSnapshotIqd: 8_800,
+        commissionFlatIqdSnapshot: 500,
+        commissionAmountIqd: 500,
+        restaurantNetSnapshotIqd: 9_500,
         customerNameSnapshot: 'x',
         customerPhoneSnapshot: '+9647712345678',
         deliveryAddressSnapshotJson: {},
@@ -432,9 +432,9 @@ describeWithDb('order lifecycle (end to end)', () => {
       discountTotalIqd: 0,
       customerTotalIqd: 20_000,
       commissionBaseIqd: 20_000,
-      commissionRateBpsSnapshot: 1_200,
-      commissionAmountIqd: 2_400,
-      restaurantNetSnapshotIqd: 17_600,
+      commissionFlatIqdSnapshot: 500,
+      commissionAmountIqd: 500,
+      restaurantNetSnapshotIqd: 19_500,
       customerNameSnapshot: 'x',
       customerPhoneSnapshot: '+9647712345678',
       deliveryAddressSnapshotJson: {},
@@ -445,7 +445,7 @@ describeWithDb('order lifecycle (end to end)', () => {
       restaurantId: fx.restaurantId,
       orderId,
       entryType: 'COMMISSION_ACCRUED' as const,
-      amountIqd: 2_400,
+      amountIqd: 500,
       direction: 'DEBIT' as const,
       effectiveAt: new Date(),
       idempotencyKey: `commission:${orderId}`,
@@ -475,9 +475,9 @@ describeWithDb('order lifecycle (end to end)', () => {
       discountTotalIqd: 0,
       customerTotalIqd: 31_000,
       commissionBaseIqd: 31_000,
-      commissionRateBpsSnapshot: 1_200,
-      commissionAmountIqd: 3_720,
-      restaurantNetSnapshotIqd: 27_280,
+      commissionFlatIqdSnapshot: 500,
+      commissionAmountIqd: 500,
+      restaurantNetSnapshotIqd: 30_500,
       customerNameSnapshot: 'x',
       customerPhoneSnapshot: '+9647712345678',
       deliveryAddressSnapshotJson: {},
@@ -529,9 +529,9 @@ describeWithDb('order lifecycle (end to end)', () => {
       discountTotalIqd: 0,
       customerTotalIqd: 15_000,
       commissionBaseIqd: 15_000,
-      commissionRateBpsSnapshot: 1_200,
-      commissionAmountIqd: 1_800,
-      restaurantNetSnapshotIqd: 13_200,
+      commissionFlatIqdSnapshot: 500,
+      commissionAmountIqd: 500,
+      restaurantNetSnapshotIqd: 14_500,
       customerNameSnapshot: 'x',
       customerPhoneSnapshot: '+9647712345678',
       deliveryAddressSnapshotJson: {},
@@ -549,9 +549,9 @@ describeWithDb('order lifecycle (end to end)', () => {
         periodStart: new Date(Date.UTC(2025, 0, startDay)),
         periodEnd: new Date(Date.UTC(2025, 0, startDay + 15)),
         status: 'DRAFT',
-        commissionTotalIqd: 1_800,
+        commissionTotalIqd: 500,
         adjustmentsTotalIqd: 0,
-        amountDueIqd: 1_800,
+        amountDueIqd: 500,
       });
       return id;
     };
@@ -562,8 +562,8 @@ describeWithDb('order lifecycle (end to end)', () => {
     const line = {
       orderId,
       commissionBaseIqd: 15_000,
-      commissionRateBpsSnapshot: 1_200,
-      commissionAmountIqd: 1_800,
+      commissionFlatIqdSnapshot: 500,
+      commissionAmountIqd: 500,
       orderCompletedAt: new Date(),
     };
 
@@ -677,9 +677,9 @@ describeWithDb('order lifecycle (end to end)', () => {
         discountTotalIqd: 0,
         customerTotalIqd: 30_000,
         commissionBaseIqd: 30_000,
-        commissionRateBpsSnapshot: 1_200,
-        commissionAmountIqd: 3_600,
-        restaurantNetSnapshotIqd: 26_400,
+        commissionFlatIqdSnapshot: 500,
+        commissionAmountIqd: 500,
+        restaurantNetSnapshotIqd: 29_500,
         customerNameSnapshot: 'x',
         customerPhoneSnapshot: '+9647712345678',
         deliveryAddressSnapshotJson: {},
@@ -725,9 +725,9 @@ describeWithDb('order lifecycle (end to end)', () => {
       discountTotalIqd: 0,
       customerTotalIqd: 30_000,
       commissionBaseIqd: 30_000,
-      commissionRateBpsSnapshot: 1_200,
-      commissionAmountIqd: 3_600,
-      restaurantNetSnapshotIqd: 26_400,
+      commissionFlatIqdSnapshot: 500,
+      commissionAmountIqd: 500,
+      restaurantNetSnapshotIqd: 29_500,
       customerNameSnapshot: 'x',
       customerPhoneSnapshot: '+9647712345678',
       deliveryAddressSnapshotJson: {},

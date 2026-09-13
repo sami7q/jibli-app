@@ -15,7 +15,7 @@ import {
   buildQuote,
   assertQuoteUnchanged,
   enqueueOutboxEvent,
-  resolveCommissionRate,
+  resolveCommissionFee,
   type RequestedLine,
 } from '@jibli/domain';
 import {
@@ -229,14 +229,14 @@ export async function placeOrder(
 
     const commissionConfigs = await tx
       .select({
-        commissionRateBps: restaurantCommissionConfigs.commissionRateBps,
+        commissionFlatIqd: restaurantCommissionConfigs.commissionFlatIqd,
         effectiveFrom: restaurantCommissionConfigs.effectiveFrom,
         effectiveTo: restaurantCommissionConfigs.effectiveTo,
       })
       .from(restaurantCommissionConfigs)
       .where(eq(restaurantCommissionConfigs.restaurantId, input.restaurantId));
 
-    const commissionRateBps = resolveCommissionRate(commissionConfigs, new Date());
+    const commissionFlatIqd = resolveCommissionFee(commissionConfigs, new Date());
 
     const quote = buildQuote({
       restaurantId: input.restaurantId,
@@ -244,7 +244,7 @@ export async function placeOrder(
       catalog,
       deliveryFeeIqd: branchRow.branch.deliveryFeeIqd,
       platformServiceFeeIqd,
-      commissionRateBps,
+      commissionFlatIqd,
       minimumOrderIqd: branchRow.restaurant.minimumOrderIqd,
     });
 
@@ -308,7 +308,7 @@ export async function placeOrder(
       customerTotalIqd: quote.totals.customerTotalIqd,
 
       commissionBaseIqd: quote.totals.commissionBaseIqd,
-      commissionRateBpsSnapshot: quote.totals.commissionRateBpsSnapshot,
+      commissionFlatIqdSnapshot: quote.totals.commissionFlatIqdSnapshot,
       commissionAmountIqd: quote.totals.commissionAmountIqd,
       restaurantNetSnapshotIqd: quote.totals.restaurantNetIqd,
 

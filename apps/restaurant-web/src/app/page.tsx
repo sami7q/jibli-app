@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart,
-  bpsPercent,
   money,
   moneyCompact,
   percentDelta,
@@ -234,8 +233,8 @@ function FinanceCard({ finance }: { finance: NonNullable<DashboardOverview['fina
       <div className="figure">
         <span className="figure__label">
           العمولة الحالية
-          {finance.commission_rate_bps !== null
-            ? ` — النسبة ${bpsPercent(finance.commission_rate_bps)}`
+          {finance.commission_flat_iqd !== null
+            ? ` — ${money(finance.commission_flat_iqd)} لكل طلب`
             : ''}
         </span>
         <span className="figure__value">{money(finance.open_commission_iqd)}</span>

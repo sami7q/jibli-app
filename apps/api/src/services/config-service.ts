@@ -14,7 +14,7 @@ import type { AppContext } from '../lib/context.js';
 export const CONFIG_DEFAULTS = {
   global_checkout_enabled: true,
   platform_service_fee_iqd: 1000,
-  default_commission_rate_bps: 1500,
+  commission_flat_iqd: 500,
   default_settlement_policy: 'HALF_MONTH',
   default_payment_term_days: 7,
   delivery_pin_enabled: true,

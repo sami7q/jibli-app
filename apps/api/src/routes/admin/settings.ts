@@ -37,7 +37,7 @@ import { CONFIG_DEFAULTS, setConfig, type ConfigKey } from '../../services/confi
 const CONFIG_SCHEMAS: Record<ConfigKey, z.ZodTypeAny> = {
   global_checkout_enabled: z.boolean(),
   platform_service_fee_iqd: z.number().int().min(0).max(100_000),
-  default_commission_rate_bps: z.number().int().min(0).max(10_000),
+  commission_flat_iqd: z.number().int().min(0).max(100_000),
   default_settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']),
   default_payment_term_days: z.number().int().min(0).max(90),
   delivery_pin_enabled: z.boolean(),
@@ -52,7 +52,7 @@ const CONFIG_SCHEMAS: Record<ConfigKey, z.ZodTypeAny> = {
 const REASON_REQUIRED: ReadonlySet<ConfigKey> = new Set([
   'global_checkout_enabled',
   'platform_service_fee_iqd',
-  'default_commission_rate_bps',
+  'commission_flat_iqd',
   'delivery_pin_enabled',
   'minimum_app_version',
 ]);

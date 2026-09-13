@@ -134,8 +134,8 @@ async function generateForRestaurant(
         id: orders.id,
         customerTotalIqd: orders.customerTotalIqd,
         commissionBaseIqd: orders.commissionBaseIqd,
-        commissionRateBpsSnapshot: orders.commissionRateBpsSnapshot,
-        // 3. The immutable snapshot — never the restaurant's current rate.
+        commissionFlatIqdSnapshot: orders.commissionFlatIqdSnapshot,
+        // 3. The immutable snapshot — never the restaurant's current fee.
         commissionAmountIqd: orders.commissionAmountIqd,
         completedAt: orders.completedAt,
       })
@@ -215,7 +215,7 @@ async function generateForRestaurant(
         settlementId,
         orderId: order.id,
         commissionBaseIqd: order.commissionBaseIqd,
-        commissionRateBpsSnapshot: order.commissionRateBpsSnapshot,
+        commissionFlatIqdSnapshot: order.commissionFlatIqdSnapshot,
         commissionAmountIqd: order.commissionAmountIqd,
         orderCompletedAt: order.completedAt as Date,
       })),

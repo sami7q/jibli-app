@@ -75,12 +75,16 @@ A restaurant disputes through the portal with a reason. The statement moves to
 DISPUTED and stops accruing overdue status.
 
 1. Pull the settlement lines and compare against the restaurant's own record.
-   Each line carries the commission base, the rate snapshot and the amount as
+   Each line carries the commission base, the fee snapshot and the amount as
    they were at order completion.
 
-2. If the restaurant's rate changed during the period, that is expected: orders
-   snapshot the rate in force when they were placed, so one statement can
-   legitimately contain lines at two different rates.
+2. If the restaurant's commission changed during the period, that is expected:
+   orders snapshot the fee in force when they were placed, so one statement can
+   legitimately contain lines at two different fees.
+
+   A line whose amount is *below* the fee is also expected, and is not an error:
+   the fee is capped at the commission base, so an order too small to carry it
+   is charged what the restaurant earned and no more (ADR 0006).
 
 3. Resolve by credit, debit or reversal. Void and reissue only when the
    statement is structurally wrong — a void requires a reason and a fresh MFA

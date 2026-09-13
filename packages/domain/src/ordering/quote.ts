@@ -1,9 +1,7 @@
 import { AppError, ERROR_CODES } from '@jibli/contracts';
 import {
   calculateOrderTotals,
-  bps,
   iqd,
-  type Bps,
   type DiscountInput,
   type Iqd,
   type OrderTotals,
@@ -79,7 +77,7 @@ export interface QuoteInput {
   readonly catalog: ReadonlyMap<string, CatalogItem>;
   readonly deliveryFeeIqd: number;
   readonly platformServiceFeeIqd: number;
-  readonly commissionRateBps: number;
+  readonly commissionFlatIqd: number;
   readonly minimumOrderIqd: number;
   readonly discounts?: readonly DiscountInput[];
 }
@@ -239,7 +237,7 @@ export function buildQuote(input: QuoteInput): Quote {
     discounts: input.discounts,
     deliveryFeeIqd: iqd(input.deliveryFeeIqd),
     platformServiceFeeIqd: iqd(input.platformServiceFeeIqd),
-    commissionRateBps: bps(input.commissionRateBps),
+    commissionFlatIqd: iqd(input.commissionFlatIqd),
   });
 
   // Minimum order is judged on the items subtotal, not the total: adding a
@@ -281,17 +279,17 @@ export function assertQuoteUnchanged(
   }
 }
 
-/** Resolve the commission rate in force at a moment (plan §24). */
+/** Resolve the commission fee in force at a moment (plan §24). */
 export interface CommissionConfig {
-  readonly commissionRateBps: number;
+  readonly commissionFlatIqd: number;
   readonly effectiveFrom: Date;
   readonly effectiveTo: Date | null;
 }
 
-export function resolveCommissionRate(
+export function resolveCommissionFee(
   configs: readonly CommissionConfig[],
   at: Date = new Date(),
-): Bps {
+): Iqd {
   const active = configs.find(
     (c) =>
       c.effectiveFrom.getTime() <= at.getTime() &&
@@ -302,5 +300,5 @@ export function resolveCommissionRate(
       details: { at: at.toISOString() },
     });
   }
-  return bps(active.commissionRateBps);
+  return iqd(active.commissionFlatIqd);
 }

@@ -706,6 +706,11 @@ The customer sees every fee before confirming. No hidden fees are added after co
 
 # 24. Restaurant Commission
 
+> **Superseded in part by [ADR 0006](adr/0006-flat-commission.md).** Jibli
+> charges a flat amount per order, not a percentage. The effective-dating,
+> snapshotting and commission-base rules below all still hold; `commission_rate_bps`
+> is `commission_flat_iqd` and the snapshot column is `commission_flat_iqd_snapshot`.
+
 Every restaurant has an effective-dated commission configuration.
 
 ```text

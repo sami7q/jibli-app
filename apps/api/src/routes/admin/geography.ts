@@ -12,6 +12,7 @@ import {
 import { auditLogs, cities, governorates, providers, restaurantApplications, restaurantBranches, restaurantCommissionConfigs, restaurantMembers, restaurants, users, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
+import { getConfig } from '../../services/config-service.js';
 import { computeReadiness } from '../../services/readiness-service.js';
 import {
   cityCoverageImpact,
@@ -411,12 +412,19 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
       const { applicationId } = z.object({ applicationId: uuidSchema }).parse(request.params);
       const body = z
         .object({
-          commission_rate_bps: z.number().int().min(0).max(10_000).optional(),
+          commission_flat_iqd: z.number().int().min(0).max(100_000).optional(),
           settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']).default('HALF_MONTH'),
           override_coverage: z.boolean().default(false),
           reason: reasonSchema.optional(),
         })
         .parse(request.body ?? {});
+
+      /*
+       * Read before the transaction opens: the approved restaurant starts on
+       * the platform-wide commission unless this approval negotiates its own.
+       */
+      const commissionFlatIqd =
+        body.commission_flat_iqd ?? (await getConfig(ctx, 'commission_flat_iqd', 500));
 
       const result = await ctx.db.transaction(async (tx) => {
         const [row] = await tx
@@ -555,7 +563,7 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
         await tx.insert(restaurantCommissionConfigs).values({
           id: uuidv7(),
           restaurantId,
-          commissionRateBps: body.commission_rate_bps ?? 1500,
+          commissionFlatIqd,
           settlementPolicy: body.settlement_policy,
           effectiveFrom: now,
           createdBy: principal.userId,
