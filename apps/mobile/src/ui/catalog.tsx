@@ -11,6 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
 import { Row, Text } from './index';
@@ -102,7 +103,7 @@ export function SearchBar({
         style,
       ]}
     >
-      <Text tone="muted">⌕</Text>
+      <MaterialCommunityIcons name="magnify" size={20} color={color.textMuted} />
       <TextInput
         placeholderTextColor={palette.ink[400]}
         style={[text.small, { flex: 1, color: color.textPrimary, paddingVertical: space[2] }]}
@@ -123,7 +124,7 @@ export function SearchBar({
             justifyContent: 'center',
           }}
         >
-          <Text tone="secondary">≡</Text>
+          <MaterialCommunityIcons name="tune-variant" size={18} color={color.textSecondary} />
         </Pressable>
       ) : null}
     </Row>
@@ -145,9 +146,12 @@ export function RatingPill({ rating, count }: { rating: number | null; count?: n
   }
 
   return (
-    <View style={pill(palette.warning[50], palette.warning[500])}>
+    <View
+      style={[pill(palette.warning[50], palette.warning[500]), { flexDirection: 'row', gap: 3 }]}
+    >
+      <MaterialCommunityIcons name="star" size={13} color={palette.warning[500]} />
       <Text variant="caption" style={{ color: palette.warning[700] }}>
-        ★ {rating.toFixed(1)}
+        {rating.toFixed(1)}
         {count === undefined ? '' : ` (${count})`}
       </Text>
     </View>
@@ -163,6 +167,7 @@ function pill(background: string, border: string): ViewStyle {
     paddingVertical: 2,
     borderRadius: radius.md,
     alignSelf: 'flex-start',
+    alignItems: 'center',
   };
 }
 
@@ -200,22 +205,22 @@ export function Stepper({
         overflow: 'hidden',
       }}
     >
-      <StepperButton label="−" accessibilityLabel="إنقاص" disabled={value <= min} onPress={() => step(-1)} />
+      <StepperButton icon="minus" accessibilityLabel="إنقاص" disabled={value <= min} onPress={() => step(-1)} />
       <View style={{ minWidth: 36, alignItems: 'center' }}>
         <Text variant="bodyBold">{value}</Text>
       </View>
-      <StepperButton label="+" accessibilityLabel="زيادة" disabled={value >= max} onPress={() => step(1)} />
+      <StepperButton icon="plus" accessibilityLabel="زيادة" disabled={value >= max} onPress={() => step(1)} />
     </Row>
   );
 }
 
 function StepperButton({
-  label,
+  icon,
   accessibilityLabel,
   onPress,
   disabled,
 }: {
-  label: string;
+  icon: 'minus' | 'plus';
   accessibilityLabel: string;
   onPress: () => void;
   disabled: boolean;
@@ -238,9 +243,7 @@ function StepperButton({
         disabled ? { opacity: 0.3 } : null,
       ]}
     >
-      <Text variant="h3" tone="brand">
-        {label}
-      </Text>
+      <MaterialCommunityIcons name={icon} size={20} color={color.brand} />
     </Pressable>
   );
 }
@@ -354,8 +357,11 @@ export function ListRow({
         </View>
       ) : null}
 
-      {/* Points toward the start edge, which under RTL is the left. */}
-      <Text tone="muted">‹</Text>
+      {/*
+        * `chevron-left` is correct under RTL: the row opens a screen that
+        * slides in from the start edge, which is the left here.
+        */}
+      <MaterialCommunityIcons name="chevron-left" size={22} color={color.textMuted} />
     </Pressable>
   );
 }
@@ -479,7 +485,7 @@ export function DriverCard({
             justifyContent: 'center',
           }}
         >
-          <Text tone="success">✆</Text>
+          <MaterialCommunityIcons name="phone" size={20} color={color.successStrong} />
         </Pressable>
       ) : null}
     </Row>
@@ -787,30 +793,59 @@ export function RestaurantCard({
       <View style={{ height: 176, backgroundColor: color.surfaceSunken }}>
         {coverUrl ? (
           <Image source={{ uri: coverUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-        ) : null}
+        ) : (
+          /*
+           * A restaurant with no photograph yet.
+           *
+           * Left empty this is 176px of grey with a badge floating in it, which
+           * reads as an image that failed to load rather than one that was
+           * never uploaded — and most restaurants have no cover on the day they
+           * are approved. A tinted ground with the brand mark says "no picture"
+           * instead of "something is broken".
+           */
+          <View
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: color.brandSoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialCommunityIcons
+              name="silverware-fork-knife"
+              size={44}
+              color={palette.orange[300]}
+            />
+          </View>
+        )}
 
         {/*
          * The scrim the badges sit on. It is not decoration: the overlays are
          * white text on whatever photograph the restaurant uploaded, and a
          * pale dish makes them unreadable.
          */}
-        <LinearGradient
-          colors={['rgba(17,24,39,0)', 'rgba(17,24,39,0.55)']}
-          style={{
-            position: 'absolute',
-            insetInlineStart: 0,
-            insetInlineEnd: 0,
-            bottom: 0,
-            height: 88,
-          }}
-        />
+        {coverUrl ? (
+          <LinearGradient
+            colors={['rgba(17,24,39,0)', 'rgba(17,24,39,0.55)']}
+            style={{
+              position: 'absolute',
+              insetInlineStart: 0,
+              insetInlineEnd: 0,
+              bottom: 0,
+              height: 88,
+            }}
+          />
+        ) : null}
 
         {offer ? (
           <View
             style={{
               position: 'absolute',
               top: space[3],
-              insetInlineEnd: space[3],
+              // The start edge, which is the right one under RTL — where the
+              // comp draws both badges.
+              insetInlineStart: space[3],
               backgroundColor: color.brand,
               paddingHorizontal: space[2],
               paddingVertical: 4,
@@ -827,7 +862,7 @@ export function RestaurantCard({
           style={{
             position: 'absolute',
             bottom: space[3],
-            insetInlineEnd: space[3],
+            insetInlineStart: space[3],
             backgroundColor: 'rgba(17,24,39,0.85)',
             paddingHorizontal: space[2],
             paddingVertical: 4,
@@ -881,7 +916,7 @@ export function RestaurantCard({
         </Text>
 
         <Text variant="caption" tone="secondary">
-          {deliveryFee} توصيل
+          {deliveryFee}
         </Text>
       </View>
     </Pressable>

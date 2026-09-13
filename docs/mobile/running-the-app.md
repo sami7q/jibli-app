@@ -36,9 +36,11 @@ or with **Expo Go** on Android, and the app opens on your phone.
 
 The app points at the deployed API by default — `https://jibli-api.onrender.com`
 — so it reads the real categories, banners and restaurants that Admin manages,
-with no further setup. What that amounts to *today* is in §7; the short version
-is that the categories are there and the restaurant list is empty for a reason
-that is a setting, not a bug.
+with no further setup. §7 says what that amounts to today.
+
+**Pick a delivery area on first launch.** Browse as a guest, tap the location
+row in the header, and choose بغداد. Nothing appears before that, by design:
+`GET /restaurants` is scoped to one city and the app has no way to guess it.
 
 > **First request is slow.** The API runs on Render's free plan, which spins
 > down after 15 minutes idle and takes about a minute to wake. A measured cold
@@ -139,7 +141,7 @@ Both platforms bundle: **1224 modules (iOS), 1220 (Android)**.
 | First load hangs ~1 min, then works | Render cold start. §2. |
 | "تعذّر الاتصال بالإنترنت" on every screen | `EXPO_PUBLIC_API_URL` points at `localhost`, or the local API binds `127.0.0.1`. §2. |
 | The app opens on a welcome screen, not the home | Correct. First launch asks once: sign in, or browse as a guest. |
-| Home says «اختر منطقتك» and lists nothing | No delivery area chosen yet, or the chosen area has no restaurants. §8 below. |
+| Home says «اختر منطقتك» and lists nothing | No delivery area chosen yet. Tap the location row in the header. If an area is chosen and the list is still empty, see §8. |
 | Sign-in never arrives | No SMS gateway on staging. §3. |
 | Metro cannot resolve a module after pulling | `pnpm install`, then `pnpm dev:mobile --clear`. |
 | Arabic renders left-to-right on a fresh install | RTL is forced at startup and Android applies it after one restart. Close and reopen. |
@@ -150,54 +152,95 @@ Both platforms bundle: **1224 modules (iOS), 1220 (Android)**.
 
 Fetched live from the deployed API, so this is what the app renders right now:
 
-| Part of the home screen | State | Why |
+| Part of the home screen | State |
+|---|---|
+| Category strip | **22 categories**, Arabic names, emoji — from Admin → التصنيفات. None has an image yet, so each falls back to its emoji, which is the designed fallback. |
+| Banner carousel | **hidden** — `banners: []`. The carousel renders nothing rather than an empty box. Add one in Admin → شكل التطبيق and it appears on the next launch. |
+| Rotation speed | 5 seconds, Admin's value, already being read. |
+| Restaurant list | **6 restaurants in بغداد**, seeded as demo data. See below. |
+
+Those strings exist nowhere in the app. They came out of the database Admin
+writes to, which is what "connected" means here.
+
+---
+
+## 8. The demo marketplace
+
+`pnpm --filter @jibli/db seed` creates six restaurants in بغداد whenever
+`APP_ENV` is not `production`. They are not six of the same thing: each one
+exists to make a different state of the app reachable.
+
+| Restaurant | What it proves |
+|---|---|
+| **مندي حضرموت** | The full path. Open around the clock, 10 dishes in 3 categories, a **required** option group (الحجم) and an optional one (إضافات) — so the item sheet's "you must choose a size" rule is testable at any hour. |
+| **برجر بغداد** | Free delivery. The card shows «توصيل مجاني» and the cart shows «التوصيل مجاني» instead of a fee. Also open around the clock. |
+| **شاورما الأصيل** | No ratings yet, so the card must show «جديد» rather than a fake `0.0`. Opens 09:00 and closes at 02:00 the next morning — the overnight wrap. |
+| **بيتزا روما** | Three option sizes with different prices. Closed outside 12:00–23:00. |
+| **حلويات أبو عفيف** | Closed most of the day (08:00–16:00, shut on Friday), which is how the «مغلق الآن» overlay and the faded menu get exercised. |
+| **مشاوي الخيمة** | A 25,000 IQD minimum, so the cart's "add 12,000 more" warning is reachable. Two items marked unavailable. |
+
+**45 menu items, 15 categories, 8 option groups**, and one unavailable dish per
+restaurant where it makes sense — because an item that is out of stock today has
+to grey out rather than disappear.
+
+Re-running the seed changes nothing: it is idempotent on `partner_code`. A
+second run reports `0 inserted, 6 updated`.
+
+### Restaurant portal accounts
+
+Each demo restaurant has an owner who can sign into the restaurant portal:
+
+| Username | Password | Restaurant |
 |---|---|---|
-| Category strip | **22 categories**, Arabic names, emoji | Admin → التصنيفات, already populated. None has an image yet, so each falls back to its emoji — which is the designed fallback, not a gap. |
-| Banner carousel | **hidden** | `banners: []`. The carousel renders nothing rather than an empty box. Add one in Admin → شكل التطبيق and it appears on the next launch. |
-| Rotation speed | 5 seconds | Admin's value, already being read. |
-| Restaurant list | **empty** | §8. This one is a configuration problem worth fixing. |
+| `demo.mandi` | `Jibli!Demo2026` | مندي حضرموت |
+| `demo.burger` | `Jibli!Demo2026` | برجر بغداد |
+| `demo.pizza` | `Jibli!Demo2026` | بيتزا روما |
+| `demo.shawarma` | `Jibli!Demo2026` | شاورما الأصيل |
+| `demo.sweets` | `Jibli!Demo2026` | حلويات أبو عفيف |
+| `demo.grill` | `Jibli!Demo2026` | مشاوي الخيمة |
 
-The first three prove the link end to end: those strings exist nowhere in the
-app, they came out of the database that Admin writes to.
+Demo credentials, printed in the seed output and stated here on purpose. They
+belong to fake restaurants and must not exist in production — the seeder
+refuses to run when `APP_ENV=production`.
 
----
+### Geography
 
-## 8. Why the restaurant list is empty — and it is not the app
-
-Checked live against the deployed API:
-
-```
-GET /api/v1/geography/governorates?capability=ordering
-  → 1 governorate:  الأنبار
-GET /api/v1/geography/governorates/<الأنبار>/cities?capability=ordering
-  → 1 city:  حديثة
-GET /api/v1/restaurants?city_id=<حديثة>
-  → []
-```
-
-So the only area open for ordering has no restaurants in it, and **بغداد has no
-enabled cities at all** under either capability.
-
-`GET /restaurants` requires, all at once: the city enabled *and* ordering-enabled,
-its governorate the same, the restaurant `APPROVED` and `ACTIVE`, and its branch
-active and accepting orders. Any one of those being off yields an empty list,
-which is the same thing the app shows when everything is fine and the area is
-genuinely empty.
-
-**To make the app show something**, in Admin → المناطق:
-
-1. Enable **بغداد** for `ordering` (not only `customer_signup`).
-2. Add or enable at least one **city** in بغداد, with ordering enabled.
-3. Confirm the restaurant's branch sits in that city, is active, and accepts
-   orders.
-
-Geography is checked twice on purpose — once on the governorate and once on the
-city — so a governorate can be opened for signup before it is ready to take
-orders. That is the state the platform is in right now.
+The seed also opens **بغداد** for signup, onboarding and ordering. Before it
+ran, the only ordering-enabled area was حديثة in الأنبار and it had no
+restaurants, so the app showed an empty list — indistinguishable from a broken
+one. `GET /restaurants` requires the city *and* its governorate to be enabled
+for ordering, the restaurant `APPROVED` and `ACTIVE`, and the branch active and
+accepting orders. Any one of those being off yields `[]`.
 
 ---
 
-## 9. What is deployed, and where
+## 9. Seeing the screens without a phone
+
+```bash
+pnpm --filter @jibli/mobile web
+```
+
+This runs the same app through React Native Web and opens it in a browser at
+`http://localhost:8081`. It is a review tool, not a target: RNW is a different
+renderer, and two things differ in ways worth knowing.
+
+- **RTL is not forced.** `I18nManager.forceRTL` is a no-op on web, so the
+  preview lays out left-to-right unless you set `dir="rtl"` on the document
+  (DevTools → `document.documentElement.dir = 'rtl'`). Without that, every
+  header looks mirrored from what a device shows.
+- **CORS applies.** The browser sends an `Origin` header, and the API's
+  allowlist does not include `localhost`. Point the app at a local API, or run a
+  proxy, if you want the data screens to load.
+
+Used properly it earns its keep: six real defects were found this way — English
+cuisine keys leaking into Arabic cards, a blank grey block where a restaurant
+has no cover photo, text glyphs standing in for icons, category names truncated
+mid-word, badges on the wrong edge under RTL, and a sign-in button disabled for
+a reason that had nothing to do with signing in.
+
+---
+
+## 10. What is deployed, and where
 
 | Piece | Where | Verified |
 |---|---|---|
@@ -206,7 +249,8 @@ orders. That is the state the platform is in right now.
 | Restaurant portal | Vercel | — |
 | Database | Neon PostgreSQL | reported healthy by the API |
 | Redis / Key Value | Render | reported healthy by the API |
-| Customer app | not published | bundles for both platforms; never run on a device |
+| Customer app | not published | bundles for both platforms; reviewed screen by screen in a browser; never run on a device |
+| Demo marketplace | Neon, بغداد | 6 restaurants, 45 items, 8 option groups — §8 |
 
 The worker (`jibli-worker`) is the one paid service in `render.yaml`. Without it
 the portals still work — the order board falls back to polling — but the

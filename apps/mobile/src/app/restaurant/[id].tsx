@@ -3,6 +3,7 @@ import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
@@ -107,7 +108,7 @@ export default function RestaurantScreen() {
 
         <InfoCard
           name={detail.display_name}
-          tags={detail.cuisine_tags.join(' • ') || detail.city_name_ar}
+          tags={detail.cuisine_tags.map(cuisineLabelAr).join('، ') || detail.city_name_ar}
           logoUrl={detail.logo_asset_id ? assetUrl(detail.logo_asset_id) : null}
           rating={detail.rating}
           ratingCount={detail.rating_count}
@@ -117,6 +118,36 @@ export default function RestaurantScreen() {
           isOpen={detail.is_open}
           orderable={detail.orderable}
         />
+
+        {/*
+          * Why nothing responds.
+          *
+          * A closed restaurant's dishes are faded and inert, which is correct
+          * — but the «مغلق الآن» badge is in the card at the top, and by the
+          * time someone has scrolled into the menu it is off screen. Tapping a
+          * dish and getting nothing is the experience this line prevents.
+          */}
+        {!detail.orderable ? (
+          <View
+            style={{
+              marginHorizontal: space[4],
+              marginTop: space[4],
+              padding: space[3],
+              borderRadius: radius.md,
+              backgroundColor: color.warningSoft,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space[2],
+            }}
+          >
+            <MaterialCommunityIcons name="clock-outline" size={18} color={palette.warning[700]} />
+            <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+              {detail.is_open
+                ? 'المطعم لا يستقبل طلبات حالياً. يمكنك تصفّح المنيو.'
+                : 'المطعم مغلق الآن. يمكنك تصفّح المنيو والعودة لاحقاً.'}
+            </Text>
+          </View>
+        ) : null}
 
         {shownCategories.length === 0 ? (
           <View style={{ padding: space[6], alignItems: 'center' }}>
@@ -206,7 +237,28 @@ function Cover({
           style={{ width: '100%', height: '100%' }}
           resizeMode="cover"
         />
-      ) : null}
+      ) : (
+        /*
+         * No photograph yet — which is the normal state for a restaurant on
+         * the day it is approved. 224px of plain grey reads as a failed image;
+         * the brand tint reads as one that was never uploaded.
+         */
+        <View
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: color.brandSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <MaterialCommunityIcons
+            name="silverware-fork-knife"
+            size={56}
+            color={palette.orange[300]}
+          />
+        </View>
+      )}
 
       <View
         style={{
@@ -347,7 +399,7 @@ function InfoCard({
             height: 56,
             borderRadius: radius.lg,
             overflow: 'hidden',
-            backgroundColor: color.surfaceSunken,
+            backgroundColor: color.brandSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -359,7 +411,7 @@ function InfoCard({
               resizeMode="cover"
             />
           ) : (
-            <Text variant="h2" tone="muted">
+            <Text variant="h2" tone="brand">
               {name.slice(0, 1)}
             </Text>
           )}
@@ -574,7 +626,11 @@ function MenuItemRow({
             resizeMode="cover"
           />
         ) : (
-          <MaterialCommunityIcons name="silverware-fork-knife" size={24} color={color.textMuted} />
+          <MaterialCommunityIcons
+            name="silverware-fork-knife"
+            size={24}
+            color={palette.orange[300]}
+          />
         )}
       </View>
     </Pressable>
@@ -698,7 +754,7 @@ function ItemSheet({
         <Row justify="space-between" gap={space[3]}>
           <Stepper value={quantity} onChange={setQuantity} />
           <Button
-            label={`إضافة • ${formatIqdArabic(iqd(unitPriceIqd * quantity))}`}
+            label={`إضافة — ${formatIqdArabic(iqd(unitPriceIqd * quantity))}`}
             onPress={submit}
             disabled={missing.length > 0}
             style={{ flex: 1 }}

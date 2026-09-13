@@ -38,6 +38,3 @@ ios/
 
 # Metro bundle output from `pnpm --filter @jibli/mobile bundle`.
 .expo-export/
-
-# Scratch space for live API probes; never committed.
-.probe/

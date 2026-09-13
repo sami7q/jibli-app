@@ -231,13 +231,52 @@ Not asserted — run.
 | API reachable | `/health/live` 200 in 12.5s (cold start) |
 | API healthy | `/health/ready` → database `true`, redis `true` |
 | Storefront returns Admin's data | 22 categories with Arabic names and emoji; 0 banners; rotation 5s |
-| Geography reflects Admin's switches | `ordering` → 1 governorate, 1 city; `customer_signup` → 2 governorates |
-| Restaurant list for the only ordering city | `[]` — see `running-the-app.md` §7 |
-| App bundles | iOS 1224 modules, Android 1220 |
+| Geography reflects Admin's switches | بغداد opened for ordering; the list changed from 1 governorate to 2 on the next request |
+| Restaurant list | 6 restaurants, correct open/closed state for the hour, fees and minimums as seeded |
+| Menu and options | full menu for each; `الحجم` required, `إضافات` max 3, prices applied |
+| Cart arithmetic against the live prices | 18,000 + 500 modifier = 18,500; + 2,000 delivery = 20,500 |
+| Minimum-order rule | 4,000 against a 5,000 minimum → «أضف 1,000 د.ع» |
+| Seed idempotency | second run: `0 inserted, 6 updated` |
+| Every screen rendered and photographed | welcome, home, restaurant, item sheet, cart, account, favourites, closed restaurant |
+| App bundles | iOS 1220 modules, Android 1171 |
 | Resolved app config | `apiUrl`, brand `#FF5400`, no camera/location strings |
 | Monorepo | typecheck, lint, 386 tests, build — all clean |
 
+### What the visual pass found
+
+Rendering the screens rather than reasoning about them turned up six defects
+that typecheck, lint and tests all pass over:
+
+1. **English in the middle of an Arabic card.** `cuisine_tags` stores keys —
+   `shawarma`, `levantine` — and the cards joined the raw array. The contract
+   calls those keys "never shown"; `cuisineLabelAr()` existed for exactly this
+   and was not being used.
+2. **A blank grey block** where a restaurant has no cover photo, which is every
+   restaurant on the day it is approved. It read as a failed image; it is now a
+   brand-tinted ground with the mark.
+3. **Text glyphs standing in for icons** — `⌕`, `≡`, `★`, `−`, `+`, `‹`, `✆`,
+   `•`. Several are not in Cairo and rendered as replacement boxes.
+4. **Category names truncated mid-word** at one line; «أسماك ومأكولات بحرية»
+   does not fit. Two lines now.
+5. **Card badges on the wrong edge** under RTL — `insetInlineEnd` where the comp
+   puts them on the start side.
+6. **A sign-in button disabled** because the basket was below the restaurant's
+   minimum. The minimum blocks checkout, not signing in, and nothing on screen
+   explained the grey.
+
+A seventh was a missing explanation rather than a defect: a closed restaurant's
+dishes are faded and inert, but the «مغلق الآن» badge is off screen by the time
+anyone scrolls into the menu, so tapping a dish did nothing with no reason
+given. There is a line above the menu now.
+
 What has **not** been verified: nothing has run on a physical device or
-simulator. Layout under forced RTL, Android's per-weight font families, the
-bottom sheet with a keyboard open, and push delivery are all unproven until
-`expo run:ios` and `expo run:android` are executed.
+simulator. The browser pass used React Native Web with `dir="rtl"` forced,
+which is a fair approximation and not the same renderer — Android's per-weight
+font families, the bottom sheet with a keyboard open, the real safe-area insets
+and push delivery are all unproven until `expo run:ios` and `expo run:android`
+are executed.
+
+Signing in is also unproven end to end, because staging has no SMS gateway:
+everything behind the phone screen — checkout, placing an order, the order
+timeline, rating, favourites — has been checked at the API and in the screens,
+but never with a real session on a device.

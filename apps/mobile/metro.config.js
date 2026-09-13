@@ -38,7 +38,52 @@ config.resolver.nodeModulesPaths = [
 /** Extensions a `.js` specifier may actually be on disk, in order. */
 const SOURCE_EXTENSIONS = ['.ts', '.tsx'];
 
+/**
+ * One React, always.
+ *
+ * This monorepo runs two React majors on purpose: the web portals are React 19
+ * (Next.js 15) and the app is React 18, because React Native 0.76 does not
+ * support 19. pnpm resolves a package's `react` from whichever importer pulled
+ * it, so a transitive dependency can quietly end up holding the *other* copy —
+ * and it did: a React 19 `jsx-runtime` was in the bundle beside React 18's
+ * renderer.
+ *
+ * That is not a version warning, it is a broken screen. React 19 stamps its
+ * elements with `Symbol.for('react.transitional.element')` where 18 uses
+ * `react.element`, so React 18's reconciler does not recognise them and throws
+ * "Objects are not valid as a React child (found: object with keys {$$typeof,
+ * type, key, props})" — an error that names nothing useful and renders nothing
+ * at all.
+ *
+ * Pinning the whole React family to the app's own copies makes the mix
+ * unrepresentable rather than unlikely.
+ */
+const REACT_SINGLETONS = [
+  'react',
+  'react/jsx-runtime',
+  'react/jsx-dev-runtime',
+  'react-dom',
+  'react-dom/client',
+  'react-is',
+];
+
+/** Resolved once at startup; a name the app does not have is simply skipped. */
+const SINGLETON_PATHS = new Map(
+  REACT_SINGLETONS.flatMap((name) => {
+    try {
+      return [[name, require.resolve(name, { paths: [projectRoot] })]];
+    } catch {
+      return [];
+    }
+  }),
+);
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const singleton = SINGLETON_PATHS.get(moduleName);
+  if (singleton) {
+    return { type: 'sourceFile', filePath: singleton };
+  }
+
   const relative = moduleName.startsWith('.');
 
   if (relative && moduleName.endsWith('.js')) {

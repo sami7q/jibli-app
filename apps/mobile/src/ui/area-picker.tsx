@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError, type GeographyOption } from '@/lib/api';
 import { useArea, type DeliveryArea } from '@/lib/area';
@@ -90,9 +91,12 @@ export function AreaPicker({ visible, onClose }: { visible: boolean; onClose: ()
           accessibilityLabel="رجوع إلى المحافظات"
           style={{ minHeight: TAP_TARGET, justifyContent: 'center' }}
         >
-          <Text variant="smallBold" tone="brand">
-            ‹ كل المحافظات
-          </Text>
+          <Row gap={space[1]}>
+            <MaterialCommunityIcons name="chevron-right" size={18} color={color.brand} />
+            <Text variant="smallBold" tone="brand">
+              كل المحافظات
+            </Text>
+          </Row>
         </Pressable>
       ) : null}
 
@@ -139,7 +143,13 @@ export function AreaPicker({ visible, onClose }: { visible: boolean; onClose: ()
                 <Text variant={selected ? 'bodyBold' : 'body'} tone={selected ? 'brand' : 'primary'}>
                   {option.name_ar}
                 </Text>
-                <Text tone="muted">{governorate ? (selected ? '✓' : '') : '‹'}</Text>
+                {governorate ? (
+                  selected ? (
+                    <MaterialCommunityIcons name="check" size={18} color={color.brand} />
+                  ) : null
+                ) : (
+                  <MaterialCommunityIcons name="chevron-left" size={18} color={color.textMuted} />
+                )}
               </Row>
             </Pressable>
           );

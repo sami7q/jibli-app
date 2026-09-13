@@ -2,6 +2,7 @@ import { createDatabase } from '../client.js';
 import { shouldUseSsl } from '../ssl.js';
 import { seedGeography, activateCity } from './geography.js';
 import { seedPlatformConfig } from './platform-config.js';
+import { DEMO_OWNER_CREDENTIALS, seedDemoMarketplace } from './demo-marketplace.js';
 
 /**
  * Seed runner.
@@ -68,6 +69,30 @@ async function main(): Promise<void> {
         ordering: true,
       });
       console.log('  IQ-BG-BAGHDAD is open for signup, onboarding and ordering');
+
+      /*
+       * Demo restaurants.
+       *
+       * An activated city with nothing in it looks exactly like a broken app,
+       * and telling those two apart is what costs the time. The set is chosen
+       * to exercise every state the customer app can render — closed, free
+       * delivery, a minimum order, unrated, item options — rather than to be
+       * six of the same thing.
+       */
+      console.log('\n→ Development: demo marketplace');
+      const demo = await seedDemoMarketplace(db, 'IQ-BG-BAGHDAD');
+      console.log(
+        `  ${demo.restaurantsInserted} inserted, ${demo.restaurantsUpdated} updated ` +
+          `in ${demo.cityNameAr}`,
+      );
+      console.log(
+        `  ${demo.branches} branch(es), ${demo.categories} menu categories, ` +
+          `${demo.items} items, ${demo.modifierGroups} option groups`,
+      );
+      console.log(`  ${demo.owners} portal owner account(s):`);
+      for (const owner of DEMO_OWNER_CREDENTIALS) {
+        console.log(`    ${owner.username} / ${owner.password}   → ${owner.restaurant}`);
+      }
       console.log('\n✓ Seed complete.');
     }
   } catch (error) {

@@ -6,7 +6,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { assetUrl } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
-import { color, radius, shadow, space, TAP_TARGET, text } from '@/theme';
+import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
 import { Button, EmptyState, Row, Screen, Text } from '@/ui';
 import { Stepper, SummaryRow } from '@/ui/catalog';
 
@@ -89,7 +89,7 @@ export default function CartScreen() {
                   height: 64,
                   borderRadius: radius.md,
                   overflow: 'hidden',
-                  backgroundColor: color.surfaceSunken,
+                  backgroundColor: color.brandSoft,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -104,7 +104,7 @@ export default function CartScreen() {
                   <MaterialCommunityIcons
                     name="silverware-fork-knife"
                     size={20}
-                    color={color.textMuted}
+                    color={palette.orange[300]}
                   />
                 )}
               </View>
@@ -229,7 +229,17 @@ export default function CartScreen() {
         <Button
           label={isGuest ? 'تسجيل الدخول لإتمام الطلب' : 'متابعة إلى العنوان والدفع'}
           block
-          disabled={belowMinimum}
+          /*
+           * The minimum blocks checkout, not signing in.
+           *
+           * For a guest this button goes to the phone screen, and greying that
+           * out because the basket is small disables an action for a reason
+           * that has nothing to do with it — the label says «تسجيل الدخول» and
+           * nothing on screen explains why it cannot be pressed. They can top
+           * the order up after signing in; the server enforces the minimum at
+           * placement regardless.
+           */
+          disabled={!isGuest && belowMinimum}
           onPress={() => {
             /*
              * This is the one place the app requires an account, and the reason

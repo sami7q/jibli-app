@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type RestaurantCard as RestaurantSummary } from '@/lib/api';
 import { useArea } from '@/lib/area';
@@ -451,11 +452,13 @@ function CategoryStrip({
                 )}
               </IconTile>
 
+              {/* Two lines: a third of the real category list — «أسماك
+                  ومأكولات بحرية» — does not fit on one at this width. */}
               <Text
                 variant="caption"
                 align="center"
                 tone={active ? 'brand' : 'secondary'}
-                numberOfLines={1}
+                numberOfLines={2}
               >
                 {entry.name_ar}
               </Text>
@@ -480,11 +483,19 @@ function RestaurantSummaryCard({
   return (
     <RestaurantCard
       name={restaurant.display_name}
-      tags={restaurant.cuisine_tags.slice(0, 3).join(' • ') || restaurant.city_name_ar}
+      /*
+       * Arabic labels, not the stored keys. `cuisine_tags` holds `shawarma`,
+       * `levantine` — the contract calls them "never shown" and means it;
+       * joining the raw array put English into the middle of an Arabic card.
+       */
+      tags={
+        restaurant.cuisine_tags.slice(0, 3).map(cuisineLabelAr).join('، ') ||
+        restaurant.city_name_ar
+      }
       coverUrl={restaurant.cover_asset_id ? assetUrl(restaurant.cover_asset_id) : null}
       rating={restaurant.rating}
       ratingCount={restaurant.rating_count}
-      deliveryFee={free ? 'مجاناً' : formatIqdArabic(iqd(restaurant.delivery_fee_iqd))}
+      deliveryFee={free ? 'التوصيل مجاني' : `التوصيل ${formatIqdArabic(iqd(restaurant.delivery_fee_iqd))}`}
       etaMinutes={restaurant.estimated_preparation_minutes}
       offer={free ? 'توصيل مجاني' : null}
       closed={closed}

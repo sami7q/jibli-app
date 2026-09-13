@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl } from '@/lib/api';
 import { useIsGuest } from '@/lib/session';
@@ -73,14 +74,17 @@ export default function FavoritesScreen() {
             <RestaurantCard
               key={restaurant.id}
               name={restaurant.display_name}
-              tags={restaurant.cuisine_tags.slice(0, 3).join(' • ') || restaurant.city_name_ar}
+              tags={
+                restaurant.cuisine_tags.slice(0, 3).map(cuisineLabelAr).join('، ') ||
+                restaurant.city_name_ar
+              }
               coverUrl={restaurant.cover_asset_id ? assetUrl(restaurant.cover_asset_id) : null}
               rating={restaurant.rating}
               ratingCount={restaurant.rating_count}
               deliveryFee={
                 restaurant.delivery_fee_iqd === 0
-                  ? 'مجاناً'
-                  : formatIqdArabic(iqd(restaurant.delivery_fee_iqd))
+                  ? 'التوصيل مجاني'
+                  : `التوصيل ${formatIqdArabic(iqd(restaurant.delivery_fee_iqd))}`
               }
               etaMinutes={restaurant.estimated_preparation_minutes}
               closed={!restaurant.is_open || !restaurant.accepts_orders}
