@@ -11,7 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { formatIraqiPhoneDisplay, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { saveSession } from '@/lib/secure-session';
-import { colors, radius, spacing, TAP_TARGET, typography } from '@/theme';
+import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 const OTP_LENGTH = 4;
 
@@ -153,7 +153,7 @@ export default function OtpScreen() {
         ))}
       </View>
 
-      {isSubmitting ? <ActivityIndicator color={colors.orange500} /> : null}
+      {isSubmitting ? <ActivityIndicator color={color.brand} /> : null}
 
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
@@ -190,52 +190,52 @@ export default function OtpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
-    gap: spacing.lg,
+    backgroundColor: color.surfaceCard,
+    padding: space[6],
+    gap: space[4],
     alignItems: 'center',
-    paddingTop: spacing.xxl * 2,
+    paddingTop: space[8] * 2,
   },
-  title: { ...typography.h1, color: colors.textPrimary },
-  subtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
-  phone: { ...typography.bodyBold, color: colors.textPrimary, writingDirection: 'ltr' },
+  title: { ...text.h1, color: color.textPrimary },
+  subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
+  phone: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
 
-  codeRow: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.lg },
+  codeRow: { flexDirection: 'row', gap: space[3], marginVertical: space[4] },
   codeBox: {
     width: 56,
     height: 64,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: color.borderSubtle,
     borderRadius: radius.md,
-    backgroundColor: colors.ink50,
-    ...typography.h1,
-    color: colors.textPrimary,
+    backgroundColor: palette.ink[50],
+    ...text.h1,
+    color: color.textPrimary,
   },
-  codeBoxFilled: { borderColor: colors.orange500, backgroundColor: colors.orange50 },
+  codeBoxFilled: { borderColor: color.brand, backgroundColor: color.brandSoft },
 
   error: {
-    ...typography.caption,
-    color: colors.danger,
-    backgroundColor: colors.dangerBg,
-    padding: spacing.md,
+    ...text.small,
+    color: color.danger,
+    backgroundColor: color.dangerSoft,
+    padding: space[3],
     borderRadius: radius.sm,
     textAlign: 'center',
     alignSelf: 'stretch',
   },
 
-  resend: { ...typography.body, color: colors.orange600, fontWeight: '700' },
-  resendDisabled: { color: colors.textMuted, fontWeight: '400' },
+  resend: { ...text.body, color: color.brandStrong, fontWeight: '700' },
+  resendDisabled: { color: color.textMuted, fontWeight: '400' },
 
   button: {
-    backgroundColor: colors.orange500,
+    backgroundColor: color.brand,
     minHeight: TAP_TARGET + 8,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'stretch',
     marginTop: 'auto',
-    marginBottom: spacing.xl,
+    marginBottom: space[6],
   },
-  buttonDisabled: { backgroundColor: colors.ink300 },
-  buttonText: { ...typography.bodyBold, color: colors.white },
+  buttonDisabled: { backgroundColor: palette.ink[300] },
+  buttonText: { ...text.bodyBold, color: palette.white },
 });

@@ -1,8 +1,12 @@
 /**
  * Jibli design tokens.
  *
- * Derived from the brand mark and the reference portal designs: a vivid orange
- * on a near-white ground, with dark chrome reserved for the Admin shell.
+ * GENERATED — do not edit the :root block below.
+ * Source: packages/design-tokens/src/index.ts
+ * Regenerate: pnpm --filter @jibli/design-tokens build:css
+ *
+ * The same values feed the mobile app, which cannot read CSS. Editing a colour
+ * here rather than at the source is how a phone stops matching its portals.
  *
  * Plan §2 makes RTL a first-class layout requirement, not a mirrored
  * afterthought. These tokens are direction-agnostic — spacing uses logical
@@ -10,7 +14,7 @@
  */
 
 :root {
-  /* ── Brand ──────────────────────────────────────────────────────────── */
+  /* ── Palette ───────────────────────────────────────────────────────────── */
   --jibli-orange-50: #fff4ed;
   --jibli-orange-100: #ffe6d5;
   --jibli-orange-200: #ffc9aa;
@@ -21,67 +25,49 @@
   --jibli-orange-700: #c73c07;
   --jibli-orange-800: #9e310e;
   --jibli-orange-900: #7f2b0f;
-
-  --jibli-ink-900: #16181d; /* Admin sidebar, headings */
-  --jibli-ink-800: #21242b;
-  --jibli-ink-700: #333741;
-  --jibli-ink-600: #4a4f5c;
-  --jibli-ink-500: #6b7280;
-  --jibli-ink-400: #9aa1ad;
-  --jibli-ink-300: #c7ccd4;
-  --jibli-ink-200: #e3e6eb;
-  --jibli-ink-100: #f1f3f6;
   --jibli-ink-50: #f8f9fb;
-
-  /* ── Semantic ───────────────────────────────────────────────────────── */
+  --jibli-ink-100: #f1f3f6;
+  --jibli-ink-200: #e3e6eb;
+  --jibli-ink-300: #c7ccd4;
+  --jibli-ink-400: #9aa1ad;
+  --jibli-ink-500: #6b7280;
+  --jibli-ink-600: #4a4f5c;
+  --jibli-ink-700: #333741;
+  --jibli-ink-800: #21242b;
+  --jibli-ink-900: #16181d; /* Admin sidebar, headings */
   --jibli-success-50: #ecfdf3;
   --jibli-success-500: #12b76a;
   --jibli-success-700: #027a48;
-
   --jibli-warning-50: #fffaeb;
   --jibli-warning-500: #f79009;
   --jibli-warning-700: #b54708;
-
   --jibli-danger-50: #fef3f2;
   --jibli-danger-500: #f04438;
   --jibli-danger-700: #b42318;
-
   --jibli-info-50: #eff8ff;
   --jibli-info-500: #2e90fa;
-
-  /* The fifth headline tile. Five tiles and four tones meant two of them
-     shared orange, so the row read as four categories, not five. */
+  --jibli-info-700: #175cd3;
   --jibli-violet-50: #f4f3ff;
-  --jibli-violet-500: #7a5af8;
+  --jibli-violet-500: #7a5af8; /* the fifth headline tile, so the row reads as five */
   --jibli-violet-700: #5925dc;
 
-  /* ── Surfaces ───────────────────────────────────────────────────────── */
+  /* ── Semantic — what a colour is for ───────────────────────────────────── */
   --surface-page: var(--jibli-ink-50);
   --surface-card: #ffffff;
   --surface-raised: #ffffff;
   --surface-sunken: var(--jibli-ink-100);
   --surface-inverse: var(--jibli-ink-900);
-
   --border-subtle: var(--jibli-ink-200);
   --border-strong: var(--jibli-ink-300);
-
   --text-primary: var(--jibli-ink-900);
   --text-secondary: var(--jibli-ink-600);
   --text-muted: var(--jibli-ink-500);
   --text-inverse: #ffffff;
   --text-brand: var(--jibli-orange-600);
 
-  /* ── Typography ─────────────────────────────────────────────────────── */
-  /*
-   * Arabic first: Cairo and Tajawal render Arabic far better than a Latin
-   * default, and the system stack catches anything unavailable.
-   */
-  --font-sans:
-    var(--font-cairo), 'Cairo', 'Tajawal', 'Noto Sans Arabic', 'Segoe UI', system-ui,
-    -apple-system, sans-serif;
-  /* Order numbers and money stay legible in a tabular column. */
-  --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
-
+  /* ── Type — Arabic first ───────────────────────────────────────────────── */
+  --font-sans: var(--font-cairo), 'Cairo', 'Tajawal', 'Noto Sans Arabic', 'Segoe UI', system-ui, -apple-system, sans-serif; /* a Latin default falls back to the wrong Arabic face */
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', ui-monospace, monospace; /* order numbers and money, in a tabular column */
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -89,12 +75,12 @@
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
   --text-3xl: 1.875rem;
-
+  --text-4xl: 2.25rem;
   --leading-tight: 1.3;
   --leading-normal: 1.6; /* Arabic needs more line height than Latin */
   --leading-relaxed: 1.8;
 
-  /* ── Spacing and shape ──────────────────────────────────────────────── */
+  /* ── Spacing and shape — a 4px base ────────────────────────────────────── */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -104,24 +90,28 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
   --space-12: 3rem;
-
+  --space-16: 4rem;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
+  --radius-2xl: 28px;
   --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px 0px rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08);
+  --shadow-xl: 0 20px 28px -6px rgba(16, 24, 40, 0.12);
 
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
-  --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
-
-  /* Touch targets stay large enough for a restaurant tablet (plan §134). */
-  --tap-target-min: 44px;
-
+  /* ── Layout constants ──────────────────────────────────────────────────── */
+  --tap-target-min: 44px; /* large enough for a restaurant tablet (plan §134) */
   --z-dropdown: 100;
   --z-sticky: 200;
   --z-modal: 400;
   --z-toast: 500;
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-normal: 220ms;
+  --duration-slow: 320ms;
 }
 
 /* ── Base reset ─────────────────────────────────────────────────────────── */

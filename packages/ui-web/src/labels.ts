@@ -1,9 +1,7 @@
 import type {
   CouponFundingSource,
   CouponType,
-  DeliveryAssignmentStatus,
   ExpenseCategory,
-  OrderStatus,
   RestaurantRole,
   SettlementStatus,
   PlatformRole,
@@ -17,49 +15,16 @@ import type {
  * of every screen (plan §2).
  */
 
-export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  PLACED: 'تم إرسال الطلب',
-  PENDING_RESTAURANT: 'طلب جديد',
-  ACCEPTED: 'تم قبول الطلب',
-  PREPARING: 'قيد التحضير',
-  READY: 'جاهز',
-  OUT_FOR_DELIVERY: 'قيد التوصيل',
-  DELIVERED: 'تم التسليم',
-  COMPLETED: 'مكتمل',
-  REJECTED: 'مرفوض',
-  CANCELLED: 'ملغي',
-};
-
-/**
- * Status tone for badges.
- *
- * Colour is always supplementary: the label carries the meaning, so a
- * colour-blind user loses nothing (plan §29, §134).
+/*
+ * Order and delivery statuses now live in `@jibli/contracts`, beside the enums
+ * they name, so the mobile app can read the same Arabic. Re-exported here so
+ * the twenty screens already importing them from this module keep working.
  */
-export const ORDER_STATUS_TONE: Record<OrderStatus, 'new' | 'progress' | 'ready' | 'done' | 'failed'> =
-  {
-    PLACED: 'new',
-    PENDING_RESTAURANT: 'new',
-    ACCEPTED: 'progress',
-    PREPARING: 'progress',
-    READY: 'ready',
-    OUT_FOR_DELIVERY: 'progress',
-    DELIVERED: 'done',
-    COMPLETED: 'done',
-    REJECTED: 'failed',
-    CANCELLED: 'failed',
-  };
-
-export const DELIVERY_STATUS_LABELS: Record<DeliveryAssignmentStatus, string> = {
-  ASSIGNED: 'تم التعيين',
-  ACCEPTED: 'قبل المندوب',
-  REJECTED: 'رفض المندوب',
-  PICKED_UP: 'استلم الطلب',
-  ARRIVED_CUSTOMER: 'وصل إلى العميل',
-  DELIVERED: 'تم التسليم',
-  CANCELLED: 'ملغي',
-  REASSIGNED: 'تم إعادة التعيين',
-};
+export {
+  DELIVERY_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_TONE,
+} from '@jibli/contracts';
 
 export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   DRAFT: 'مسودة',

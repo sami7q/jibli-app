@@ -231,7 +231,46 @@ export interface RestaurantCard {
   city_name_ar: string;
 }
 
+/** The home screen, as Admin arranged it in «شكل التطبيق». */
+export interface Storefront {
+  categories: {
+    key: string;
+    name_ar: string;
+    emoji: string | null;
+    image_asset_id: string | null;
+  }[];
+  banners: {
+    id: string;
+    title_ar: string;
+    subtitle_ar: string | null;
+    image_asset_id: string | null;
+    link_type: 'NONE' | 'CATEGORY' | 'RESTAURANT' | 'URL';
+    link_value: string | null;
+  }[];
+  banner_rotation_seconds: number;
+}
+
+/**
+ * Where an uploaded image is served from.
+ *
+ * Built from the id rather than returned per row: the id is what the database
+ * stores, and every screen showing a logo, a cover or a category picture needs
+ * the same URL from it.
+ */
+export function assetUrl(assetId: string): string {
+  return `${API_BASE}/api/v1/assets/${assetId}`;
+}
+
 export const api = {
+  /**
+   * Categories, banners and how fast to rotate them.
+   *
+   * Unauthenticated on purpose: it is the first request the app makes, before
+   * there is a session, and a home screen that needs a sign-in to show a
+   * category strip is a home screen nobody reaches.
+   */
+  storefront: () => apiRequest<Storefront>('/api/v1/storefront', { authenticated: false }),
+
   requestOtp: (phone: string) =>
     apiRequest<{ sent: boolean; resend_after_seconds: number; dev_code?: string }>(
       '/api/v1/auth/otp/request',

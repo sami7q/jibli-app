@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { fullNameSchema } from '@jibli/validation';
 import { api, ApiError, NetworkError, type GeographyOption } from '@/lib/api';
-import { colors, radius, spacing, TAP_TARGET, typography } from '@/theme';
+import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
  * Mandatory profile completion (plan §11).
@@ -140,7 +140,7 @@ export default function ProfileScreen() {
           value={fullName}
           onChangeText={setFullName}
           placeholder="محمد علي"
-          placeholderTextColor={colors.ink400}
+          placeholderTextColor={palette.ink[400]}
           accessibilityLabel="الاسم الكامل"
           editable={!isSubmitting}
         />
@@ -161,7 +161,7 @@ export default function ProfileScreen() {
           accessibilityLabel={`المحافظة: ${governorate?.name_ar ?? 'لم يتم الاختيار'}`}
         >
           {loadingGovernorates ? (
-            <ActivityIndicator color={colors.orange500} />
+            <ActivityIndicator color={color.brand} />
           ) : (
             <Text style={governorate ? styles.selectValue : styles.selectPlaceholder}>
               {governorate?.name_ar ?? 'اختر المحافظة'}
@@ -183,7 +183,7 @@ export default function ProfileScreen() {
           accessibilityHint={!governorate ? 'اختر المحافظة أولاً' : undefined}
         >
           {loadingCities ? (
-            <ActivityIndicator color={colors.orange500} />
+            <ActivityIndicator color={color.brand} />
           ) : (
             <Text style={city ? styles.selectValue : styles.selectPlaceholder}>
               {city?.name_ar ?? (governorate ? 'اختر المدينة' : 'اختر المحافظة أولاً')}
@@ -211,7 +211,7 @@ export default function ProfileScreen() {
         accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
       >
         {isSubmitting ? (
-          <ActivityIndicator color={colors.white} />
+          <ActivityIndicator color={palette.white} />
         ) : (
           <Text style={styles.buttonText}>متابعة</Text>
         )}
@@ -270,7 +270,7 @@ function OptionPicker({
             value={query}
             onChangeText={setQuery}
             placeholder="ابحث…"
-            placeholderTextColor={colors.ink400}
+            placeholderTextColor={palette.ink[400]}
             accessibilityLabel="البحث في القائمة"
           />
 
@@ -298,78 +298,78 @@ function OptionPicker({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface, padding: spacing.xl, gap: spacing.lg },
-  header: { gap: spacing.xs, marginTop: spacing.xxl },
-  title: { ...typography.h1, color: colors.textPrimary },
-  subtitle: { ...typography.body, color: colors.textMuted },
+  container: { flex: 1, backgroundColor: color.surfaceCard, padding: space[6], gap: space[4] },
+  header: { gap: space[1], marginTop: space[8] },
+  title: { ...text.h1, color: color.textPrimary },
+  subtitle: { ...text.body, color: color.textMuted },
 
-  field: { gap: spacing.sm },
-  label: { ...typography.bodyBold, color: colors.textPrimary },
+  field: { gap: space[2] },
+  label: { ...text.bodyBold, color: color.textPrimary },
   input: {
-    ...typography.body,
-    color: colors.textPrimary,
+    ...text.body,
+    color: color.textPrimary,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: color.borderSubtle,
     borderRadius: radius.md,
-    backgroundColor: colors.ink50,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: palette.ink[50],
+    paddingHorizontal: space[4],
     minHeight: TAP_TARGET,
     textAlign: 'right',
   },
-  fieldError: { ...typography.caption, color: colors.danger },
+  fieldError: { ...text.small, color: color.danger },
 
   select: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: color.borderSubtle,
     borderRadius: radius.md,
-    backgroundColor: colors.ink50,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: palette.ink[50],
+    paddingHorizontal: space[4],
     minHeight: TAP_TARGET,
     justifyContent: 'center',
   },
   selectDisabled: { opacity: 0.5 },
-  selectValue: { ...typography.body, color: colors.textPrimary },
-  selectPlaceholder: { ...typography.body, color: colors.ink400 },
+  selectValue: { ...text.body, color: color.textPrimary },
+  selectPlaceholder: { ...text.body, color: palette.ink[400] },
 
   error: {
-    ...typography.caption,
-    color: colors.danger,
-    backgroundColor: colors.dangerBg,
-    padding: spacing.md,
+    ...text.small,
+    color: color.danger,
+    backgroundColor: color.dangerSoft,
+    padding: space[3],
     borderRadius: radius.sm,
   },
 
   button: {
-    backgroundColor: colors.orange500,
+    backgroundColor: color.brand,
     minHeight: TAP_TARGET + 8,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 'auto',
-    marginBottom: spacing.xl,
+    marginBottom: space[6],
   },
-  buttonDisabled: { backgroundColor: colors.ink300 },
-  buttonText: { ...typography.bodyBold, color: colors.white },
+  buttonDisabled: { backgroundColor: palette.ink[300] },
+  buttonText: { ...text.bodyBold, color: palette.white },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(22,24,29,0.5)', justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: color.surfaceCard,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    padding: spacing.xl,
+    padding: space[6],
     maxHeight: '80%',
-    gap: spacing.md,
+    gap: space[3],
   },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  modalTitle: { ...typography.h2, color: colors.textPrimary },
-  modalClose: { ...typography.bodyBold, color: colors.orange600 },
+  modalTitle: { ...text.h2, color: color.textPrimary },
+  modalClose: { ...text.bodyBold, color: color.brandStrong },
 
   option: {
     minHeight: TAP_TARGET,
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: colors.ink100,
+    borderBottomColor: palette.ink[100],
   },
-  optionText: { ...typography.body, color: colors.textPrimary },
-  emptyText: { ...typography.body, color: colors.textMuted, textAlign: 'center', padding: spacing.xl },
+  optionText: { ...text.body, color: color.textPrimary },
+  emptyText: { ...text.body, color: color.textMuted, textAlign: 'center', padding: space[6] },
 });

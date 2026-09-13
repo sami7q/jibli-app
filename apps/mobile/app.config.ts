@@ -15,6 +15,7 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   scheme: 'jibli',
   userInterfaceStyle: 'light',
+  icon: './assets/icon.png',
   // The app is Arabic-only in Release 1 and RTL is forced, not inferred from
   // the device locale (plan §2).
   extra: { forceRTL: true },
@@ -24,6 +25,7 @@ const config: ExpoConfig = {
     backgroundColor: '#FF6B2C',
   },
   assetBundlePatterns: ['**/*'],
+  web: { favicon: './assets/favicon.png' },
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'iq.jibli.app',
@@ -44,7 +46,16 @@ const config: ExpoConfig = {
     permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION', 'POST_NOTIFICATIONS'],
     // Never ACCESS_BACKGROUND_LOCATION: Release 1 does not track drivers.
   },
-  plugins: ['expo-router', 'expo-secure-store', 'expo-localization'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    'expo-localization',
+    /*
+     * The splash is held by the app until fonts and the session have resolved
+     * (see src/app/_layout.tsx), so the plugin must not hide it on its own.
+     */
+    ['expo-splash-screen', { backgroundColor: '#FF6B2C', image: './assets/splash.png' }],
+  ],
   experiments: { typedRoutes: true },
 };
 

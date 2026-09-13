@@ -14,7 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { normalizeDigits } from '@jibli/validation';
 import { apiRequest, ApiError, idempotencyKey, NetworkError } from '@/lib/api';
-import { colors, radius, spacing, TAP_TARGET, typography } from '@/theme';
+import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
  * Driver delivery task (plan §49, §50, §52, §132).
@@ -224,7 +224,7 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
           accessibilityRole="button"
         >
           {isSubmitting ? (
-            <ActivityIndicator color={colors.white} />
+            <ActivityIndicator color={palette.white} />
           ) : (
             <Text style={styles.buttonPrimaryText}>استلمت الطلب</Text>
           )}
@@ -239,7 +239,7 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
           accessibilityRole="button"
         >
           {isSubmitting ? (
-            <ActivityIndicator color={colors.white} />
+            <ActivityIndicator color={palette.white} />
           ) : (
             <Text style={styles.buttonPrimaryText}>وصلت إلى العميل</Text>
           )}
@@ -259,7 +259,7 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
             maxLength={6}
             textAlign="center"
             placeholder="••••"
-            placeholderTextColor={colors.ink300}
+            placeholderTextColor={palette.ink[300]}
             accessibilityLabel="رمز التسليم"
             editable={!isSubmitting}
           />
@@ -277,7 +277,7 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
             accessibilityRole="button"
           >
             {isSubmitting ? (
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={palette.white} />
             ) : (
               <Text style={styles.buttonPrimaryText}>تأكيد التسليم</Text>
             )}
@@ -295,82 +295,82 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.lg },
+  container: { flex: 1, backgroundColor: color.surfacePage },
+  content: { padding: space[4], gap: space[4] },
 
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: color.surfaceCard,
     borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.md,
+    padding: space[4],
+    gap: space[3],
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: color.borderSubtle,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   flex: { flex: 1 },
 
-  orderNumber: { ...typography.bodyBold, color: colors.textPrimary, writingDirection: 'ltr' },
+  orderNumber: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
   cashBadge: {
     marginStart: 'auto',
-    backgroundColor: colors.successBg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    backgroundColor: color.successSoft,
+    paddingHorizontal: space[3],
+    paddingVertical: space[1],
     borderRadius: radius.full,
   },
-  cashText: { ...typography.tiny, color: colors.success },
+  cashText: { ...text.caption, color: color.success },
 
-  customerName: { ...typography.h2, color: colors.textPrimary },
-  addressText: { ...typography.body, color: colors.textSecondary },
+  customerName: { ...text.h2, color: color.textPrimary },
+  addressText: { ...text.body, color: color.textSecondary },
   note: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    backgroundColor: colors.ink100,
-    padding: spacing.md,
+    ...text.small,
+    color: color.textSecondary,
+    backgroundColor: palette.ink[100],
+    padding: space[3],
     borderRadius: radius.sm,
   },
 
-  sectionTitle: { ...typography.h3, color: colors.textPrimary },
-  hint: { ...typography.caption, color: colors.textMuted },
+  sectionTitle: { ...text.h3, color: color.textPrimary },
+  hint: { ...text.small, color: color.textMuted },
 
   button: {
     minHeight: TAP_TARGET + 4,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: space[4],
   },
-  buttonPrimary: { backgroundColor: colors.orange500 },
-  buttonPrimaryText: { ...typography.bodyBold, color: colors.white },
-  buttonGhost: { backgroundColor: colors.orange50 },
-  buttonGhostText: { ...typography.bodyBold, color: colors.orange700 },
-  buttonOutline: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  buttonOutlineText: { ...typography.bodyBold, color: colors.textSecondary },
-  buttonDisabled: { backgroundColor: colors.ink300 },
-  textDisabled: { color: colors.ink400 },
+  buttonPrimary: { backgroundColor: color.brand },
+  buttonPrimaryText: { ...text.bodyBold, color: palette.white },
+  buttonGhost: { backgroundColor: color.brandSoft },
+  buttonGhostText: { ...text.bodyBold, color: color.brandDeep },
+  buttonOutline: { borderWidth: 1, borderColor: color.borderSubtle, backgroundColor: color.surfaceCard },
+  buttonOutlineText: { ...text.bodyBold, color: color.textSecondary },
+  buttonDisabled: { backgroundColor: palette.ink[300] },
+  textDisabled: { color: palette.ink[400] },
 
   pinInput: {
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: color.borderSubtle,
     borderRadius: radius.md,
-    backgroundColor: colors.ink50,
+    backgroundColor: palette.ink[50],
     minHeight: 64,
-    ...typography.h1,
-    color: colors.textPrimary,
+    ...text.h1,
+    color: color.textPrimary,
     letterSpacing: 12,
   },
 
   warning: {
-    ...typography.caption,
-    color: colors.warning,
-    backgroundColor: colors.warningBg,
-    padding: spacing.md,
+    ...text.small,
+    color: color.warning,
+    backgroundColor: color.warningSoft,
+    padding: space[3],
     borderRadius: radius.sm,
   },
   error: {
-    ...typography.caption,
-    color: colors.danger,
-    backgroundColor: colors.dangerBg,
-    padding: spacing.md,
+    ...text.small,
+    color: color.danger,
+    backgroundColor: color.dangerSoft,
+    padding: space[3],
     borderRadius: radius.sm,
   },
 });

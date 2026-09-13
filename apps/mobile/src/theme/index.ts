@@ -1,104 +1,117 @@
-import { I18nManager, Platform } from 'react-native';
+import { I18nManager, Platform, type TextStyle, type ViewStyle } from 'react-native';
+import {
+  color,
+  duration,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  palette,
+  radius,
+  shadow as shadowTokens,
+  shadowColor,
+  space,
+  tapTarget,
+  type ShadowToken,
+} from '@jibli/design-tokens';
 
 /**
- * Mobile design tokens.
+ * The mobile theme.
  *
- * Mirrors the web palette so the brand reads the same across surfaces, with
- * values shaped for React Native (numbers, not CSS strings).
+ * An adapter, not a source. Every value comes from `@jibli/design-tokens`,
+ * which the web portals read too — this file's whole job is turning
+ * platform-neutral data into React Native shapes: a shadow into
+ * `shadowOffset`/`elevation`, a multiplier into an absolute `lineHeight`.
+ *
+ * It used to be a hand-typed copy of the web palette. That is the kind of
+ * duplication nobody notices until a designer changes the orange, one copy is
+ * updated, and the phone quietly stops matching the portals.
  */
 
-export const colors = {
-  orange50: '#FFF4ED',
-  orange100: '#FFE6D5',
-  orange200: '#FFC9AA',
-  orange300: '#FFA474',
-  orange400: '#FF7A3C',
-  orange500: '#FF6B2C',
-  orange600: '#F04E0A',
-  orange700: '#C73C07',
+export { color, palette, radius, space, fontSize, fontWeight, duration };
 
-  ink900: '#16181D',
-  ink800: '#21242B',
-  ink700: '#333741',
-  ink600: '#4A4F5C',
-  ink500: '#6B7280',
-  ink400: '#9AA1AD',
-  ink300: '#C7CCD4',
-  ink200: '#E3E6EB',
-  ink100: '#F1F3F6',
-  ink50: '#F8F9FB',
+/** Minimum touch target on a phone (plan §134). */
+export const TAP_TARGET = tapTarget.native;
 
-  white: '#FFFFFF',
-  success: '#12B76A',
-  successBg: '#ECFDF3',
-  warning: '#F79009',
-  warningBg: '#FFFAEB',
-  danger: '#F04438',
-  dangerBg: '#FEF3F2',
+/**
+ * One bundled font file per weight, named by the family React Native will ask
+ * for.
+ *
+ * This is the detail that decides whether the app looks right on Android.
+ * Android does not synthesise weights for a custom font: `fontFamily: 'Cairo'`
+ * with `fontWeight: '700'` renders *regular*, silently, while the same code on
+ * iOS looks bold — so a heading is heavy on one platform and not the other and
+ * nobody can see why from the code.
+ *
+ * Naming the family per weight and never setting `fontWeight` makes both
+ * platforms load the file that was actually designed at that weight.
+ */
+const FAMILY_FOR_WEIGHT: Record<string, string> = {
+  [fontWeight.regular]: 'Cairo_400Regular',
+  [fontWeight.medium]: 'Cairo_500Medium',
+  [fontWeight.semibold]: 'Cairo_600SemiBold',
+  [fontWeight.bold]: 'Cairo_700Bold',
+  [fontWeight.extrabold]: 'Cairo_800ExtraBold',
+};
 
-  surface: '#FFFFFF',
-  background: '#F8F9FB',
-  border: '#E3E6EB',
-  textPrimary: '#16181D',
-  textSecondary: '#4A4F5C',
-  textMuted: '#6B7280',
+/** Every family the app must load before its first text renders. */
+export const FONT_FAMILIES = Object.values(FAMILY_FOR_WEIGHT);
+
+/**
+ * Type styles, with line height resolved to absolute pixels.
+ *
+ * React Native's `lineHeight` is a number of pixels, not a multiplier, so the
+ * ratio is applied here. Rounded, because a fractional line height makes text
+ * jitter by a pixel between re-renders on Android.
+ */
+function type(size: number, weight: keyof typeof FAMILY_FOR_WEIGHT, ratio: number): TextStyle {
+  return {
+    fontFamily: FAMILY_FOR_WEIGHT[weight],
+    fontSize: size,
+    lineHeight: Math.round(size * ratio),
+  };
+}
+
+export const text = {
+  display: type(fontSize['3xl'], fontWeight.extrabold, lineHeight.tight),
+  h1: type(fontSize['2xl'], fontWeight.extrabold, lineHeight.tight),
+  h2: type(fontSize.xl, fontWeight.bold, lineHeight.tight),
+  h3: type(fontSize.lg, fontWeight.bold, lineHeight.normal),
+  body: type(fontSize.base, fontWeight.regular, lineHeight.normal),
+  bodyBold: type(fontSize.base, fontWeight.bold, lineHeight.normal),
+  small: type(fontSize.sm, fontWeight.regular, lineHeight.normal),
+  smallBold: type(fontSize.sm, fontWeight.semibold, lineHeight.normal),
+  caption: type(fontSize.xs, fontWeight.medium, lineHeight.normal),
 } as const;
 
-export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  xxl: 32,
-} as const;
+/**
+ * A shadow as React Native understands it.
+ *
+ * iOS composites a real shadow from offset/radius/opacity; Android has only an
+ * `elevation` integer and draws its own. Neither can be expressed as the
+ * other, which is why the token carries both rather than a CSS string.
+ */
+function elevate(token: ShadowToken): ViewStyle {
+  return (
+    Platform.select<ViewStyle>({
+      ios: {
+        shadowColor,
+        shadowOffset: { width: 0, height: token.offsetY },
+        shadowOpacity: token.opacity,
+        // CSS blur is a diameter; iOS `shadowRadius` is closer to a radius.
+        shadowRadius: token.blur / 2,
+      },
+      android: { elevation: token.elevation },
+      default: {},
+    }) ?? {}
+  );
+}
 
-export const radius = {
-  sm: 6,
-  md: 10,
-  lg: 16,
-  xl: 24,
-  full: 999,
+export const shadow = {
+  sm: elevate(shadowTokens.sm),
+  md: elevate(shadowTokens.md),
+  lg: elevate(shadowTokens.lg),
+  xl: elevate(shadowTokens.xl),
 } as const;
-
-export const typography = {
-  // Cairo ships with the app; the platform fallback keeps Arabic readable if
-  // font loading fails on a low-end device (plan §135).
-  fontFamily: Platform.select({ ios: 'Cairo', android: 'Cairo', default: 'System' }),
-  h1: { fontSize: 26, fontWeight: '800' as const, lineHeight: 34 },
-  h2: { fontSize: 20, fontWeight: '700' as const, lineHeight: 28 },
-  h3: { fontSize: 17, fontWeight: '700' as const, lineHeight: 24 },
-  body: { fontSize: 15, fontWeight: '400' as const, lineHeight: 24 },
-  bodyBold: { fontSize: 15, fontWeight: '700' as const, lineHeight: 24 },
-  caption: { fontSize: 13, fontWeight: '400' as const, lineHeight: 20 },
-  tiny: { fontSize: 11, fontWeight: '600' as const, lineHeight: 16 },
-} as const;
-
-export const shadows = {
-  card: Platform.select({
-    ios: {
-      shadowColor: '#101828',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-    },
-    android: { elevation: 2 },
-    default: {},
-  }),
-  raised: Platform.select({
-    ios: {
-      shadowColor: '#101828',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.1,
-      shadowRadius: 16,
-    },
-    android: { elevation: 6 },
-    default: {},
-  }),
-} as const;
-
-/** Minimum touch target (plan §134). */
-export const TAP_TARGET = 48;
 
 /**
  * Force RTL at startup.
@@ -107,8 +120,9 @@ export const TAP_TARGET = 48;
  * something to inherit from the device locale — a phone set to English must
  * still render Jibli right-to-left (plan §2).
  *
- * Must run before the first render. `forceRTL` requires an app restart to take
- * effect on a fresh install, which Expo handles on the next launch.
+ * Must run before the first render. On a fresh install `forceRTL` only takes
+ * effect after a restart, which is why `isRtlActive()` exists: the first launch
+ * can be laid out the wrong way round, and a screen that needs to know can ask.
  */
 export function enforceRtl(): void {
   if (!I18nManager.isRTL) {

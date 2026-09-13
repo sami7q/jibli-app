@@ -9,7 +9,15 @@ export default defineConfig({
   test: {
     globals: false,
     environment: 'node',
-    include: ['packages/**/*.test.ts', 'apps/api/**/*.test.ts', 'apps/worker/**/*.test.ts'],
+    include: [
+      'packages/**/*.test.ts',
+      'apps/api/**/*.test.ts',
+      'apps/worker/**/*.test.ts',
+      // The mobile client holds the single-flight token refresh and the
+      // idempotency rules; it was outside the suite entirely until the app
+      // foundation went in.
+      'apps/mobile/**/*.test.ts',
+    ],
     // The E2E suite needs a real database and has its own config
     // (vitest.e2e.config.ts); running it here would fail on resolution.
     exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/*.e2e.test.ts'],
@@ -37,6 +45,7 @@ export default defineConfig({
       '@jibli/geography': pkg('geography'),
       '@jibli/domain': pkg('domain'),
       '@jibli/notifications': pkg('notifications'),
+      '@jibli/design-tokens': pkg('design-tokens'),
     },
   },
 });

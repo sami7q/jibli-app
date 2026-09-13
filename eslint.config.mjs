@@ -80,6 +80,8 @@ export default tseslint.config(
       'packages/db/src/migrate.ts',
       'packages/db/src/reset.ts',
       'packages/db/src/schema-drift.ts',
+      'packages/design-tokens/src/emit-css.ts',
+      'packages/design-tokens/src/make-app-icons.ts',
     ],
     rules: { 'no-console': 'off' },
   },

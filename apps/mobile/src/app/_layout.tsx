@@ -1,25 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import {
+  Cairo_400Regular,
+  Cairo_500Medium,
+  Cairo_600SemiBold,
+  Cairo_700Bold,
+  Cairo_800ExtraBold,
+} from '@expo-google-fonts/cairo';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { apiRequest, ApiError, NetworkError } from '@/lib/api';
-import { clearSession, loadSession } from '@/lib/secure-session';
-import { colors, enforceRtl } from '@/theme';
+import { ApiError, NetworkError } from '@/lib/api';
+import { SessionProvider, useSession } from '@/lib/session';
+import { OfflineBanner, startNetworkWatch } from '@/lib/network';
+import { ErrorBoundary } from '@/lib/error-boundary';
+import { color, enforceRtl, palette } from '@/theme';
 
 /**
  * App root.
  *
- * Two things happen before the first screen renders:
- *   1. RTL is forced — Release 1 is Arabic-only regardless of device locale
- *      (plan §2).
- *   2. The stored session is resolved, so a returning customer lands on Home
- *      and an incomplete profile is routed to the mandatory flow (plan §11).
+ * Four things have to be true before the first screen renders, and the order
+ * matters:
+ *
+ *   1. **RTL, at module scope.** Release 1 is Arabic-only regardless of device
+ *      locale (plan §2), and `forceRTL` must be set before any layout happens.
+ *   2. **Fonts loaded.** Text painted before Cairo arrives renders in the
+ *      system Arabic face and then reflows — visible, and worse on a slow
+ *      device where it lasts long enough to read.
+ *   3. **The session resolved**, so a returning customer lands on Home and an
+ *      incomplete profile is routed to the mandatory flow (plan §11).
+ *   4. **The splash held** until 2 and 3 are done, rather than flashing an
+ *      empty screen between them.
  */
 
-// RTL must be set before any layout happens, so this runs at module scope.
+// Must run before the first render, so it runs at module scope.
 enforceRtl();
+
+// Held until the app can actually paint; see `Gate` below.
+void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,86 +58,91 @@ const queryClient = new QueryClient({
   },
 });
 
-type BootState = 'loading' | 'signed-out' | 'needs-profile' | 'ready';
-
-interface MeResponse {
-  user_id: string;
-  profile_completed: boolean;
-  modes: ('CUSTOMER' | 'DRIVER')[];
-  driver_id: string | null;
-}
-
 export default function RootLayout() {
-  const router = useRouter();
-  const [boot, setBoot] = useState<BootState>('loading');
+  const [fontsLoaded, fontError] = useFonts({
+    Cairo_400Regular,
+    Cairo_500Medium,
+    Cairo_600SemiBold,
+    Cairo_700Bold,
+    Cairo_800ExtraBold,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
+  useEffect(() => startNetworkWatch(), []);
 
-    const resolve = async (): Promise<void> => {
-      const session = await loadSession();
-      if (!session) {
-        if (!cancelled) setBoot('signed-out');
-        return;
-      }
-
-      try {
-        const me = await apiRequest<MeResponse>('/api/v1/auth/me');
-        if (cancelled) return;
-        setBoot(me.profile_completed ? 'ready' : 'needs-profile');
-      } catch (error) {
-        if (cancelled) return;
-
-        if (error instanceof NetworkError) {
-          // Offline with a stored session: let the user in and work from cache.
-          // Ordering still requires connectivity and revalidates server-side
-          // (plan §109).
-          setBoot('ready');
-          return;
-        }
-
-        // The session is genuinely invalid.
-        await clearSession();
-        setBoot('signed-out');
-      }
-    };
-
-    void resolve();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (boot === 'signed-out') router.replace('/(auth)/phone');
-    else if (boot === 'needs-profile') router.replace('/(auth)/profile');
-  }, [boot, router]);
-
-  if (boot === 'loading') {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.orange500, justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={colors.white} />
-      </View>
-    );
+  /*
+   * A font that fails to load is not a reason to show nothing. The system
+   * Arabic face is worse-looking, not unreadable, and a blank screen is the
+   * only outcome that loses the user entirely.
+   */
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: color.brand }} />;
   }
 
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="dark" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-            // Slide from the correct edge under RTL.
-            animation: 'slide_from_left',
-          }}
-        >
-          <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-          <Stack.Screen name="(driver)" options={{ animation: 'fade' }} />
-        </Stack>
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <SessionProvider>
+            <StatusBar style="dark" />
+            <OfflineBanner />
+            <Gate />
+          </SessionProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
+}
+
+/**
+ * Routes to the right group for the session, and nothing else.
+ *
+ * Kept separate from `RootLayout` because it must be *inside* the provider to
+ * read it — and separate from the screens because a redirect that lives in a
+ * screen fires after that screen has already rendered, which is how a
+ * signed-out user sees a flash of the home page.
+ *
+ * The `segments` check is what stops the loop: redirecting to `(auth)` from
+ * inside `(auth)` re-runs the effect forever.
+ */
+function Gate() {
+  const { state } = useSession();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (state.status === 'loading') return;
+
+    void SplashScreen.hideAsync();
+
+    // Typed as a narrow tuple by expo-router's generated routes, so it is read
+    // as plain strings here rather than fighting the generated type.
+    const path = segments as readonly string[];
+    const inAuth = path[0] === '(auth)';
+
+    if (state.status === 'signed-out' && !inAuth) {
+      router.replace('/(auth)/phone');
+      return;
+    }
+
+    if (state.status === 'needs-profile' && path[1] !== 'profile') {
+      router.replace('/(auth)/profile');
+      return;
+    }
+
+    // Signed in and complete, but still sitting on a sign-in screen: this is
+    // the hop after a successful OTP.
+    if ((state.status === 'ready' || state.status === 'offline-ready') && inAuth) {
+      router.replace('/(tabs)');
+    }
+  }, [state, segments, router]);
+
+  if (state.status === 'loading') {
+    return (
+      <View style={{ flex: 1, backgroundColor: color.brand, justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={palette.white} />
+      </View>
+    );
+  }
+
+  return <Slot />;
 }

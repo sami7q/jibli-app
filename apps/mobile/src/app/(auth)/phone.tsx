@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
-import { colors, radius, spacing, TAP_TARGET, typography } from '@/theme';
+import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
  * Phone entry — the first screen of the customer journey (plan §10).
@@ -90,7 +90,7 @@ export default function PhoneScreen() {
           value={rawInput}
           onChangeText={handleChange}
           placeholder="771 234 5678"
-          placeholderTextColor={colors.ink400}
+          placeholderTextColor={palette.ink[400]}
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           autoComplete="tel"
@@ -118,7 +118,7 @@ export default function PhoneScreen() {
         accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
       >
         {isSubmitting ? (
-          <ActivityIndicator color={colors.white} />
+          <ActivityIndicator color={palette.white} />
         ) : (
           <Text style={styles.buttonText}>إرسال رمز التحقق</Text>
         )}
@@ -134,63 +134,63 @@ export default function PhoneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
-    padding: spacing.xl,
+    backgroundColor: color.surfaceCard,
+    padding: space[6],
     justifyContent: 'center',
-    gap: spacing.lg,
+    gap: space[4],
   },
-  header: { gap: spacing.sm, alignItems: 'center', marginBottom: spacing.lg },
-  title: { ...typography.h1, color: colors.textPrimary, textAlign: 'center' },
-  brand: { color: colors.orange500 },
-  subtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
+  header: { gap: space[2], alignItems: 'center', marginBottom: space[4] },
+  title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
+  brand: { color: color.brand },
+  subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
 
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: space[2],
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: color.borderSubtle,
     borderRadius: radius.md,
-    backgroundColor: colors.ink50,
-    paddingHorizontal: spacing.md,
+    backgroundColor: palette.ink[50],
+    paddingHorizontal: space[3],
     minHeight: TAP_TARGET + 8,
   },
   prefix: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingEnd: spacing.md,
+    gap: space[1],
+    paddingEnd: space[3],
     borderEndWidth: 1,
-    borderEndColor: colors.border,
+    borderEndColor: color.borderSubtle,
   },
-  prefixText: { ...typography.bodyBold, color: colors.textPrimary },
+  prefixText: { ...text.bodyBold, color: color.textPrimary },
   flag: { fontSize: 18 },
   input: {
     flex: 1,
-    ...typography.body,
-    color: colors.textPrimary,
-    paddingVertical: spacing.md,
+    ...text.body,
+    color: color.textPrimary,
+    paddingVertical: space[3],
     // Digits stay LTR regardless of layout direction.
     writingDirection: 'ltr',
   },
 
   error: {
-    ...typography.caption,
-    color: colors.danger,
-    backgroundColor: colors.dangerBg,
-    padding: spacing.md,
+    ...text.small,
+    color: color.danger,
+    backgroundColor: color.dangerSoft,
+    padding: space[3],
     borderRadius: radius.sm,
   },
 
   button: {
-    backgroundColor: colors.orange500,
+    backgroundColor: color.brand,
     minHeight: TAP_TARGET + 8,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: { backgroundColor: colors.ink300 },
-  buttonText: { ...typography.bodyBold, color: colors.white },
+  buttonDisabled: { backgroundColor: palette.ink[300] },
+  buttonText: { ...text.bodyBold, color: palette.white },
 
-  legal: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  legal: { ...text.small, color: color.textMuted, textAlign: 'center' },
 });
