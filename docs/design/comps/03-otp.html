@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>التحقق من رقمك - OTP Verification</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration for Fonts and Custom Colors -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+          },
+          colors: {
+            iosKeypad: '#d1d5db',
+            iosKeypadBg: '#e5e7eb',
+            keyBg: '#ffffff',
+          }
+        }
+      }
+    }
+  </script>
+<!-- iOS-Specific Keypad Custom Styles -->
+<style data-purpose="custom-layout">
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .key-press-effect:active {
+      background-color: #b0b5bc !important;
+      transform: scale(0.98);
+      transition: all 0.05s ease-in-out;
+    }
+    .keyboard-shadow {
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-0 sm:p-4 font-sans antialiased text-gray-900">
+<!-- BEGIN: MobileDeviceFrame -->
+<div class="relative w-full max-w-[400px] h-[844px] bg-white sm:rounded-[50px] shadow-2xl overflow-hidden flex flex-col justify-between border-[8px] border-black sm:border-neutral-900" data-purpose="device-container">
+<!-- BEGIN: TopBar -->
+<header class="w-full pt-3 px-6 shrink-0" data-purpose="status-and-nav">
+<!-- iOS Dynamic Island Simulation -->
+<div class="flex justify-center mb-2">
+<div class="w-28 h-7 bg-black rounded-full"></div>
+</div>
+<!-- Back Navigation Button -->
+<div class="flex items-center justify-start mt-2">
+<button aria-label="الرجوع" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-800 hover:bg-gray-100 active:bg-gray-200 transition-colors" type="button">
+<!-- Back Arrow (Pointing right for RTL) -->
+<svg class="w-5 h-5 rtl:rotate-0" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: VerificationContent -->
+<main class="flex-1 flex flex-col items-center px-6 pt-6" data-purpose="otp-verification-screen">
+<!-- Title -->
+<h1 class="text-2xl sm:text-[26px] font-extrabold text-neutral-900 tracking-tight text-center mb-3">
+        تحقق من رقمك
+      </h1>
+<!-- Description & Phone Number -->
+<div class="text-center space-y-1 mb-8" data-purpose="phone-info">
+<p class="text-gray-500 text-sm font-normal">
+          ادخل رمز التحقق المرسل إلي
+        </p>
+<p class="text-neutral-900 text-base font-bold tracking-wide" dir="ltr">
+          +964 771 234 5678
+        </p>
+</div>
+<!-- OTP Input Boxes (6 digits) -->
+<div class="w-full flex justify-center items-center gap-2.5 mb-8" data-purpose="otp-pin-boxes" dir="ltr">
+<!-- Digit 1 -->
+<div class="w-12 h-14 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-900 shadow-sm">
+          1
+        </div>
+<!-- Digit 2 -->
+<div class="w-12 h-14 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-900 shadow-sm">
+          2
+        </div>
+<!-- Digit 3 -->
+<div class="w-12 h-14 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-900 shadow-sm">
+          3
+        </div>
+<!-- Digit 4 -->
+<div class="w-12 h-14 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-900 shadow-sm">
+          4
+        </div>
+<!-- Digit 5 (Empty) -->
+<div class="w-12 h-14 bg-gray-50/70 border border-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-900 shadow-sm">
+</div>
+<!-- Digit 6 (Empty) -->
+<div class="w-12 h-14 bg-gray-50/70 border border-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-900 shadow-sm">
+</div>
+</div>
+<!-- Resend Timer -->
+<div class="text-center" data-purpose="resend-timer">
+<p class="text-gray-400 text-sm font-medium">
+          إعادة الارسال خلال <span class="font-semibold text-gray-500">00:45</span>
+</p>
+</div>
+</main>
+<!-- END: VerificationContent -->
+<!-- BEGIN: CustomNumericKeypad -->
+<footer class="w-full bg-[#d2d5db] pt-2 pb-6 px-1.5 shrink-0" data-purpose="ios-numeric-keypad">
+<!-- Grid Keypad -->
+<div class="grid grid-cols-3 gap-1.5 max-w-sm mx-auto px-1">
+<!-- Key 1 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          1
+        </button>
+<!-- Key 2 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          2
+        </button>
+<!-- Key 3 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          3
+        </button>
+<!-- Key 4 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          4
+        </button>
+<!-- Key 5 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          5
+        </button>
+<!-- Key 6 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          6
+        </button>
+<!-- Key 7 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          7
+        </button>
+<!-- Key 8 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          8
+        </button>
+<!-- Key 9 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          9
+        </button>
+<!-- Empty Placeholder for iOS spacing -->
+<div class="h-12"></div>
+<!-- Key 0 -->
+<button class="key-press-effect keyboard-shadow h-12 bg-white rounded-md flex items-center justify-center text-2xl font-normal text-black active:bg-gray-200" type="button">
+          0
+        </button>
+<!-- Key Backspace / Delete -->
+<button aria-label="حذف" class="key-press-effect h-12 rounded-md flex items-center justify-center text-gray-800 active:bg-gray-300" type="button">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 9.75L14.25 12m0 0l2.25 2.25M14.25 12l2.25-2.25M14.25 12L12 14.25m-2.58 4.92l-6.375-6.375a1.125 1.125 0 010-1.59L9.42 4.83c.21-.211.497-.33.795-.33H19.5A2.25 2.25 0 0121.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-9.285a1.125 1.125 0 01-.795-.33z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- iOS Home Indicator Bar -->
+<div class="w-32 h-1 bg-black rounded-full mx-auto mt-4" data-purpose="home-indicator"></div>
+</footer>
+<!-- END: CustomNumericKeypad -->
+</div>
+<!-- END: MobileDeviceFrame -->
+</body></html>

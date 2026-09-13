@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>تسجيل الدخول - جيبلي</title>
+<!-- Tailwind CSS v3 CDN with forms & container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Cairo & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&amp;family=Inter:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              orange: '#FF5722',
+              'orange-hover': '#F44336',
+              dark: '#1A1A1A',
+              muted: '#71717A',
+              border: '#F0F0F2',
+              inputBg: '#F8F9FA'
+            }
+          },
+          fontFamily: {
+            cairo: ['Cairo', 'sans-serif'],
+            inter: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Styles -->
+<style data-purpose="base-typography">
+    body {
+      font-family: 'Cairo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input {
+      font-family: 'Inter', 'Cairo', sans-serif;
+    }
+    /* Remove number spin arrows */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+<!-- END: Custom Styles -->
+</head>
+<body class="bg-[#F2F4F7] min-h-screen flex items-center justify-center p-0 sm:p-4">
+<!-- BEGIN: MobileContainer -->
+<!-- Mimics mobile screen container (iPhone proportions) -->
+<div class="w-full max-w-[420px] bg-white min-h-screen sm:min-h-[850px] sm:rounded-[44px] sm:shadow-2xl flex flex-col justify-between px-6 pt-10 pb-8 relative overflow-hidden">
+<!-- BEGIN: TopBar -->
+<header class="w-full flex justify-between items-center text-sm font-semibold text-black px-2 mb-8" data-purpose="status-bar-spacer">
+<span class="font-inter text-base font-bold">9:41</span>
+<!-- Dynamic Island / Top Center Indicator Area -->
+<div class="hidden sm:block w-28 h-6 bg-black rounded-full mx-auto -mt-2"></div>
+<!-- Cellular, WiFi, Battery Icons -->
+<div class="flex items-center gap-1.5">
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9z" opacity="0.3"></path>
+<path d="M2 17h2v4H2zm4-3h2v7H6zm4-3h2v10h-2zm4-3h2v13h-2zm4-3h2v16h-2z"></path>
+</svg>
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 3c3.78 0 7.26 1.41 9.94 3.76L12 18.52 2.06 10.76C4.74 8.41 8.22 7 12 7z"></path>
+</svg>
+<div class="w-6 h-3 border border-black rounded-sm p-0.5 flex items-center">
+<div class="h-full w-full bg-black rounded-2xs"></div>
+</div>
+</div>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 flex flex-col justify-center">
+<!-- BEGIN: HeaderSection -->
+<section class="text-center mb-8" data-purpose="welcome-heading">
+<h1 class="text-3xl font-extrabold text-[#111827] flex items-center justify-center gap-1.5 tracking-tight mb-2">
+<span>مرحباً بك في</span>
+<span class="text-brand-orange relative inline-block">
+            جيبلي
+            <!-- Small Orange Dot Badge -->
+<span class="inline-block w-2 h-2 rounded-full border-2 border-brand-orange ml-0.5 align-super"></span>
+</span>
+</h1>
+<p class="text-[#64748B] text-base font-semibold">
+          أدخل رقم هاتفك للمتابعة
+        </p>
+</section>
+<!-- END: HeaderSection -->
+<!-- BEGIN: PhoneInputForm -->
+<section class="w-full space-y-4" data-purpose="phone-input-section">
+<!-- Input Composite Box -->
+<div class="flex items-center w-full h-[62px] bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl px-4 transition-all focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/20">
+<!-- Flag & Country Code Selector -->
+<div class="flex items-center gap-2 pl-3 border-l border-[#CBD5E1] cursor-pointer" data-purpose="country-code-selector">
+<!-- Iraq Flag SVG Icon -->
+<div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center border border-gray-200 shadow-sm shrink-0">
+<svg class="w-full h-full object-cover" viewbox="0 0 900 600">
+<rect fill="#ce1126" height="200" width="900"></rect>
+<rect fill="#ffffff" height="200" width="900" y="200"></rect>
+<rect fill="#000000" height="200" width="900" y="400"></rect>
+<text fill="#007a3d" font-family="'Cairo', sans-serif" font-size="80" font-weight="900" text-anchor="middle" x="450" y="335">الله أكبر</text>
+</svg>
+</div>
+<!-- Country Dial Code -->
+<span class="text-lg font-bold text-[#0F172A] font-inter tracking-tight" dir="ltr">+964</span>
+<!-- Dropdown Chevron -->
+<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+<!-- Phone Number Input -->
+<div class="flex-1 pr-3" dir="ltr">
+<input class="w-full bg-transparent border-none text-left text-lg font-semibold text-gray-800 placeholder-[#94A3B8] focus:ring-0 focus:outline-none p-0 tracking-wider font-inter" inputmode="numeric" maxlength="12" placeholder="771 234 5678" type="tel"/>
+</div>
+</div>
+<!-- Submit Button -->
+<button class="w-full h-[58px] bg-brand-orange active:bg-[#EA580C] hover:opacity-95 text-white font-bold text-lg rounded-2xl shadow-lg shadow-orange-500/20 transition duration-150 ease-in-out flex items-center justify-center" data-purpose="submit-otp-button" type="button">
+          إرسال رمز التحقق
+        </button>
+</section>
+<!-- END: PhoneInputForm -->
+<!-- BEGIN: Divider -->
+<div class="relative my-9 flex items-center justify-center" data-purpose="section-divider">
+<div class="w-full border-t border-[#E2E8F0]"></div>
+<span class="absolute bg-white px-4 text-sm font-semibold text-[#64748B]">
+          أو تابع باستخدام
+        </span>
+</div>
+<!-- END: Divider -->
+<!-- BEGIN: SocialLogins -->
+<section class="grid grid-cols-2 gap-4" data-purpose="social-login-section">
+<!-- Google Login Button -->
+<button class="h-[84px] border border-[#E2E8F0] rounded-2xl bg-white hover:bg-gray-50 active:scale-98 transition flex flex-col items-center justify-center gap-1.5 shadow-sm" data-purpose="google-login" type="button">
+<!-- Google 'G' Official SVG -->
+<svg class="w-7 h-7" viewbox="0 0 24 24">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"></path>
+</svg>
+<span class="text-sm font-bold text-gray-800 font-inter">Google</span>
+</button>
+<!-- Apple Login Button -->
+<button class="h-[84px] border border-[#E2E8F0] rounded-2xl bg-white hover:bg-gray-50 active:scale-98 transition flex flex-col items-center justify-center gap-1.5 shadow-sm" data-purpose="apple-login" type="button">
+<!-- Apple SVG Icon -->
+<svg class="w-7 h-7 fill-black" viewbox="0 0 170 170">
+<path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.04-7.67-7.81-11.94-14.3-5.26-7.88-9.43-16.74-12.52-26.58-3.09-9.84-4.64-19.16-4.64-27.95 0-14.44 3.73-26.33 11.19-35.65 7.46-9.33 16.79-14.07 27.99-14.23 4.19 0 8.98 1.05 14.36 3.16 5.38 2.12 9.07 3.24 11.07 3.36 2.45 0 6.47-1.24 12.06-3.72 5.59-2.48 10.37-3.51 14.34-3.09 15.93 1.25 28.02 7.74 36.27 19.48-14.2 8.6-21.16 20.31-20.88 35.12.28 11.66 4.71 21.36 13.29 29.1 3.91 3.6 8.35 6.3 13.33 8.11-2.9 8.76-6.68 17.1-11.36 25.02zM119.22 33.15c0-7.26 2.63-14.21 7.89-20.85 5.26-6.64 11.88-10.74 19.86-12.3 1.05 7.37-.9 14.38-5.84 21.03-4.94 6.65-11.58 10.77-19.91 12.37-.53-.08-1.07-.16-2-.25z"></path>
+</svg>
+<span class="text-sm font-bold text-gray-800 font-inter">Apple</span>
+</button>
+</section>
+<!-- END: SocialLogins -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: FooterTerms -->
+<footer class="mt-8 text-center" data-purpose="terms-and-conditions">
+<p class="text-sm text-[#64748B] font-medium leading-relaxed">
+        بالدخول فإنك توافق على الشروط والأحكام
+      </p>
+<a class="text-sm font-extrabold text-[#0F172A] hover:text-brand-orange transition duration-150 inline-block mt-0.5" href="#">
+        وسياسة الخصوصية
+      </a>
+</footer>
+<!-- END: FooterTerms -->
+<!-- BEGIN: HomeIndicator -->
+<div class="w-32 h-1 bg-black/20 rounded-full mx-auto mt-6" data-purpose="ios-home-bar"></div>
+<!-- END: HomeIndicator -->
+</div>
+<!-- END: MobileContainer -->
+</body></html>

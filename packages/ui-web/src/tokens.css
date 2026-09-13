@@ -15,26 +15,26 @@
 
 :root {
   /* ── Palette ───────────────────────────────────────────────────────────── */
-  --jibli-orange-50: #fff4ed;
-  --jibli-orange-100: #ffe6d5;
-  --jibli-orange-200: #ffc9aa;
-  --jibli-orange-300: #ffa474;
-  --jibli-orange-400: #ff7a3c;
-  --jibli-orange-500: #ff6b2c; /* primary — the logo orange */
-  --jibli-orange-600: #f04e0a;
-  --jibli-orange-700: #c73c07;
-  --jibli-orange-800: #9e310e;
-  --jibli-orange-900: #7f2b0f;
-  --jibli-ink-50: #f8f9fb;
-  --jibli-ink-100: #f1f3f6;
-  --jibli-ink-200: #e3e6eb;
+  --jibli-orange-50: #fff7f4;
+  --jibli-orange-100: #fff2ec;
+  --jibli-orange-200: #ffd9c8;
+  --jibli-orange-300: #ffb391;
+  --jibli-orange-400: #ff7f3f;
+  --jibli-orange-500: #ff5400; /* primary — the logo orange */
+  --jibli-orange-600: #e24500;
+  --jibli-orange-700: #b83800;
+  --jibli-orange-800: #8f2c00;
+  --jibli-orange-900: #6b2100;
+  --jibli-ink-50: #f8f9fa;
+  --jibli-ink-100: #f1f3f5;
+  --jibli-ink-200: #e5e7eb;
   --jibli-ink-300: #c7ccd4;
-  --jibli-ink-400: #9aa1ad;
+  --jibli-ink-400: #9ca3af;
   --jibli-ink-500: #6b7280;
-  --jibli-ink-600: #4a4f5c;
-  --jibli-ink-700: #333741;
-  --jibli-ink-800: #21242b;
-  --jibli-ink-900: #16181d; /* Admin sidebar, headings */
+  --jibli-ink-600: #4b5563;
+  --jibli-ink-700: #374151;
+  --jibli-ink-800: #1f2937;
+  --jibli-ink-900: #111827; /* Admin sidebar, headings */
   --jibli-success-50: #ecfdf3;
   --jibli-success-500: #12b76a;
   --jibli-success-700: #027a48;
@@ -91,16 +91,17 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
   --space-16: 4rem;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-2xl: 28px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 26px;
+  --radius-3xl: 32px;
   --radius-full: 9999px;
-  --shadow-sm: 0 1px 2px 0px rgba(16, 24, 40, 0.05);
-  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.08);
-  --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08);
-  --shadow-xl: 0 20px 28px -6px rgba(16, 24, 40, 0.12);
+  --shadow-sm: 0 2px 6px -1px rgba(17, 24, 39, 0.04);
+  --shadow-md: 0 8px 24px -4px rgba(17, 24, 39, 0.06);
+  --shadow-lg: 0 12px 28px -4px rgba(17, 24, 39, 0.1);
+  --shadow-xl: 0 20px 36px -6px rgba(17, 24, 39, 0.14);
 
   /* ── Layout constants ──────────────────────────────────────────────────── */
   --tap-target-min: 44px; /* large enough for a restaurant tablet (plan §134) */

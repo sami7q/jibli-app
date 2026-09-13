@@ -2,8 +2,10 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { AppError, ERROR_CODES, type PlatformRole, type RestaurantRole } from '@jibli/contracts';
 import { hashRefreshToken, signAccessToken } from '@jibli/auth';
 import {
+  cities,
   drivers,
   generateToken,
+  governorates,
   restaurantMembers,
   sessions,
   userPlatformRoles,
@@ -38,6 +40,20 @@ export interface SessionCapabilities {
   readonly username: string | null;
   /** Which app modes the client should offer (plan §47). */
   readonly modes: ('CUSTOMER' | 'DRIVER')[];
+  /**
+   * Default discovery geography, with names (plan §12).
+   *
+   * The customer app cannot list a single restaurant without a city id —
+   * `GET /restaurants` takes one — so a `me` without it leaves the home screen
+   * permanently empty. The names ride along because the header shows the area
+   * and a second round trip for two strings is waste.
+   */
+  readonly area: {
+    readonly governorateId: string;
+    readonly governorateNameAr: string;
+    readonly cityId: string;
+    readonly cityNameAr: string;
+  } | null;
 }
 
 /** Load everything the client needs to decide which experience to show. */
@@ -52,8 +68,16 @@ export async function loadCapabilities(
       profileCompletedAt: users.profileCompletedAt,
       fullName: users.fullName,
       username: users.username,
+      governorateId: users.profileGovernorateId,
+      governorateNameAr: governorates.nameAr,
+      cityId: users.profileCityId,
+      cityNameAr: cities.nameAr,
     })
     .from(users)
+    // Left joins: a portal account or a customer mid-signup has no area, and
+    // that must not make them disappear from their own `me`.
+    .leftJoin(cities, eq(cities.id, users.profileCityId))
+    .leftJoin(governorates, eq(governorates.id, users.profileGovernorateId))
     .where(eq(users.id, userId))
     .limit(1);
 
@@ -92,6 +116,15 @@ export async function loadCapabilities(
     fullName: user?.fullName ?? null,
     username: user?.username ?? null,
     modes,
+    area:
+      user?.cityId && user.cityNameAr && user.governorateId && user.governorateNameAr
+        ? {
+            governorateId: user.governorateId,
+            governorateNameAr: user.governorateNameAr,
+            cityId: user.cityId,
+            cityNameAr: user.cityNameAr,
+          }
+        : null,
   };
 }
 

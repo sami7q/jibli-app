@@ -1,10 +1,23 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { fullNameSchema, iraqCoordinatesSchema, uuidSchema } from '@jibli/validation';
 import { sanitizeDisplayText } from '@jibli/validation';
-import { cities, governorates, userAddresses, userDevices, users, uuidv7 } from '@jibli/db';
+import {
+  auditLogs,
+  cities,
+  customerFavorites,
+  governorates,
+  orders,
+  restaurantMembers,
+  sessions,
+  userAddresses,
+  userDevices,
+  userPlatformRoles,
+  users,
+  uuidv7,
+} from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { assertSelectableGeography, resolveCity } from '../services/geography-service.js';
@@ -352,5 +365,160 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
       });
 
     return reply.send(success({ registered: true }, { request_id: request.requestId }));
+  });
+
+  /**
+   * Delete my account (App Store guideline 5.1.1(v)).
+   *
+   * Apple requires that an app which lets you create an account let you delete
+   * it **from inside the app** — not by emailing support, and not by a link to
+   * a website. It is the most common rejection for an app shaped like this one.
+   *
+   * Deletion here is anonymisation, not a DROP. Orders and settlements are
+   * financial records belonging to the restaurant and the platform as much as
+   * to the customer, and a delivered order cannot stop having happened. So the
+   * personal data goes — name, phone, saved addresses, push tokens — and what
+   * remains is a detached row no one can be identified from. The confirmation
+   * screen in the app says exactly this before the customer confirms.
+   */
+  app.delete('/api/v1/profile', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
+
+    /*
+     * An order in flight is somebody's dinner and somebody else's money. There
+     * is a driver on the way, a kitchen that has already cooked, and cash to be
+     * collected — deleting the account underneath that leaves the order with
+     * nobody to deliver to.
+     */
+    const [live] = await ctx.db
+      .select({ id: orders.id, status: orders.status })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.userId, principal.userId),
+          inArray(orders.status, [
+            'PLACED',
+            'PENDING_RESTAURANT',
+            'ACCEPTED',
+            'PREPARING',
+            'READY',
+            'OUT_FOR_DELIVERY',
+          ]),
+        ),
+      )
+      .limit(1);
+
+    if (live) {
+      throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+        messageAr:
+          'لا يمكن حذف الحساب أثناء وجود طلب قيد التنفيذ. انتظر حتى اكتمال الطلب أو ألغِه.',
+        details: { order_id: live.id, status: live.status },
+      });
+    }
+
+    /*
+     * Staff and restaurant owners are not consumer accounts: their access is
+     * granted by someone else and has to be removed by them, or a restaurant
+     * loses its only owner to a tap. Apple's requirement is about the account
+     * the app itself created.
+     */
+    const [staff] = await ctx.db
+      .select({ role: userPlatformRoles.role })
+      .from(userPlatformRoles)
+      .where(and(eq(userPlatformRoles.userId, principal.userId), isNull(userPlatformRoles.revokedAt)))
+      .limit(1);
+
+    const [member] = await ctx.db
+      .select({ restaurantId: restaurantMembers.restaurantId })
+      .from(restaurantMembers)
+      .where(
+        and(eq(restaurantMembers.userId, principal.userId), eq(restaurantMembers.isActive, true)),
+      )
+      .limit(1);
+
+    if (staff || member) {
+      throw new AppError(ERROR_CODES.FORBIDDEN, {
+        messageAr: 'هذا الحساب مرتبط بصلاحيات إدارية أو بمطعم. تواصل مع الدعم لحذفه.',
+      });
+    }
+
+    const now = new Date();
+    /*
+     * A tombstone username.
+     *
+     * The phone goes to NULL so the number is free to register again, but
+     * `phone_e164 IS NOT NULL OR username IS NOT NULL` (migration 0005) means
+     * something has to take its place, and it has to satisfy the username
+     * format check — lowercase, dots allowed, 3 to 32 characters. Four plus
+     * twenty-eight hex digits is exactly 32 and carries enough of the user id
+     * that two deletions in the same millisecond cannot collide.
+     */
+    const tombstone = `del.${principal.userId.replace(/-/g, '').slice(0, 28)}`;
+
+    await ctx.db.transaction(async (tx) => {
+      const [before] = await tx
+        .select({ phone: users.phoneE164, fullName: users.fullName })
+        .from(users)
+        .where(eq(users.id, principal.userId))
+        .limit(1);
+
+      await tx
+        .update(users)
+        .set({
+          fullName: null,
+          phoneE164: null,
+          username: tombstone,
+          passwordHash: null,
+          mfaSecretEncrypted: null,
+          mfaPendingSecretEncrypted: null,
+          mfaEnabledAt: null,
+          profileGovernorateId: null,
+          profileCityId: null,
+          /*
+           * Cleared with the geography, not merely alongside it.
+           *
+           * `users_profile_geography_complete` (migration 0001) says a row with
+           * `profile_completed_at` set must still carry a name, a governorate
+           * and a city. Scrubbing those three while leaving the timestamp
+           * would make the UPDATE fail the constraint — and it would fail for
+           * exactly the customers most likely to delete an account, the ones
+           * who finished signing up.
+           */
+          profileCompletedAt: null,
+          status: 'DEACTIVATED',
+          deletedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(users.id, principal.userId));
+
+      // Saved addresses and push tokens are personal data with no accounting
+      // role; orders keep their own delivery snapshot, so nothing is orphaned.
+      await tx.delete(userAddresses).where(eq(userAddresses.userId, principal.userId));
+      await tx.delete(userDevices).where(eq(userDevices.userId, principal.userId));
+      await tx.delete(customerFavorites).where(eq(customerFavorites.userId, principal.userId));
+
+      // Every device signed out, including ones not holding this request.
+      await tx
+        .update(sessions)
+        .set({ revokedAt: now, revokedReason: 'ACCOUNT_DELETED' })
+        .where(and(eq(sessions.userId, principal.userId), isNull(sessions.revokedAt)));
+
+      await tx.insert(auditLogs).values({
+        id: uuidv7(),
+        actorUserId: null,
+        actorRole: 'CUSTOMER',
+        action: 'ACCOUNT_DELETED',
+        entityType: 'user',
+        entityId: principal.userId,
+        // The phone is recorded so a customer who contacts support about a
+        // past order can be matched; nothing else identifying is kept.
+        beforeJson: { phone_e164: before?.phone ?? null, had_name: Boolean(before?.fullName) },
+        afterJson: { status: 'DEACTIVATED', username: tombstone },
+        reason: 'SELF_SERVICE_DELETION',
+        requestId: request.requestId,
+      });
+    });
+
+    return reply.send(success({ deleted: true }, { request_id: request.requestId }));
   });
 }

@@ -1,0 +1,816 @@
+import { useMemo, useRef, useState } from 'react';
+import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { formatIqdArabic, iqd } from '@jibli/money';
+import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
+import { useCart } from '@/lib/cart';
+import { useIsGuest } from '@/lib/session';
+import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
+import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
+import { RatingPill, Sheet, Stepper } from '@/ui/catalog';
+
+/**
+ * Restaurant detail and menu (`6.html`).
+ *
+ * Public: a guest reads the whole menu and fills a cart. The account is asked
+ * for at checkout, which is the only step that actually needs one — an order
+ * needs an address to go to (App Store 5.1.1(ii)).
+ *
+ * The cover, the badges and the category tabs come straight from the comp. The
+ * open/closed state does not: it is computed on the server from the working
+ * hours the restaurant set in its own portal, so a closed kitchen cannot be
+ * ordered from no matter what this screen renders.
+ */
+export default function RestaurantScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { cart, itemCount, subtotalIqd } = useCart();
+
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [openItem, setOpenItem] = useState<MenuItem | null>(null);
+
+  /*
+   * Where each category section starts, measured as it lays out.
+   *
+   * Without this the category tabs are decoration — they highlight and nothing
+   * moves, which is the sort of control that teaches people to stop trusting
+   * the interface.
+   */
+  const scroller = useRef<ScrollView>(null);
+  const sectionTops = useRef<Record<string, number>>({});
+
+  const jumpTo = (categoryId: string) => {
+    setActiveCategory(categoryId);
+    const top = sectionTops.current[categoryId];
+    if (top !== undefined) {
+      scroller.current?.scrollTo({ y: Math.max(0, top - space[2]), animated: true });
+    }
+  };
+
+  const restaurant = useQuery({
+    queryKey: ['restaurant', id],
+    queryFn: () => api.restaurant(id),
+    enabled: Boolean(id),
+  });
+
+  const categories = restaurant.data?.categories ?? [];
+  const shownCategories = useMemo(
+    () => categories.filter((category) => category.items.length > 0),
+    [categories],
+  );
+
+  if (restaurant.isLoading) {
+    return (
+      <Screen padded={false} edges={['top']}>
+        <Skeleton height={220} />
+        <View style={{ padding: space[4], gap: space[3] }}>
+          <Skeleton height={96} style={{ borderRadius: radius.xl }} />
+          <Skeleton height={72} />
+          <Skeleton height={72} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (restaurant.isError || !restaurant.data) {
+    return (
+      <Screen edges={['top']}>
+        <ErrorState
+          message={
+            restaurant.error instanceof ApiError
+              ? restaurant.error.messageAr
+              : 'تعذّر تحميل المطعم'
+          }
+          onRetry={() => void restaurant.refetch()}
+        />
+      </Screen>
+    );
+  }
+
+  const detail = restaurant.data;
+  const cartIsThisRestaurant = cart?.restaurantId === detail.id;
+
+  return (
+    <Screen padded={false} edges={[]} background={color.surfacePage}>
+      <ScrollView
+        ref={scroller}
+        contentContainerStyle={{ paddingBottom: itemCount > 0 ? 120 : space[8] }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Cover
+          coverUrl={detail.cover_asset_id ? assetUrl(detail.cover_asset_id) : null}
+          onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+          restaurantId={detail.id}
+        />
+
+        <InfoCard
+          name={detail.display_name}
+          tags={detail.cuisine_tags.join(' • ') || detail.city_name_ar}
+          logoUrl={detail.logo_asset_id ? assetUrl(detail.logo_asset_id) : null}
+          rating={detail.rating}
+          ratingCount={detail.rating_count}
+          etaMinutes={detail.estimated_preparation_minutes}
+          deliveryFeeIqd={detail.delivery_fee_iqd}
+          minimumOrderIqd={detail.minimum_order_iqd}
+          isOpen={detail.is_open}
+          orderable={detail.orderable}
+        />
+
+        {shownCategories.length === 0 ? (
+          <View style={{ padding: space[6], alignItems: 'center' }}>
+            <Text tone="muted" align="center">
+              لم يُضف المنيو بعد.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <CategoryTabs
+              categories={shownCategories.map((category) => ({
+                id: category.id,
+                name: category.name_ar,
+              }))}
+              active={activeCategory ?? shownCategories[0]?.id ?? null}
+              onSelect={jumpTo}
+            />
+
+            {shownCategories.map((category) => (
+              <View
+                key={category.id}
+                onLayout={(event) => {
+                  sectionTops.current[category.id] = event.nativeEvent.layout.y;
+                }}
+                style={{ paddingHorizontal: space[4], paddingTop: space[5] }}
+              >
+                <Text variant="h3">{category.name_ar}</Text>
+                {category.description_ar ? (
+                  <Text variant="caption" tone="muted">
+                    {category.description_ar}
+                  </Text>
+                ) : null}
+
+                <View style={{ gap: space[3], paddingTop: space[3] }}>
+                  {category.items.map((item) => (
+                    <MenuItemRow
+                      key={item.id}
+                      item={item}
+                      disabled={!detail.orderable}
+                      onPress={() => setOpenItem(item)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+
+      {/*
+       * The cart bar rides above the content rather than living at the bottom
+       * of the scroll: someone who has added three things and is still reading
+       * the menu should not have to scroll to the end to find out what they
+       * have.
+       */}
+      {itemCount > 0 && cartIsThisRestaurant ? (
+        <CartBar
+          count={itemCount}
+          totalIqd={subtotalIqd}
+          onPress={() => router.push('/cart')}
+        />
+      ) : null}
+
+      <ItemSheet
+        item={openItem}
+        restaurant={detail}
+        onClose={() => setOpenItem(null)}
+      />
+    </Screen>
+  );
+}
+
+function Cover({
+  coverUrl,
+  onBack,
+  restaurantId,
+}: {
+  coverUrl: string | null;
+  onBack: () => void;
+  restaurantId: string;
+}) {
+  return (
+    <View style={{ height: 224, backgroundColor: color.surfaceSunken }}>
+      {coverUrl ? (
+        <Image
+          source={{ uri: coverUrl }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      <View
+        style={{
+          position: 'absolute',
+          top: space[10],
+          insetInlineStart: space[4],
+          insetInlineEnd: space[4],
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+        }}
+      >
+        <CircleButton label="رجوع" icon="chevron-right" onPress={onBack} />
+        <FavoriteButton restaurantId={restaurantId} />
+      </View>
+    </View>
+  );
+}
+
+/** A round control over the cover art, dark enough to read on any photograph. */
+function CircleButton({
+  label,
+  icon,
+  onPress,
+  tint = palette.white,
+}: {
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  onPress: () => void;
+  tint?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        {
+          width: TAP_TARGET,
+          height: TAP_TARGET,
+          borderRadius: radius.full,
+          backgroundColor: 'rgba(17,24,39,0.5)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        pressed ? { opacity: 0.7 } : null,
+      ]}
+    >
+      <MaterialCommunityIcons name={icon} size={22} color={tint} />
+    </Pressable>
+  );
+}
+
+/**
+ * The heart.
+ *
+ * Optimistic, because the answer is never in doubt and a heart that waits for
+ * a round trip feels broken. A guest is sent to sign in instead: a favourite
+ * has to belong to someone.
+ */
+function FavoriteButton({ restaurantId }: { restaurantId: string }) {
+  const isGuest = useIsGuest();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const favorites = useQuery({
+    queryKey: ['favorites'],
+    queryFn: () => api.favorites(),
+    enabled: !isGuest,
+    staleTime: 60_000,
+  });
+
+  const isFavorite = (favorites.data ?? []).some((entry) => entry.id === restaurantId);
+
+  const toggle = useMutation({
+    mutationFn: () => (isFavorite ? api.unfavorite(restaurantId) : api.favorite(restaurantId)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['favorites'] }),
+  });
+
+  return (
+    <CircleButton
+      label={isFavorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
+      icon={isFavorite ? 'heart' : 'heart-outline'}
+      tint={isFavorite ? palette.danger[500] : palette.white}
+      onPress={() => {
+        if (isGuest) {
+          router.push('/(auth)/phone');
+          return;
+        }
+        toggle.mutate();
+      }}
+    />
+  );
+}
+
+function InfoCard({
+  name,
+  tags,
+  logoUrl,
+  rating,
+  ratingCount,
+  etaMinutes,
+  deliveryFeeIqd,
+  minimumOrderIqd,
+  isOpen,
+  orderable,
+}: {
+  name: string;
+  tags: string;
+  logoUrl: string | null;
+  rating: number | null;
+  ratingCount: number;
+  etaMinutes: number;
+  deliveryFeeIqd: number;
+  minimumOrderIqd: number;
+  isOpen: boolean;
+  orderable: boolean;
+}) {
+  return (
+    <View
+      style={[
+        {
+          marginTop: -space[6],
+          marginHorizontal: space[4],
+          padding: space[4],
+          backgroundColor: color.surfaceCard,
+          borderRadius: radius.xl,
+          borderWidth: 1,
+          borderColor: color.borderSubtle,
+          gap: space[3],
+        },
+        shadow.md,
+      ]}
+    >
+      <Row gap={space[3]} align="flex-start">
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: radius.lg,
+            overflow: 'hidden',
+            backgroundColor: color.surfaceSunken,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {logoUrl ? (
+            <Image
+              source={{ uri: logoUrl }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text variant="h2" tone="muted">
+              {name.slice(0, 1)}
+            </Text>
+          )}
+        </View>
+
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="h3" numberOfLines={2}>
+            {name}
+          </Text>
+          <Text variant="caption" tone="muted" numberOfLines={2}>
+            {tags}
+          </Text>
+        </View>
+
+        <RatingPill rating={rating} count={ratingCount > 0 ? ratingCount : undefined} />
+      </Row>
+
+      {/*
+       * Open/closed is the server's answer, computed from the hours the
+       * restaurant keeps in its own portal — not something this screen decides.
+       */}
+      <Row gap={space[2]}>
+        <View
+          style={{
+            paddingHorizontal: space[2],
+            paddingVertical: 3,
+            borderRadius: radius.full,
+            backgroundColor: orderable ? color.successSoft : color.surfaceSunken,
+          }}
+        >
+          <Text variant="caption" tone={orderable ? 'success' : 'muted'}>
+            {orderable ? 'مفتوح الآن' : isOpen ? 'لا يستقبل طلبات حالياً' : 'مغلق الآن'}
+          </Text>
+        </View>
+      </Row>
+
+      <Row
+        justify="space-between"
+        style={{ borderTopWidth: 1, borderTopColor: color.borderSubtle, paddingTop: space[3] }}
+      >
+        <Fact icon="clock-outline" label="يصل خلال" value={`${etaMinutes} دقيقة`} />
+        <Fact
+          icon="bike-fast"
+          label="رسوم التوصيل"
+          value={deliveryFeeIqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(deliveryFeeIqd))}
+        />
+        <Fact
+          icon="store-outline"
+          label="أقل طلب"
+          value={minimumOrderIqd === 0 ? 'لا يوجد' : formatIqdArabic(iqd(minimumOrderIqd))}
+        />
+      </Row>
+    </View>
+  );
+}
+
+function Fact({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={{ alignItems: 'center', gap: 2, flex: 1 }}>
+      <MaterialCommunityIcons name={icon} size={18} color={color.brand} />
+      <Text variant="caption" tone="muted">
+        {label}
+      </Text>
+      <Text variant="caption" tone="primary">
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function CategoryTabs({
+  categories,
+  active,
+  onSelect,
+}: {
+  categories: { id: string; name: string }[];
+  active: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingHorizontal: space[4],
+        paddingTop: space[4],
+        gap: space[2],
+      }}
+    >
+      {categories.map((category) => {
+        const selected = active === category.id;
+        return (
+          <Pressable
+            key={category.id}
+            onPress={() => onSelect(category.id)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={category.name}
+            style={{
+              minHeight: TAP_TARGET - 8,
+              paddingHorizontal: space[4],
+              justifyContent: 'center',
+              borderRadius: radius.full,
+              backgroundColor: selected ? color.brand : color.surfaceCard,
+              borderWidth: 1,
+              borderColor: selected ? color.brand : color.borderSubtle,
+            }}
+          >
+            <Text variant="smallBold" tone={selected ? 'inverse' : 'secondary'}>
+              {category.name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function MenuItemRow({
+  item,
+  disabled,
+  onPress,
+}: {
+  item: MenuItem;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const unavailable = disabled || !item.is_available;
+
+  return (
+    <Pressable
+      onPress={unavailable ? undefined : onPress}
+      disabled={unavailable}
+      accessibilityRole="button"
+      accessibilityLabel={item.name_ar}
+      accessibilityState={{ disabled: unavailable }}
+      style={({ pressed }) => [
+        {
+          flexDirection: 'row',
+          gap: space[3],
+          padding: space[3],
+          backgroundColor: color.surfaceCard,
+          borderRadius: radius.lg,
+          borderWidth: 1,
+          borderColor: color.borderSubtle,
+          opacity: unavailable ? 0.55 : 1,
+        },
+        pressed ? { opacity: 0.8 } : null,
+      ]}
+    >
+      <View style={{ flex: 1, gap: space[1] }}>
+        <Row gap={space[2]}>
+          <Text variant="bodyBold" numberOfLines={1} style={{ flexShrink: 1 }}>
+            {item.name_ar}
+          </Text>
+          {item.is_popular ? (
+            <View
+              style={{
+                paddingHorizontal: space[2],
+                paddingVertical: 1,
+                borderRadius: radius.full,
+                backgroundColor: color.warningSoft,
+              }}
+            >
+              <Text variant="caption" style={{ color: palette.warning[700] }}>
+                الأكثر طلباً
+              </Text>
+            </View>
+          ) : null}
+        </Row>
+
+        {item.description_ar ? (
+          <Text variant="caption" tone="muted" numberOfLines={2}>
+            {item.description_ar}
+          </Text>
+        ) : null}
+
+        <Text variant="smallBold" tone="brand">
+          {formatIqdArabic(iqd(item.price_iqd))}
+        </Text>
+
+        {!item.is_available ? (
+          <Text variant="caption" tone="danger">
+            غير متوفر حالياً
+          </Text>
+        ) : null}
+      </View>
+
+      <View
+        style={{
+          width: 88,
+          height: 88,
+          borderRadius: radius.md,
+          overflow: 'hidden',
+          backgroundColor: color.surfaceSunken,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {item.image_asset_id ? (
+          <Image
+            source={{ uri: assetUrl(item.image_asset_id) }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        ) : (
+          <MaterialCommunityIcons name="silverware-fork-knife" size={24} color={color.textMuted} />
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+/**
+ * The dish, opened.
+ *
+ * Options are fetched here rather than with the menu: most customers open two
+ * or three dishes out of forty, and loading every modifier group for every
+ * item would be most of the payload for none of the use.
+ */
+function ItemSheet({
+  item,
+  restaurant,
+  onClose,
+}: {
+  item: MenuItem | null;
+  restaurant: {
+    id: string;
+    branch_id: string;
+    display_name: string;
+    delivery_fee_iqd: number;
+    minimum_order_iqd: number;
+  };
+  onClose: () => void;
+}) {
+  const { add } = useCart();
+  const [quantity, setQuantity] = useState(1);
+  const [chosen, setChosen] = useState<Record<string, string[]>>({});
+
+  const groups = useQuery({
+    queryKey: ['item-modifiers', item?.id],
+    queryFn: () => api.itemModifiers(item?.id as string),
+    enabled: Boolean(item),
+  });
+
+  const groupList = groups.data ?? [];
+
+  const unitPriceIqd = useMemo(() => {
+    if (!item) return 0;
+    const extras = groupList.flatMap((group) =>
+      (chosen[group.id] ?? []).map(
+        (id) => group.modifiers.find((modifier) => modifier.id === id)?.price_iqd ?? 0,
+      ),
+    );
+    return item.price_iqd + extras.reduce((sum, price) => sum + price, 0);
+  }, [item, groupList, chosen]);
+
+  // A required group with nothing chosen is the one thing that must block the
+  // button — the kitchen cannot guess which size was meant.
+  const missing = groupList.filter(
+    (group) => group.is_required && (chosen[group.id] ?? []).length < Math.max(1, group.min_select),
+  );
+
+  const reset = () => {
+    setQuantity(1);
+    setChosen({});
+  };
+
+  const toggle = (groupId: string, modifierId: string, maxSelect: number) => {
+    setChosen((current) => {
+      const picked = current[groupId] ?? [];
+      if (picked.includes(modifierId)) {
+        return { ...current, [groupId]: picked.filter((id) => id !== modifierId) };
+      }
+      // One choice replaces; many append up to the limit.
+      if (maxSelect <= 1) return { ...current, [groupId]: [modifierId] };
+      if (picked.length >= maxSelect) return current;
+      return { ...current, [groupId]: [...picked, modifierId] };
+    });
+  };
+
+  const submit = () => {
+    if (!item || missing.length > 0) return;
+
+    const optionNames = groupList
+      .flatMap((group) =>
+        (chosen[group.id] ?? []).map(
+          (id) => group.modifiers.find((modifier) => modifier.id === id)?.name_ar ?? '',
+        ),
+      )
+      .filter(Boolean);
+
+    const result = add(
+      {
+        restaurantId: restaurant.id,
+        branchId: restaurant.branch_id,
+        restaurantName: restaurant.display_name,
+        deliveryFeeIqd: restaurant.delivery_fee_iqd,
+        minimumOrderIqd: restaurant.minimum_order_iqd,
+      },
+      {
+        menuItemId: item.id,
+        nameAr: item.name_ar,
+        unitPriceIqd,
+        quantity,
+        imageAssetId: item.image_asset_id,
+        notes: optionNames.length > 0 ? optionNames.join('، ') : null,
+      },
+    );
+
+    if (result === 'replaced') {
+      Alert.alert('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
+    }
+
+    reset();
+    onClose();
+  };
+
+  return (
+    <Sheet
+      visible={Boolean(item)}
+      onClose={() => {
+        reset();
+        onClose();
+      }}
+      title={item?.name_ar}
+      footer={
+        <Row justify="space-between" gap={space[3]}>
+          <Stepper value={quantity} onChange={setQuantity} />
+          <Button
+            label={`إضافة • ${formatIqdArabic(iqd(unitPriceIqd * quantity))}`}
+            onPress={submit}
+            disabled={missing.length > 0}
+            style={{ flex: 1 }}
+          />
+        </Row>
+      }
+    >
+      {item?.description_ar ? (
+        <Text tone="secondary">{item.description_ar}</Text>
+      ) : null}
+
+      {groups.isLoading ? <Skeleton height={64} /> : null}
+
+      {groupList.map((group) => (
+        <View key={group.id} style={{ gap: space[2] }}>
+          <Row justify="space-between">
+            <Text variant="bodyBold">{group.name_ar}</Text>
+            <Text variant="caption" tone={group.is_required ? 'danger' : 'muted'}>
+              {group.is_required
+                ? 'مطلوب'
+                : group.max_select > 1
+                  ? `اختر حتى ${group.max_select}`
+                  : 'اختياري'}
+            </Text>
+          </Row>
+
+          {group.modifiers.map((modifier) => {
+            const picked = (chosen[group.id] ?? []).includes(modifier.id);
+
+            return (
+              <Pressable
+                key={modifier.id}
+                onPress={() =>
+                  modifier.is_available && toggle(group.id, modifier.id, group.max_select)
+                }
+                disabled={!modifier.is_available}
+                accessibilityRole={group.max_select > 1 ? 'checkbox' : 'radio'}
+                accessibilityState={{ checked: picked, disabled: !modifier.is_available }}
+                accessibilityLabel={modifier.name_ar}
+                style={{
+                  minHeight: TAP_TARGET,
+                  paddingHorizontal: space[3],
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: picked ? color.brand : color.borderSubtle,
+                  backgroundColor: picked ? color.brandSoft : color.surfaceCard,
+                  justifyContent: 'center',
+                  opacity: modifier.is_available ? 1 : 0.5,
+                }}
+              >
+                <Row justify="space-between">
+                  <Text variant={picked ? 'smallBold' : 'small'}>{modifier.name_ar}</Text>
+                  <Text variant="caption" tone={picked ? 'brand' : 'muted'}>
+                    {modifier.price_iqd > 0 ? `+ ${formatIqdArabic(iqd(modifier.price_iqd))}` : '—'}
+                  </Text>
+                </Row>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </Sheet>
+  );
+}
+
+/** The floating cart bar. */
+function CartBar({
+  count,
+  totalIqd,
+  onPress,
+}: {
+  count: number;
+  totalIqd: number;
+  onPress: () => void;
+}) {
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        bottom: space[6],
+        insetInlineStart: space[4],
+        insetInlineEnd: space[4],
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`عرض السلة، ${count} صنف`}
+        style={({ pressed }) => [
+          {
+            minHeight: TAP_TARGET + 8,
+            borderRadius: radius.full,
+            backgroundColor: color.brand,
+            paddingHorizontal: space[4],
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          },
+          shadow.lg,
+          pressed ? { opacity: 0.9 } : null,
+        ]}
+      >
+        <Row gap={space[2]}>
+          <MaterialCommunityIcons name="cart-outline" size={20} color={palette.white} />
+          <Text variant="smallBold" tone="inverse">
+            {count} صنف
+          </Text>
+        </Row>
+        <Text variant="bodyBold" tone="inverse">
+          {formatIqdArabic(iqd(totalIqd))}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}

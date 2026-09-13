@@ -1,82 +1,280 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 import Constants from 'expo-constants';
-import { useSession } from '@/lib/session';
-import { space } from '@/theme';
-import { Button, Card, Divider, Ltr, Row, Screen, Text } from '@/ui';
+import { useRouter } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { api, ApiError } from '@/lib/api';
+import { useArea } from '@/lib/area';
+import { useIsGuest, useSession } from '@/lib/session';
+import { color, palette, radius, space } from '@/theme';
+import { Button, Ltr, Row, Screen, Text } from '@/ui';
+import { AreaPicker } from '@/ui/area-picker';
+import { IconTile, ListRow, Sheet } from '@/ui/catalog';
 
 /**
- * Account.
+ * Account (`9.html`).
  *
- * Deliberately small. Everything a customer needs to *do* lives on the other
- * two tabs; this is where they check who they are signed in as, find the app
- * version when support asks for it, and sign out.
+ * The comp lists eight rows; this ships the ones that do something. «طرق
+ * الدفع» is not here because there is one method and it is cash — a row that
+ * opens a screen saying "cash" is a row that wastes a tap.
+ *
+ * Three rows are here because App Review will look for them: the privacy
+ * policy (5.1.1), a way to reach a human (1.5), and account deletion — 5.1.1(v),
+ * the most common rejection for a delivery app, and one that has to work from
+ * inside the app rather than by emailing support.
  */
 export default function AccountScreen() {
+  const router = useRouter();
   const { state, signOut } = useSession();
-  const [confirming, setConfirming] = useState(false);
+  const isGuest = useIsGuest();
+  const { area } = useArea();
+
+  const [pickingArea, setPickingArea] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const me = state.status === 'ready' || state.status === 'needs-profile' ? state.me : null;
+  const extra = Constants.expoConfig?.extra as
+    | { supportPhone?: string; privacyPolicyUrl?: string; termsUrl?: string }
+    | undefined;
+
+  const open = (url: string) => {
+    void Linking.openURL(url).catch(() =>
+      Alert.alert('تعذّر الفتح', 'لم نتمكن من فتح الرابط على هذا الجهاز.'),
+    );
+  };
 
   return (
-    <Screen scroll edges={['top']}>
-      <Text variant="h2" style={{ marginBottom: space[3] }}>
-        حسابي
-      </Text>
+    <Screen scroll edges={['top']} padded={false}>
+      <View style={{ padding: space[4], gap: space[4] }}>
+        <Text variant="h2">حسابي</Text>
 
-      <Card>
-        <Text variant="bodyBold">{me?.full_name ?? 'مستخدم جيبلي'}</Text>
-        <Divider />
-
-        <Row justify="space-between">
-          <Text tone="muted" variant="small">
-            حالة الملف
-          </Text>
-          <Text variant="small">
-            {me?.profile_completed ? 'مكتمل' : 'غير مكتمل'}
-          </Text>
-        </Row>
-
-        {state.status === 'offline-ready' ? (
-          <>
-            <Divider spacing={space[2]} />
-            <Text variant="caption" tone="muted">
-              أنت غير متصل — بعض البيانات قد تكون قديمة.
+        {isGuest ? (
+          <View
+            style={{
+              padding: space[4],
+              borderRadius: radius.lg,
+              backgroundColor: color.brandSoft,
+              borderWidth: 1,
+              borderColor: palette.orange[200],
+              gap: space[2],
+            }}
+          >
+            <Text variant="bodyBold" tone="brand">
+              تتصفّح كضيف
             </Text>
-          </>
-        ) : null}
-      </Card>
+            <Text variant="small" tone="secondary">
+              سجّل دخولك لحفظ عناوينك، متابعة طلباتك، وحفظ مطاعمك المفضّلة.
+            </Text>
+            <Button label="تسجيل الدخول" onPress={() => router.push('/(auth)/phone')} />
+          </View>
+        ) : (
+          <Row gap={space[3]}>
+            <IconTile size={64}>
+              <Text variant="h1" tone="brand">
+                {(me?.full_name ?? 'ج').slice(0, 1)}
+              </Text>
+            </IconTile>
+            <View style={{ flex: 1 }}>
+              <Text variant="h3" numberOfLines={1}>
+                {me?.full_name ?? 'مستخدم جيبلي'}
+              </Text>
+              <Text variant="caption" tone="muted">
+                {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'لم تُحدَّد المنطقة'}
+              </Text>
+              {state.status === 'offline-ready' ? (
+                <Text variant="caption" tone="muted">
+                  أنت غير متصل — بعض البيانات قد تكون قديمة.
+                </Text>
+              ) : null}
+            </View>
+          </Row>
+        )}
+      </View>
 
-      <View style={{ height: space[4] }} />
+      <Group title="حسابي">
+        <ListRow
+          label="منطقة التوصيل"
+          sublabel={area?.cityNameAr ?? 'اختر منطقتك'}
+          icon={<MaterialCommunityIcons name="map-marker-outline" size={20} color={color.brand} />}
+          onPress={() => setPickingArea(true)}
+        />
+        <ListRow
+          label="المفضلة"
+          icon={<MaterialCommunityIcons name="heart-outline" size={20} color={color.brand} />}
+          onPress={() => router.push('/(tabs)/favorites')}
+        />
+        <ListRow
+          label="طلباتي"
+          icon={<MaterialCommunityIcons name="clipboard-list-outline" size={20} color={color.brand} />}
+          onPress={() => router.push('/(tabs)/orders')}
+        />
+      </Group>
 
-      <Card>
-        <Row justify="space-between">
-          <Text tone="muted" variant="small">
+      <Group title="المساعدة">
+        <ListRow
+          label="المساعدة والدعم"
+          sublabel="تواصل معنا مباشرة"
+          icon={<MaterialCommunityIcons name="headset" size={20} color={color.brand} />}
+          onPress={() => open(`tel:${extra?.supportPhone ?? ''}`)}
+        />
+        <ListRow
+          label="سياسة الخصوصية"
+          icon={
+            <MaterialCommunityIcons name="shield-check-outline" size={20} color={color.brand} />
+          }
+          onPress={() => open(extra?.privacyPolicyUrl ?? 'https://jibli.iq/privacy')}
+        />
+        <ListRow
+          label="الشروط والأحكام"
+          icon={
+            <MaterialCommunityIcons name="file-document-outline" size={20} color={color.brand} />
+          }
+          onPress={() => open(extra?.termsUrl ?? 'https://jibli.iq/terms')}
+        />
+      </Group>
+
+      {!isGuest ? (
+        <Group title="الحساب">
+          <ListRow
+            label="تسجيل الخروج"
+            icon={<MaterialCommunityIcons name="logout" size={20} color={color.textSecondary} />}
+            onPress={() =>
+              Alert.alert('تسجيل الخروج؟', 'ستحتاج إلى رمز تحقق جديد لتسجيل الدخول مرة أخرى.', [
+                { text: 'تراجع', style: 'cancel' },
+                { text: 'خروج', style: 'destructive', onPress: () => void signOut() },
+              ])
+            }
+          />
+          <ListRow
+            label="حذف حسابي"
+            sublabel="حذف نهائي لبياناتك الشخصية"
+            destructive
+            icon={
+              <MaterialCommunityIcons
+                name="trash-can-outline"
+                size={20}
+                color={color.dangerStrong}
+              />
+            }
+            onPress={() => setDeleting(true)}
+          />
+        </Group>
+      ) : null}
+
+      <View style={{ padding: space[4], alignItems: 'center', gap: space[1] }}>
+        <Row gap={space[2]}>
+          <Text variant="caption" tone="muted">
             إصدار التطبيق
           </Text>
           {/* Latin inside Arabic: isolated so "1.0.0" is not reordered. */}
-          <Ltr variant="small" tone="secondary">
+          <Ltr variant="caption" tone="muted">
             {Constants.expoConfig?.version ?? '1.0.0'}
           </Ltr>
         </Row>
-      </Card>
+      </View>
 
-      <View style={{ height: space[6] }} />
-
-      {confirming ? (
-        <Card>
-          <Text variant="bodyBold">تسجيل الخروج؟</Text>
-          <Text tone="muted" variant="small" style={{ marginTop: space[1] }}>
-            ستحتاج إلى رمز تحقق جديد لتسجيل الدخول مرة أخرى. طلباتك محفوظة ولا تتأثر.
-          </Text>
-          <Row gap={space[2]} style={{ marginTop: space[3] }}>
-            <Button label="خروج" variant="danger" onPress={() => void signOut()} />
-            <Button label="إلغاء" variant="ghost" onPress={() => setConfirming(false)} />
-          </Row>
-        </Card>
-      ) : (
-        <Button label="تسجيل الخروج" variant="secondary" block onPress={() => setConfirming(true)} />
-      )}
+      <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
+      <DeleteAccountSheet visible={deleting} onClose={() => setDeleting(false)} />
     </Screen>
+  );
+}
+
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={{ paddingHorizontal: space[4], paddingBottom: space[2] }}>
+      <Text variant="caption" tone="muted" style={{ paddingBottom: space[1] }}>
+        {title}
+      </Text>
+      <View
+        style={{
+          backgroundColor: color.surfaceCard,
+          borderRadius: radius.lg,
+          borderWidth: 1,
+          borderColor: color.borderSubtle,
+          paddingVertical: space[1],
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Deleting the account — App Store guideline 5.1.1(v).
+ *
+ * It says what actually happens before it happens, because the honest answer
+ * is not "everything disappears": a delivered order is a record the restaurant
+ * and the platform keep too. What goes is the personal data, and saying so
+ * plainly is both the decent thing and what keeps the screen truthful.
+ */
+function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { signOut } = useSession();
+
+  const remove = useMutation({
+    mutationFn: () => api.deleteAccount(),
+    onSuccess: async () => {
+      onClose();
+      // Clears the keystore and drops the app back to the welcome screen.
+      await signOut();
+      Alert.alert('تم حذف الحساب', 'نأسف لرحيلك. يمكنك إنشاء حساب جديد في أي وقت.');
+    },
+    onError: (error) =>
+      Alert.alert(
+        'تعذّر حذف الحساب',
+        error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى لاحقاً.',
+      ),
+  });
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="حذف الحساب"
+      footer={
+        <Row gap={space[2]}>
+          <Button label="تراجع" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <Button
+            label="حذف نهائي"
+            variant="danger"
+            loading={remove.isPending}
+            disabled={remove.isPending}
+            onPress={() => remove.mutate()}
+            style={{ flex: 1 }}
+          />
+        </Row>
+      }
+    >
+      <Text tone="secondary">هذا الإجراء لا يمكن التراجع عنه. عند الحذف:</Text>
+
+      <Bullet icon="check" text="يُحذف اسمك ورقم هاتفك وعناوينك المحفوظة." />
+      <Bullet icon="check" text="تُحذف مطاعمك المفضّلة وإشعاراتك." />
+      <Bullet icon="check" text="يتم تسجيل خروجك من كل الأجهزة." />
+      <Bullet
+        icon="information"
+        text="تبقى سجلات الطلبات السابقة لدى المطاعم كسجلات مالية، دون ربطها بك."
+      />
+      <Bullet icon="alert" text="لا يمكن الحذف أثناء وجود طلب قيد التنفيذ." />
+    </Sheet>
+  );
+}
+
+function Bullet({ icon, text }: { icon: 'check' | 'information' | 'alert'; text: string }) {
+  const tint =
+    icon === 'check' ? color.textSecondary : icon === 'alert' ? color.dangerStrong : color.info;
+
+  return (
+    <Row gap={space[2]} align="flex-start">
+      <MaterialCommunityIcons
+        name={icon === 'check' ? 'circle-small' : `${icon}-outline`}
+        size={20}
+        color={tint}
+        style={{ marginTop: 1 }}
+      />
+      <Text variant="small" tone="secondary" style={{ flex: 1 }}>
+        {text}
+      </Text>
+    </Row>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,10 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { JibliWordmark } from '@/ui/brand';
 
 /**
  * Phone entry — the first screen of the customer journey (plan §10).
@@ -21,6 +25,12 @@ import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
  * national number, which is what they know. Arabic-Indic digits are normalised
  * as they type, so a customer on an Arabic keypad is never told their correct
  * number is invalid (plan §2).
+ *
+ * The comp also draws «أو تابع باستخدام» with Google and Apple buttons. They
+ * are deliberately not here: there is no social identity provider behind them,
+ * and offering one would pull in App Store guideline 4.8 — a third-party login
+ * obliges the app to offer Sign in with Apple beside it. Phone OTP is the only
+ * way in, which keeps 4.8 out of scope entirely.
  */
 export default function PhoneScreen() {
   const router = useRouter();
@@ -68,7 +78,24 @@ export default function PhoneScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {/*
+       * A way back, because there is somewhere to go back to now: a guest who
+       * tapped «تسجيل الدخول» from the home header is browsing, not committed,
+       * and a sign-in screen with no exit is a trap.
+       */}
+      {router.canGoBack() ? (
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="رجوع"
+          style={styles.back}
+        >
+          <MaterialCommunityIcons name="chevron-right" size={26} color={color.textPrimary} />
+        </Pressable>
+      ) : null}
+
       <View style={styles.header}>
+        <JibliWordmark width={168} tint={color.brand} pinTint={palette.white} />
         <Text style={styles.title}>
           مرحباً بك في <Text style={styles.brand}>جيبلي</Text>
         </Text>
@@ -124,8 +151,20 @@ export default function PhoneScreen() {
         )}
       </Pressable>
 
+      {/*
+       * Tappable, not decorative. App Review looks for the privacy policy to be
+       * reachable from inside the app, and this is the screen where consent is
+       * actually being given.
+       */}
       <Text style={styles.legal}>
-        بالدخول فإنك توافق على الشروط والأحكام وسياسة الخصوصية
+        بالدخول فإنك توافق على{' '}
+        <Text style={styles.link} onPress={() => openLegal('termsUrl')}>
+          الشروط والأحكام
+        </Text>{' '}
+        و
+        <Text style={styles.link} onPress={() => openLegal('privacyPolicyUrl')}>
+          سياسة الخصوصية
+        </Text>
       </Text>
     </KeyboardAvoidingView>
   );
@@ -138,6 +177,15 @@ const styles = StyleSheet.create({
     padding: space[6],
     justifyContent: 'center',
     gap: space[4],
+  },
+  back: {
+    position: 'absolute',
+    top: space[10],
+    insetInlineStart: space[4],
+    width: TAP_TARGET,
+    height: TAP_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: { gap: space[2], alignItems: 'center', marginBottom: space[4] },
   title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
@@ -193,4 +241,12 @@ const styles = StyleSheet.create({
   buttonText: { ...text.bodyBold, color: palette.white },
 
   legal: { ...text.small, color: color.textMuted, textAlign: 'center' },
+  link: { color: color.textBrand },
 });
+
+/** Opens one of the legal URLs from the Expo config. */
+function openLegal(key: 'termsUrl' | 'privacyPolicyUrl'): void {
+  const extra = Constants.expoConfig?.extra as Record<string, string | undefined> | undefined;
+  const url = extra?.[key];
+  if (url) void Linking.openURL(url).catch(() => undefined);
+}

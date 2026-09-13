@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>الملف الشخصي والحساب</title>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              orange: '#FF4713',
+              dark: '#1D1E20',
+              muted: '#7A8089',
+              light: '#F8F9FA',
+              border: '#F0F1F3',
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- Google Fonts: Cairo for crisp Arabic typography -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<style data-purpose="typography">
+    body {
+      font-family: 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+  </style>
+<style data-purpose="scroll-and-layout">
+    /* Hide scrollbars for clean mobile appearance */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#F6F7F9] flex justify-center min-h-screen">
+<!-- BEGIN: MobileDeviceFrame -->
+<main class="w-full max-w-[430px] min-h-screen bg-[#FAFAFA] flex flex-col relative shadow-2xl overflow-hidden pb-24">
+<!-- BEGIN: iOSStatusBar -->
+<header class="w-full pt-3 px-7 pb-2 flex justify-between items-center text-black font-semibold text-[14px] z-30" data-purpose="status-bar">
+<!-- Time -->
+<span class="tracking-tight font-bold">9:41</span>
+<!-- Dynamic Island Placeholder Indicator -->
+<div class="w-28 h-7 bg-black rounded-full absolute left-1/2 -translate-x-1/2 top-2 hidden sm:block"></div>
+<!-- Device Status Icons -->
+<div class="flex items-center space-x-1.5 space-x-reverse text-black">
+<!-- Cellular Signal -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M2 17h3v4H2v-4zm5-4h3v8H7v-8zm5-4h3v12h-3V9zm5-5h3v17h-3V4z"></path>
+</svg>
+<!-- Wi-Fi -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0012 4zm0 3.8c3.2 0 6.15 1.15 8.48 3.07L12 19.38 3.52 10.87A13.06 13.06 0 0112 7.8z"></path>
+</svg>
+<!-- Battery Icon -->
+<div class="w-6 h-3 border border-black rounded-[4px] p-0.5 flex items-center">
+<div class="w-full h-full bg-black rounded-[1px]"></div>
+</div>
+</div>
+</header>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: UserProfileHeader -->
+<section class="pt-6 pb-6 px-6 flex items-center gap-4 bg-transparent" data-purpose="user-profile-summary">
+<!-- User Avatar Placeholder matching original graphic -->
+<div class="w-20 h-20 rounded-full bg-[#E5E7EB] flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+<svg class="w-14 h-14 text-[#9CA3AF] translate-y-2.5" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8V21h19.2v-1.8c0-3.2-6.4-4.8-9.6-4.8z"></path>
+</svg>
+</div>
+<!-- User Information -->
+<div class="flex flex-col justify-center">
+<h1 class="text-2xl font-bold text-gray-900 tracking-tight leading-snug">محمد علي</h1>
+<p class="text-[15px] font-medium text-gray-800 tracking-wider dir-ltr text-right mt-0.5" dir="ltr">+964 771 234 5678</p>
+</div>
+</section>
+<!-- END: UserProfileHeader -->
+<!-- BEGIN: AccountNavigationList -->
+<nav aria-label="قائمة الحساب" class="flex-1 px-4 space-y-2.5" data-purpose="account-menu">
+<!-- Item 1: ملفي الشخصي -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Profile / User -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+<circle cx="12" cy="7" r="4"></circle>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">ملفي الشخصي</span>
+</div>
+<!-- Chevron Left (RTL context points backward/left) -->
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Item 2: عناويني -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Location Map Pin -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M12 21s-7-4.35-7-10a7 7 0 0 1 14 0c0 5.65-7 10-7 10z"></path>
+<circle cx="12" cy="11" r="2.5"></circle>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">عناويني</span>
+</div>
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Item 3: طرق الدفع -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Payment Card -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<rect height="14" rx="2.5" width="20" x="2" y="5"></rect>
+<line x1="2" x2="22" y1="10" y2="10"></line>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">طرق الدفع</span>
+</div>
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Item 4: المفضلة -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Heart -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">المفضلة</span>
+</div>
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Item 5: طلباتي -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Clipboard Orders -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+<rect height="4" rx="1" ry="1" width="8" x="8" y="2"></rect>
+<line x1="9" x2="15" y1="11" y2="11"></line>
+<line x1="9" x2="13" y1="15" y2="15"></line>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">طلباتي</span>
+</div>
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Item 6: الإشعارات (مع شارة التنبيه الحمراء) -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Bell Notification -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">الإشعارات</span>
+</div>
+<div class="flex items-center gap-2">
+<!-- Notification Counter Badge -->
+<span class="w-6 h-6 rounded-full bg-[#E52B1E] text-white text-[13px] font-bold flex items-center justify-center">3</span>
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</a>
+<!-- Item 7: المساعدة والدعم -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Customer Support Headset -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">المساعدة والدعم</span>
+</div>
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+<!-- Item 8: الإعدادات -->
+<a class="group flex items-center justify-between p-4 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/60 active:scale-[0.99] transition-transform" href="#">
+<div class="flex items-center gap-3.5">
+<!-- Icon: Settings Cog -->
+<svg class="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span class="text-[16px] font-semibold text-gray-900">الإعدادات</span>
+</div>
+<svg class="w-5 h-5 text-gray-800 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</a>
+</nav>
+<!-- END: AccountNavigationList -->
+<!-- BEGIN: BottomNavigation -->
+<nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-100/80 px-5 pt-3 pb-7 flex justify-between items-center z-40" data-purpose="bottom-tab-bar">
+<!-- Tab 1: الرئيسية (Active Highlight) -->
+<a class="flex flex-col items-center justify-center text-center" href="#">
+<div class="w-10 h-10 rounded-full bg-brand-orange flex items-center justify-center text-white mb-1 shadow-md shadow-orange-500/20">
+<svg class="w-5 h-5 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[12px] font-bold text-brand-orange">الرئيسية</span>
+</a>
+<!-- Tab 2: طلباتي -->
+<a class="flex flex-col items-center justify-center text-center text-gray-500 hover:text-gray-900 transition-colors" href="#">
+<div class="w-10 h-10 flex items-center justify-center">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[12px] font-medium">طلباتي</span>
+</a>
+<!-- Tab 3: المفضلة -->
+<a class="flex flex-col items-center justify-center text-center text-gray-500 hover:text-gray-900 transition-colors" href="#">
+<div class="w-10 h-10 flex items-center justify-center">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[12px] font-medium">المفضلة</span>
+</a>
+<!-- Tab 4: حسابي -->
+<a class="flex flex-col items-center justify-center text-center text-gray-500 hover:text-gray-900 transition-colors" href="#">
+<div class="w-10 h-10 flex items-center justify-center">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[12px] font-medium">حسابي</span>
+</a>
+</nav>
+<!-- END: BottomNavigation -->
+<!-- BEGIN: iOSHomeIndicator -->
+<div class="fixed bottom-1 left-1/2 -translate-x-1/2 w-36 h-1 bg-black rounded-full pointer-events-none z-50"></div>
+<!-- END: iOSHomeIndicator -->
+</main>
+<!-- END: MobileDeviceFrame -->
+</body></html>

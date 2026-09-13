@@ -34,29 +34,36 @@
 // `brand` can.
 
 export const palette = {
+  /*
+   * Reconciled from the ten design comps, which each picked their own orange —
+   * seven of them, between #FF4700 and #FF5E00. 500 is the one on the home
+   * screen: the screen every session starts at, shared by the cart and the
+   * profile flow, and the median of the cluster, so no comp is more than a few
+   * degrees of hue from it. See docs/design/mobile-design-system.md §2.
+   */
   orange: {
-    50: '#fff4ed',
-    100: '#ffe6d5',
-    200: '#ffc9aa',
-    300: '#ffa474',
-    400: '#ff7a3c',
-    500: '#ff6b2c', // primary — the logo orange
-    600: '#f04e0a',
-    700: '#c73c07',
-    800: '#9e310e',
-    900: '#7f2b0f',
+    50: '#fff7f4',
+    100: '#fff2ec',
+    200: '#ffd9c8',
+    300: '#ffb391',
+    400: '#ff7f3f',
+    500: '#ff5400', // primary — the home screen's orange
+    600: '#e24500',
+    700: '#b83800',
+    800: '#8f2c00',
+    900: '#6b2100',
   },
   ink: {
-    50: '#f8f9fb',
-    100: '#f1f3f6',
-    200: '#e3e6eb',
+    50: '#f8f9fa',
+    100: '#f1f3f5',
+    200: '#e5e7eb',
     300: '#c7ccd4',
-    400: '#9aa1ad',
-    500: '#6b7280',
-    600: '#4a4f5c',
-    700: '#333741',
-    800: '#21242b',
-    900: '#16181d', // Admin sidebar, headings
+    400: '#9ca3af',
+    500: '#6b7280', // the comps' muted text
+    600: '#4b5563',
+    700: '#374151',
+    800: '#1f2937',
+    900: '#111827', // the comps' near-black — Admin sidebar, headings
   },
   success: { 50: '#ecfdf3', 500: '#12b76a', 700: '#027a48' },
   warning: { 50: '#fffaeb', 500: '#f79009', 700: '#b54708' },
@@ -134,12 +141,20 @@ export const space = {
   16: 64,
 } as const;
 
+/**
+ * Corner radii, read off the comps rather than invented.
+ *
+ * `lg` is the 16px tile that carries every icon, category and search field;
+ * `xl` the 24px restaurant card; `2xl` the 26px promo banner. Three sizes doing
+ * three specific jobs is why they are not a smooth geometric scale.
+ */
 export const radius = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
-  '2xl': 28,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  '2xl': 26,
+  '3xl': 32,
   full: 9999,
 } as const;
 
@@ -209,14 +224,20 @@ export interface ShadowToken {
 }
 
 export const shadow = {
-  sm: { offsetY: 1, blur: 2, spread: 0, opacity: 0.05, elevation: 1 },
-  md: { offsetY: 4, blur: 8, spread: -2, opacity: 0.08, elevation: 3 },
-  lg: { offsetY: 12, blur: 16, spread: -4, opacity: 0.08, elevation: 6 },
-  xl: { offsetY: 20, blur: 28, spread: -6, opacity: 0.12, elevation: 10 },
+  sm: { offsetY: 2, blur: 6, spread: -1, opacity: 0.04, elevation: 1 },
+  /** The card shadow every comp uses, at its lower layer. */
+  md: { offsetY: 8, blur: 24, spread: -4, opacity: 0.06, elevation: 3 },
+  lg: { offsetY: 12, blur: 28, spread: -4, opacity: 0.1, elevation: 6 },
+  xl: { offsetY: 20, blur: 36, spread: -6, opacity: 0.14, elevation: 10 },
 } as const satisfies Record<string, ShadowToken>;
 
-/** The colour every shadow is cast in. Neutral-cool, never pure black. */
-export const shadowColor = '#101828';
+/**
+ * The colour every shadow is cast in.
+ *
+ * `#111827` — the same ink as the darkest text, which is what the comps cast
+ * with. Never pure black: a black shadow over a warm page reads as dirt.
+ */
+export const shadowColor = '#111827';
 
 // ── Motion ──────────────────────────────────────────────────────────────────
 

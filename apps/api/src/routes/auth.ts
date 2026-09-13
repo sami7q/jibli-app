@@ -162,6 +162,12 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
           driver_id: capabilities.driverId,
           platform_roles: capabilities.platformRoles,
           restaurant_roles: capabilities.restaurantRoles,
+          // The app needs a city id before it can list a single restaurant,
+          // and the header shows the area by name.
+          governorate_id: capabilities.area?.governorateId ?? null,
+          governorate_name_ar: capabilities.area?.governorateNameAr ?? null,
+          city_id: capabilities.area?.cityId ?? null,
+          city_name_ar: capabilities.area?.cityNameAr ?? null,
         },
         { request_id: request.requestId },
       ),

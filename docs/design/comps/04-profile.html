@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>جبلي - إكمال البيانات</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#FFF6F2',
+              100: '#FFE8DC',
+              500: '#FF5722',
+              600: '#F04B18',
+              primary: '#FF5400',
+              dark: '#111827',
+            }
+          },
+          fontFamily: {
+            cairo: ['Cairo', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          boxShadow: {
+            'soft': '0 2px 14px rgba(0, 0, 0, 0.04)',
+            'cta': '0 8px 24px -4px rgba(255, 84, 0, 0.38)',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Google Fonts: Cairo -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<style>
+    * {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    body {
+      font-family: 'Cairo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    body {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    input::placeholder, textarea::placeholder {
+      color: #9CA3AF;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body class="bg-[#F3F4F6] min-h-screen flex justify-center items-center select-none p-0 sm:p-4 text-gray-900">
+<!-- Mobile App Frame -->
+<main class="w-full max-w-[420px] bg-white h-screen sm:h-[880px] sm:max-h-[96vh] sm:rounded-[44px] shadow-2xl relative flex flex-col overflow-hidden sm:border sm:border-gray-200/70">
+<!-- iOS Status Bar -->
+<header class="w-full pt-3.5 px-7 pb-1 flex justify-between items-center z-30 bg-white" data-purpose="status-bar">
+<span class="text-sm font-semibold tracking-tight text-gray-900 font-sans">9:41</span>
+<!-- Dynamic Island for modern iPhone frame -->
+<div class="w-24 h-5 bg-black rounded-full mx-auto -mt-1 hidden sm:block"></div>
+<div class="flex items-center space-x-1.5 space-x-reverse text-gray-900">
+<!-- Cellular -->
+<svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.31 19.64 10.6 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 2c3.87 0 7 3.13 7 7 0 1.48-.46 2.85-1.25 3.99L15.3 13.54c.25-.47.4-1 .4-1.54 0-2.04-1.66-3.7-3.7-3.7-.54 0-1.07.15-1.54.4l-2.45-2.45C9.15 5.46 10.52 5 12 5z"></path>
+</svg>
+<!-- Wifi -->
+<svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A17.92 17.92 0 0012 4zm0 3.3c3.54 0 6.78 1.42 9.17 3.73L12 19.04 2.83 11.03C5.22 8.72 8.46 7.3 12 7.3z"></path>
+</svg>
+<!-- Battery -->
+<svg class="w-5 h-5" fill="currentColor" viewbox="0 0 24 24">
+<path d="M16 4H8C6.9 4 6 4.9 6 6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 10h-2v2h-2v-2H9v-2h2v-2h2v2h2v2z"></path>
+</svg>
+</div>
+</header>
+<!-- Top App Bar & Minimal Progress Indicator -->
+<section class="px-5 pt-2 pb-3 bg-white z-20" data-purpose="top-navigation">
+<div class="flex items-center justify-between">
+<!-- Back Button -->
+<button aria-label="الرجوع" class="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 active:scale-90 flex items-center justify-center text-gray-700 transition" onclick="history.back()" type="button">
+<svg class="w-5 h-5 rotate-180" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Segmented Clean Progress Indicator -->
+<div class="flex items-center gap-1.5 bg-gray-100/90 px-3 py-1.5 rounded-full">
+<div class="w-4 h-1.5 bg-brand-primary rounded-full"></div>
+<div class="w-4 h-1.5 bg-brand-primary rounded-full"></div>
+<div class="w-4 h-1.5 bg-brand-primary rounded-full"></div>
+<span class="text-[11px] font-bold text-gray-700 mr-1">3 / 3</span>
+</div>
+<!-- Skip / Help text -->
+<button class="text-xs font-semibold text-gray-400 hover:text-gray-600 transition" type="button">مساعدة</button>
+</div>
+</section>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto px-5 pt-1 pb-32" data-purpose="content-area">
+<!-- Title & Welcoming Subtitle -->
+<div class="mt-2 mb-6 text-right">
+<h1 class="text-2xl font-extrabold text-gray-900 tracking-tight leading-snug">
+          أهلاً بك في جبلي! 🎉
+        </h1>
+<p class="text-xs font-medium text-gray-500 mt-1 leading-relaxed">
+          خطوة أخيرة لتأكيد بياناتك وحفظ عنوانك الافتراضي لتوصيل أسرع
+        </p>
+</div>
+<!-- Human-Crafted Subtle Avatar / Profile Section -->
+<div class="flex items-center gap-3.5 p-3.5 mb-5 bg-gradient-to-r from-orange-50/50 via-white to-orange-50/20 rounded-2xl border border-orange-100/60 shadow-soft">
+<div class="relative shrink-0">
+<div class="w-14 h-14 rounded-full bg-orange-100/80 border border-brand-primary/20 flex items-center justify-center overflow-hidden" id="avatarPreviewContainer">
+<svg class="w-7 h-7 text-brand-primary/70" fill="currentColor" id="defaultAvatarIcon" viewbox="0 0 24 24">
+<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
+</svg>
+<img alt="الصورة الشخصية" class="w-full h-full object-cover hidden" id="avatarImage"/>
+</div>
+<label class="absolute -bottom-0.5 -left-0.5 w-5 h-5 bg-brand-primary text-white rounded-full flex items-center justify-center shadow cursor-pointer active:scale-90 transition" for="profileUploadInput">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<input accept="image/*" class="hidden" id="profileUploadInput" type="file"/>
+</label>
+</div>
+<div class="text-right flex-1">
+<div class="flex items-center gap-1.5">
+<span class="text-xs font-bold text-gray-900">الصورة الشخصية</span>
+<span class="text-[10px] font-semibold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">اختياري</span>
+</div>
+<p class="text-[11px] text-gray-500 mt-0.5">تساعد المندوب في التعرف عليك عند التسليم</p>
+</div>
+</div>
+<!-- Main Form -->
+<form class="space-y-4" id="profileForm" onsubmit="event.preventDefault(); handleFormSubmit();">
+<!-- Field 1: Full Name -->
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1.5 text-right" for="fullName">
+            الاسم الكامل <span class="text-brand-primary">*</span>
+</label>
+<div class="relative">
+<div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<input class="w-full pr-10 pl-3.5 py-3 bg-[#F9FAFB] border border-gray-200/80 rounded-xl text-xs font-bold text-gray-900 placeholder-gray-400 focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-orange-500/10 transition-all outline-none" id="fullName" placeholder="مثال: علي حسن التميمي" required="" type="text"/>
+</div>
+</div>
+<!-- Verified Phone Number Pill (Realistic App Experience) -->
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1.5 text-right">
+            رقم الهاتف الموثّق
+          </label>
+<div class="flex items-center justify-between px-3.5 py-2.5 bg-gray-50/90 border border-gray-200/60 rounded-xl text-gray-600">
+<div class="flex items-center gap-2">
+<span class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewbox="0 0 24 24">
+<path d="M4.5 12.75l6 6 9-13.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</span>
+<span class="text-xs font-bold font-mono tracking-wide text-gray-800" dir="ltr">+964 770 123 4567</span>
+</div>
+<span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">تم التحقق</span>
+</div>
+</div>
+<!-- Field 2: Email (Optional) -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="text-xs font-bold text-gray-700 text-right" for="email">البريد الإلكتروني</label>
+<span class="text-[10px] font-semibold text-gray-400">اختياري للفواتير</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<input class="w-full text-right pr-10 pl-3.5 py-3 bg-[#F9FAFB] border border-gray-200/80 rounded-xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-orange-500/10 transition-all outline-none" dir="ltr" id="email" placeholder="name@domain.com" type="email"/>
+</div>
+</div>
+<!-- Section: Delivery Address Header -->
+<div class="pt-3 pb-1">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="text-brand-primary font-bold">📍</span>
+<h2 class="text-xs font-extrabold text-gray-900">عنوان التوصيل الرئيسي</h2>
+</div>
+<span class="text-[10px] font-bold text-brand-primary bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-md">أساسي للطلب</span>
+</div>
+</div>
+<!-- Sleek Map / GPS Auto-detect Button (Food-Delivery style) -->
+<div class="cursor-pointer relative overflow-hidden bg-gradient-to-l from-orange-500 to-[#FF6B35] rounded-2xl p-3.5 text-white shadow-sm active:scale-[0.99] transition duration-150" id="useGpsBtn" role="button" tabindex="0">
+<div class="flex items-center justify-between relative z-10">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+<svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M19.5 12a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M12 2v2m0 16v2m10-10h-2M4 12H2" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="text-right">
+<span class="block text-xs font-extrabold text-white">تحديد موقعي الحالي على الخريطة</span>
+<span class="block text-[10px] text-white/85 font-medium mt-0.5">جلب اسم المنطقة والشارع بنقرة واحدة</span>
+</div>
+</div>
+<div class="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
+<svg class="w-3.5 h-3.5 text-white rotate-180" fill="none" stroke="currentColor" stroke-width="3" viewbox="0 0 24 24">
+<path d="M8.25 4.5l7.5 7.5-7.5 7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<!-- Subtle map grid illustration pattern -->
+<div class="absolute -right-4 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+</div>
+<!-- Address Type Chips (Home, Work, Other) -->
+<div>
+<label class="block text-[11px] font-bold text-gray-600 mb-1.5 text-right">نوع العنوان</label>
+<div class="flex items-center gap-2" id="addressTypeChips">
+<button class="chip-btn flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition bg-orange-50 border-brand-primary text-brand-primary flex items-center justify-center gap-1" data-tag="home" type="button">
+<span>🏠</span> المنزل
+            </button>
+<button class="chip-btn flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition bg-gray-50 border-gray-200/80 text-gray-600 hover:bg-gray-100 flex items-center justify-center gap-1" data-tag="work" type="button">
+<span>💼</span> العمل
+            </button>
+<button class="chip-btn flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition bg-gray-50 border-gray-200/80 text-gray-600 hover:bg-gray-100 flex items-center justify-center gap-1" data-tag="other" type="button">
+<span>📍</span> أخرى
+            </button>
+</div>
+</div>
+<!-- Dropdown & District (2 columns) -->
+<div class="grid grid-cols-2 gap-2.5">
+<!-- Governorate -->
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1.5 text-right" for="governorate">
+              المحافظة <span class="text-brand-primary">*</span>
+</label>
+<div class="relative">
+<select class="w-full appearance-none pr-3 pl-8 py-3 bg-[#F9FAFB] border border-gray-200/80 rounded-xl text-xs font-bold text-gray-900 focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-orange-500/10 transition-all outline-none cursor-pointer" id="governorate">
+<option selected="" value="baghdad">بغداد</option>
+<option value="basra">البصرة</option>
+<option value="erbil">أربيل</option>
+<option value="najaf">النجف</option>
+<option value="karbala">كربلاء</option>
+<option value="sulaymaniyah">السليمانية</option>
+<option value="kirkuk">كركوك</option>
+<option value="babil">بابل</option>
+</select>
+<div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+</div>
+<!-- District -->
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1.5 text-right" for="district">
+              المنطقة / الحي <span class="text-brand-primary">*</span>
+</label>
+<input class="w-full px-3 py-3 bg-[#F9FAFB] border border-gray-200/80 rounded-xl text-xs font-bold text-gray-900 placeholder-gray-400 focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-orange-500/10 transition-all outline-none" id="district" placeholder="مثال: المنصور" required="" type="text"/>
+</div>
+</div>
+<!-- Street & Landmark -->
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1.5 text-right" for="streetDetails">
+            تفاصيل الشارع وأقرب نقطة دالة <span class="text-brand-primary">*</span>
+</label>
+<div class="relative">
+<div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-gray-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<input class="w-full pr-10 pl-3.5 py-3 bg-[#F9FAFB] border border-gray-200/80 rounded-xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-orange-500/10 transition-all outline-none" id="streetDetails" placeholder="مثال: شارع 14 رمضان، قرب مثلجات نادية" required="" type="text"/>
+</div>
+</div>
+<!-- Optional Driver Note -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="text-xs font-bold text-gray-700 text-right" for="deliveryNotes">ملاحظات للمندوب</label>
+<span class="text-[10px] font-semibold text-gray-400">اختياري</span>
+</div>
+<input class="w-full px-3.5 py-2.5 bg-[#F9FAFB] border border-gray-200/80 rounded-xl text-xs font-medium text-gray-800 placeholder-gray-400 focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-orange-500/10 transition-all outline-none" id="deliveryNotes" placeholder="رقم الشقة، الطابق، أو علامة مميزة للمنزل..." type="text"/>
+</div>
+</form>
+</div>
+<!-- Modern Floating Bottom Action Bar -->
+<footer class="absolute bottom-0 inset-x-0 bg-white/95 backdrop-blur-md px-5 pt-3 pb-6 border-t border-gray-100 z-30" data-purpose="bottom-bar">
+<!-- Main Action CTA -->
+<button class="w-full py-3.5 bg-brand-primary hover:bg-brand-600 active:scale-[0.98] text-white font-extrabold text-sm rounded-2xl shadow-cta transition-all duration-150 flex items-center justify-center gap-2" id="submitBtn" onclick="handleFormSubmit()" type="button">
+<span>ابدأ الطلب الآن</span>
+<svg class="w-4 h-4 rotate-180" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<p class="text-center text-[10px] text-gray-400 mt-2 font-medium">
+        يمكنك تعديل العنوان أو إضافة وجهات أخرى لاحقاً بكل سهولة
+      </p>
+<!-- iOS Home Indicator -->
+<div class="w-32 h-1 bg-gray-300 rounded-full mx-auto mt-2.5"></div>
+</footer>
+</main>
+<!-- Interactive Logic -->
+<script>
+    // Address type chip selector
+    const chips = document.querySelectorAll('.chip-btn');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => {
+          c.className = 'chip-btn flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition bg-gray-50 border-gray-200/80 text-gray-600 hover:bg-gray-100 flex items-center justify-center gap-1';
+        });
+        chip.className = 'chip-btn flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition bg-orange-50 border-brand-primary text-brand-primary flex items-center justify-center gap-1';
+      });
+    });
+
+    // Avatar preview
+    const fileInput = document.getElementById('profileUploadInput');
+    const avatarImg = document.getElementById('avatarImage');
+    const defaultIcon = document.getElementById('defaultAvatarIcon');
+
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          avatarImg.src = event.target.result;
+          avatarImg.classList.remove('hidden');
+          defaultIcon.classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // GPS Auto-detect Simulation
+    const gpsBtn = document.getElementById('useGpsBtn');
+    gpsBtn.addEventListener('click', function() {
+      const originalContent = gpsBtn.innerHTML;
+      gpsBtn.innerHTML = `
+        <div class="flex items-center justify-center gap-2 py-1 text-white">
+          <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span class="text-xs font-bold">جاري تحديد الموقع بدقة...</span>
+        </div>
+      `;
+
+      setTimeout(() => {
+        document.getElementById('governorate').value = 'baghdad';
+        document.getElementById('district').value = 'حي الكرادة';
+        document.getElementById('streetDetails').value = 'شارع العرصات - قرب ساحة مسبح';
+
+        gpsBtn.innerHTML = `
+          <div class="flex items-center justify-center gap-2 py-1 text-white">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+            </svg>
+            <span class="text-xs font-bold">تم تحديد موقعك الحالي بنجاح (الكرادة)</span>
+          </div>
+        `;
+        gpsBtn.classList.remove('from-orange-500', 'to-[#FF6B35]');
+        gpsBtn.classList.add('from-emerald-500', 'to-emerald-600');
+      }, 900);
+    });
+
+    // Submission handler
+    function handleFormSubmit() {
+      const name = document.getElementById('fullName');
+      const district = document.getElementById('district');
+      const street = document.getElementById('streetDetails');
+
+      let isValid = true;
+      [name, district, street].forEach(input => {
+        if (!input.value.trim()) {
+          input.classList.add('border-red-400', 'bg-red-50/40');
+          isValid = false;
+        } else {
+          input.classList.remove('border-red-400', 'bg-red-50/40');
+        }
+      });
+
+      if (!isValid) return;
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>جاري الحفظ...</span>
+      `;
+
+      setTimeout(() => {
+        submitBtn.innerHTML = `
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+          </svg>
+          <span>تم الحفظ! أهلاً بك</span>
+        `;
+        submitBtn.classList.replace('bg-brand-primary', 'bg-emerald-600');
+      }, 1000);
+    }
+  </script>
+</body></html>

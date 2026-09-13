@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>تفاصيل الطلب - جبلي</title>
+<!-- Google Fonts: Cairo for Arabic UI typography -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN with forms and container-queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#FF5722',
+              orange: '#FF5722',
+              light: '#FFF5F2'
+            },
+            neutral: {
+              surface: '#F8F9FB',
+              line: '#E5E7EB',
+              muted: '#8E9AA7',
+              dark: '#1E293B'
+            }
+          },
+          fontFamily: {
+            sans: ['Cairo', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Base Styles -->
+<style data-purpose="base-styling">
+    body {
+      font-family: 'Cairo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 flex justify-center items-center min-h-screen p-0 sm:p-4">
+<!-- BEGIN: MobileDeviceContainer -->
+<!-- Mimics mobile device screen viewport -->
+<div class="w-full max-w-md bg-white min-h-screen sm:min-h-[844px] sm:max-h-[900px] sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col justify-between border border-gray-100 relative">
+<!-- BEGIN: TopAppHeader -->
+<header class="pt-10 pb-4 px-6 bg-white flex items-center justify-between relative z-10">
+<!-- Back Button -->
+<button aria-label="الرجوع" class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-800 hover:bg-gray-100 transition-colors" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Page Title -->
+<h1 class="text-xl font-bold text-gray-900 tracking-tight">تفاصيل الطلب</h1>
+<!-- Empty spacer for symmetry -->
+<div class="w-10 h-10"></div>
+</header>
+<!-- END: TopAppHeader -->
+<!-- BEGIN: MainContentArea -->
+<main class="flex-1 px-6 overflow-y-auto pb-4">
+<!-- BEGIN: OrderSummaryCard -->
+<!-- Displays order reference number and time -->
+<section class="bg-gray-50/80 rounded-2xl p-4 my-2 flex items-center justify-between border border-gray-100" data-purpose="order-info-card">
+<span class="text-base font-extrabold text-gray-900 tracking-tight" dir="ltr">#JBL123456</span>
+<div class="flex items-center gap-2 text-xs font-semibold text-gray-500" dir="ltr">
+<span>2024-03-15</span>
+<span>07:42</span>
+</div>
+</section>
+<!-- END: OrderSummaryCard -->
+<!-- BEGIN: OrderStatusTimeline -->
+<!-- Visual timeline of the 5 delivery stages -->
+<section class="py-4 relative" data-purpose="order-tracking-timeline">
+<div class="relative flex flex-col space-y-6">
+<!-- Connecting vertical timeline line -->
+<div aria-hidden="true" class="absolute right-[19px] top-4 bottom-5 w-[2px] bg-[#FF5722]"></div>
+<!-- Inactive lower segment of vertical line -->
+<div aria-hidden="true" class="absolute right-[19px] top-[242px] bottom-5 w-[2px] bg-gray-200"></div>
+<!-- Stage 1: Order Received (Completed) -->
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-10 h-10 rounded-full bg-[#FF5722] flex items-center justify-center shrink-0 shadow-sm">
+<svg class="w-5 h-5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="pt-0.5">
+<h2 class="text-base font-bold text-gray-900 leading-tight">تم استلام الطلب</h2>
+<p class="text-xs text-gray-400 mt-0.5">07:42 م</p>
+<p class="text-xs text-gray-500 font-medium mt-0.5">بانتظار قبول المطعم</p>
+</div>
+</div>
+<!-- Stage 2: Order Accepted (Completed) -->
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-10 h-10 rounded-full bg-[#FF5722] flex items-center justify-center shrink-0 shadow-sm">
+<svg class="w-5 h-5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="pt-0.5">
+<h2 class="text-base font-bold text-gray-900 leading-tight">تم قبول الطلب</h2>
+<p class="text-xs text-gray-400 mt-0.5">07:45 م</p>
+</div>
+</div>
+<!-- Stage 3: Preparing (Completed) -->
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-10 h-10 rounded-full bg-[#FF5722] flex items-center justify-center shrink-0 shadow-sm">
+<svg class="w-5 h-5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="pt-0.5">
+<h2 class="text-base font-bold text-gray-900 leading-tight">جاري التحضير</h2>
+<p class="text-xs text-gray-400 mt-0.5">07:50 م</p>
+</div>
+</div>
+<!-- Stage 4: Out for Delivery (Active) -->
+<div class="flex items-start gap-4 relative z-10">
+<!-- Delivery Icon Node -->
+<div class="w-10 h-10 rounded-full bg-[#FF5722] flex items-center justify-center shrink-0 shadow-md">
+<svg class="w-5 h-5 text-white fill-current" viewbox="0 0 24 24">
+<!-- Scooter delivery icon -->
+<path d="M19 12c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm0 4.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm-14-4.5c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm0 4.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm6.5-1.5h1.23l1.82-3.64c.2-.4.61-.66 1.07-.66h2.38v-1.5h-2.38c-.92 0-1.74.52-2.14 1.32L12.05 13h-2.1c-.24-.59-.81-1-1.48-1H6v1.5h2.47l1.79 3.58c.2.4.61.66 1.07.66h3.17v-1.5h-3zm-1.5-5.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"></path>
+</svg>
+</div>
+<div class="pt-0.5">
+<h2 class="text-base font-bold text-gray-900 leading-tight">خرج للتوصيل</h2>
+<p class="text-xs text-gray-400 mt-0.5">08:16 م</p>
+<p class="text-xs text-gray-500 font-medium mt-0.5">طلبك في الطريق إليك</p>
+</div>
+</div>
+<!-- Stage 5: Delivered (Pending) -->
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center shrink-0">
+<svg class="w-5 h-5 text-white stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="pt-1.5">
+<h2 class="text-base font-bold text-gray-800 leading-tight">تم التسليم</h2>
+</div>
+</div>
+</div>
+</section>
+<!-- END: OrderStatusTimeline -->
+</main>
+<!-- END: MainContentArea -->
+<!-- BEGIN: BottomActionSection -->
+<!-- Delivery Agent Card and Map Tracking Button -->
+<footer class="p-6 pt-2 bg-white space-y-4">
+<!-- Courier / Delivery Agent Information Card -->
+<section class="bg-gray-50/80 rounded-2xl p-3 px-4 flex items-center justify-between border border-gray-100" data-purpose="courier-card">
+<div class="flex items-center gap-3">
+<!-- Courier Avatar -->
+<div class="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-white shadow-sm">
+<img alt="صورة مندوب التوصيل أحمد" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiWm5DLQJXI4SCV0_5ztY389lU08yDDTs1x8nwor98xBsEMcR0Xw9chcMMQLPg_uQj3aeAVWqjaBqAxtyB5lWARs-XjB2DxeY-264sLVKRA1e1Ao3hHm7PToEiNHUV4ZrPuQxtY0mBcqqSeY0kndQ2YU6LjcEEAYvx1JcSsukL9iRjcagTu90V--5c-U1wb00d8R0e-iUYpff65M67PZJ3HACHm7YCvY3pT1nP_ofBExe8dFXzbCxM"/>
+</div>
+<!-- Courier Details -->
+<div>
+<h3 class="text-base font-bold text-gray-900 leading-none">أحمد</h3>
+<p class="text-xs text-gray-400 font-medium mt-1.5">مندوب التوصيل</p>
+</div>
+</div>
+<!-- Phone Call Button -->
+<a aria-label="الاتصال بمندوب التوصيل" class="w-11 h-11 rounded-full border border-[#FF5722] flex items-center justify-center text-[#FF5722] hover:bg-[#FF5722] hover:text-white transition-colors duration-200" href="tel:#">
+<svg class="w-5 h-5 fill-current transform scale-x-[-1]" viewbox="0 0 24 24">
+<path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"></path>
+</svg>
+</a>
+</section>
+<!-- Track on Map Primary Button -->
+<button class="w-full py-4 bg-[#FF5722] hover:bg-[#F4511E] active:scale-[0.99] transition-all text-white font-bold rounded-2xl text-base shadow-lg shadow-[#FF5722]/30 flex items-center justify-center" type="button">
+        تتبع الطلب على الخريطة
+      </button>
+<!-- iOS Home Indicator -->
+<div aria-hidden="true" class="flex justify-center pt-2">
+<div class="w-36 h-1 bg-gray-300 rounded-full"></div>
+</div>
+</footer>
+<!-- END: BottomActionSection -->
+</div>
+<!-- END: MobileDeviceContainer -->
+</body></html>

@@ -18,6 +18,7 @@ import { registerMfaRoutes } from './routes/mfa.js';
 import { registerGeographyRoutes } from './routes/geography.js';
 import { registerProfileRoutes } from './routes/profile.js';
 import { registerCatalogRoutes } from './routes/catalog.js';
+import { registerFavoriteRoutes } from './routes/favorites.js';
 import { registerAssetRoutes } from './routes/assets.js';
 import { registerPublicApplicationRoutes } from './routes/applications.js';
 import { registerOrderRoutes } from './routes/orders.js';
@@ -221,6 +222,7 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
   registerGeographyRoutes(app, ctx);
   registerProfileRoutes(app, ctx);
   registerCatalogRoutes(app, ctx);
+  registerFavoriteRoutes(app, ctx);
   registerAssetRoutes(app, ctx);
   registerPublicApplicationRoutes(app, ctx);
   registerOrderRoutes(app, ctx);

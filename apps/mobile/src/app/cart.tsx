@@ -1,0 +1,291 @@
+import { useState } from 'react';
+import { Image, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { formatIqdArabic, iqd } from '@jibli/money';
+import { assetUrl } from '@/lib/api';
+import { useCart } from '@/lib/cart';
+import { useIsGuest } from '@/lib/session';
+import { color, radius, shadow, space, TAP_TARGET, text } from '@/theme';
+import { Button, EmptyState, Row, Screen, Text } from '@/ui';
+import { Stepper, SummaryRow } from '@/ui/catalog';
+
+/**
+ * The cart (`5.html`).
+ *
+ * The totals here are the ones this screen can be sure of: the prices the menu
+ * showed and the delivery fee the restaurant charges. The service fee and any
+ * discount come from `POST /checkout/quote` on the next screen, because they
+ * depend on the delivery address, and showing a total that later changes is
+ * worse than showing one line fewer.
+ */
+export default function CartScreen() {
+  const router = useRouter();
+  const isGuest = useIsGuest();
+  const { cart, subtotalIqd, itemCount, setQuantity, remove, clear } = useCart();
+  const [notes, setNotes] = useState('');
+
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)'));
+
+  if (!cart || itemCount === 0) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        <TopBar title="سلة المشتريات" onBack={goBack} />
+        <EmptyState
+          title="سلتك فارغة"
+          body="تصفّح المطاعم وأضف ما يعجبك."
+          action={{ label: 'تصفّح المطاعم', onPress: () => router.replace('/(tabs)') }}
+        />
+      </Screen>
+    );
+  }
+
+  const belowMinimum = subtotalIqd < cart.minimumOrderIqd;
+  const totalIqd = subtotalIqd + cart.deliveryFeeIqd;
+
+  return (
+    <Screen edges={['top']} padded={false}>
+      <View style={{ paddingHorizontal: space[4], paddingTop: space[2] }}>
+        <TopBar
+          title="سلة المشتريات"
+          onBack={goBack}
+          onClear={() => {
+            clear();
+            goBack();
+          }}
+        />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{ padding: space[4], paddingBottom: space[10], gap: space[4] }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Row gap={space[2]}>
+          <MaterialCommunityIcons name="store-outline" size={18} color={color.brand} />
+          <Text variant="smallBold">{cart.restaurantName}</Text>
+        </Row>
+
+        <View style={{ gap: space[3] }}>
+          {cart.lines.map((line) => (
+            <View
+              key={line.key}
+              style={[
+                {
+                  flexDirection: 'row',
+                  gap: space[3],
+                  padding: space[3],
+                  backgroundColor: color.surfaceCard,
+                  borderRadius: radius.lg,
+                  borderWidth: 1,
+                  borderColor: color.borderSubtle,
+                },
+                shadow.sm,
+              ]}
+            >
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: radius.md,
+                  overflow: 'hidden',
+                  backgroundColor: color.surfaceSunken,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {line.imageAssetId ? (
+                  <Image
+                    source={{ uri: assetUrl(line.imageAssetId) }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="silverware-fork-knife"
+                    size={20}
+                    color={color.textMuted}
+                  />
+                )}
+              </View>
+
+              <View style={{ flex: 1, gap: space[1] }}>
+                <Text variant="bodyBold" numberOfLines={1}>
+                  {line.nameAr}
+                </Text>
+                {line.notes ? (
+                  <Text variant="caption" tone="muted" numberOfLines={2}>
+                    {line.notes}
+                  </Text>
+                ) : null}
+                <Text variant="smallBold" tone="brand">
+                  {formatIqdArabic(iqd(line.unitPriceIqd * line.quantity))}
+                </Text>
+              </View>
+
+              <View style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <Pressable
+                  onPress={() => remove(line.key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`حذف ${line.nameAr}`}
+                  hitSlop={space[2]}
+                  style={{ padding: space[1] }}
+                >
+                  <MaterialCommunityIcons
+                    name="trash-can-outline"
+                    size={18}
+                    color={color.dangerStrong}
+                  />
+                </Pressable>
+
+                <Stepper
+                  value={line.quantity}
+                  onChange={(quantity) => setQuantity(line.key, quantity)}
+                  min={0}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ gap: space[2] }}>
+          <Row gap={space[2]}>
+            <MaterialCommunityIcons name="note-text-outline" size={18} color={color.textMuted} />
+            <Text variant="smallBold">ملاحظات للمطعم</Text>
+          </Row>
+          <TextInput
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="بدون بصل، صلصة إضافية…"
+            placeholderTextColor={color.textMuted}
+            multiline
+            maxLength={300}
+            style={[
+              text.small,
+              {
+                minHeight: 88,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: color.borderSubtle,
+                backgroundColor: color.surfaceCard,
+                padding: space[3],
+                color: color.textPrimary,
+                textAlignVertical: 'top',
+              },
+            ]}
+          />
+        </View>
+
+        <View
+          style={{
+            gap: space[2],
+            padding: space[4],
+            borderRadius: radius.lg,
+            backgroundColor: color.surfaceCard,
+            borderWidth: 1,
+            borderColor: color.borderSubtle,
+          }}
+        >
+          <SummaryRow label="المجموع الفرعي" value={formatIqdArabic(iqd(subtotalIqd))} />
+          <SummaryRow
+            label="رسوم التوصيل"
+            value={
+              cart.deliveryFeeIqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(cart.deliveryFeeIqd))
+            }
+            tone={cart.deliveryFeeIqd === 0 ? 'success' : undefined}
+          />
+          <SummaryRow label="الإجمالي" value={formatIqdArabic(iqd(totalIqd))} emphasis />
+          <Text variant="caption" tone="muted">
+            تُحتسب رسوم الخدمة وأي خصم عند تأكيد العنوان في الخطوة التالية.
+          </Text>
+        </View>
+
+        {belowMinimum ? (
+          <View
+            style={{
+              padding: space[3],
+              borderRadius: radius.md,
+              backgroundColor: color.warningSoft,
+            }}
+          >
+            <Text variant="caption" tone="secondary">
+              الحد الأدنى للطلب من {cart.restaurantName} هو{' '}
+              {formatIqdArabic(iqd(cart.minimumOrderIqd))}. أضف{' '}
+              {formatIqdArabic(iqd(cart.minimumOrderIqd - subtotalIqd))} لإتمام الطلب.
+            </Text>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      <View
+        style={{
+          padding: space[4],
+          paddingBottom: space[6],
+          backgroundColor: color.surfaceCard,
+          borderTopWidth: 1,
+          borderTopColor: color.borderSubtle,
+        }}
+      >
+        <Button
+          label={isGuest ? 'تسجيل الدخول لإتمام الطلب' : 'متابعة إلى العنوان والدفع'}
+          block
+          disabled={belowMinimum}
+          onPress={() => {
+            /*
+             * This is the one place the app requires an account, and the reason
+             * is in the label: an order needs an address to go to and a number
+             * to call. Everything before this point works signed-out.
+             */
+            if (isGuest) {
+              router.push('/(auth)/phone');
+              return;
+            }
+            router.push({ pathname: '/checkout', params: notes ? { notes } : {} });
+          }}
+        />
+      </View>
+    </Screen>
+  );
+}
+
+function TopBar({
+  title,
+  onBack,
+  onClear,
+}: {
+  title: string;
+  onBack: () => void;
+  onClear?: () => void;
+}) {
+  return (
+    <Row justify="space-between" style={{ minHeight: TAP_TARGET }}>
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="رجوع"
+        hitSlop={space[2]}
+        style={{ width: TAP_TARGET, height: TAP_TARGET, justifyContent: 'center' }}
+      >
+        <MaterialCommunityIcons name="chevron-right" size={26} color={color.textPrimary} />
+      </Pressable>
+
+      <Text variant="h3">{title}</Text>
+
+      {onClear ? (
+        <Pressable
+          onPress={onClear}
+          accessibilityRole="button"
+          accessibilityLabel="تفريغ السلة"
+          hitSlop={space[2]}
+          style={{ width: TAP_TARGET, height: TAP_TARGET, justifyContent: 'center', alignItems: 'flex-end' }}
+        >
+          <Text variant="caption" tone="danger">
+            تفريغ
+          </Text>
+        </Pressable>
+      ) : (
+        <View style={{ width: TAP_TARGET }} />
+      )}
+    </Row>
+  );
+}

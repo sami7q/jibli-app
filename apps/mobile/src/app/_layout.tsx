@@ -15,6 +15,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiError, NetworkError } from '@/lib/api';
 import { SessionProvider, useSession } from '@/lib/session';
+import { AreaProvider } from '@/lib/area';
+import { CartProvider } from '@/lib/cart';
 import { OfflineBanner, startNetworkWatch } from '@/lib/network';
 import { ErrorBoundary } from '@/lib/error-boundary';
 import { color, enforceRtl, palette } from '@/theme';
@@ -83,9 +85,13 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <SessionProvider>
-            <StatusBar style="dark" />
-            <OfflineBanner />
-            <Gate />
+            <AreaProvider>
+              <CartProvider>
+                <StatusBar style="dark" />
+                <OfflineBanner />
+                <Gate />
+              </CartProvider>
+            </AreaProvider>
           </SessionProvider>
         </QueryClientProvider>
       </ErrorBoundary>
@@ -118,9 +124,29 @@ function Gate() {
     // as plain strings here rather than fighting the generated type.
     const path = segments as readonly string[];
     const inAuth = path[0] === '(auth)';
+    const onWelcome = path[1] === 'welcome';
 
+    /*
+     * Signed out and undecided: the welcome screen, not the phone screen.
+     *
+     * Sending someone straight to "enter your number" is the App Store 5.1.1(ii)
+     * rejection — registration demanded for content that does not require it.
+     * The welcome screen offers browsing as a guest beside signing in, and the
+     * number is asked for at checkout, where an account genuinely is needed.
+     */
     if (state.status === 'signed-out' && !inAuth) {
-      router.replace('/(auth)/phone');
+      router.replace('/(auth)/welcome');
+      return;
+    }
+
+    /*
+     * A guest is a signed-in-enough user as far as routing goes: they may be
+     * anywhere except the welcome screen, which they have already answered.
+     * Reaching sign-in from inside the app is a deliberate move, not something
+     * to redirect away from.
+     */
+    if (state.status === 'guest') {
+      if (onWelcome) router.replace('/(tabs)');
       return;
     }
 

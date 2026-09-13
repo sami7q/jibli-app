@@ -1,22 +1,23 @@
 import { Tabs } from 'expo-router';
 import { Platform, View } from 'react-native';
-import { color, palette, space, TAP_TARGET, text } from '@/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { color, radius, space, TAP_TARGET, text } from '@/theme';
 
 /**
- * The signed-in shell.
+ * The shell.
  *
- * The root layout has declared a `(tabs)` group since the project was created
- * and the directory never existed, so a customer who signed in successfully
- * landed on an empty stack. This is that group.
+ * Four tabs, which `main.html` and `9.html` agree on — الرئيسية، المفضلة،
+ * طلباتي، حسابي — and which is also the ceiling: a fifth turns the bar into a
+ * row of icons nobody reads.
  *
- * Four tabs, which is the ceiling: a fifth turns the bar into a row of icons
- * nobody reads, and everything else in this product is reachable from inside
- * one of these four.
+ * Icons are real now rather than the placeholder dots this file shipped with:
+ * an outline for the resting state and a solid for the active one, which is
+ * how the comps distinguish them and how a tab bar reads at a glance without
+ * relying on colour alone.
  *
- * Icons are drawn as shapes rather than pulled from an icon font, for the same
- * reason the app icon is: the designs have not arrived yet, and a placeholder
- * that is obviously a placeholder is better than committing to an icon set that
- * will be replaced.
+ * A guest sees all four. المفضلة and طلباتي ask for an account when opened,
+ * which is the honest shape — hiding them would tell a browsing customer the
+ * app does less than it does.
  */
 export default function TabsLayout() {
   return (
@@ -29,7 +30,7 @@ export default function TabsLayout() {
           backgroundColor: color.surfaceCard,
           borderTopColor: color.borderSubtle,
           // Room for the home indicator on iOS, where the bar sits over it.
-          height: TAP_TARGET + (Platform.OS === 'ios' ? 34 : 12),
+          height: TAP_TARGET + (Platform.OS === 'ios' ? 34 : 14),
           paddingTop: space[1],
         },
         tabBarLabelStyle: text.caption,
@@ -39,39 +40,59 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'الرئيسية',
-          tabBarIcon: ({ color: tint, focused }) => <TabDot tint={tint} focused={focused} />,
+          tabBarIcon: (props) => <TabIcon {...props} name="home" />,
+        }}
+      />
+      <Tabs.Screen
+        name="favorites"
+        options={{
+          title: 'المفضلة',
+          tabBarIcon: (props) => <TabIcon {...props} name="heart" />,
         }}
       />
       <Tabs.Screen
         name="orders"
         options={{
           title: 'طلباتي',
-          tabBarIcon: ({ color: tint, focused }) => <TabDot tint={tint} focused={focused} />,
+          tabBarIcon: (props) => <TabIcon {...props} name="clipboard-list" />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
           title: 'حسابي',
-          tabBarIcon: ({ color: tint, focused }) => <TabDot tint={tint} focused={focused} />,
+          tabBarIcon: (props) => <TabIcon {...props} name="account" />,
         }}
       />
     </Tabs>
   );
 }
 
-/** A placeholder mark, sized to the icon slot the real set will occupy. */
-function TabDot({ tint, focused }: { tint: string; focused: boolean }) {
+/** Outline when resting, solid plus a dot when active — as the comps draw it. */
+function TabIcon({
+  color: tint,
+  focused,
+  name,
+}: {
+  color: string;
+  focused: boolean;
+  name: 'home' | 'heart' | 'clipboard-list' | 'account';
+}) {
   return (
-    <View
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderWidth: 2,
-        borderColor: tint,
-        backgroundColor: focused ? tint : palette.white,
-      }}
-    />
+    <View style={{ alignItems: 'center', gap: 3 }}>
+      <MaterialCommunityIcons
+        name={focused ? name : (`${name}-outline` as const)}
+        size={23}
+        color={tint}
+      />
+      <View
+        style={{
+          width: 5,
+          height: 5,
+          borderRadius: radius.full,
+          backgroundColor: focused ? tint : 'transparent',
+        }}
+      />
+    </View>
   );
 }

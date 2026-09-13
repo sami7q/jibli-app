@@ -1,10 +1,15 @@
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api, ApiError } from '@/lib/api';
-import { radius, space } from '@/theme';
-import { Badge, Card, EmptyState, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
+import { useIsGuest } from '@/lib/session';
+import { color, radius, space, TAP_TARGET } from '@/theme';
+import { Badge, EmptyState, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
+import { RateOrderSheet } from '@/ui/rate-order';
 
 /**
  * My orders.
@@ -15,59 +20,151 @@ import { Badge, Card, EmptyState, ErrorState, Ltr, Row, Screen, Skeleton, Text }
  * fraction of the battery.
  */
 export default function OrdersScreen() {
+  const router = useRouter();
+  const isGuest = useIsGuest();
+  const [rating, setRating] = useState<{ orderId: string; restaurantName: string } | null>(null);
+
   const orders = useQuery({
     queryKey: ['my-orders'],
     queryFn: () => api.myOrders(),
+    enabled: !isGuest,
     refetchInterval: 30_000,
   });
 
+  /*
+   * The rating prompt the plan asks for: a quarter of an hour after delivery,
+   * not the second the driver walks away. The server decides when the window
+   * opens; this only shows what it returns.
+   */
+  const pending = useQuery({
+    queryKey: ['pending-reviews'],
+    queryFn: () => api.pendingReviews(),
+    enabled: !isGuest,
+    staleTime: 60_000,
+  });
+
   return (
-    <Screen scroll edges={['top']}>
-      <Text variant="h2" style={{ marginBottom: space[3] }}>
-        طلباتي
-      </Text>
+    <Screen scroll edges={['top']} padded={false}>
+      <View style={{ paddingHorizontal: space[4], paddingTop: space[2] }}>
+        <Text variant="h2">طلباتي</Text>
+      </View>
 
-      {orders.isError ? (
-        <ErrorState
-          message={orders.error instanceof ApiError ? orders.error.messageAr : 'تعذّر تحميل طلباتك'}
-          onRetry={() => void orders.refetch()}
-        />
-      ) : orders.isLoading ? (
-        <View style={{ gap: space[3] }}>
-          <Skeleton height={78} style={{ borderRadius: radius.lg }} />
-          <Skeleton height={78} style={{ borderRadius: radius.lg }} />
-        </View>
-      ) : (orders.data ?? []).length === 0 ? (
-        <EmptyState
-          title="لا توجد طلبات بعد"
-          body="عندما تطلب، ستتابع حالة الطلب من هنا خطوة بخطوة."
-        />
-      ) : (
-        <View style={{ gap: space[3] }}>
-          {(orders.data ?? []).map((order) => (
-            <Card key={order.id}>
-              <Row justify="space-between">
-                <Text variant="bodyBold" numberOfLines={1} style={{ flex: 1 }}>
-                  {order.restaurant_name ?? 'مطعم'}
-                </Text>
-                <Badge
-                  label={ORDER_STATUS_LABELS[order.status as OrderStatus] ?? order.status}
-                  tone={toneFor(order.status)}
-                />
-              </Row>
+      <View style={{ padding: space[4], gap: space[3] }}>
+        {isGuest ? (
+          <EmptyState
+            title="سجّل دخولك لمتابعة طلباتك"
+            body="ستتابع كل طلب خطوة بخطوة من هنا."
+            action={{ label: 'تسجيل الدخول', onPress: () => router.push('/(auth)/phone') }}
+          />
+        ) : (
+          <>
+            {(pending.data ?? []).map((entry) => (
+              <Pressable
+                key={entry.order_id}
+                onPress={() =>
+                  setRating({ orderId: entry.order_id, restaurantName: entry.restaurant_name })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`قيّم طلبك من ${entry.restaurant_name}`}
+                style={({ pressed }) => [
+                  {
+                    minHeight: TAP_TARGET + 8,
+                    padding: space[3],
+                    borderRadius: radius.lg,
+                    backgroundColor: color.warningSoft,
+                    justifyContent: 'center',
+                  },
+                  pressed ? { opacity: 0.8 } : null,
+                ]}
+              >
+                <Row gap={space[2]}>
+                  <MaterialCommunityIcons name="star-outline" size={20} color={color.warning} />
+                  <Text variant="small" style={{ flex: 1 }}>
+                    كيف كان طلبك من {entry.restaurant_name}؟
+                  </Text>
+                  <Text variant="smallBold" tone="brand">
+                    قيّم
+                  </Text>
+                </Row>
+              </Pressable>
+            ))}
 
-              <Row justify="space-between" style={{ marginTop: space[2] }}>
-                {/* The order number is Latin inside Arabic: without isolation
-                    the digits come out reversed. */}
-                <Ltr variant="caption" tone="muted">
-                  #{order.public_order_number}
-                </Ltr>
-                <Text variant="bodyBold">{formatIqdArabic(iqd(order.customer_total_iqd))}</Text>
-              </Row>
-            </Card>
-          ))}
-        </View>
-      )}
+            {orders.isError ? (
+              <ErrorState
+                message={
+                  orders.error instanceof ApiError ? orders.error.messageAr : 'تعذّر تحميل طلباتك'
+                }
+                onRetry={() => void orders.refetch()}
+              />
+            ) : orders.isLoading ? (
+              <>
+                <Skeleton height={92} style={{ borderRadius: radius.lg }} />
+                <Skeleton height={92} style={{ borderRadius: radius.lg }} />
+              </>
+            ) : (orders.data ?? []).length === 0 ? (
+              <EmptyState
+                title="لا توجد طلبات بعد"
+                body="عندما تطلب، ستتابع حالة الطلب من هنا خطوة بخطوة."
+                action={{ label: 'تصفّح المطاعم', onPress: () => router.push('/(tabs)') }}
+              />
+            ) : (
+              (orders.data ?? []).map((order) => (
+                <Pressable
+                  key={order.id}
+                  onPress={() => router.push(`/order/${order.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`طلب من ${order.restaurant_name ?? 'مطعم'}`}
+                  style={({ pressed }) => [
+                    {
+                      padding: space[4],
+                      borderRadius: radius.lg,
+                      backgroundColor: color.surfaceCard,
+                      borderWidth: 1,
+                      borderColor: color.borderSubtle,
+                      gap: space[2],
+                    },
+                    pressed ? { opacity: 0.85 } : null,
+                  ]}
+                >
+                  <Row justify="space-between">
+                    <Text variant="bodyBold" numberOfLines={1} style={{ flex: 1 }}>
+                      {order.restaurant_name ?? 'مطعم'}
+                    </Text>
+                    <Badge
+                      label={ORDER_STATUS_LABELS[order.status as OrderStatus] ?? order.status}
+                      tone={toneFor(order.status)}
+                    />
+                  </Row>
+
+                  <Row justify="space-between">
+                    {/* The order number is Latin inside Arabic: without
+                        isolation the digits come out reversed. */}
+                    <Ltr variant="caption" tone="muted">
+                      #{order.public_order_number}
+                    </Ltr>
+                    <Text variant="bodyBold">
+                      {formatIqdArabic(iqd(order.customer_total_iqd))}
+                    </Text>
+                  </Row>
+                </Pressable>
+              ))
+            )}
+          </>
+        )}
+      </View>
+
+      {rating ? (
+        <RateOrderSheet
+          visible
+          orderId={rating.orderId}
+          restaurantName={rating.restaurantName}
+          onClose={() => setRating(null)}
+          onSubmitted={() => {
+            setRating(null);
+            void pending.refetch();
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

@@ -9,7 +9,15 @@ import {
   type ReactNode,
 } from 'react';
 import { apiRequest, ApiError, NetworkError } from './api';
-import { clearSession, loadSession, saveSession, type StoredSession } from './secure-session';
+import {
+  clearSession,
+  forgetGuestChoice,
+  loadGuestChoice,
+  loadSession,
+  rememberGuestChoice,
+  saveSession,
+  type StoredSession,
+} from './secure-session';
 
 /**
  * Who is signed in, resolved once.
@@ -27,7 +35,9 @@ export interface Me {
   readonly full_name: string | null;
   readonly profile_completed: boolean;
   readonly governorate_id: string | null;
+  readonly governorate_name_ar: string | null;
   readonly city_id: string | null;
+  readonly city_name_ar: string | null;
   readonly modes: ('CUSTOMER' | 'DRIVER')[];
   readonly driver_id: string | null;
 }
@@ -35,6 +45,16 @@ export interface Me {
 export type SessionState =
   | { status: 'loading' }
   | { status: 'signed-out' }
+  /**
+   * Browsing without an account.
+   *
+   * App Store guideline 5.1.1(ii): an app may not demand registration for
+   * content that does not require it. Restaurants and menus do not — only
+   * placing an order does, because an order needs somewhere to be delivered
+   * and someone to call about it. So this is a real state the app runs in,
+   * not a screen it passes through.
+   */
+  | { status: 'guest' }
   /** Signed in, but the mandatory profile is not filled in yet (plan §11). */
   | { status: 'needs-profile'; me: Me }
   | { status: 'ready'; me: Me }
@@ -52,6 +72,8 @@ interface SessionApi {
   readonly signOut: () => Promise<void>;
   /** Re-ask the server — after completing the profile, or changing city. */
   readonly refresh: () => Promise<void>;
+  /** Take «تصفح كضيف» and remember it, so the welcome screen asks once. */
+  readonly continueAsGuest: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionApi | null>(null);
@@ -71,7 +93,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const stored = await loadSession();
     if (!stored) {
-      commit({ status: 'signed-out' });
+      // A returning guest goes straight back to browsing; only a first launch
+      // (or someone who has signed out) sees the welcome screen.
+      commit((await loadGuestChoice()) ? { status: 'guest' } : { status: 'signed-out' });
       return;
     }
 
@@ -108,14 +132,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       state,
       signIn: async (session) => {
         await saveSession(session);
+        // They have an account now; the guest flag would otherwise send them
+        // back to browsing anonymously the next time a session expires.
+        await forgetGuestChoice();
         await resolve();
       },
       signOut: async () => {
-        await clearSession();
+        await Promise.all([clearSession(), forgetGuestChoice()]);
         generation.current += 1;
         setState({ status: 'signed-out' });
       },
       refresh: resolve,
+      continueAsGuest: async () => {
+        await rememberGuestChoice();
+        generation.current += 1;
+        setState({ status: 'guest' });
+      },
     }),
     [state, resolve],
   );
@@ -142,4 +174,15 @@ export function useMe(): Me | null {
   if (state.status === 'ready' || state.status === 'needs-profile') return state.me;
   if (state.status === 'offline-ready') return state.me;
   return null;
+}
+
+/**
+ * Browsing without an account.
+ *
+ * What a screen asks before doing anything that needs one — placing an order,
+ * favouriting, opening the order history. The answer is not "show an error":
+ * it is "send them to sign in, and bring them back here".
+ */
+export function useIsGuest(): boolean {
+  return useSession().state.status === 'guest';
 }

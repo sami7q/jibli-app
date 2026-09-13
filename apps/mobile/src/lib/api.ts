@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { ERROR_MESSAGES_AR, type ErrorCode } from '@jibli/contracts';
+import { ERROR_MESSAGES_AR, type ErrorCode, type OrderStatus } from '@jibli/contracts';
 import { clearSession, loadSession, updateTokens } from './secure-session';
 
 /**
@@ -77,7 +77,7 @@ interface Envelope<T> {
 }
 
 export interface RequestOptions {
-  readonly method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly body?: unknown;
   /** Required for money-moving commands (plan §28). */
   readonly idempotencyKey?: string;
@@ -261,6 +261,118 @@ export function assetUrl(assetId: string): string {
   return `${API_BASE}/api/v1/assets/${assetId}`;
 }
 
+/** One restaurant, with the whole menu — `GET /restaurants/:id`. */
+export interface MenuItem {
+  id: string;
+  name_ar: string;
+  description_ar: string | null;
+  price_iqd: number;
+  image_asset_id: string | null;
+  is_available: boolean;
+  is_popular: boolean;
+}
+
+export interface MenuCategory {
+  id: string;
+  name_ar: string;
+  description_ar: string | null;
+  items: MenuItem[];
+}
+
+export interface RestaurantDetail {
+  id: string;
+  branch_id: string;
+  display_name: string;
+  description_ar: string | null;
+  logo_asset_id: string | null;
+  cover_asset_id: string | null;
+  cuisine_tags: string[];
+  rating: number | null;
+  rating_count: number;
+  minimum_order_iqd: number;
+  delivery_fee_iqd: number;
+  address_text: string | null;
+  city_name_ar: string;
+  is_open: boolean;
+  orderable: boolean;
+  estimated_preparation_minutes: number;
+  categories: MenuCategory[];
+}
+
+export interface ModifierGroup {
+  id: string;
+  name_ar: string;
+  min_select: number;
+  max_select: number;
+  is_required: boolean;
+  modifiers: { id: string; name_ar: string; price_iqd: number; is_available: boolean }[];
+}
+
+export interface Address {
+  id: string;
+  label: string | null;
+  city_id: string;
+  governorate_id: string;
+  district_text: string | null;
+  street: string | null;
+  building: string | null;
+  landmark: string | null;
+  delivery_notes: string | null;
+  is_default: boolean;
+}
+
+export interface Quote {
+  items_subtotal_iqd: number;
+  discount_total_iqd: number;
+  delivery_fee_iqd: number;
+  platform_service_fee_iqd: number;
+  customer_total_iqd: number;
+  estimated_preparation_minutes: number;
+}
+
+export interface OrderLinePayload {
+  menu_item_id: string;
+  quantity: number;
+  modifier_ids?: string[];
+  notes?: string;
+}
+
+export interface OrderDetail {
+  id: string;
+  public_order_number: string;
+  status: OrderStatus;
+  payment_method: string;
+  items_subtotal_iqd: number;
+  delivery_fee_iqd: number;
+  platform_service_fee_iqd: number;
+  discount_total_iqd: number;
+  customer_total_iqd: number;
+  placed_at: string;
+  estimated_preparation_minutes: number;
+  customer_notes: string | null;
+  restaurant: { name_ar?: string; address_text?: string } | null;
+  delivery_address: Record<string, unknown> | null;
+  items: {
+    id: string;
+    name_ar: string;
+    unit_price_iqd: number;
+    quantity: number;
+    line_total_iqd: number;
+    notes: string | null;
+    modifiers: { name_ar: string; price_iqd: number }[];
+  }[];
+  timeline: { status: OrderStatus; at: string }[];
+  driver: {
+    first_name: string;
+    phone: string | null;
+    photo_asset_id: string | null;
+    status: string;
+  } | null;
+}
+
+/** A favourite, in the same shape as a discovery card. */
+export type FavoriteCard = RestaurantCard & { favorited_at: string };
+
 export const api = {
   /**
    * Categories, banners and how fast to rotate them.
@@ -312,6 +424,10 @@ export const api = {
       body: payload,
     }),
 
+  /** Change the saved name or default area. */
+  updateProfile: (payload: { full_name?: string; governorate_id?: string; city_id?: string }) =>
+    apiRequest<{ updated: boolean }>('/api/v1/profile', { method: 'PATCH', body: payload }),
+
   restaurants: (cityId: string, search?: string) =>
     apiRequest<RestaurantCard[]>(
       `/api/v1/restaurants?city_id=${cityId}${search ? `&q=${encodeURIComponent(search)}` : ''}`,
@@ -330,4 +446,80 @@ export const api = {
     apiRequest<
       { id: string; public_order_number: string; status: string; customer_total_iqd: number; placed_at: string; restaurant_name: string | null }[]
     >('/api/v1/orders'),
+
+  /**
+   * One restaurant and its whole menu.
+   *
+   * Public, like discovery — a guest browsing a menu is the case App Store
+   * 5.1.1(ii) is about, and the server has always allowed it.
+   */
+  restaurant: (restaurantId: string) =>
+    apiRequest<RestaurantDetail>(`/api/v1/restaurants/${restaurantId}`, { authenticated: false }),
+
+  /** Options for one dish, fetched when the customer opens it, not up front. */
+  itemModifiers: (itemId: string) =>
+    apiRequest<ModifierGroup[]>(`/api/v1/catalog/items/${itemId}/modifiers`, {
+      authenticated: false,
+    }),
+
+  /**
+   * The authoritative total.
+   *
+   * Runs the same pricing path as placement on the server, so what the cart
+   * shows and what the customer is charged cannot drift apart (plan §22).
+   */
+  quote: (payload: {
+    restaurant_id: string;
+    branch_id: string;
+    address_id: string;
+    lines: OrderLinePayload[];
+  }) => apiRequest<Quote>('/api/v1/checkout/quote', { method: 'POST', body: payload }),
+
+  order: (orderId: string) => apiRequest<OrderDetail>(`/api/v1/orders/${orderId}`),
+
+  cancelOrder: (orderId: string, reason: string) =>
+    apiRequest<{ status: string }>(`/api/v1/orders/${orderId}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  addresses: () => apiRequest<Address[]>('/api/v1/addresses'),
+
+  createAddress: (payload: Record<string, unknown>) =>
+    apiRequest<Address>('/api/v1/addresses', { method: 'POST', body: payload }),
+
+  favorites: () => apiRequest<FavoriteCard[]>('/api/v1/favorites'),
+
+  favorite: (restaurantId: string) =>
+    apiRequest<{ favorited: boolean }>(`/api/v1/favorites/${restaurantId}`, { method: 'PUT' }),
+
+  unfavorite: (restaurantId: string) =>
+    apiRequest<{ favorited: boolean }>(`/api/v1/favorites/${restaurantId}`, { method: 'DELETE' }),
+
+  /**
+   * Delete my account — App Store guideline 5.1.1(v).
+   *
+   * The server anonymises rather than drops: a delivered order is a financial
+   * record for the restaurant too. The confirmation screen says so before this
+   * is called.
+   */
+  deleteAccount: () => apiRequest<{ deleted: boolean }>('/api/v1/profile', { method: 'DELETE' }),
+
+  /** Whether this order can be rated yet — the 15-minute window (plan §31). */
+  reviewEligibility: (orderId: string) =>
+    apiRequest<{ can_review: boolean; opens_at: string | null; already_reviewed: boolean }>(
+      `/api/v1/orders/${orderId}/review-eligibility`,
+    ),
+
+  /** Orders whose rating window is open (plan §31). */
+  pendingReviews: () =>
+    apiRequest<
+      { order_id: string; restaurant_name: string; delivered_at: string; opens_at: string }[]
+    >('/api/v1/reviews/pending'),
+
+  submitReview: (orderId: string, rating: number, comment?: string) =>
+    apiRequest<{ submitted: boolean }>(`/api/v1/orders/${orderId}/review`, {
+      method: 'POST',
+      body: { rating, ...(comment ? { comment } : {}) },
+    }),
 };

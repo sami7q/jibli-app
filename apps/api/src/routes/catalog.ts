@@ -312,7 +312,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
 }
 
 /** Load weekly hours and dated exceptions for a set of branches. */
-async function loadHours(ctx: AppContext, branchIds: string[]) {
+export async function loadHours(ctx: AppContext, branchIds: string[]) {
   const map = new Map<
     string,
     {

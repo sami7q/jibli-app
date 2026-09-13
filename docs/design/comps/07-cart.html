@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سلة المشتريات</title>
+<!-- Google Fonts: Cairo / Readex Pro for Arabic UI -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              orange: '#FF5400',
+              orangeHover: '#E84D00',
+              cardBg: '#FFFFFF',
+              appBg: '#FAFAFA',
+              softGray: '#F5F5F7',
+              borderGray: '#EFEFEF',
+              textPrimary: '#111827',
+              textSecondary: '#6B7280',
+              deleteIcon: '#111827'
+            }
+          },
+          fontFamily: {
+            cairo: ['Cairo', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+<!-- Styles for Layout and Base Presentation -->
+<style data-purpose="base-typography">
+    body {
+      font-family: 'Cairo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 flex justify-center items-center min-h-screen p-0 sm:p-4 text-brand-textPrimary select-none">
+<!-- Mobile Screen Container -->
+<main class="w-full max-w-[420px] bg-white min-h-screen sm:min-h-[890px] sm:rounded-[44px] shadow-2xl overflow-hidden flex flex-col justify-between border border-gray-100 relative">
+<!-- BEGIN: TopBar -->
+<header class="pt-8 pb-3 px-5 bg-white flex items-center justify-between sticky top-0 z-20">
+<!-- Back Button -->
+<button aria-label="الرجوع" class="w-10 h-10 rounded-full bg-brand-softGray flex items-center justify-center text-brand-textPrimary active:scale-95 transition-transform" data-purpose="navigation-back" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Page Title -->
+<h1 class="text-xl font-extrabold text-brand-textPrimary flex-1 text-center pr-2 ml-10">
+        سلة المشتريات
+      </h1>
+</header>
+<!-- END: TopBar -->
+<!-- Scrollable Content Body -->
+<div class="px-5 pb-6 flex-1 overflow-y-auto space-y-4">
+<!-- BEGIN: CartItemsList -->
+<section class="space-y-3.5 mt-2" data-purpose="cart-items-section">
+<!-- Item 1: كباب عراقي -->
+<article class="bg-white rounded-2xl border border-gray-100 p-3.5 flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+<!-- Food Image -->
+<div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-50">
+<img alt="كباب عراقي" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkiPahJASV-XultNGcUxf6oZPEpoCPfq8H1ohZUVVyzQfIesTk8xjNc5QSwVTL-2gzk-c_2YiCwJpJ48vmbIBnmbbgOBxRX3GJgsBYR7r-vl9_HS2Aizt6nUtx-eiJ9i1OwLwai6G0jUra2ZRLbWYwy-eXP0Uh1ax2z2dFviqkz-y0D1wdP3gsJ_g-9mznfixbe0NpQ-2XCwZESa5FYSI0nJEDy1DpipXNJ76g0PyZyGr3BaS4Aa_h"/>
+</div>
+<!-- Item Details -->
+<div class="flex-1 mr-3.5">
+<h2 class="font-bold text-base text-gray-900 leading-snug">كباب عراقي</h2>
+<p class="text-sm font-semibold text-gray-800 mt-1">8,000 <span class="text-xs font-medium">د.ع</span></p>
+</div>
+<!-- Quantity Counter & Delete Action -->
+<div class="flex items-center gap-2.5">
+<!-- Counter Controls -->
+<div class="flex items-center bg-brand-softGray rounded-xl px-2 py-1.5 gap-3">
+<button aria-label="زيادة" class="w-6 h-6 flex items-center justify-center font-bold text-gray-600 hover:text-black active:scale-90" type="button">+</button>
+<span class="text-sm font-bold text-gray-900 min-w-[12px] text-center">2</span>
+<button aria-label="نقصان" class="w-6 h-6 flex items-center justify-center font-bold text-gray-600 hover:text-black active:scale-90" type="button">-</button>
+</div>
+<!-- Delete Button -->
+<button aria-label="حذف العنصر" class="p-1.5 text-gray-700 hover:text-red-500 transition-colors" type="button">
+<svg class="w-5 h-5 stroke-current" fill="none" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</article>
+<!-- Item 2: دجاج مشوي -->
+<article class="bg-white rounded-2xl border border-gray-100 p-3.5 flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+<!-- Food Image -->
+<div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-50">
+<img alt="دجاج مشوي" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiwT8q4hL-v0vep-aMHIZUIQ69H4OziSSBqsoPSyDXEJlveEEHdB4VGUGHuoMPkHdAxdvsAxgmUvarRvfY15u-ODa5uNk6ZM2BFXHZEh-oaSqRs1ldySqXoqyxnmZBE782K3jIIdKw5W-YkpW_oegNfvcBfT3aXNS9KoN9lL845Ee41G_PsZuuCpPAFDJ6iLNykU8etMZY0hRLNF_knFUdnerpr96leSVCYEBVZxU1oGMzj2QLwY0H"/>
+</div>
+<!-- Item Details -->
+<div class="flex-1 mr-3.5">
+<h2 class="font-bold text-base text-gray-900 leading-snug">دجاج مشوي</h2>
+<p class="text-sm font-semibold text-gray-800 mt-1">7,000 <span class="text-xs font-medium">د.ع</span></p>
+</div>
+<!-- Quantity Counter & Delete Action -->
+<div class="flex items-center gap-2.5">
+<!-- Counter Controls -->
+<div class="flex items-center bg-brand-softGray rounded-xl px-2 py-1.5 gap-3">
+<button aria-label="زيادة" class="w-6 h-6 flex items-center justify-center font-bold text-gray-600 hover:text-black active:scale-90" type="button">+</button>
+<span class="text-sm font-bold text-gray-900 min-w-[12px] text-center">1</span>
+<button aria-label="نقصان" class="w-6 h-6 flex items-center justify-center font-bold text-gray-600 hover:text-black active:scale-90" type="button">-</button>
+</div>
+<!-- Delete Button -->
+<button aria-label="حذف العنصر" class="p-1.5 text-gray-700 hover:text-red-500 transition-colors" type="button">
+<svg class="w-5 h-5 stroke-current" fill="none" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</article>
+<!-- Item 3: دولمة -->
+<article class="bg-white rounded-2xl border border-gray-100 p-3.5 flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+<!-- Food Image -->
+<div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-50">
+<img alt="دولمة" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR_ALiuTbIpN0H6kSpzCLrvFV9N_WIfo_tyKcK3yKPSy2GtMOykRnpDUO4W-YVT16WQoecPTeDTXClUuw2OKbriYAYCaLhxdkhlrViC_GlL3GIcjv5HHnyu-ZumB-28O5BVkvwH8Hx6Sn_prXMS3VEi2SliVFTHRpYvkzVKDIB3VY_zLXQTe8WwDmsA6W9tZv9zXq1o1hAdvKNKsrk6Lh6j4jyKdcexFkrVnse-ilLqKHkhPubh6mG"/>
+</div>
+<!-- Item Details -->
+<div class="flex-1 mr-3.5">
+<h2 class="font-bold text-base text-gray-900 leading-snug">دولمة</h2>
+<p class="text-sm font-semibold text-gray-800 mt-1">6,000 <span class="text-xs font-medium">د.ع</span></p>
+</div>
+<!-- Quantity Counter & Delete Action -->
+<div class="flex items-center gap-2.5">
+<!-- Counter Controls -->
+<div class="flex items-center bg-brand-softGray rounded-xl px-2 py-1.5 gap-3">
+<button aria-label="زيادة" class="w-6 h-6 flex items-center justify-center font-bold text-gray-600 hover:text-black active:scale-90" type="button">+</button>
+<span class="text-sm font-bold text-gray-900 min-w-[12px] text-center">1</span>
+<button aria-label="نقصان" class="w-6 h-6 flex items-center justify-center font-bold text-gray-600 hover:text-black active:scale-90" type="button">-</button>
+</div>
+<!-- Delete Button -->
+<button aria-label="حذف العنصر" class="p-1.5 text-gray-700 hover:text-red-500 transition-colors" type="button">
+<svg class="w-5 h-5 stroke-current" fill="none" stroke-width="1.8" viewbox="0 0 24 24">
+<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</article>
+</section>
+<!-- END: CartItemsList -->
+<!-- BEGIN: OrderNotes -->
+<section class="pt-1" data-purpose="order-notes-section">
+<label class="block font-bold text-base text-gray-900 mb-2" for="order-notes">
+          ملاحظات الطلب
+        </label>
+<div class="relative">
+<input class="w-full bg-brand-softGray border border-transparent focus:border-orange-400 focus:bg-white focus:ring-0 rounded-2xl py-3.5 px-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition-all" id="order-notes" placeholder="أضف أي ملاحظات خاصة بالمطعم..." type="text"/>
+</div>
+</section>
+<!-- END: OrderNotes -->
+<!-- BEGIN: OrderSummary -->
+<section class="bg-brand-softGray/60 rounded-3xl p-5 mt-4 space-y-3.5 border border-gray-100" data-purpose="order-summary-card">
+<!-- Summary Title -->
+<h3 class="font-bold text-base text-gray-900 mb-1">
+          ملخص الطلب
+        </h3>
+<!-- Subtotal -->
+<div class="flex justify-between items-center text-sm font-semibold text-gray-600">
+<span>المجموع الفرعي</span>
+<span class="text-gray-900 font-bold">28,000 <span class="font-normal text-xs">د.ع</span></span>
+</div>
+<!-- Delivery Fee -->
+<div class="flex justify-between items-center text-sm font-semibold text-gray-600">
+<span>رسوم التوصيل</span>
+<span class="text-gray-900 font-bold">2,000 <span class="font-normal text-xs">د.ع</span></span>
+</div>
+<!-- Service Fee -->
+<div class="flex justify-between items-center text-sm font-semibold text-gray-600">
+<span>رسوم الخدمة</span>
+<span class="text-gray-900 font-bold">1,000 <span class="font-normal text-xs">د.ع</span></span>
+</div>
+<!-- Total -->
+<div class="flex justify-between items-center pt-2 border-t border-gray-200/70">
+<span class="text-base font-bold text-gray-900">الإجمالي</span>
+<div class="text-brand-orange text-lg font-black tracking-tight">
+            31,000 <span class="text-sm font-bold">د.ع</span>
+</div>
+</div>
+</section>
+<!-- END: OrderSummary -->
+</div>
+<!-- BEGIN: CheckoutFooter -->
+<footer class="p-5 bg-white border-t border-gray-100/80">
+<button class="w-full bg-brand-orange hover:bg-brand-orangeHover text-white py-4 rounded-2xl font-bold text-lg shadow-[0_8px_20px_rgba(255,84,0,0.25)] active:scale-[0.98] transition-all flex items-center justify-center" data-purpose="checkout-button" type="button">
+        إتمام الطلب
+      </button>
+</footer>
+<!-- END: CheckoutFooter -->
+</main>
+</body></html>

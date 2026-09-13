@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Jibli - شاشة البداية</title>
+<!-- Google Fonts: Cairo & Fredoka for Arabic & Modern Typography -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800;900&amp;family=Fredoka:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 CDN with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              orange: '#FF5E00',
+              deep: '#E65100',
+            }
+          },
+          fontFamily: {
+            cairo: ['Cairo', 'sans-serif'],
+            fredoka: ['Fredoka', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles for Mobile Splash Layout & Background Graphics & Elegant Animations -->
+<style data-purpose="custom-styling">
+    body {
+      font-family: 'Cairo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    
+    /* Subtle food doodle outline styling */
+    .doodle-stroke {
+      stroke: rgba(255, 255, 255, 0.14);
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transform-origin: center center;
+    }
+
+    /* Keyframe Animations */
+    @keyframes logoEnter {
+      0% {
+        opacity: 0;
+        transform: scale(0.85) translateY(12px);
+      }
+      70% {
+        transform: scale(1.03) translateY(-2px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    @keyframes logoFloat {
+      0%, 100% {
+        transform: translateY(0);
+        filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.12));
+      }
+      50% {
+        transform: translateY(-5px);
+        filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.18));
+      }
+    }
+
+    @keyframes slideUpFade {
+      0% {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes floatSlow1 {
+      0%, 100% {
+        transform: translateY(0px) rotate(-12deg);
+      }
+      50% {
+        transform: translateY(-8px) rotate(-9deg);
+      }
+    }
+
+    @keyframes floatSlow2 {
+      0%, 100% {
+        transform: translateY(0px) rotate(45deg);
+      }
+      50% {
+        transform: translateY(7px) rotate(42deg);
+      }
+    }
+
+    @keyframes floatSlow3 {
+      0%, 100% {
+        transform: translateY(0px) rotate(-6deg);
+      }
+      50% {
+        transform: translateY(-9px) rotate(-4deg);
+      }
+    }
+
+    @keyframes floatSlow4 {
+      0%, 100% {
+        transform: translateY(0px) rotate(12deg);
+      }
+      50% {
+        transform: translateY(8px) rotate(15deg);
+      }
+    }
+
+    @keyframes floatSlow5 {
+      0%, 100% {
+        transform: translateY(0px) rotate(-12deg);
+      }
+      50% {
+        transform: translateY(-7px) rotate(-15deg);
+      }
+    }
+
+    @keyframes floatSlow6 {
+      0%, 100% {
+        transform: translateY(0px) rotate(-8deg);
+      }
+      50% {
+        transform: translateY(6px) rotate(-6deg);
+      }
+    }
+
+    @keyframes subtlePulseBar {
+      0%, 100% {
+        opacity: 0.65;
+        transform: scaleX(0.96);
+      }
+      50% {
+        opacity: 0.95;
+        transform: scaleX(1);
+      }
+    }
+
+    /* Animation Classes */
+    .anim-logo-wrap {
+      animation: logoEnter 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+                 logoFloat 4.5s ease-in-out 0.9s infinite;
+      will-change: transform, opacity;
+    }
+
+    .anim-slogan {
+      opacity: 0;
+      animation: slideUpFade 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s forwards;
+      will-change: transform, opacity;
+    }
+
+    .anim-footer {
+      opacity: 0;
+      animation: slideUpFade 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.6s forwards;
+      will-change: transform, opacity;
+    }
+
+    .anim-bar {
+      animation: subtlePulseBar 3s ease-in-out infinite;
+      transform-origin: center;
+    }
+
+    .float-doodle-1 { animation: floatSlow1 6s ease-in-out infinite; }
+    .float-doodle-2 { animation: floatSlow2 7s ease-in-out 0.5s infinite; }
+    .float-doodle-3 { animation: floatSlow3 6.5s ease-in-out 1s infinite; }
+    .float-doodle-4 { animation: floatSlow4 7.5s ease-in-out 1.5s infinite; }
+    .float-doodle-5 { animation: floatSlow5 6.2s ease-in-out 0.8s infinite; }
+    .float-doodle-6 { animation: floatSlow6 7.2s ease-in-out 2s infinite; }
+
+    /* Respect reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+      .anim-logo-wrap,
+      .anim-slogan,
+      .anim-footer,
+      .anim-bar,
+      .float-doodle-1,
+      .float-doodle-2,
+      .float-doodle-3,
+      .float-doodle-4,
+      .float-doodle-5,
+      .float-doodle-6 {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-neutral-900 flex items-center justify-center min-h-screen p-0 sm:p-4 antialiased">
+<!-- BEGIN: MobileDeviceFrame -->
+<!-- Container mimicking a high-end mobile phone viewport -->
+<main class="relative w-full max-w-[412px] h-[100dvh] sm:h-[844px] sm:rounded-[48px] overflow-hidden shadow-2xl bg-[#FF5E00] flex flex-col justify-between select-none">
+<!-- BEGIN: BackgroundFoodDoodles -->
+<!-- Stylized outline illustrations representing fast-food items (burger, pizza, fries, chicken) with subtle gentle floating drift -->
+<div aria-hidden="true" class="absolute inset-0 pointer-events-none overflow-hidden z-0" data-purpose="food-doodles-background">
+<!-- Top Left: Taco / Wrap Doodle -->
+<svg class="absolute -top-4 -left-10 w-44 h-44 doodle-stroke opacity-75 transform -rotate-12 float-doodle-1" viewbox="0 0 120 120">
+<path d="M 20 85 C 20 35, 75 20, 100 60 C 105 70, 95 85, 80 85 Z"></path>
+<path d="M 35 75 Q 55 55 85 70"></path>
+<circle cx="50" cy="50" fill="rgba(255,255,255,0.12)" r="3"></circle>
+<circle cx="70" cy="55" fill="rgba(255,255,255,0.12)" r="2.5"></circle>
+</svg>
+<!-- Mid-Left: Crispy Fried Chicken Leg -->
+<svg class="absolute top-[44%] -left-8 w-36 h-36 doodle-stroke opacity-70 transform rotate-45 float-doodle-2" viewbox="0 0 100 100">
+<path d="M 35 60 C 20 50, 20 25, 45 20 C 65 15, 80 35, 70 55 C 65 65, 55 70, 48 70"></path>
+<path d="M 45 70 L 35 85 C 32 90, 24 88, 25 82 C 20 80, 22 72, 30 72"></path>
+<circle cx="48" cy="38" fill="rgba(255,255,255,0.15)" r="2"></circle>
+<circle cx="40" cy="48" fill="rgba(255,255,255,0.15)" r="2"></circle>
+</svg>
+<!-- Middle-Bottom Left: Delicious Burger -->
+<svg class="absolute bottom-[24%] -left-6 w-48 h-48 doodle-stroke opacity-80 transform -rotate-6 float-doodle-3" viewbox="0 0 140 140">
+<!-- Top Bun -->
+<path d="M 25 65 C 25 30, 115 30, 115 65 Z"></path>
+<!-- Seeds -->
+<ellipse cx="55" cy="45" fill="rgba(255,255,255,0.2)" rx="2" ry="1.5"></ellipse>
+<ellipse cx="75" cy="40" fill="rgba(255,255,255,0.2)" rx="2" ry="1.5"></ellipse>
+<ellipse cx="90" cy="50" fill="rgba(255,255,255,0.2)" rx="2" ry="1.5"></ellipse>
+<!-- Patty & Cheese -->
+<rect height="10" rx="5" width="94" x="23" y="69"></rect>
+<path d="M 30 79 Q 45 88, 60 79 Q 75 88, 90 79 Q 100 86, 110 79"></path>
+<!-- Bottom Bun -->
+<path d="M 28 85 C 28 95, 112 95, 112 85 Z"></path>
+</svg>
+<!-- Mid-Right: French Fries Pack -->
+<svg class="absolute top-[48%] -right-8 w-52 h-52 doodle-stroke opacity-80 transform rotate-12 float-doodle-4" viewbox="0 0 140 140">
+<!-- Fries -->
+<path d="M 45 50 L 52 15 L 60 18 L 53 50"></path>
+<path d="M 60 48 L 70 8 L 78 11 L 68 48"></path>
+<path d="M 75 50 L 88 18 L 96 22 L 83 50"></path>
+<path d="M 88 52 L 105 28 L 112 34 L 95 54"></path>
+<!-- Packet Container -->
+<path d="M 40 50 L 50 115 L 105 115 L 115 50 C 95 62, 60 62, 40 50 Z"></path>
+<path d="M 52 75 Q 77 65, 102 75"></path>
+</svg>
+<!-- Center-Bottom: Pizza Slice -->
+<svg class="absolute bottom-[16%] left-[30%] w-44 h-44 doodle-stroke opacity-85 transform -rotate-12 float-doodle-5" viewbox="0 0 120 120">
+<!-- Crust & Slice -->
+<path d="M 20 85 Q 60 105, 95 75 L 55 15 Z"></path>
+<path d="M 25 81 Q 60 98, 90 72"></path>
+<!-- Pepperoni & Toppings -->
+<circle cx="53" cy="45" r="6"></circle>
+<circle cx="68" cy="62" r="5"></circle>
+<circle cx="48" cy="70" r="4"></circle>
+<path d="M 62 32 Q 68 36, 60 40"></path>
+</svg>
+<!-- Bottom Right: Popcorn / Snack Bucket Outline -->
+<svg class="absolute -bottom-6 -right-6 w-40 h-40 doodle-stroke opacity-70 transform rotate-[-8deg] float-doodle-6" viewbox="0 0 100 100">
+<path d="M 25 45 C 20 35, 35 25, 45 30 C 50 20, 65 20, 70 30 C 80 25, 90 35, 85 45 Z"></path>
+<path d="M 28 45 L 38 90 L 72 90 L 82 45 Z"></path>
+</svg>
+</div>
+<!-- END: BackgroundFoodDoodles -->
+<!-- BEGIN: TopBarSimulation -->
+<!-- iPhone Dynamic Island & Status Area placeholder for realistic mobile preview -->
+<header class="relative z-10 w-full pt-3 px-7 flex justify-between items-center text-white text-xs font-semibold" data-purpose="status-bar">
+<span>03:54</span>
+<div aria-hidden="true" class="w-24 h-6 bg-black rounded-full mx-auto"></div>
+<div aria-label="Status Icons" class="flex items-center gap-1.5">
+<!-- Signal Indicator -->
+<svg class="w-3.5 h-3.5 fill-current" viewbox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.28 19.58 10.58 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9z"></path></svg>
+<!-- Battery Icon -->
+<div class="w-5 h-2.5 border border-white rounded-sm p-0.5 flex items-center">
+<div class="w-full h-full bg-white rounded-2xs"></div>
+</div>
+</div>
+</header>
+<!-- END: TopBarSimulation -->
+<!-- BEGIN: BrandHeroSection -->
+<!-- Core App Logo and Catchphrase centered in viewport -->
+<section class="relative z-10 flex-1 flex flex-col items-center justify-center px-6 -mt-10" data-purpose="app-branding">
+<!-- App Wordmark Logo with Location Pin Accent & Animated Entry / Floating Pulse -->
+<div class="anim-logo-wrap flex items-center justify-center font-fredoka tracking-tight text-white select-none drop-shadow-md" style="font-family: system-ui, -apple-system, sans-serif;">
+<!-- Custom Vector Graphic for 'Jibli' matching exact reference styling -->
+<svg aria-label="Jibli Logo" class="w-72 h-auto max-w-[290px]" fill="none" role="img" viewbox="0 0 340 160" xmlns="http://www.w3.org/2000/svg">
+<!-- Letter 'J' with curved bottom tail & integrated Map Pin Pinhead as Dot -->
+<g>
+<!-- Custom Location Pin as the dot of the J -->
+<path d="M 58 48 C 58 35.85 67.85 26 80 26 C 92.15 26 102 35.85 102 48 C 102 59.5 86 78 80 84 C 74 78 58 59.5 58 48 Z" fill="white"></path>
+<circle cx="80" cy="47" fill="#FF5E00" r="6.5"></circle>
+<!-- Stem and Hook of 'J' -->
+<path d="M 72 88 L 88 88 L 88 120 C 88 136 76 148 56 148 C 36 148 24 135 24 122 C 24 116.5 28.5 112 34 112 C 39.5 112 43 116 48 120 C 51 122.5 55 124 59 124 C 67 124 72 118 72 110 L 72 88 Z" fill="white"></path>
+</g>
+<!-- Letter 'i' -->
+<g>
+<circle cx="118" cy="62" fill="white" r="9"></circle>
+<rect fill="white" height="65" rx="9" width="18" x="109" y="80"></rect>
+</g>
+<!-- Letter 'b' -->
+<g>
+<rect fill="white" height="115" rx="9" width="18" x="144" y="30"></rect>
+<path clip-rule="evenodd" d="M 160 81 C 168 76 178 73 190 73 C 213 73 229 90 229 113 C 229 135 212 150 188 150 C 176 150 166 145 158 138 L 158 81 Z M 162 113 C 162 125 172 133 186 133 C 199 133 210 124 210 112 C 210 99 199 90 186 90 C 172 90 162 99 162 113 Z" fill="white" fill-rule="evenodd"></path>
+</g>
+<!-- Letter 'l' -->
+<rect fill="white" height="115" rx="9" width="18" x="245" y="30"></rect>
+<!-- Letter 'i' (End) -->
+<g>
+<circle cx="288" cy="62" fill="white" r="9"></circle>
+<rect fill="white" height="65" rx="9" width="18" x="279" y="80"></rect>
+</g>
+</svg>
+</div>
+<!-- Main Arabic Slogan with Staggered Slide-up Animation -->
+<h1 class="anim-slogan mt-4 text-white text-3xl sm:text-[34px] font-extrabold tracking-wide text-center drop-shadow-sm font-cairo">
+        جيِبلي اللي تريده
+      </h1>
+</section>
+<!-- END: BrandHeroSection -->
+<!-- BEGIN: BottomFooterInfo -->
+<!-- Iraqi tagline and market identifier with smooth staggered fade-in -->
+<footer class="anim-footer relative z-10 pb-10 pt-4 px-6 flex flex-col items-center justify-center text-center text-white" data-purpose="footer-tagline">
+<!-- Sub-headline in Arabic -->
+<p class="text-xl font-bold tracking-wide mb-1 text-white/95 drop-shadow-sm font-cairo">
+        مذاق أقرب لك
+      </p>
+<!-- Market localization badge with Iraqi Flag -->
+<div class="flex items-center justify-center gap-2 mt-1 font-semibold text-base sm:text-lg text-white/90" dir="ltr">
+<span>Made for Iraq</span>
+<!-- Iraq National Flag Icon -->
+<span class="inline-flex items-center justify-center shadow-md rounded-[3px] overflow-hidden w-6 h-4 border border-white/20 bg-white" title="العراق">
+<svg class="w-full h-full" viewbox="0 0 900 600">
+<!-- Red Band -->
+<rect fill="#ce1126" height="200" width="900"></rect>
+<!-- White Band -->
+<rect fill="#ffffff" height="200" width="900" y="200"></rect>
+<!-- Black Band -->
+<rect fill="#000000" height="200" width="900" y="400"></rect>
+<!-- Kufic Takbir (الله أكبر) in Green -->
+<g fill="#007a3d" font-family="'Cairo', sans-serif" font-size="95" font-weight="900" text-anchor="middle">
+<text x="450" y="332">الله ★ أكبر</text>
+</g>
+</svg>
+</span>
+</div>
+<!-- Mobile Home Indicator (iOS Bottom Bar) with subtle breathing pulse -->
+<div aria-hidden="true" class="anim-bar w-36 h-1 bg-white/75 rounded-full mt-6 sm:mt-8 mx-auto"></div>
+</footer>
+<!-- END: BottomFooterInfo -->
+</main>
+<!-- END: MobileDeviceFrame -->
+</body></html>

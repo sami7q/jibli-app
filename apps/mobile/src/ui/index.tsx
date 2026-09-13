@@ -126,18 +126,24 @@ export function Screen({
   scroll = false,
   edges = ['top', 'bottom'],
   padded = true,
+  background = color.surfacePage,
   style,
 }: {
   children: ReactNode;
   scroll?: boolean;
   edges?: Edge[];
   padded?: boolean;
+  /** The page ground. Brand orange on the welcome screen; the page grey
+   * everywhere else. Set here rather than in a screen's own style so the safe
+   * areas are painted too — otherwise the notch stays grey above an orange
+   * screen. */
+  background?: string;
   style?: StyleProp<ViewStyle>;
 }) {
   const inner: StyleProp<ViewStyle> = [padded ? { padding: space[4] } : null, style];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: color.surfacePage }} edges={edges}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: background }} edges={edges}>
       {scroll ? (
         <ScrollView
           contentContainerStyle={[inner, { flexGrow: 1 }]}

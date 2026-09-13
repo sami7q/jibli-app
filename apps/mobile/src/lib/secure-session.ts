@@ -63,6 +63,70 @@ export async function clearSession(): Promise<void> {
   ]);
 }
 
+// ── The guest choice ────────────────────────────────────────────────────────
+
+const GUEST_KEY = 'jibli.browsing_as_guest';
+
+/**
+ * Whether the customer chose «تصفح كضيف» on the welcome screen.
+ *
+ * Not sensitive — it is one boolean about a choice, not credentials — but it
+ * lives here rather than pulling in AsyncStorage for a single flag. Keeping it
+ * at all is the point: without it the welcome screen reappears on every
+ * launch, and a guest who has to re-answer the same question every time is
+ * being asked to sign in with extra steps.
+ */
+export async function rememberGuestChoice(): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(GUEST_KEY, '1', OPTIONS);
+  } catch {
+    // A choice we could not persist still holds for this launch.
+  }
+}
+
+export async function loadGuestChoice(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(GUEST_KEY, OPTIONS)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export async function forgetGuestChoice(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(GUEST_KEY, OPTIONS);
+  } catch {
+    // Nothing to do: the next read fails closed to "not a guest".
+  }
+}
+
+// ── The chosen area ─────────────────────────────────────────────────────────
+
+const AREA_KEY = 'jibli.delivery_area';
+
+/**
+ * Where the customer is ordering to.
+ *
+ * A signed-in customer's area comes from their profile and this is only a
+ * cache of it. A guest has no profile, so this *is* their area — and without
+ * it the home screen has no city id, which means no restaurants at all.
+ */
+export async function saveArea(serialized: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(AREA_KEY, serialized, OPTIONS);
+  } catch {
+    // The choice still holds for this launch.
+  }
+}
+
+export async function loadArea(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(AREA_KEY, OPTIONS);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Update only the tokens after a refresh rotation, leaving the identity intact.
  */

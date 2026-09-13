@@ -103,7 +103,8 @@ describe('the scales', () => {
   });
 
   it('renders a shadow as CSS with the neutral-cool cast, never black', () => {
-    expect(cssShadow(shadow.md)).toBe('0 4px 8px -2px rgba(16, 24, 40, 0.08)');
+    // The card shadow the design comps share, to the digit.
+    expect(cssShadow(shadow.md)).toBe('0 8px 24px -4px rgba(17, 24, 39, 0.06)');
   });
 
   it('a phone gets a bigger minimum tap target than a mouse', () => {
