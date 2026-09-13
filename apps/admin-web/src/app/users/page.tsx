@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dateAr, relativeAr } from '@jibli/ui-web';
-import { USER_STATUSES, type UserStatus } from '@jibli/contracts';
+import { RESTAURANT_ROLE_LABELS, dateAr, relativeAr } from '@jibli/ui-web';
+import { USER_STATUSES, type RestaurantRole, type UserStatus } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import {
   Badge,
@@ -25,7 +26,13 @@ import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
 
 /**
- * Customer directory (plan §84, §87).
+ * People directory: restaurant owners and customers (plan §84, §87).
+ *
+ * One table for both, because one phone number is one person — an owner orders
+ * dinner from someone else's restaurant like anybody. The audience filter is
+ * what separates them on screen, and it opens on owners: that is who an
+ * operator comes here looking for, while a customer list is something you
+ * browse rather than search.
  *
  * Phone numbers arrive masked. Revealing one is a separate, audited request —
  * not a toggle — because plan §84 treats an unmask as a privileged action that
@@ -38,11 +45,19 @@ const STATUS_LABELS: Record<UserStatus, string> = {
   DEACTIVATED: 'معطّل',
 };
 
+type Audience = 'OWNERS' | 'CUSTOMERS' | '';
+
+const AUDIENCE_LABELS: Record<Exclude<Audience, ''>, string> = {
+  OWNERS: 'ملاك المطاعم',
+  CUSTOMERS: 'العملاء',
+};
+
 export default function UsersPage() {
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<UserStatus | ''>('');
+  const [audience, setAudience] = useState<Audience>('OWNERS');
   const [blocking, setBlocking] = useState<AdminCustomer | null>(null);
   const [unmasking, setUnmasking] = useState<AdminCustomer | null>(null);
   const [revealed, setRevealed] = useState<Record<string, string>>({});
@@ -52,9 +67,13 @@ export default function UsersPage() {
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const customers = useQuery({
-    queryKey: ['admin-customers', debouncedSearch, status],
+    queryKey: ['admin-customers', debouncedSearch, status, audience],
     queryFn: () =>
-      admin.customers(token, { q: debouncedSearch || undefined, status: status || undefined }),
+      admin.customers(token, {
+        q: debouncedSearch || undefined,
+        status: status || undefined,
+        role: audience || undefined,
+      }),
     enabled: session.status === 'authenticated',
   });
 
@@ -85,7 +104,18 @@ export default function UsersPage() {
 
   return (
     <AdminShell
-      title="المستخدمون"
+      title={
+        audience === 'CUSTOMERS'
+          ? 'العملاء'
+          : audience === ''
+            ? 'الأشخاص'
+            : 'ملاك المطاعم'
+      }
+      subtitle={
+        audience === 'OWNERS'
+          ? 'من يدير المطاعم على المنصة، وما يديره كل منهم'
+          : undefined
+      }
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >
@@ -94,8 +124,18 @@ export default function UsersPage() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            label="البحث عن عميل"
-            placeholder="الاسم أو رقم الهاتف…"
+            label="بحث"
+            placeholder="الاسم، الهاتف، اسم المستخدم، أو اسم المطعم…"
+          />
+          <Select
+            value={audience}
+            onChange={setAudience}
+            label="الفئة"
+            allLabel="الجميع"
+            options={(['OWNERS', 'CUSTOMERS'] as const).map((value) => ({
+              value,
+              label: AUDIENCE_LABELS[value],
+            }))}
           />
           <Select
             value={status}
@@ -119,15 +159,50 @@ export default function UsersPage() {
           <Skeleton height={320} />
         ) : (
           <DataTable<AdminCustomer>
-            caption="قائمة العملاء"
+            caption={audience === 'CUSTOMERS' ? 'قائمة العملاء' : 'قائمة الأشخاص'}
             rows={customers.data ?? []}
             keyOf={(row) => row.id}
-            emptyMessage="لا يوجد عملاء مطابقون"
+            emptyMessage={
+              audience === 'OWNERS'
+                ? 'لا يوجد ملاك مطاعم مطابقون'
+                : 'لا يوجد أشخاص مطابقون'
+            }
             columns={[
               {
                 key: 'name',
                 header: 'الاسم',
                 render: (row) => row.full_name ?? <span style={{ color: 'var(--text-muted)' }}>—</span>,
+              },
+              {
+                key: 'restaurant',
+                header: 'المطعم',
+                render: (row) =>
+                  row.restaurants.length === 0 ? (
+                    <span style={{ color: 'var(--text-muted)' }}>عميل</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {row.restaurants.map((restaurant) => (
+                        <Link
+                          key={restaurant.id}
+                          href={`/restaurants/${restaurant.id}`}
+                          style={{ color: 'inherit', fontWeight: 600 }}
+                        >
+                          {restaurant.display_name}
+                          <span
+                            style={{
+                              color: 'var(--text-muted)',
+                              fontWeight: 400,
+                              fontSize: 'var(--text-xs)',
+                              marginInlineStart: 6,
+                            }}
+                          >
+                            {RESTAURANT_ROLE_LABELS[restaurant.role as RestaurantRole] ??
+                              restaurant.role}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ),
               },
               {
                 key: 'phone',

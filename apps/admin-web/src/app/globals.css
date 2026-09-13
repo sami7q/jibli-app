@@ -1564,3 +1564,423 @@ html {
   color: var(--text-muted);
   line-height: 1.7;
 }
+
+/* ── Restaurants by area ──────────────────────────────────────────────────── */
+
+.area-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-3);
+}
+
+.area {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transition: border-color 0.15s ease;
+}
+
+.area--on {
+  border-color: var(--jibli-orange-500);
+  box-shadow: inset 0 0 0 1px var(--jibli-orange-500);
+}
+
+.area__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.area__name {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.area__name:hover {
+  color: var(--jibli-orange-600);
+}
+
+.area__expand {
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+}
+
+.area__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.area__count strong {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.area__count--active strong {
+  color: var(--jibli-orange-600);
+}
+
+.area__count--live strong {
+  color: var(--jibli-success-700);
+}
+
+.area__cities {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.area__city {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: start;
+}
+
+.area__city:hover {
+  background: var(--surface-sunken);
+}
+
+.area__city--on {
+  background: var(--jibli-orange-50);
+  color: var(--jibli-orange-700);
+  font-weight: 600;
+}
+
+.area__city-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.area-total {
+  margin-block: var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ── Commission overview ──────────────────────────────────────────────────── */
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+
+.kpi {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Only the two figures that drive a decision are lifted; the rest are context. */
+.kpi--primary {
+  background: var(--jibli-orange-50);
+  border-color: var(--jibli-orange-500);
+}
+
+.kpi--warning {
+  background: var(--jibli-warning-50);
+  border-color: var(--jibli-warning-700);
+}
+
+.kpi__label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.kpi__value {
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.kpi__note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.area-money {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-4);
+}
+
+.area-money__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.area-money__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.area-money__bar {
+  block-size: 6px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.area-money__bar span {
+  display: block;
+  block-size: 100%;
+  background: var(--jibli-orange-500);
+}
+
+.area-money__cities {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.area-money__cities button {
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: start;
+}
+
+.area-money__cities button:hover {
+  background: var(--surface-sunken);
+}
+
+.area-money__city-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.area-money__city-value em {
+  font-style: normal;
+  color: var(--jibli-warning-700);
+  font-size: 0.9em;
+}
+
+/* ── Notifications, support threads, stars ────────────────────────────────── */
+
+.bell-wrap {
+  position: relative;
+}
+
+.notifications {
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  inline-size: min(24rem, calc(100vw - 2rem));
+  max-block-size: min(28rem, 70vh);
+  overflow-y: auto;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.16);
+  z-index: 40;
+}
+
+.notifications__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  inset-block-start: 0;
+  background: var(--surface-card);
+}
+
+.notifications__empty {
+  margin: 0;
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.notifications__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notification {
+  inline-size: 100%;
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.notification:hover {
+  background: var(--surface-sunken);
+}
+
+/* Unread is a rail rather than a background, so a list of them stays readable. */
+.notification--unread {
+  border-inline-start: 3px solid var(--jibli-orange-500);
+  font-weight: 600;
+}
+
+.notification--urgent {
+  border-inline-start-color: var(--jibli-danger-700);
+}
+
+.notification__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.notification__title {
+  font-size: var(--text-sm);
+}
+
+.notification__body {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.notification__time {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.thread__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-block-end: var(--space-3);
+}
+
+.thread__message {
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  max-inline-size: min(42rem, 100%);
+}
+
+/* Who said it, by where it sits and what colour it is. */
+.thread__message--them {
+  background: var(--surface-sunken);
+  align-self: flex-start;
+}
+
+.thread__message--us {
+  background: var(--jibli-orange-50);
+  align-self: flex-end;
+}
+
+.thread__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-block-end: 4px;
+}
+
+.thread__body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+
+.stars {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.stars__star {
+  inline-size: 1rem;
+  block-size: 1rem;
+  color: var(--border-subtle);
+}
+
+.stars__star--on {
+  color: var(--jibli-warning-700);
+  fill: currentColor;
+}

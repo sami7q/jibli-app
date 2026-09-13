@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, arrayContains, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, CUISINE_KEYS, ERROR_CODES, EVENT_TYPES, OPERATIONAL_STATUSES, success } from '@jibli/contracts';
@@ -36,7 +36,10 @@ import { getConfig } from '../../services/config-service.js';
 const listQuerySchema = z.object({
   q: z.string().max(80).optional(),
   status: z.enum(OPERATIONAL_STATUSES).optional(),
+  governorate_id: uuidSchema.optional(),
   city_id: uuidSchema.optional(),
+  /** One cuisine key; a restaurant matches if it carries the tag. */
+  cuisine: z.string().max(40).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });
@@ -84,7 +87,18 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
 
     const conditions = [isNull(restaurants.deletedAt)];
     if (query.status) conditions.push(eq(restaurants.operationalStatus, query.status));
+    if (query.governorate_id) {
+      conditions.push(eq(restaurantBranches.governorateId, query.governorate_id));
+    }
     if (query.city_id) conditions.push(eq(restaurantBranches.cityId, query.city_id));
+    if (query.cuisine) {
+      /*
+       * `arrayContains`, not a hand-written `= ANY(...)`: the operator knows
+       * the column's element type, and a bare interpolated value on the other
+       * side of ANY is the shape that produced five 500s once already.
+       */
+      conditions.push(arrayContains(restaurants.cuisineTags, [query.cuisine]));
+    }
     if (query.q) {
       conditions.push(
         or(
@@ -153,10 +167,16 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       .limit(query.limit)
       .offset(query.offset);
 
+    /*
+     * The same joins as the page query, not a bare count of restaurants: a
+     * total that ignores the filters reports 40 while the table shows 3, and
+     * the pager built on it sends the operator to pages that do not exist.
+     */
     const [total] = await ctx.db
       .select({ value: count() })
       .from(restaurants)
-      .where(isNull(restaurants.deletedAt));
+      .leftJoin(restaurantBranches, eq(restaurantBranches.restaurantId, restaurants.id))
+      .where(and(...conditions));
 
     return reply.send(
       success(
@@ -187,6 +207,145 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       ),
     );
   });
+
+  /**
+   * Restaurants by area, counted.
+   *
+   * "How many restaurants do we have in Karbala, and how many are actually
+   * taking orders?" is a question the directory cannot answer by being paged
+   * through, and it is the question that decides where to spend onboarding
+   * effort. One grouped query rather than a count per city: a request per area
+   * is how a coverage screen becomes slow the moment coverage grows.
+   *
+   * `active` here means the restaurant itself is ACTIVE. Whether it is visible
+   * to customers depends on the city's ordering switch too, which is why that
+   * is reported alongside rather than folded in — an operator looking at a
+   * governorate with 12 active restaurants and no orders needs to see that the
+   * city is closed.
+   */
+  app.get(
+    '/api/v1/admin/restaurants/by-area',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      assertAdminPermission(requirePrincipal(request), 'restaurant.read');
+
+      const rows = await ctx.db
+        .select({
+          governorateId: governorates.id,
+          governorateNameAr: governorates.nameAr,
+          governorateEnabled: governorates.isEnabled,
+          governorateOrdering: governorates.orderingEnabled,
+          cityId: cities.id,
+          cityNameAr: cities.nameAr,
+          cityEnabled: cities.isEnabled,
+          cityOrdering: cities.orderingEnabled,
+          /*
+           * DISTINCT because the join is on branches: a restaurant with two
+           * branches in one city is one restaurant there, not two.
+           */
+          total: sql<number>`COUNT(DISTINCT ${restaurants.id})`,
+          active: sql<number>`COUNT(DISTINCT ${restaurants.id}) FILTER (
+            WHERE ${restaurants.operationalStatus} = 'ACTIVE'
+          )`,
+          accepting: sql<number>`COUNT(DISTINCT ${restaurants.id}) FILTER (
+            WHERE ${restaurants.operationalStatus} = 'ACTIVE'
+              AND ${restaurantBranches.isActive} = true
+              AND ${restaurantBranches.acceptsOrders} = true
+          )`,
+        })
+        .from(governorates)
+        /*
+         * Left joins all the way down, so a governorate Jibli has opened but
+         * not yet filled still appears with a zero. An inner join would hide
+         * exactly the areas that need attention.
+         */
+        .leftJoin(cities, eq(cities.governorateId, governorates.id))
+        .leftJoin(
+          restaurantBranches,
+          and(eq(restaurantBranches.cityId, cities.id), isNull(restaurantBranches.deletedAt)),
+        )
+        .leftJoin(
+          restaurants,
+          and(
+            eq(restaurants.id, restaurantBranches.restaurantId),
+            isNull(restaurants.deletedAt),
+          ),
+        )
+        .groupBy(
+          governorates.id,
+          governorates.nameAr,
+          governorates.isEnabled,
+          governorates.orderingEnabled,
+          cities.id,
+          cities.nameAr,
+          cities.isEnabled,
+          cities.orderingEnabled,
+        )
+        .orderBy(governorates.nameAr, cities.nameAr);
+
+      const byGovernorate = new Map<
+        string,
+        {
+          id: string;
+          name_ar: string;
+          is_enabled: boolean;
+          ordering_enabled: boolean;
+          total: number;
+          active: number;
+          accepting: number;
+          cities: {
+            id: string;
+            name_ar: string;
+            is_enabled: boolean;
+            ordering_enabled: boolean;
+            total: number;
+            active: number;
+            accepting: number;
+          }[];
+        }
+      >();
+
+      for (const row of rows) {
+        const entry = byGovernorate.get(row.governorateId) ?? {
+          id: row.governorateId,
+          name_ar: row.governorateNameAr,
+          is_enabled: row.governorateEnabled,
+          ordering_enabled: row.governorateOrdering,
+          total: 0,
+          active: 0,
+          accepting: 0,
+          cities: [],
+        };
+
+        const total = Number(row.total);
+        const active = Number(row.active);
+        const accepting = Number(row.accepting);
+
+        entry.total += total;
+        entry.active += active;
+        entry.accepting += accepting;
+
+        // A governorate with no cities yet produces one row with a null city.
+        if (row.cityId) {
+          entry.cities.push({
+            id: row.cityId,
+            name_ar: row.cityNameAr as string,
+            is_enabled: row.cityEnabled as boolean,
+            ordering_enabled: row.cityOrdering as boolean,
+            total,
+            active,
+            accepting,
+          });
+        }
+
+        byGovernorate.set(row.governorateId, entry);
+      }
+
+      return reply.send(
+        success([...byGovernorate.values()], { request_id: request.requestId }),
+      );
+    },
+  );
 
   /** One restaurant, with everything an operator needs on the detail screen. */
   app.get(

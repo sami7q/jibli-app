@@ -9,6 +9,7 @@ import { clientIp, userAgent } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
 import { assertRestaurantPermission } from '@jibli/auth';
 import { computeReadiness } from '../../services/readiness-service.js';
+import { notifyAdmins } from '../../services/admin-notification-service.js';
 
 /**
  * Going live, from the restaurant's side.
@@ -149,9 +150,30 @@ export function registerRestaurantActivationRoutes(app: FastifyInstance, ctx: Ap
         });
 
         /*
-         * Through the outbox, not a direct notification: the request is
-         * committed with the row that records it, and the worker is what tells
-         * Admin. A notification sent outside the transaction is one that can
+         * The bell, in the same transaction as the request. A request that
+         * rolls back must not leave a notification pointing at it.
+         */
+        await notifyAdmins(
+          ctx,
+          {
+            kind: 'ACTIVATION_REQUESTED',
+            severity: 'ATTENTION',
+            titleAr: 'مطعم يطلب التفعيل',
+            bodyAr: body.note ?? 'أكمل المطعم قائمة الجاهزية وينتظر المراجعة',
+            linkPath: `/restaurants/${restaurantId}`,
+            entityType: 'restaurant',
+            entityId: restaurantId,
+            restaurantId,
+            // One entry per restaurant: asking twice is still one thing waiting.
+            dedupeKey: `activation:${restaurantId}`,
+          },
+          tx,
+        );
+
+        /*
+         * Through the outbox as well, for anything outside the portal: the
+         * request is committed with the row that records it, and the worker is
+         * what publishes. An event sent outside the transaction is one that can
          * arrive for a change that rolled back.
          */
         await enqueueOutboxEvent(tx, {

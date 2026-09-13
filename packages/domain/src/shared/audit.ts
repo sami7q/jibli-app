@@ -133,6 +133,9 @@ export const AUDIT_ACTIONS = {
   PASSWORD_CHANGE: 'password.change',
   COUPON_CREATE: 'coupon.create',
   COUPON_UPDATE: 'coupon.update',
+  SUPPORT_THREAD_RESOLVE: 'support.thread.resolve',
+  REVIEW_HIDE: 'review.hide',
+  REVIEW_RESTORE: 'review.restore',
   EXPORT_CREATE: 'export.create',
 } as const;
 

@@ -10,6 +10,8 @@ import { registerRestaurantMeRoute } from './me.js';
 import { registerRestaurantHistoryRoutes } from './history.js';
 import { registerRestaurantDashboardRoutes } from './dashboard.js';
 import { registerRestaurantActivationRoutes } from './activation.js';
+import { registerRestaurantSupportRoutes } from './support.js';
+import { registerRestaurantReviewRoutes } from './reviews.js';
 
 /**
  * Restaurant Portal API surface (plan §29, §70, §72, §73).
@@ -29,4 +31,6 @@ export function registerRestaurantPortalRoutes(app: FastifyInstance, ctx: AppCon
   registerRestaurantHistoryRoutes(app, ctx);
   registerRestaurantDashboardRoutes(app, ctx);
   registerRestaurantActivationRoutes(app, ctx);
+  registerRestaurantSupportRoutes(app, ctx);
+  registerRestaurantReviewRoutes(app, ctx);
 }

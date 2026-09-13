@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icon';
 
 /**
@@ -349,11 +349,17 @@ export function ForbiddenState({ requiredAr }: { requiredAr?: string }) {
 }
 
 /**
- * Step-up MFA prompt (plan §88).
+ * Step-up prompt for a sensitive action (plan §88).
  *
  * Shown when the server answers REAUTHENTICATION_REQUIRED. The action is not
  * retried automatically after verification — the operator confirms again, so a
  * sensitive change is never executed by a stale click.
+ *
+ * Which factor it asks for depends on the account. An authenticator is the
+ * stronger answer and is used whenever one is enrolled; an account without one
+ * re-enters its password. Asking for a code that no authenticator can produce
+ * would not make the action safer, only impossible — and an operator who
+ * cannot change a commission has no reason to keep the control on.
  */
 export function MfaChallenge({
   onVerified,
@@ -363,19 +369,47 @@ export function MfaChallenge({
   onCancel: () => void;
 }) {
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [usesAuthenticator, setUsesAuthenticator] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
+
+  // Which factor to ask for. Until this answers, the dialog shows neither
+  // field rather than guessing and making the operator retype.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiRequest } = await import('@/lib/api');
+        const status = await apiRequest<{ enabled: boolean }>('/api/v1/auth/mfa/status');
+        if (!cancelled) setUsesAuthenticator(status.enabled);
+      } catch {
+        // Ask for the code: it is the stricter of the two, so a failed check
+        // never downgrades the challenge.
+        if (!cancelled) setUsesAuthenticator(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const answer = usesAuthenticator ? code : password;
 
   const submit = async () => {
     setSubmitting(true);
     setError(null);
     try {
       const { apiRequest } = await import('@/lib/api');
-      await apiRequest('/api/v1/auth/mfa/verify', { method: 'POST', body: { code } });
+      await apiRequest('/api/v1/auth/mfa/verify', {
+        method: 'POST',
+        body: usesAuthenticator ? { code } : { password },
+      });
       onVerified();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'رمز غير صحيح');
+      setError(caught instanceof Error ? caught.message : 'تعذّر التحقق');
       setCode('');
+      setPassword('');
     } finally {
       setSubmitting(false);
     }
@@ -385,22 +419,50 @@ export function MfaChallenge({
     <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="mfa-title">
       <div className="dialog">
         <h2 id="mfa-title">تأكيد الهوية</h2>
-        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-          هذا الإجراء حساس ويتطلب رمز التحقق بخطوتين. أدخل الرمز من تطبيق المصادقة، أو أحد رموز
-          الاسترداد.
-        </p>
 
-        <div className="field">
-          <label htmlFor="mfa-code">رمز التحقق</label>
-          <input
-            id="mfa-code"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            style={{ textAlign: 'center', letterSpacing: 6, fontSize: 'var(--text-xl)' }}
-          />
-        </div>
+        {usesAuthenticator === null ? (
+          <Skeleton height={120} />
+        ) : usesAuthenticator ? (
+          <>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              هذا الإجراء حساس ويتطلب رمز التحقق بخطوتين. أدخل الرمز من تطبيق المصادقة، أو أحد
+              رموز الاسترداد.
+            </p>
+
+            <div className="field">
+              <label htmlFor="mfa-code">رمز التحقق</label>
+              <input
+                id="mfa-code"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                style={{ textAlign: 'center', letterSpacing: 6, fontSize: 'var(--text-xl)' }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              هذا الإجراء حساس. أكّد أنك أنت بإدخال كلمة مرور حسابك.
+            </p>
+
+            <div className="field">
+              <label htmlFor="mfa-password">كلمة المرور</label>
+              <input
+                id="mfa-password"
+                type="password"
+                dir="ltr"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+              />
+              <span className="field__hint">
+                لحماية أقوى، فعّل التحقق بخطوتين من صفحة الأمان — عندها يُطلب رمز بدل كلمة المرور.
+              </span>
+            </div>
+          </>
+        )}
 
         {error ? (
           <p className="alert-bar alert-bar--danger" role="alert">
@@ -412,7 +474,7 @@ export function MfaChallenge({
           <button
             type="button"
             className="btn btn--primary"
-            disabled={code.length < 6 || isSubmitting}
+            disabled={answer.length < (usesAuthenticator ? 6 : 1) || isSubmitting}
             onClick={() => void submit()}
           >
             {isSubmitting ? 'جاري التحقق…' : 'تأكيد'}

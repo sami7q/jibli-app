@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SETTLEMENT_STATUS_LABELS, dateAr, pluralAr } from '@jibli/ui-web';
 import { SETTLEMENT_STATUSES, type SettlementStatus } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
+import { CommissionOverviewCards } from '@/components/commission-overview';
 import {
   Badge,
   Card,
@@ -25,7 +26,12 @@ import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 
 /**
- * Commission statements (plan §41, §42, §44).
+ * Commissions and statements (plan §41, §42, §44).
+ *
+ * Two questions on one screen, in the order they get asked. First: how much
+ * have we earned, where, and how much of it is still sitting at restaurants —
+ * read live from completed orders, because the money an operator chases is
+ * exactly the part no statement covers yet. Then: the statements themselves.
  *
  * Generation is automatic and stops at DRAFT; issuing is a deliberate human
  * action, which is why it is a button here and not a background job. Finance
@@ -90,6 +96,8 @@ export default function SettlementsPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >
+      <CommissionOverviewCards token={token} />
+
       {/*
         A finance dashboard whose underlying invariants are failing must say so
         rather than presenting its numbers as authoritative (plan §95).

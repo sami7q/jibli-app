@@ -31,6 +31,8 @@ export type IconName =
   | 'cash'
   | 'chart'
   | 'alert'
+  | 'info'
+  | 'star'
   | 'volume'
   | 'geography'
   | 'restaurants'
@@ -78,6 +80,8 @@ const PATHS: Record<IconName, string> = {
   cash: 'M2 7h20v10H2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   chart: 'M3 3v18h18M7 15l4-4 3 3 5-6',
   alert: 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+  info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01',
+  star: 'M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8z',
   volume: 'M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14',
   geography: 'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   restaurants: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6',

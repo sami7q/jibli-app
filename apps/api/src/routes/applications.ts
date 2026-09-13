@@ -6,6 +6,7 @@ import { displayNameSchema, iraqiPhoneSchema, toE164Iraq, uuidSchema } from '@ji
 import { cities, governorates, restaurantApplications, uuidv7 } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { clientIp, userAgent } from '../lib/context.js';
+import { notifyAdmins } from '../services/admin-notification-service.js';
 
 /**
  * A restaurant applying to join, with no account and nobody to ask.
@@ -197,7 +198,21 @@ export function registerPublicApplicationRoutes(app: FastifyInstance, ctx: AppCo
        * actor here — an application is a fact about a stranger, and the log
        * line above is the record of it. The audit trail starts when someone at
        * Jibli reviews it.
+       *
+       * A bell entry is a different thing: not a record of who acted, but a
+       * note that something is waiting. Without it an application sits in the
+       * queue until somebody thinks to look, which on a public form is the
+       * difference between a day and a fortnight.
        */
+      await notifyAdmins(ctx, {
+        kind: 'APPLICATION_RECEIVED',
+        severity: 'ATTENTION',
+        titleAr: `طلب انضمام جديد: ${body.display_name}`,
+        bodyAr: `${body.applicant_name} — ${body.address_text}`,
+        linkPath: '/applications',
+        entityType: 'restaurant_application',
+        entityId: applicationId,
+      });
 
       return reply.status(202).send(
         success({ received: true, note_ar: ACKNOWLEDGEMENT }, { request_id: request.requestId }),

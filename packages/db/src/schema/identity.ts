@@ -322,7 +322,7 @@ export const mfaAttempts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     succeeded: boolean('succeeded').notNull(),
-    method: text('method').$type<'TOTP' | 'RECOVERY_CODE'>().notNull(),
+    method: text('method').$type<'TOTP' | 'RECOVERY_CODE' | 'PASSWORD'>().notNull(),
     ip: text('ip'),
     createdAt: createdAt(),
   },

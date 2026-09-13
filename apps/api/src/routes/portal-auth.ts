@@ -22,6 +22,7 @@ import {
 import { clientIp, userAgent, type AppContext } from '../lib/context.js';
 import { issueSession, loadCapabilities, refreshSession, revokeSessionByRefreshToken, revokeSessionChain } from '../services/session-service.js';
 import { requirePrincipal } from '../plugins/auth.js';
+import { getConfig } from '../services/config-service.js';
 import { verifyTotpForUser } from './mfa.js';
 
 /**
@@ -296,11 +297,16 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
              */
             must_change_password: user.mustChangePassword,
             /*
-             * Platform roles reach money and roles, so MFA is not optional
-             * (plan §88, §1853). The portal sends them to enrolment before
-             * anything else when this is true.
+             * Platform roles reach money and roles, so the plan makes MFA
+             * mandatory for them (§88, §1853). Whether that is *enforced* is a
+             * setting: on a one-person pilot a hard requirement locks the only
+             * admin out of their own platform, and an account that cannot sign
+             * in is not a more secure account. Sensitive actions still demand
+             * a step-up either way — with an authenticator code when one is
+             * enrolled, and the password when one is not.
              */
-            mfa_enrolment_required: isPlatform && !mfaEnabled,
+            mfa_enrolment_required:
+              isPlatform && !mfaEnabled && (await getConfig(ctx, 'require_mfa', false)),
             /* Where the browser should go. A user with both kinds of access is
              * sent to Admin, which is the more privileged surface. */
             portal: isPlatform ? 'ADMIN' : 'RESTAURANT',

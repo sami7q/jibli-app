@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { ADMIN_NAV, dateWithWeekdayAr, JibliLogo } from '@jibli/ui-web';
 import { Icon, type IconName } from './icon';
 import { SessionMenu } from './session-menu';
+import { NotificationBell } from './notification-bell';
+import { useAdminSession } from '@/hooks/use-session';
 
 /**
  * Admin shell (plan §130).
@@ -38,6 +40,15 @@ export function AdminShell({
     '/applications': pendingApplications,
     '/orders/live': liveOrders,
   };
+
+  /*
+   * The bell reads the session itself rather than taking a token prop. Every
+   * screen renders this shell, and threading a token through nineteen pages to
+   * reach one component in the header is how a prop ends up missing on the
+   * twentieth.
+   */
+  const session = useAdminSession();
+  const bellToken = session.status === 'authenticated' ? session.accessToken : '';
 
   return (
     <div className="shell">
@@ -91,26 +102,7 @@ export function AdminShell({
 
           <AdminSearch />
 
-          {/*
-            Badge count also lives in the accessible name: a red dot on a bell
-            says nothing to a screen reader (plan §134).
-          */}
-          <Link
-            href="/applications"
-            className="bell"
-            aria-label={
-              pendingApplications === 0
-                ? 'لا توجد طلبات انضمام بانتظار المراجعة'
-                : `${pendingApplications} من طلبات الانضمام بانتظار المراجعة`
-            }
-          >
-            <Icon name="bell" className="nav__icon" aria-hidden />
-            {pendingApplications > 0 ? (
-              <span className="bell__badge" aria-hidden>
-                {pendingApplications > 9 ? '9+' : pendingApplications}
-              </span>
-            ) : null}
-          </Link>
+          <NotificationBell token={bellToken} />
 
           <SessionMenu userName={userName} userRoleAr={userRoleAr} />
 

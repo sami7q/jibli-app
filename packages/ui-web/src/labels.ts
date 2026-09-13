@@ -113,6 +113,8 @@ export const RESTAURANT_NAV = [
   { href: '/settlements', labelAr: 'التسويات', icon: 'settlements' },
   { href: '/drivers', labelAr: 'السائقون', icon: 'drivers' },
   { href: '/staff', labelAr: 'الموظفون', icon: 'staff' },
+  { href: '/reviews', labelAr: 'التقييمات', icon: 'star' },
+  { href: '/support', labelAr: 'الدعم', icon: 'support' },
   { href: '/settings', labelAr: 'الإعدادات', icon: 'settings' },
 ] as const;
 
@@ -136,16 +138,23 @@ export const ADMIN_NAV = [
     ],
   },
   {
-    group: 'المستخدمون',
+    group: 'الأشخاص',
     items: [
-      { href: '/users', labelAr: 'المستخدمون', icon: 'users' },
+      { href: '/users', labelAr: 'ملاك المطاعم', icon: 'users' },
       { href: '/drivers', labelAr: 'المندوبون', icon: 'drivers' },
+    ],
+  },
+  {
+    group: 'الدعم والتقييم',
+    items: [
+      { href: '/support', labelAr: 'رسائل المطاعم', icon: 'support' },
+      { href: '/reviews', labelAr: 'التقييمات', icon: 'star' },
     ],
   },
   {
     group: 'المالية والتقارير',
     items: [
-      { href: '/finance/settlements', labelAr: 'العمولات والتسويات', icon: 'commissions' },
+      { href: '/finance/settlements', labelAr: 'العمولات', icon: 'commissions' },
       { href: '/finance/reports', labelAr: 'التقارير المالية', icon: 'reports' },
       { href: '/finance/invoices', labelAr: 'الفواتير', icon: 'invoices' },
     ],

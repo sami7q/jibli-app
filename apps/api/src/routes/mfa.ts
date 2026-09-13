@@ -13,6 +13,7 @@ import {
   generateRecoveryCodes,
   generateTotpSecret,
   hashRecoveryCode,
+  verifyPassword,
   verifyTotpCode,
 } from '@jibli/auth';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
@@ -56,10 +57,30 @@ const codeSchema = z.object({
 });
 
 /**
- * Whether this principal is required to hold MFA.
+ * A step-up challenge: a TOTP code, or the account password.
+ *
+ * Both answer the same question — "is this still the person who signed in?" —
+ * and an account with no authenticator can only answer it the second way.
+ * Requiring TOTP from someone who never enrolled does not make the action
+ * safer; it makes it impossible.
+ */
+const stepUpSchema = z
+  .object({
+    code: z.string().min(6).max(16).optional(),
+    password: z.string().min(1).max(200).optional(),
+  })
+  .refine((value) => Boolean(value.code || value.password), {
+    message: 'A code or a password is required',
+  });
+
+/**
+ * Whether this principal's role would require MFA if the platform enforces it.
  *
  * Derived from the role matrix rather than a per-user flag, so adding a Finance
- * Admin automatically brings the requirement with it.
+ * Admin automatically brings the requirement with it. Whether the requirement
+ * is *enforced* is a separate question, answered by the `require_mfa` setting:
+ * a one-person pilot and a platform with a finance team are not the same
+ * operation, and only one of them can afford a locked-out admin.
  */
 function mfaRequiredFor(roles: readonly PlatformRole[]): boolean {
   return roles.some((role) => MFA_MANDATORY_ROLES.includes(role));
@@ -83,7 +104,12 @@ async function recentFailures(ctx: AppContext, userId: string): Promise<number> 
 
 async function recordAttempt(
   ctx: AppContext,
-  params: { userId: string; succeeded: boolean; method: 'TOTP' | 'RECOVERY_CODE'; ip: string | null },
+  params: {
+    userId: string;
+    succeeded: boolean;
+    method: 'TOTP' | 'RECOVERY_CODE' | 'PASSWORD';
+    ip: string | null;
+  },
 ): Promise<void> {
   await ctx.db.insert(mfaAttempts).values({
     id: uuidv7(),
@@ -411,16 +437,56 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
    */
   app.post('/api/v1/auth/mfa/verify', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
-    const body = codeSchema.parse(request.body);
+    const body = stepUpSchema.parse(request.body);
     const ip = clientIp(request);
 
-    // One implementation for both paths: see verifyTotpForUser above.
-    await verifyTotpForUser(ctx, {
-      userId: principal.userId,
-      code: body.code,
-      ip,
-      userAgent: userAgent(request),
-    });
+    if (body.code) {
+      // One implementation for both paths: see verifyTotpForUser above.
+      await verifyTotpForUser(ctx, {
+        userId: principal.userId,
+        code: body.code,
+        ip,
+        userAgent: userAgent(request),
+      });
+    } else {
+      /*
+       * The password path, and only for an account with no authenticator. An
+       * account that *has* one must use it: falling back to the password there
+       * would let a stolen password alone reach the actions MFA exists to
+       * protect, which is the whole point of having enrolled.
+       */
+      const [account] = await ctx.db
+        .select({ passwordHash: users.passwordHash, mfaEnabledAt: users.mfaEnabledAt })
+        .from(users)
+        .where(eq(users.id, principal.userId))
+        .limit(1);
+
+      if (account?.mfaEnabledAt) {
+        throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+          details: { field: 'code', reason: 'MFA_ENROLLED' },
+          messageAr: 'هذا الحساب مفعّل عليه التحقق بخطوتين. أدخل الرمز من تطبيق المصادقة.',
+        });
+      }
+
+      const ok = account?.passwordHash
+        ? await verifyPassword(body.password as string, account.passwordHash)
+        : false;
+
+      // Recorded on the same ledger as a failed code: the lockout window
+      // protects the step-up, not one particular way of answering it.
+      await recordAttempt(ctx, {
+        userId: principal.userId,
+        succeeded: ok,
+        method: 'PASSWORD',
+        ip,
+      });
+
+      if (!ok) {
+        throw new AppError(ERROR_CODES.INVALID_CREDENTIALS, {
+          messageAr: 'كلمة المرور غير صحيحة',
+        });
+      }
+    }
 
     // Stamp the session. This is what `hasFreshMfa` reads for step-up checks.
     await ctx.db

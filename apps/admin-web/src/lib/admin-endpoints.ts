@@ -30,6 +30,125 @@ export interface AdminRestaurant {
   created_at: string;
 }
 
+/** Restaurants counted per governorate and city, for the coverage panel. */
+export interface AreaCoverage {
+  id: string;
+  name_ar: string;
+  is_enabled: boolean;
+  ordering_enabled: boolean;
+  total: number;
+  active: number;
+  accepting: number;
+  cities: {
+    id: string;
+    name_ar: string;
+    is_enabled: boolean;
+    ordering_enabled: boolean;
+    total: number;
+    active: number;
+    accepting: number;
+  }[];
+}
+
+/** Commission earned and outstanding, grouped three ways over one filtered set. */
+export interface AdminNotification {
+  id: string;
+  kind: string;
+  severity: 'INFO' | 'ATTENTION' | 'URGENT';
+  title_ar: string;
+  body_ar: string | null;
+  link_path: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface SupportThreadSummary {
+  id: string;
+  subject: string;
+  topic: string;
+  status: 'OPEN' | 'ANSWERED' | 'RESOLVED';
+  priority: 'NORMAL' | 'URGENT';
+  restaurant_id: string;
+  restaurant_name: string;
+  partner_code: string;
+  last_message_at: string;
+  last_message_from: 'RESTAURANT' | 'JIBLI';
+  awaiting_jibli: boolean;
+  message_count: number;
+  created_at: string;
+}
+
+export interface SupportThreadDetail {
+  id: string;
+  subject: string;
+  topic: string;
+  status: 'OPEN' | 'ANSWERED' | 'RESOLVED';
+  priority: 'NORMAL' | 'URGENT';
+  restaurant_id: string;
+  restaurant_name: string;
+  partner_code: string;
+  created_at: string;
+  resolved_at: string | null;
+  messages: {
+    id: string;
+    side: 'RESTAURANT' | 'JIBLI';
+    author_name: string;
+    body: string;
+    created_at: string;
+  }[];
+}
+
+export interface AdminReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  is_hidden: boolean;
+  restaurant_id: string;
+  restaurant_name: string;
+  public_order_number: string;
+  author_name: string | null;
+  created_at: string;
+}
+
+export interface CommissionOverview {
+  totals: {
+    order_count: number;
+    restaurant_count: number;
+    gross_sales_iqd: number;
+    commission_iqd: number;
+    outstanding_iqd: number;
+  };
+  by_area: {
+    id: string;
+    name_ar: string;
+    order_count: number;
+    commission_iqd: number;
+    outstanding_iqd: number;
+    gross_sales_iqd: number;
+    cities: {
+      id: string;
+      name_ar: string;
+      order_count: number;
+      commission_iqd: number;
+      outstanding_iqd: number;
+      gross_sales_iqd: number;
+    }[];
+  }[];
+  by_restaurant: {
+    restaurant_id: string;
+    display_name: string;
+    partner_code: string;
+    governorate_name_ar: string;
+    city_name_ar: string;
+    order_count: number;
+    gross_sales_iqd: number;
+    commission_iqd: number;
+    outstanding_iqd: number;
+    last_order_at: string | null;
+  }[];
+  truncated: boolean;
+}
+
 export interface CommissionConfigView {
   flat_iqd: number;
   commission_display: string;
@@ -145,6 +264,15 @@ export interface OrderStats {
 export interface AdminCustomer {
   id: string;
   full_name: string | null;
+  /** Restaurants this person runs. Empty for an ordinary customer. */
+  restaurants: {
+    id: string;
+    display_name: string;
+    partner_code: string;
+    operational_status: string;
+    role: string;
+    is_active: boolean;
+  }[];
   phone: string;
   phone_masked: boolean;
   status: string;
@@ -511,6 +639,84 @@ export const admin = {
   // ── People ──────────────────────────────────────────────────────────────
   customers: (token: string, filters: Record<string, string | undefined> = {}) =>
     apiRequest<AdminCustomer[]>(`/api/v1/admin/users${qs(filters)}`, { accessToken: token }),
+
+  commissionOverview: (
+    token: string,
+    filters: Record<string, string | undefined> = {},
+  ) =>
+    apiRequest<CommissionOverview>(
+      `/api/v1/admin/finance/commission-overview${qs(filters)}`,
+      { accessToken: token },
+    ),
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+
+  unreadNotificationCount: (token: string) =>
+    apiRequest<{ unread: number }>('/api/v1/admin/notifications/unread-count', {
+      accessToken: token,
+    }),
+
+  notifications: (token: string, limit = 30) =>
+    apiRequest<AdminNotification[]>(`/api/v1/admin/notifications?limit=${limit}`, {
+      accessToken: token,
+    }),
+
+  markNotificationsRead: (token: string, ids?: string[]) =>
+    apiRequest<{ marked: number }>('/api/v1/admin/notifications/read', {
+      method: 'POST',
+      accessToken: token,
+      body: ids ? { notification_ids: ids } : {},
+    }),
+
+  // ── Support ───────────────────────────────────────────────────────────────
+
+  supportThreads: (token: string, filters: Record<string, string | undefined> = {}) =>
+    apiRequest<SupportThreadSummary[]>(`/api/v1/admin/support/threads${qs(filters)}`, {
+      accessToken: token,
+    }),
+
+  supportThread: (token: string, threadId: string) =>
+    apiRequest<SupportThreadDetail>(`/api/v1/admin/support/threads/${threadId}`, {
+      accessToken: token,
+    }),
+
+  replyToSupportThread: (
+    token: string,
+    threadId: string,
+    body: { message: string; resolve: boolean },
+  ) =>
+    apiRequest<{ sent: boolean }>(`/api/v1/admin/support/threads/${threadId}/messages`, {
+      method: 'POST',
+      accessToken: token,
+      body,
+    }),
+
+  resolveSupportThread: (token: string, threadId: string, reason?: string) =>
+    apiRequest<{ resolved: boolean }>(`/api/v1/admin/support/threads/${threadId}/resolve`, {
+      method: 'POST',
+      accessToken: token,
+      body: reason ? { reason } : {},
+    }),
+
+  // ── Reviews ───────────────────────────────────────────────────────────────
+
+  reviews: (token: string, filters: Record<string, string | undefined> = {}) =>
+    apiRequest<AdminReview[]>(`/api/v1/admin/reviews${qs(filters)}`, { accessToken: token }),
+
+  setReviewHidden: (token: string, reviewId: string, hidden: boolean, reason: string) =>
+    apiRequest<{
+      hidden: boolean;
+      restaurant_rating: number | null;
+      restaurant_rating_count: number;
+      note_ar: string;
+    }>(`/api/v1/admin/reviews/${reviewId}/visibility`, {
+      method: 'POST',
+      accessToken: token,
+      body: { hidden, reason },
+    }),
+
+  restaurantsByArea: (token: string) =>
+    apiRequest<AreaCoverage[]>('/api/v1/admin/restaurants/by-area', { accessToken: token }),
 
   unmaskPhone: (token: string, id: string, reason: string) =>
     apiRequest<{ phone: string }>(`/api/v1/admin/users/${id}/unmask-phone`, {

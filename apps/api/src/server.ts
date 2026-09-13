@@ -21,6 +21,7 @@ import { registerCatalogRoutes } from './routes/catalog.js';
 import { registerAssetRoutes } from './routes/assets.js';
 import { registerPublicApplicationRoutes } from './routes/applications.js';
 import { registerOrderRoutes } from './routes/orders.js';
+import { registerReviewRoutes } from './routes/reviews.js';
 import { registerDriverRoutes } from './routes/driver.js';
 import { registerRestaurantPortalRoutes } from './routes/restaurant/index.js';
 import { registerAdminRoutes } from './routes/admin/index.js';
@@ -223,6 +224,7 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
   registerAssetRoutes(app, ctx);
   registerPublicApplicationRoutes(app, ctx);
   registerOrderRoutes(app, ctx);
+  registerReviewRoutes(app, ctx);
   registerDriverRoutes(app, ctx);
   registerRestaurantPortalRoutes(app, ctx);
   registerAdminRoutes(app, ctx);

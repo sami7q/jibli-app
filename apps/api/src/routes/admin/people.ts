@@ -21,6 +21,7 @@ import {
   drivers,
   orders,
   restaurantDrivers,
+  restaurantMembers,
   restaurants,
   userPlatformRoles,
   users,
@@ -39,7 +40,14 @@ import { revokeSessionChain } from '../../services/session-service.js';
  */
 
 export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext): void {
-  /** Customer directory. */
+  /**
+   * People directory: customers and the people who run restaurants.
+   *
+   * One table rather than two, because one phone number is one person: the
+   * owner of a restaurant orders dinner from somebody else's, and splitting
+   * them into separate directories creates two records that drift apart. The
+   * `role` filter is how the screen shows one group at a time.
+   */
   app.get('/api/v1/admin/users', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
     assertAdminPermission(principal, 'customer.read');
@@ -48,6 +56,8 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         q: z.string().max(80).optional(),
         status: z.enum(USER_STATUSES).optional(),
         city_id: uuidSchema.optional(),
+        /** OWNERS: has a live restaurant membership. CUSTOMERS: has none. */
+        role: z.enum(['OWNERS', 'CUSTOMERS']).optional(),
         limit: z.coerce.number().int().min(1).max(100).default(25),
         offset: z.coerce.number().int().min(0).max(10_000).default(0),
       })
@@ -59,10 +69,41 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
     if (query.status) conditions.push(eq(users.status, query.status));
     if (query.city_id) conditions.push(eq(users.profileCityId, query.city_id));
     if (query.q) {
+      /*
+       * Searches the restaurant name too. Someone looking for the owner of
+       * "مندي حضرموت" knows the restaurant, not the person — that is the whole
+       * reason they are on this screen.
+       */
       conditions.push(
-        or(ilike(users.fullName, `%${query.q}%`), ilike(users.phoneE164, `%${query.q}%`)) as never,
+        or(
+          ilike(users.fullName, `%${query.q}%`),
+          ilike(users.phoneE164, `%${query.q}%`),
+          ilike(users.username, `%${query.q}%`),
+          sql`EXISTS (
+            SELECT 1 FROM ${restaurantMembers}
+            JOIN ${restaurants} ON ${restaurants.id} = ${restaurantMembers.restaurantId}
+            WHERE ${restaurantMembers.userId} = ${users.id}
+              AND ${restaurants.deletedAt} IS NULL
+              AND ${restaurants.displayName} ILIKE ${`%${query.q}%`}
+          )`,
+        ) as never,
       );
     }
+
+    /*
+     * Membership decides which group someone is in, not a column on the user:
+     * a person becomes a restaurant owner the moment Admin creates the
+     * restaurant, and a flag would have to be kept in step with that by hand.
+     */
+    const runsARestaurant = sql`EXISTS (
+      SELECT 1 FROM ${restaurantMembers}
+      JOIN ${restaurants} ON ${restaurants.id} = ${restaurantMembers.restaurantId}
+      WHERE ${restaurantMembers.userId} = ${users.id}
+        AND ${restaurantMembers.isActive} = true
+        AND ${restaurants.deletedAt} IS NULL
+    )`;
+    if (query.role === 'OWNERS') conditions.push(runsARestaurant as never);
+    if (query.role === 'CUSTOMERS') conditions.push(sql`NOT ${runsARestaurant}` as never);
 
     const rows = await ctx.db
       .select({
@@ -91,11 +132,57 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
 
     const [total] = await ctx.db.select({ value: count() }).from(users).where(and(...conditions));
 
+    /*
+     * Memberships for this page of results only. A join on the main query
+     * would multiply rows per restaurant and break both the count and the
+     * page size; a lookup keyed by the ids already fetched does not.
+     */
+    const memberships =
+      rows.length === 0
+        ? []
+        : await ctx.db
+            .select({
+              userId: restaurantMembers.userId,
+              restaurantId: restaurants.id,
+              displayName: restaurants.displayName,
+              partnerCode: restaurants.partnerCode,
+              operationalStatus: restaurants.operationalStatus,
+              role: restaurantMembers.role,
+              isActive: restaurantMembers.isActive,
+            })
+            .from(restaurantMembers)
+            .innerJoin(restaurants, eq(restaurants.id, restaurantMembers.restaurantId))
+            .where(
+              and(
+                inArray(
+                  restaurantMembers.userId,
+                  rows.map((row) => row.id),
+                ),
+                isNull(restaurants.deletedAt),
+              ),
+            )
+            .orderBy(restaurants.displayName);
+
+    const byUser = new Map<string, typeof memberships>();
+    for (const membership of memberships) {
+      const list = byUser.get(membership.userId) ?? [];
+      list.push(membership);
+      byUser.set(membership.userId, list);
+    }
+
     return reply.send(
       success(
         rows.map((row) => ({
           id: row.id,
           full_name: row.fullName,
+          restaurants: (byUser.get(row.id) ?? []).map((membership) => ({
+            id: membership.restaurantId,
+            display_name: membership.displayName,
+            partner_code: membership.partnerCode,
+            operational_status: membership.operationalStatus,
+            role: membership.role,
+            is_active: membership.isActive,
+          })),
           phone: row.phoneE164 ? (canUnmask ? row.phoneE164 : maskPhone(row.phoneE164)) : null,
           phone_masked: !canUnmask,
           status: row.status,

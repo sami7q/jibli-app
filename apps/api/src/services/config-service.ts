@@ -15,6 +15,18 @@ export const CONFIG_DEFAULTS = {
   global_checkout_enabled: true,
   platform_service_fee_iqd: 1000,
   commission_flat_iqd: 500,
+  /*
+   * Whether a platform role must enrol an authenticator before it can use the
+   * portal. Off for a one-person operation, where the only thing a hard
+   * requirement reliably produces is a locked-out owner; turn it on before the
+   * first hire who is not you.
+   */
+  require_mfa: false,
+  /*
+   * How long after delivery a customer may rate. A rating taken at the
+   * doorstep measures the last thirty seconds of a meal nobody has eaten yet.
+   */
+  review_delay_minutes: 15,
   default_settlement_policy: 'HALF_MONTH',
   default_payment_term_days: 7,
   delivery_pin_enabled: true,

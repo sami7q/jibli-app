@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { OPERATIONAL_STATUSES, type OperationalStatus } from '@jibli/contracts';
+import { CUISINES, OPERATIONAL_STATUSES, type OperationalStatus } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
+import { AreaCoverageCard } from '@/components/area-coverage';
 import { IssuePortalAccess } from '@/components/portal-credentials';
 import {
   Badge,
@@ -19,6 +20,7 @@ import {
 } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { admin, type AdminRestaurant } from '@/lib/admin-endpoints';
+import { adminApi } from '@/lib/api';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
@@ -44,6 +46,9 @@ export default function RestaurantsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<OperationalStatus | ''>('');
+  const [governorateId, setGovernorateId] = useState('');
+  const [cityId, setCityId] = useState('');
+  const [cuisine, setCuisine] = useState('');
   /** The restaurant whose owner is being given a username and password. */
   const [issuingFor, setIssuingFor] = useState<AdminRestaurant | null>(null);
 
@@ -53,14 +58,41 @@ export default function RestaurantsPage() {
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const restaurants = useQuery({
-    queryKey: ['admin-restaurants', debouncedSearch, status],
+    queryKey: ['admin-restaurants', debouncedSearch, status, governorateId, cityId, cuisine],
     queryFn: () =>
       admin.restaurants(token, {
         q: debouncedSearch || undefined,
         status: status || undefined,
+        governorate_id: governorateId || undefined,
+        city_id: cityId || undefined,
+        cuisine: cuisine || undefined,
       }),
     enabled: session.status === 'authenticated',
   });
+
+  const governorates = useQuery({
+    queryKey: ['admin-governorates'],
+    queryFn: () => adminApi.governorates(token),
+    enabled: session.status === 'authenticated',
+    staleTime: 5 * 60_000,
+  });
+
+  /*
+   * Cities for the chosen governorate only. Loading all of Iraq's cities into
+   * one select produces a list nobody can use, and the pair is how an address
+   * is actually written.
+   */
+  const cities = useQuery({
+    queryKey: ['admin-cities', governorateId],
+    queryFn: () => adminApi.cities(token, governorateId),
+    enabled: session.status === 'authenticated' && governorateId !== '',
+    staleTime: 5 * 60_000,
+  });
+
+  const selectArea = (area: { governorateId: string; cityId: string }) => {
+    setGovernorateId(area.governorateId);
+    setCityId(area.cityId);
+  };
 
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
@@ -77,6 +109,13 @@ export default function RestaurantsPage() {
         </Link>
       }
     >
+      <AreaCoverageCard
+        token={token}
+        selectedGovernorateId={governorateId}
+        selectedCityId={cityId}
+        onSelect={selectArea}
+      />
+
       <Card>
         <FilterBar>
           <SearchInput
@@ -84,6 +123,41 @@ export default function RestaurantsPage() {
             onChange={setSearch}
             label="البحث عن مطعم"
             placeholder="اسم المطعم أو رقم الشريك…"
+          />
+          <Select
+            value={governorateId}
+            onChange={(value) => {
+              setGovernorateId(value);
+              // The chosen city belongs to the old governorate; keeping it
+              // would filter to an impossible pair and show nothing.
+              setCityId('');
+            }}
+            label="المحافظة"
+            allLabel="كل المحافظات"
+            options={(governorates.data ?? []).map((governorate) => ({
+              value: governorate.id,
+              label: governorate.name_ar,
+            }))}
+          />
+          <Select
+            value={cityId}
+            onChange={setCityId}
+            label="المدينة"
+            allLabel={governorateId ? 'كل المدن' : 'اختر المحافظة أولاً'}
+            options={(cities.data ?? []).map((city) => ({
+              value: city.id,
+              label: city.name_ar,
+            }))}
+          />
+          <Select
+            value={cuisine}
+            onChange={setCuisine}
+            label="التصنيف"
+            allLabel="كل التصنيفات"
+            options={CUISINES.map((entry) => ({
+              value: entry.key,
+              label: `${entry.emoji} ${entry.labelAr}`,
+            }))}
           />
           <Select
             value={status}

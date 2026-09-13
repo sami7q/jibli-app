@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -15,6 +15,7 @@ import { assertAdminPermission } from '@jibli/auth';
 import { idempotencyKeySchema, reasonSchema, uuidSchema } from '@jibli/validation';
 import {
   AUDIT_ACTIONS,
+  addDays,
   appendLedgerEntry,
   assertPaymentWithinBalance,
   dueDateFor,
@@ -22,11 +23,15 @@ import {
   reconcileSettlementTotals,
   settlementStatusFromAmounts,
   writeAudit,
+  zonedTimeToUtc,
 } from '@jibli/domain';
 import {
+  cities,
+  governorates,
   ledgerEntries,
   orders,
   reconciliationRuns,
+  restaurantBranches,
   restaurantCommissionConfigs,
   restaurants,
   settlementAdjustments,
@@ -52,7 +57,254 @@ import { requirePrincipal } from '../../plugins/auth.js';
  * financial record in place (plan §4.4).
  */
 
+/**
+ * Midnight in Baghdad on a named calendar day, as a UTC instant.
+ *
+ * An operator asking for "1 September to 30 September" means the Iraqi
+ * calendar, not UTC. Reading the dates as UTC shifts every boundary by three
+ * hours, which quietly moves the orders placed late on the last evening of a
+ * month into the next one — and those are settlement figures.
+ */
+function baghdadDayStart(day: string, addDaysCount = 0): Date {
+  const [year, month, date] = day.split('-').map(Number) as [number, number, number];
+  const midnight = zonedTimeToUtc(year, month, date, 0, 0, 0);
+  return addDaysCount === 0 ? midnight : addDays(midnight, addDaysCount);
+}
+
+/** Restaurants listed on the commission screen before it says it truncated. */
+const RESTAURANT_ROW_LIMIT = 200;
+
 export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext): void {
+  /**
+   * What Jibli has earned, and how much of it is still sitting at restaurants.
+   *
+   * The settlement list answers "which statements exist". It cannot answer
+   * "how much commission have we earned in Baghdad this month", because a
+   * statement appears only once the worker has closed a period — and the
+   * figure an operator most wants is precisely the part not settled yet,
+   * because that is the money still out there.
+   *
+   * So this reads the orders, not the statements. Every completed order froze
+   * its own commission at placement (ADR 0006), so summing that column is the
+   * exact figure rather than one re-derived from a fee that may have changed
+   * since. An order counts as settled when a settlement line claims it, which
+   * is the same definition the restaurant portal uses — the two screens must
+   * never disagree about what a restaurant owes.
+   *
+   * Three groupings over one filtered set — overall, by area, by restaurant —
+   * so the totals on the page always re-sum to each other.
+   */
+  app.get(
+    '/api/v1/admin/finance/commission-overview',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      assertAdminPermission(requirePrincipal(request), 'finance.read.global');
+
+      const query = z
+        .object({
+          /** Inclusive day, Asia/Baghdad, as the operator reads a calendar. */
+          from: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          to: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          governorate_id: uuidSchema.optional(),
+          city_id: uuidSchema.optional(),
+          q: z.string().max(80).optional(),
+          /** UNSETTLED narrows to what is still owed. */
+          settlement: z.enum(['ALL', 'SETTLED', 'UNSETTLED']).default('ALL'),
+        })
+        .parse(request.query);
+
+      const claimed = sql`EXISTS (
+        SELECT 1 FROM ${settlementLines}
+        WHERE ${settlementLines.orderId} = ${orders.id}
+      )`;
+
+      const conditions = [eq(orders.status, 'COMPLETED')];
+      if (query.from) conditions.push(gte(orders.completedAt, baghdadDayStart(query.from)));
+      if (query.to) {
+        // Exclusive end of the named day: a half-open window is the only kind
+        // that cannot double-count an order placed at midnight.
+        conditions.push(lt(orders.completedAt, baghdadDayStart(query.to, 1)));
+      }
+      if (query.governorate_id) {
+        conditions.push(eq(restaurantBranches.governorateId, query.governorate_id));
+      }
+      if (query.city_id) conditions.push(eq(restaurantBranches.cityId, query.city_id));
+      if (query.q) {
+        conditions.push(
+          or(
+            ilike(restaurants.displayName, `%${query.q}%`),
+            ilike(restaurants.partnerCode, `%${query.q}%`),
+          ) as never,
+        );
+      }
+      if (query.settlement === 'SETTLED') conditions.push(claimed as never);
+      if (query.settlement === 'UNSETTLED') conditions.push(sql`NOT ${claimed}` as never);
+
+      const where = and(...conditions);
+
+      const commission = sql<number>`COALESCE(SUM(${orders.commissionAmountIqd}), 0)`;
+      const outstanding = sql<number>`COALESCE(SUM(
+        CASE WHEN ${claimed} THEN 0 ELSE ${orders.commissionAmountIqd} END
+      ), 0)`;
+      const gross = sql<number>`COALESCE(SUM(${orders.customerTotalIqd}), 0)`;
+
+      /*
+       * The same joins in all three queries. The branch carries the address, so
+       * area comes from it rather than from the restaurant: a chain with
+       * branches in two governorates earns in both, and attributing all of it
+       * to a head office would misreport exactly the thing this page is for.
+       */
+      const [totals] = await ctx.db
+        .select({
+          orderCount: count(orders.id),
+          restaurantCount: sql<number>`COUNT(DISTINCT ${orders.restaurantId})`,
+          grossSalesIqd: gross,
+          commissionIqd: commission,
+          outstandingIqd: outstanding,
+        })
+        .from(orders)
+        .innerJoin(restaurants, eq(restaurants.id, orders.restaurantId))
+        .innerJoin(restaurantBranches, eq(restaurantBranches.id, orders.branchId))
+        .innerJoin(cities, eq(cities.id, restaurantBranches.cityId))
+        .innerJoin(governorates, eq(governorates.id, cities.governorateId))
+        .where(where);
+
+      const areaRows = await ctx.db
+        .select({
+          governorateId: governorates.id,
+          governorateNameAr: governorates.nameAr,
+          cityId: cities.id,
+          cityNameAr: cities.nameAr,
+          orderCount: count(orders.id),
+          commissionIqd: commission,
+          outstandingIqd: outstanding,
+          grossSalesIqd: gross,
+        })
+        .from(orders)
+        .innerJoin(restaurants, eq(restaurants.id, orders.restaurantId))
+        .innerJoin(restaurantBranches, eq(restaurantBranches.id, orders.branchId))
+        .innerJoin(cities, eq(cities.id, restaurantBranches.cityId))
+        .innerJoin(governorates, eq(governorates.id, cities.governorateId))
+        .where(where)
+        .groupBy(governorates.id, governorates.nameAr, cities.id, cities.nameAr)
+        .orderBy(desc(commission));
+
+      const restaurantRows = await ctx.db
+        .select({
+          restaurantId: restaurants.id,
+          displayName: restaurants.displayName,
+          partnerCode: restaurants.partnerCode,
+          governorateNameAr: governorates.nameAr,
+          cityNameAr: cities.nameAr,
+          orderCount: count(orders.id),
+          commissionIqd: commission,
+          outstandingIqd: outstanding,
+          grossSalesIqd: gross,
+          lastOrderAt: sql<string | null>`MAX(${orders.completedAt})`,
+        })
+        .from(orders)
+        .innerJoin(restaurants, eq(restaurants.id, orders.restaurantId))
+        .innerJoin(restaurantBranches, eq(restaurantBranches.id, orders.branchId))
+        .innerJoin(cities, eq(cities.id, restaurantBranches.cityId))
+        .innerJoin(governorates, eq(governorates.id, cities.governorateId))
+        .where(where)
+        .groupBy(
+          restaurants.id,
+          restaurants.displayName,
+          restaurants.partnerCode,
+          governorates.nameAr,
+          cities.nameAr,
+        )
+        // Most owed first: this screen exists to chase money, not to browse.
+        .orderBy(desc(outstanding), desc(commission))
+        .limit(RESTAURANT_ROW_LIMIT);
+
+      const byGovernorate = new Map<
+        string,
+        {
+          id: string;
+          name_ar: string;
+          order_count: number;
+          commission_iqd: number;
+          outstanding_iqd: number;
+          gross_sales_iqd: number;
+          cities: {
+            id: string;
+            name_ar: string;
+            order_count: number;
+            commission_iqd: number;
+            outstanding_iqd: number;
+            gross_sales_iqd: number;
+          }[];
+        }
+      >();
+
+      for (const row of areaRows) {
+        const entry = byGovernorate.get(row.governorateId) ?? {
+          id: row.governorateId,
+          name_ar: row.governorateNameAr,
+          order_count: 0,
+          commission_iqd: 0,
+          outstanding_iqd: 0,
+          gross_sales_iqd: 0,
+          cities: [],
+        };
+        entry.order_count += Number(row.orderCount);
+        entry.commission_iqd += Number(row.commissionIqd);
+        entry.outstanding_iqd += Number(row.outstandingIqd);
+        entry.gross_sales_iqd += Number(row.grossSalesIqd);
+        entry.cities.push({
+          id: row.cityId,
+          name_ar: row.cityNameAr,
+          order_count: Number(row.orderCount),
+          commission_iqd: Number(row.commissionIqd),
+          outstanding_iqd: Number(row.outstandingIqd),
+          gross_sales_iqd: Number(row.grossSalesIqd),
+        });
+        byGovernorate.set(row.governorateId, entry);
+      }
+
+      return reply.send(
+        success(
+          {
+            totals: {
+              order_count: Number(totals?.orderCount ?? 0),
+              restaurant_count: Number(totals?.restaurantCount ?? 0),
+              gross_sales_iqd: Number(totals?.grossSalesIqd ?? 0),
+              commission_iqd: Number(totals?.commissionIqd ?? 0),
+              /** Earned, not yet on any statement: the money still at restaurants. */
+              outstanding_iqd: Number(totals?.outstandingIqd ?? 0),
+            },
+            by_area: [...byGovernorate.values()].sort(
+              (a, b) => b.commission_iqd - a.commission_iqd,
+            ),
+            by_restaurant: restaurantRows.map((row) => ({
+              restaurant_id: row.restaurantId,
+              display_name: row.displayName,
+              partner_code: row.partnerCode,
+              governorate_name_ar: row.governorateNameAr,
+              city_name_ar: row.cityNameAr,
+              order_count: Number(row.orderCount),
+              gross_sales_iqd: Number(row.grossSalesIqd),
+              commission_iqd: Number(row.commissionIqd),
+              outstanding_iqd: Number(row.outstandingIqd),
+              last_order_at: row.lastOrderAt ? new Date(row.lastOrderAt).toISOString() : null,
+            })),
+            /* Says so rather than silently showing a partial list. */
+            truncated: restaurantRows.length === RESTAURANT_ROW_LIMIT,
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
   /** Settlement list with the aging an accountant actually chases. */
   app.get(
     '/api/v1/admin/finance/settlements',

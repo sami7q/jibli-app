@@ -342,7 +342,89 @@ function qs(params: Record<string, string | number | undefined>): string {
   return query ? `?${query}` : '';
 }
 
+export interface SupportThreadSummary {
+  id: string;
+  subject: string;
+  topic: string;
+  status: 'OPEN' | 'ANSWERED' | 'RESOLVED';
+  priority: 'NORMAL' | 'URGENT';
+  last_message_at: string;
+  last_message_from: 'RESTAURANT' | 'JIBLI';
+  awaiting_you: boolean;
+  message_count: number;
+  created_at: string;
+}
+
+export interface SupportThreadDetail {
+  id: string;
+  subject: string;
+  topic: string;
+  status: 'OPEN' | 'ANSWERED' | 'RESOLVED';
+  priority: 'NORMAL' | 'URGENT';
+  created_at: string;
+  resolved_at: string | null;
+  messages: {
+    id: string;
+    side: 'RESTAURANT' | 'JIBLI';
+    author_name: string;
+    body: string;
+    created_at: string;
+  }[];
+}
+
+export interface PortalReviews {
+  rating: number | null;
+  rating_count: number;
+  distribution: Record<string, number>;
+  reviews: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    public_order_number: string;
+    author_name: string;
+    created_at: string;
+  }[];
+}
+
 export const portal = {
+  // ── Support ─────────────────────────────────────────────────────────────
+
+  supportThreads: (auth: Auth) =>
+    apiRequest<SupportThreadSummary[]>(
+      '/api/v1/restaurant-portal/support/threads',
+      scoped(auth),
+    ),
+
+  supportThread: (auth: Auth, threadId: string) =>
+    apiRequest<SupportThreadDetail>(
+      `/api/v1/restaurant-portal/support/threads/${threadId}`,
+      scoped(auth),
+    ),
+
+  openSupportThread: (
+    auth: Auth,
+    body: { subject: string; topic: string; priority: string; message: string },
+  ) =>
+    apiRequest<{ id: string; note_ar: string }>('/api/v1/restaurant-portal/support/threads', {
+      ...scoped(auth),
+      method: 'POST',
+      body,
+    }),
+
+  replyToSupportThread: (auth: Auth, threadId: string, message: string) =>
+    apiRequest<{ sent: boolean }>(
+      `/api/v1/restaurant-portal/support/threads/${threadId}/messages`,
+      { ...scoped(auth), method: 'POST', body: { message } },
+    ),
+
+  // ── Reviews ─────────────────────────────────────────────────────────────
+
+  reviews: (auth: Auth, filters: Record<string, string | number | undefined> = {}) =>
+    apiRequest<PortalReviews>(
+      `/api/v1/restaurant-portal/reviews${qs(filters)}`,
+      scoped(auth),
+    ),
+
   // ── Dashboard ───────────────────────────────────────────────────────────
   /** Everything the home screen shows, in one round trip (plan §131). */
   dashboard: (auth: Auth) =>

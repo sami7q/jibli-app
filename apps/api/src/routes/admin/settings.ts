@@ -38,6 +38,8 @@ const CONFIG_SCHEMAS: Record<ConfigKey, z.ZodTypeAny> = {
   global_checkout_enabled: z.boolean(),
   platform_service_fee_iqd: z.number().int().min(0).max(100_000),
   commission_flat_iqd: z.number().int().min(0).max(100_000),
+  require_mfa: z.boolean(),
+  review_delay_minutes: z.number().int().min(0).max(1440),
   default_settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']),
   default_payment_term_days: z.number().int().min(0).max(90),
   delivery_pin_enabled: z.boolean(),
@@ -53,6 +55,7 @@ const REASON_REQUIRED: ReadonlySet<ConfigKey> = new Set([
   'global_checkout_enabled',
   'platform_service_fee_iqd',
   'commission_flat_iqd',
+  'require_mfa',
   'delivery_pin_enabled',
   'minimum_app_version',
 ]);
