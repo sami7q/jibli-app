@@ -89,6 +89,7 @@ async function main(): Promise<void> {
         `  ${demo.branches} branch(es), ${demo.categories} menu categories, ` +
           `${demo.items} items, ${demo.modifierGroups} option groups`,
       );
+      console.log(`  ${demo.images} generated image(s), ${demo.banners} home banner(s)`);
       console.log(`  ${demo.owners} portal owner account(s):`);
       for (const owner of DEMO_OWNER_CREDENTIALS) {
         console.log(`    ${owner.username} / ${owner.password}   → ${owner.restaurant}`);

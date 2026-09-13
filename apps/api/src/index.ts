@@ -1,7 +1,13 @@
-import { loadApiEnv, EnvValidationError } from '@jibli/config';
-import { createLogger } from '@jibli/logger';
+import { loadApiEnv, EnvValidationError, type ApiEnv } from '@jibli/config';
+import { createLogger, type Logger } from '@jibli/logger';
 import { closeDatabase, getDatabase } from '@jibli/db';
-import { ConsolePushProvider, ConsoleSmsProvider } from '@jibli/notifications';
+import {
+  AllowlistSmsProvider,
+  ConsolePushProvider,
+  ConsoleSmsProvider,
+  HttpSmsGatewayProvider,
+  type SmsProvider,
+} from '@jibli/notifications';
 import { createRedis, type AppContext } from './lib/context.js';
 import { buildServer } from './server.js';
 
@@ -12,6 +18,51 @@ import { buildServer } from './server.js';
  * so a missing secret fails the deploy rather than the first request that needs
  * it (plan §7).
  */
+
+/**
+ * Which SMS provider this deployment uses.
+ *
+ * `console` logs that a code was issued and, in local development only, the
+ * code itself — so a developer can sign in without a gateway. `sms_gateway` is
+ * the real thing, and production refuses to boot on anything else.
+ *
+ * A non-production deployment with an allowlist configured is wrapped in one,
+ * so staging can be pointed at a live gateway to prove the integration without
+ * being able to text a real customer (plan §7).
+ */
+function buildSmsProvider(env: ApiEnv, logger: Logger): SmsProvider {
+  const base: SmsProvider =
+    env.OTP_PROVIDER === 'sms_gateway'
+      ? new HttpSmsGatewayProvider(logger, {
+          // The env schema refuses to validate `sms_gateway` without these two.
+          url: env.SMS_GATEWAY_URL as string,
+          apiKey: env.SMS_GATEWAY_API_KEY as string,
+          senderId: env.SMS_GATEWAY_SENDER_ID,
+          authScheme: env.SMS_GATEWAY_AUTH_SCHEME,
+          apiKeyHeader: env.SMS_GATEWAY_API_KEY_HEADER,
+          apiKeyField: env.SMS_GATEWAY_API_KEY_FIELD,
+          toField: env.SMS_GATEWAY_TO_FIELD,
+          bodyField: env.SMS_GATEWAY_BODY_FIELD,
+          senderField: env.SMS_GATEWAY_SENDER_FIELD,
+          timeoutMs: env.SMS_GATEWAY_TIMEOUT_MS,
+        })
+      : new ConsoleSmsProvider(logger, env.APP_ENV === 'local');
+
+  const allowlist = (env.OTP_PHONE_ALLOWLIST ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (env.APP_ENV !== 'production' && allowlist.length > 0) {
+    logger.info(
+      { event: 'sms.allowlist_active', count: allowlist.length, provider: base.name },
+      'SMS restricted to the configured allowlist',
+    );
+    return new AllowlistSmsProvider(base, allowlist, logger);
+  }
+
+  return base;
+}
 
 async function main(): Promise<void> {
   let env;
@@ -45,9 +96,7 @@ async function main(): Promise<void> {
     throw error;
   });
 
-  // In local development the console provider prints the OTP so a developer can
-  // sign in without an SMS gateway. It never does so in any other environment.
-  const sms = new ConsoleSmsProvider(logger, env.APP_ENV === 'local');
+  const sms = buildSmsProvider(env, logger);
   const push = new ConsolePushProvider(logger);
 
   const ctx: AppContext = { env, db, redis, logger, sms, push };

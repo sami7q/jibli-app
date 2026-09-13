@@ -111,6 +111,29 @@ export default function AccountScreen() {
         />
       </Group>
 
+      {/*
+        * The other door into the platform.
+        *
+        * A driver account could only be created from inside a restaurant's
+        * portal, so anyone who wanted to deliver had to already know an owner.
+        * It sits on the customer's account screen because that is the only
+        * screen a prospective driver has — they arrive as a customer.
+        */}
+      <Group title="العمل مع جيبلي">
+        <ListRow
+          label="الانضمام كمندوب توصيل"
+          sublabel="وصّل الطلبات واكسب معنا"
+          icon={<MaterialCommunityIcons name="motorbike" size={20} color={color.brand} />}
+          /*
+           * Shown to a guest too. Somebody who wants to deliver arrives as a
+           * browsing customer, and hiding the row until they sign in means they
+           * never find out the door exists. The screen itself asks for the
+           * account, which is the right place: it can explain why.
+           */
+          onPress={() => router.push('/(driver)/apply')}
+        />
+      </Group>
+
       <Group title="المساعدة">
         <ListRow
           label="المساعدة والدعم"

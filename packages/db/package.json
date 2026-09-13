@@ -26,6 +26,7 @@
     "@jibli/auth": "workspace:*",
     "@jibli/config": "workspace:*",
     "@jibli/contracts": "workspace:*",
+    "@jibli/design-tokens": "workspace:*",
     "@jibli/geography": "workspace:*",
     "@jibli/logger": "workspace:*",
     "@jibli/money": "workspace:*",

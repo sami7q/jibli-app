@@ -64,6 +64,22 @@ const otpSchema = z.object({
   SMS_GATEWAY_URL: z.string().url().optional(),
   SMS_GATEWAY_API_KEY: z.string().optional(),
   SMS_GATEWAY_SENDER_ID: z.string().optional(),
+  /*
+   * How this particular gateway is shaped.
+   *
+   * Iraqi OTP traffic is bought from local aggregators, and every one of them
+   * posts the same three values under different names with the key in a
+   * different place. Rather than a provider class per vendor — each a copy of
+   * the last with three strings changed — the names are configuration and the
+   * behaviour that matters (timeout, one retry, never logging the body) is not.
+   */
+  SMS_GATEWAY_AUTH_SCHEME: z.enum(['bearer', 'header', 'body']).default('bearer'),
+  SMS_GATEWAY_API_KEY_HEADER: z.string().optional(),
+  SMS_GATEWAY_API_KEY_FIELD: z.string().optional(),
+  SMS_GATEWAY_TO_FIELD: z.string().optional(),
+  SMS_GATEWAY_BODY_FIELD: z.string().optional(),
+  SMS_GATEWAY_SENDER_FIELD: z.string().optional(),
+  SMS_GATEWAY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
   /**
    * Staging safety valve: comma-separated E.164 allowlist. When set, OTP delivery to
    * any other number is refused so staging cannot text real customers (plan §7).

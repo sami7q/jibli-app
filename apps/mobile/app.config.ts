@@ -62,18 +62,20 @@ const config: ExpoConfig = {
       CFBundleAllowMixedLocalizations: true,
       // Foreground-only, and only to help place a delivery pin (plan §13).
       /*
-       * No purpose strings, because this build uses no gated capability.
+       * One capability, and the string says exactly what it is for.
        *
-       * It previously declared camera access for delivery-proof photography —
-       * Driver Mode's job, not the customer app's — and location for a
-       * delivery pin. `expo-location` is not even a dependency, so the app
-       * cannot ask for a position; the entry only ever added a "Location" line
-       * to the store's privacy label for something that never happens.
+       * Foreground location only, used once — when the customer taps «تحديد
+       * موقعي» while saving a delivery address — to attach a point to it. The
+       * app never reads a position in the background and never tracks anyone:
+       * there is no background entitlement here and ADR-0005 explains why
+       * there is no driver tracking either.
        *
-       * A purpose string for an unused capability is a rejection in its own
-       * right (5.1.1), and both stores read these as declarations of what the
-       * app does. They come back with the feature, not before it.
+       * Camera is still absent. It claimed delivery-proof photography, which
+       * is Driver Mode's job and does not ship in this binary, and a purpose
+       * string for an unused capability is a rejection in its own right.
        */
+      NSLocationWhenInUseUsageDescription:
+        'لتحديد موقع التوصيل بدقة عند حفظ عنوانك. يمكنك دائماً كتابة العنوان يدوياً بدلاً من ذلك.',
     },
   },
   android: {
@@ -84,12 +86,13 @@ const config: ExpoConfig = {
     },
     /*
      * Only what the app uses. Notifications are real — `expo-notifications`
-     * registers a token after sign-in — while the two location permissions
-     * were declared for a map picker that does not exist in this binary.
+     * registers a token after sign-in — and coarse/fine location is asked for
+     * once, when the customer attaches a point to a delivery address.
      *
-     * Never ACCESS_BACKGROUND_LOCATION: Release 1 does not track drivers.
+     * Never ACCESS_BACKGROUND_LOCATION: Release 1 does not track anyone, and
+     * the entitlement is the hardest one to justify to either store.
      */
-    permissions: ['POST_NOTIFICATIONS'],
+    permissions: ['POST_NOTIFICATIONS', 'ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION'],
   },
   plugins: [
     'expo-router',

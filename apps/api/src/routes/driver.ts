@@ -10,12 +10,21 @@ import {
   ERROR_CODES,
   EVENT_TYPES,
   success,
+  VEHICLE_TYPES,
   type DeliveryAssignmentStatus,
 } from '@jibli/contracts';
 import { assertDriver, assertOwnsAssignment } from '@jibli/auth';
 import { deliveryPinSchema, idempotencyKeySchema, uuidSchema } from '@jibli/validation';
 import { buildNavigationLinks, computeCustody, enqueueOutboxEvent } from '@jibli/domain';
-import { deliveryAssignments, driverCashEvents, drivers, orders, restaurants } from '@jibli/db';
+import {
+  deliveryAssignments,
+  driverCashEvents,
+  drivers,
+  orders,
+  restaurants,
+  users,
+  uuidv7,
+} from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { confirmDelivery } from '../services/delivery-service.js';
@@ -42,7 +51,146 @@ const confirmDeliverySchema = z.object({
   override_reason: z.string().min(10).max(300).optional(),
 });
 
+const applicationSchema = z.object({
+  vehicle_type: z.enum(VEHICLE_TYPES),
+  /** Optional: a bicycle or someone on foot has no plate. */
+  plate_number: z.string().trim().min(2).max(20).optional(),
+});
+
 export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): void {
+  /**
+   * Apply to drive (plan §46).
+   *
+   * A driver could only be created from inside a restaurant's portal, which
+   * meant somebody who wanted to deliver had no way to say so — they had to
+   * already know a restaurant owner. This is the other door.
+   *
+   * It creates the account in `PENDING_ACTIVATION`, which is the default the
+   * schema already carried and exactly right: applying is not joining. An
+   * operator activates it, and only then does `assertDriver` let the applicant
+   * reach a single delivery.
+   *
+   * Idempotent. Applying twice returns the existing application rather than
+   * failing, because the second tap is almost always someone checking whether
+   * the first one worked.
+   */
+  app.post('/api/v1/driver/apply', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
+    const body = applicationSchema.parse(request.body);
+
+    const [existing] = await ctx.db
+      .select({
+        id: drivers.id,
+        status: drivers.status,
+        vehicleType: drivers.defaultVehicleType,
+        createdAt: drivers.createdAt,
+      })
+      .from(drivers)
+      .where(eq(drivers.userId, principal.userId))
+      .limit(1);
+
+    if (existing) {
+      return reply.send(
+        success(
+          {
+            driver_id: existing.id,
+            status: existing.status,
+            vehicle_type: existing.vehicleType,
+            applied_at: existing.createdAt.toISOString(),
+            already_applied: true,
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    }
+
+    /*
+     * A completed profile is the minimum.
+     *
+     * An operator reviewing applications needs a name to review, and a driver
+     * with no name reaches a customer's door as an anonymous stranger.
+     */
+    const [user] = await ctx.db
+      .select({ fullName: users.fullName, profileCompletedAt: users.profileCompletedAt })
+      .from(users)
+      .where(eq(users.id, principal.userId))
+      .limit(1);
+
+    if (!user?.profileCompletedAt || !user.fullName) {
+      throw new AppError(ERROR_CODES.PROFILE_INCOMPLETE, {
+        messageAr: 'أكمل بياناتك الشخصية أولاً قبل التقديم كمندوب توصيل.',
+      });
+    }
+
+    const driverId = uuidv7();
+    await ctx.db.insert(drivers).values({
+      id: driverId,
+      userId: principal.userId,
+      status: 'PENDING_ACTIVATION',
+      availability: 'OFFLINE',
+      defaultVehicleType: body.vehicle_type,
+      plateNumber: body.plate_number ?? null,
+    });
+
+    return reply.send(
+      success(
+        {
+          driver_id: driverId,
+          status: 'PENDING_ACTIVATION' as const,
+          vehicle_type: body.vehicle_type,
+          applied_at: new Date().toISOString(),
+          already_applied: false,
+        },
+        { request_id: request.requestId },
+      ),
+    );
+  });
+
+  /**
+   * The state of my application, if I have one.
+   *
+   * Separate from `/driver/me`, which requires an activated driver — this is
+   * the endpoint an applicant can actually reach while they are still waiting.
+   */
+  app.get(
+    '/api/v1/driver/application',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+
+      const [application] = await ctx.db
+        .select({
+          id: drivers.id,
+          status: drivers.status,
+          vehicleType: drivers.defaultVehicleType,
+          plateNumber: drivers.plateNumber,
+          createdAt: drivers.createdAt,
+          activatedAt: drivers.activatedAt,
+          suspendedReason: drivers.suspendedReason,
+        })
+        .from(drivers)
+        .where(eq(drivers.userId, principal.userId))
+        .limit(1);
+
+      return reply.send(
+        success(
+          application
+            ? {
+                driver_id: application.id,
+                status: application.status,
+                vehicle_type: application.vehicleType,
+                plate_number: application.plateNumber,
+                applied_at: application.createdAt.toISOString(),
+                activated_at: application.activatedAt?.toISOString() ?? null,
+                suspended_reason: application.suspendedReason,
+              }
+            : null,
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
   /** Driver home: status, availability and cash summary (plan §47). */
   app.get('/api/v1/driver/me', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);

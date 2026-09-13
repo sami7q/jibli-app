@@ -547,6 +547,34 @@ export const api = {
    */
   deleteAccount: () => apiRequest<{ deleted: boolean }>('/api/v1/profile', { method: 'DELETE' }),
 
+  /**
+   * Apply to deliver for Jibli.
+   *
+   * Creates a driver account in `PENDING_ACTIVATION`; an operator activates it.
+   * Idempotent — a second call returns the existing application rather than
+   * failing, because the second tap is usually someone checking the first.
+   */
+  applyAsDriver: (payload: { vehicle_type: string; plate_number?: string }) =>
+    apiRequest<{
+      driver_id: string;
+      status: string;
+      vehicle_type: string;
+      applied_at: string;
+      already_applied: boolean;
+    }>('/api/v1/driver/apply', { method: 'POST', body: payload }),
+
+  /** My application, or null. Reachable while still pending, unlike `/driver/me`. */
+  driverApplication: () =>
+    apiRequest<{
+      driver_id: string;
+      status: string;
+      vehicle_type: string;
+      plate_number: string | null;
+      applied_at: string;
+      activated_at: string | null;
+      suspended_reason: string | null;
+    } | null>('/api/v1/driver/application'),
+
   /** Whether this order can be rated yet — the 15-minute window (plan §31). */
   reviewEligibility: (orderId: string) =>
     apiRequest<{ can_review: boolean; opens_at: string | null; already_reviewed: boolean }>(

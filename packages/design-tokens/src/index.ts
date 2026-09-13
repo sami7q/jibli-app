@@ -428,3 +428,9 @@ export function cssVariables(): CssVariable[] {
 
   return vars;
 }
+
+/**
+ * Drawing, for the placeholder artwork the brand ships with — the app icon
+ * and splash, and the demo marketplace's covers and banners.
+ */
+export * from './png.js';

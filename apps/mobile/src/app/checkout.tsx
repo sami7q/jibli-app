@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, idempotencyKey, NetworkError, type Address } from '@/lib/api';
 import { useArea } from '@/lib/area';
+import { captureCurrentLocation, LOCATION_MESSAGES_AR, type Coordinates } from '@/lib/location';
 import { useCart, useOrderLines } from '@/lib/cart';
 import { color, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
@@ -401,6 +402,28 @@ function AddressSheet({
   const [district, setDistrict] = useState('');
   const [street, setStreet] = useState('');
   const [landmark, setLandmark] = useState('');
+  /**
+   * A point on the address, captured once with permission.
+   *
+   * Optional on purpose: in a city where addresses are landmarks rather than
+   * street numbers, «قرب صيدلية النور» is what actually gets the driver there,
+   * and a coordinate is an extra rather than a replacement. Everything works
+   * without it.
+   */
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  const locate = async () => {
+    setLocating(true);
+    const outcome = await captureCurrentLocation();
+    setLocating(false);
+
+    if (outcome.status === 'ok') {
+      setCoordinates(outcome.coordinates);
+      return;
+    }
+    Alert.alert('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
+  };
 
   const create = useMutation({
     mutationFn: () =>
@@ -411,6 +434,14 @@ function AddressSheet({
         ...(district ? { district_text: district } : {}),
         ...(street ? { street } : {}),
         ...(landmark ? { landmark } : {}),
+        ...(coordinates
+          ? {
+              coordinates: {
+                latitude: coordinates.latitude,
+                longitude: coordinates.longitude,
+              },
+            }
+          : {}),
         is_default: true,
       }),
     onSuccess: onCreated,
@@ -451,6 +482,55 @@ function AddressSheet({
           اختر منطقتك من الشاشة الرئيسية أولاً.
         </Text>
       )}
+
+      {/*
+        * The point, offered before the fields.
+        *
+        * It is the one thing that removes ambiguity from a landmark address,
+        * and offering it first means a customer who taps it has less typing to
+        * feel guilty about skipping.
+        */}
+      <Pressable
+        onPress={() => void locate()}
+        disabled={locating}
+        accessibilityRole="button"
+        accessibilityLabel="تحديد موقعي الحالي"
+        style={({ pressed }) => [
+          {
+            minHeight: TAP_TARGET + 6,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderStyle: coordinates ? 'solid' : 'dashed',
+            borderColor: coordinates ? color.success : color.borderStrong,
+            backgroundColor: coordinates ? color.successSoft : color.surfaceCard,
+            paddingHorizontal: space[3],
+            justifyContent: 'center',
+          },
+          pressed ? { opacity: 0.7 } : null,
+        ]}
+      >
+        <Row gap={space[2]}>
+          <MaterialCommunityIcons
+            name={coordinates ? 'map-marker-check' : 'crosshairs-gps'}
+            size={20}
+            color={coordinates ? color.successStrong : color.brand}
+          />
+          <View style={{ flex: 1 }}>
+            <Text variant="smallBold" tone={coordinates ? 'success' : 'brand'}>
+              {locating
+                ? 'جارٍ تحديد الموقع…'
+                : coordinates
+                  ? 'تم تحديد الموقع'
+                  : 'تحديد موقعي الحالي'}
+            </Text>
+            <Text variant="caption" tone="muted">
+              {coordinates
+                ? `دقة تقريبية ${Math.round(coordinates.accuracy ?? 0)} متر — اضغط للتحديث`
+                : 'اختياري، يساعد المندوب في الوصول بدقة'}
+            </Text>
+          </View>
+        </Row>
+      </Pressable>
 
       <LabelledInput label="الاسم" value={label} onChangeText={setLabel} placeholder="المنزل، العمل…" />
       <LabelledInput

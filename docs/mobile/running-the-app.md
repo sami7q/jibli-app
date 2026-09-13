@@ -156,10 +156,9 @@ Fetched live from the deployed API, so this is what the app renders right now:
 
 | Part of the home screen | State |
 |---|---|
-| Category strip | **22 categories**, Arabic names, emoji — from Admin → التصنيفات. None has an image yet, so each falls back to its emoji, which is the designed fallback. |
-| Banner carousel | **hidden** — `banners: []`. The carousel renders nothing rather than an empty box. Add one in Admin → شكل التطبيق and it appears on the next launch. |
-| Rotation speed | 5 seconds, Admin's value, already being read. |
-| Restaurant list | **6 restaurants in بغداد**, seeded as demo data. See below. |
+| Category strip | **22 categories**, Arabic names, emoji — from Admin → التصنيفات. None has an image, so each falls back to its emoji. That is not a gap: the emoji are sharper than any placeholder that could be drawn for them, and a category image uploaded in Admin replaces one without a release. |
+| Banner carousel | **3 banners**, with art, rotating every 5 seconds — all of it from Admin → شكل التطبيق. Two of them link to a category. |
+| Restaurant list | **6 restaurants in بغداد**, each with a generated cover and logo. See below. |
 
 Those strings exist nowhere in the app. They came out of the database Admin
 writes to, which is what "connected" means here.
@@ -184,6 +183,18 @@ exists to make a different state of the app reachable.
 **45 menu items, 15 categories, 8 option groups**, and one unavailable dish per
 restaurant where it makes sense — because an item that is out of stock today has
 to grey out rather than disappear.
+
+**And 15 generated images**: a cover and a logo per restaurant, plus three
+banners. Drawn rather than photographed — a stock photograph in a repository is
+a licensing question nobody wants — and each restaurant's is the brand orange
+turned a fixed number of degrees around the wheel, so six covers look like six
+restaurants without inventing a second palette. They go through the same
+pipeline an upload does: a row in `assets`, bytes in `asset_bytes`, served by
+`GET /api/v1/assets/:id`. The day a restaurant uploads its own, these disappear.
+
+The hue range is deliberately narrow — red through orange to amber. The first
+attempt used ±45° and the shawarma restaurant came out yellow-green, which is
+the colour of nothing anybody wants to eat.
 
 Re-running the seed changes nothing: it is idempotent on `partner_code`. A
 second run reports `0 inserted, 6 updated`.
@@ -222,8 +233,13 @@ Two terminals:
 
 ```bash
 pnpm --filter @jibli/mobile proxy      # terminal 1
-pnpm --filter @jibli/mobile web        # terminal 2  → http://localhost:8081
+pnpm --filter @jibli/mobile web        # terminal 2
 ```
+
+Then open **http://localhost:4010** — not 8081. The proxy serves a phone frame
+that renders the app at a real device size with a size picker (iPhone SE
+through Pro Max), because a layout reviewed across a 1900px desktop window is
+not the layout anyone will use. 8081 still works if you want it full-width.
 
 This runs the same app through React Native Web. Both terminals are needed, and
 each solves a problem that only exists in a browser:
@@ -248,7 +264,19 @@ do with signing in.
 
 ---
 
-## 10. What is deployed, and where
+## 10. What is real, and what is not
+
+Three integrations get asked about, so they are written down plainly.
+
+| | State |
+|---|---|
+| **OTP / SMS** | The gateway is **implemented** — `HttpSmsGatewayProvider`, with one retry on a 5xx or a timeout, never on a rejection, and the body never logged. It is **not connected**: staging still runs `OTP_PROVIDER=console`. Set `OTP_PROVIDER=sms_gateway`, `SMS_GATEWAY_URL` and `SMS_GATEWAY_API_KEY` and sign-in works. Field names differ by aggregator and are configuration (`SMS_GATEWAY_TO_FIELD` and friends); `SMS_GATEWAY_AUTH_SCHEME` chooses bearer, header or body. On staging, set `OTP_PHONE_ALLOWLIST` so a live gateway cannot text a real customer. |
+| **Maps** | There is **no in-app map**, deliberately. What exists: the customer can attach their current coordinates to a saved address (`expo-location`, foreground only, asked once), and any point can be opened in whatever maps app the phone already has — `geo:` on Android, Apple Maps on iOS, a Google Maps URL as the fallback. None of that needs an API key or a billing account. A rendered map would need a map SDK, a key, and a geocoder, and in a city where addresses are landmarks it would still be «قرب صيدلية النور» that gets the driver there. ADR-0005 stands: no live driver tracking. |
+| **Driver sign-up** | **Now exists.** `POST /api/v1/driver/apply` creates a driver in `PENDING_ACTIVATION`; `GET /api/v1/driver/application` reports its state. In the app it is a row on the account screen — visible to guests too, because somebody who wants to deliver arrives as a browsing customer. Applying is not joining: an operator activates the account, and `assertDriver` refuses everything until they do. |
+
+---
+
+## 11. What is deployed, and where
 
 | Piece | Where | Verified |
 |---|---|---|

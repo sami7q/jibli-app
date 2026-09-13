@@ -3,6 +3,7 @@ import { hashPassword } from '@jibli/auth';
 import type { Database } from '../client.js';
 import { uuidv7 } from '../ids.js';
 import {
+  appBanners,
   branchWorkingHours,
   cities,
   itemModifierGroups,
@@ -16,6 +17,14 @@ import {
   restaurants,
   users,
 } from '../schema/index.js';
+import {
+  DEMO_BANNERS,
+  DEMO_HUE_SHIFTS,
+  promoBanner,
+  restaurantCover,
+  restaurantLogo,
+  upsertImageAsset,
+} from './demo-images.js';
 
 /**
  * A demo marketplace: restaurants, branches, hours and menus.
@@ -560,6 +569,8 @@ export interface DemoSeedResult {
   readonly items: number;
   readonly modifierGroups: number;
   readonly owners: number;
+  readonly images: number;
+  readonly banners: number;
   readonly cityNameAr: string;
 }
 
@@ -591,6 +602,8 @@ export async function seedDemoMarketplace(
     items: 0,
     modifierGroups: 0,
     owners: 0,
+    images: 0,
+    banners: 0,
   };
 
   for (const demo of DEMO_RESTAURANTS) {
@@ -603,6 +616,7 @@ export async function seedDemoMarketplace(
 
       const now = new Date();
       let restaurantId: string;
+      const hueShift = DEMO_HUE_SHIFTS[demo.partnerCode] ?? 0;
 
       if (existing) {
         restaurantId = existing.id;
@@ -612,6 +626,16 @@ export async function seedDemoMarketplace(
             displayName: demo.name,
             descriptionAr: demo.description,
             cuisineTags: [...demo.cuisines],
+            coverAssetId: await upsertImageAsset(
+              tx,
+              restaurantCover(demo.partnerCode, hueShift),
+              existing.id,
+            ),
+            logoAssetId: await upsertImageAsset(
+              tx,
+              restaurantLogo(demo.partnerCode, hueShift),
+              existing.id,
+            ),
             minimumOrderIqd: demo.minimumOrderIqd,
             ratingAverage: demo.rating,
             ratingCount: demo.ratingCount,
@@ -625,6 +649,7 @@ export async function seedDemoMarketplace(
           })
           .where(eq(restaurants.id, restaurantId));
         result.restaurantsUpdated += 1;
+        result.images += 2;
       } else {
         const providerId = uuidv7();
         await tx
@@ -648,6 +673,24 @@ export async function seedDemoMarketplace(
           approvedAt: now,
         });
         result.restaurantsInserted += 1;
+
+        // After the insert, because the asset row references the restaurant.
+        await tx
+          .update(restaurants)
+          .set({
+            coverAssetId: await upsertImageAsset(
+              tx,
+              restaurantCover(demo.partnerCode, hueShift),
+              restaurantId,
+            ),
+            logoAssetId: await upsertImageAsset(
+              tx,
+              restaurantLogo(demo.partnerCode, hueShift),
+              restaurantId,
+            ),
+          })
+          .where(eq(restaurants.id, restaurantId));
+        result.images += 2;
       }
 
       // ── Branch ──────────────────────────────────────────────────────────
@@ -917,6 +960,50 @@ export async function seedDemoMarketplace(
         .set({ menuVersion: (current?.menuVersion ?? 1) + 1, updatedAt: now })
         .where(eq(restaurants.id, restaurantId));
     });
+  }
+
+  /*
+   * The banners across the top of the home screen.
+   *
+   * Seeded last because they are the one part of the storefront that is pure
+   * merchandising: they reference categories that must already exist, and an
+   * operator replaces them from Admin → شكل التطبيق without touching anything
+   * else. Keyed on the storage key of their art, so re-seeding rewrites rather
+   * than duplicates.
+   */
+  for (const [index, banner] of DEMO_BANNERS.entries()) {
+    const imageAssetId = await upsertImageAsset(
+      db,
+      promoBanner(banner.key, banner.from, banner.to),
+      null,
+    );
+    result.images += 1;
+
+    const [existing] = await db
+      .select({ id: appBanners.id })
+      .from(appBanners)
+      .where(eq(appBanners.titleAr, banner.titleAr))
+      .limit(1);
+
+    const values = {
+      titleAr: banner.titleAr,
+      subtitleAr: banner.subtitleAr,
+      imageAssetId,
+      linkType: banner.linkType,
+      linkValue: banner.linkValue,
+      sortOrder: index,
+      isActive: true,
+      startsAt: null,
+      endsAt: null,
+      updatedAt: new Date(),
+    };
+
+    if (existing) {
+      await db.update(appBanners).set(values).where(eq(appBanners.id, existing.id));
+    } else {
+      await db.insert(appBanners).values({ id: uuidv7(), ...values });
+    }
+    result.banners += 1;
   }
 
   return { ...result, cityNameAr: city.nameAr };

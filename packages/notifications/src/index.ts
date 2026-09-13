@@ -48,6 +48,168 @@ export class ConsoleSmsProvider implements SmsProvider {
 }
 
 /**
+ * A real SMS gateway, over HTTP.
+ *
+ * `OTP_PROVIDER=sms_gateway` has been a valid setting since the config was
+ * written — and production refuses to boot without it — but nothing
+ * implemented it, so the only provider that existed was the console stub and
+ * nobody could sign into the app from a deployed build.
+ *
+ * Deliberately generic rather than Twilio-shaped. Iraqi OTP traffic is usually
+ * bought from a local aggregator whose API is a POST with an API key, and
+ * every one of them differs in the names of three fields — so the field names
+ * are configuration too. What is *not* configurable is the part that matters:
+ * the timeout, the single retry, and never logging the body.
+ */
+export class HttpSmsGatewayProvider implements SmsProvider {
+  readonly name = 'sms_gateway';
+
+  constructor(
+    private readonly logger: Logger,
+    private readonly config: {
+      readonly url: string;
+      readonly apiKey: string;
+      readonly senderId?: string | undefined;
+      /** Field names, because no two Iraqi aggregators agree on them. */
+      readonly toField?: string | undefined;
+      readonly bodyField?: string | undefined;
+      readonly senderField?: string | undefined;
+      /** How the key travels: a bearer token, or a field in the body. */
+      readonly authScheme?: 'bearer' | 'header' | 'body' | undefined;
+      readonly apiKeyHeader?: string | undefined;
+      readonly apiKeyField?: string | undefined;
+      readonly timeoutMs?: number | undefined;
+    },
+  ) {}
+
+  async send(message: SmsMessage): Promise<{
+    ok: boolean;
+    providerMessageId?: string;
+    error?: string;
+  }> {
+    const toField = this.config.toField ?? 'to';
+    const bodyField = this.config.bodyField ?? 'message';
+    const senderField = this.config.senderField ?? 'sender';
+    const scheme = this.config.authScheme ?? 'bearer';
+
+    const payload: Record<string, string> = {
+      [toField]: message.toE164,
+      [bodyField]: message.body,
+      ...(this.config.senderId ? { [senderField]: this.config.senderId } : {}),
+      ...(scheme === 'body' ? { [this.config.apiKeyField ?? 'api_key']: this.config.apiKey } : {}),
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(scheme === 'bearer' ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
+      ...(scheme === 'header'
+        ? { [this.config.apiKeyHeader ?? 'X-API-Key']: this.config.apiKey }
+        : {}),
+    };
+
+    /*
+     * One retry, and only on a transport failure or a 5xx.
+     *
+     * A 4xx is the gateway saying the number is wrong or the account is out of
+     * credit; repeating it wastes the customer's time and can cost money. A
+     * timeout might be the gateway and might be the network, and an OTP that
+     * never arrives is a customer who cannot sign in at all.
+     */
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const outcome = await this.attempt(payload, headers);
+
+      if (outcome.ok || outcome.permanent) {
+        this.logger[outcome.ok ? 'info' : 'error'](
+          {
+            event: 'sms.send',
+            provider: this.name,
+            // Never the body: it carries the code (plan §10).
+            to: `${message.toE164.slice(0, 6)}***`,
+            attempt,
+            ...(outcome.status ? { status: outcome.status } : {}),
+            ...(outcome.error ? { err: outcome.error } : {}),
+          },
+          outcome.ok ? 'SMS dispatched' : 'SMS refused by gateway',
+        );
+        return outcome.ok
+          ? { ok: true, ...(outcome.id ? { providerMessageId: outcome.id } : {}) }
+          : { ok: false, error: outcome.error ?? 'GATEWAY_REFUSED' };
+      }
+
+      if (attempt === 2) {
+        this.logger.error(
+          {
+            event: 'sms.send_failed',
+            provider: this.name,
+            to: `${message.toE164.slice(0, 6)}***`,
+            err: outcome.error,
+          },
+          'SMS gateway unreachable after retry',
+        );
+        return { ok: false, error: outcome.error ?? 'GATEWAY_UNREACHABLE' };
+      }
+    }
+
+    return { ok: false, error: 'GATEWAY_UNREACHABLE' };
+  }
+
+  private async attempt(
+    payload: Record<string, string>,
+    headers: Record<string, string>,
+  ): Promise<{
+    ok: boolean;
+    /** True when retrying cannot help — a rejection, not a failure to reach. */
+    permanent: boolean;
+    id?: string;
+    status?: number;
+    error?: string;
+  }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 8000);
+
+    try {
+      const response = await fetch(this.config.url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        // A gateway that returns an id lets a delivery report be matched later;
+        // one that does not is still a successful send.
+        let id: string | undefined;
+        try {
+          const parsed = (await response.json()) as Record<string, unknown>;
+          const candidate = parsed.message_id ?? parsed.messageId ?? parsed.id;
+          if (typeof candidate === 'string') id = candidate;
+        } catch {
+          /* not JSON, which several gateways are not */
+        }
+        return { ok: true, permanent: true, ...(id ? { id } : {}) };
+      }
+
+      return {
+        ok: false,
+        // 4xx is the gateway's answer; 5xx might be a bad minute.
+        permanent: response.status < 500,
+        status: response.status,
+        error: `HTTP_${response.status}`,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        permanent: false,
+        error: error instanceof Error ? error.name : 'FETCH_FAILED',
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+/**
  * Wraps any provider with an allowlist so a staging deployment cannot send to
  * arbitrary real numbers (plan §7).
  */
