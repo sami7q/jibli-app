@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { JibliLogo, safeReturnPath } from '@jibli/ui-web';
+import {
+  JibliLogo,
+  quickLoginSupported,
+  recallCredentials,
+  rememberCredentials,
+  safeReturnPath,
+} from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
 
 /**
@@ -44,6 +50,9 @@ function LoginFrame({ children }: { children: React.ReactNode }) {
 const BACKOFF_AFTER_ATTEMPTS = 3;
 const BACKOFF_SECONDS = 15;
 
+/** What the browser shows beside the saved password in its own list. */
+const NOTE_DISPLAY_NAME = 'لوحة إدارة جيبلي';
+
 function LoginForm() {
   const router = useRouter();
 
@@ -58,11 +67,32 @@ function LoginForm() {
   const [failures, setFailures] = useState(0);
   const [lockedFor, setLockedFor] = useState(0);
 
+  const [quickLoginReady, setQuickLoginReady] = useState(false);
+
   const mfaInput = useRef<HTMLInputElement>(null);
   const usernameInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     usernameInput.current?.focus();
+  }, []);
+
+  /*
+   * Offer the password the browser already holds for this origin.
+   *
+   * `silent` means "fill it only if you can do so without interrupting" — one
+   * saved account, and silent access not withdrawn. It stops at filling the
+   * fields: signing in on its own would spend one of ten rate-limited attempts
+   * on a stale password every time this page loaded.
+   */
+  useEffect(() => {
+    if (!quickLoginSupported()) return;
+    setQuickLoginReady(true);
+
+    void recallCredentials('silent').then((saved) => {
+      if (!saved) return;
+      setUsername(saved.username);
+      setPassword(saved.password);
+    });
   }, []);
 
   // Move focus to the code field the moment the second stage appears, so a
@@ -87,8 +117,15 @@ function LoginForm() {
     setCapsLock(event.getModifierState?.('CapsLock') ?? false);
   };
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  /**
+   * One sign-in attempt against an explicit pair.
+   *
+   * Takes the credentials rather than reading them from state so the quick
+   * sign-in can use what the browser just handed back: a `setState` in the same
+   * tick has not landed yet, and submitting the old state would post an empty
+   * password.
+   */
+  const attempt = async (credentials: { username: string; password: string }) => {
     if (submitting || lockedFor > 0) return;
 
     setSubmitting(true);
@@ -103,8 +140,8 @@ function LoginForm() {
       }>('/api/v1/auth/login', {
         method: 'POST',
         body: {
-          username: username.trim(),
-          password,
+          username: credentials.username.trim(),
+          password: credentials.password,
           ...(stage === 'MFA' ? { mfa_code: mfaCode.trim() } : {}),
         },
       });
@@ -140,9 +177,24 @@ function LoginForm() {
        * page they were originally heading for.
        */
       if (response.must_change_password) {
+        // Deliberately not remembered: this password is about to be replaced,
+        // and saving it now would leave the browser offering a dead one.
         router.replace(`/change-password?next=${encodeURIComponent(destination)}`);
         return;
       }
+
+      /*
+       * The sign-in worked, so this pair is worth keeping. Awaited before
+       * navigating because the prompt belongs to this page — leaving first can
+       * cancel it, which is exactly the bug this fixes: the form posts with
+       * `fetch` and routes client-side, which Chrome does not read as a form
+       * submission, so it never offered to save the password by itself.
+       */
+      await rememberCredentials({
+        username: credentials.username.trim(),
+        password: credentials.password,
+        displayName: NOTE_DISPLAY_NAME,
+      });
 
       /*
        * Platform roles reach settlements and role assignment, so MFA is not
@@ -175,6 +227,32 @@ function LoginForm() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await attempt({ username, password });
+  };
+
+  /**
+   * Sign in with the saved password, showing the account picker.
+   *
+   * `optional` rather than `silent`: this is a button someone pressed, so an
+   * account chooser is an answer, not an interruption.
+   */
+  const signInWithSavedPassword = async () => {
+    const saved = await recallCredentials('optional');
+
+    if (!saved) {
+      setError(
+        'لا توجد كلمة مرور محفوظة لهذا الموقع في هذا المتصفح. سجّل الدخول مرة واحدة ووافق على حفظ كلمة المرور، ثم سيعمل هذا الزر.',
+      );
+      return;
+    }
+
+    setUsername(saved.username);
+    setPassword(saved.password);
+    await attempt(saved);
   };
 
   const disabled =
@@ -296,6 +374,22 @@ function LoginForm() {
                 ? 'تسجيل الدخول'
                 : 'تأكيد'}
         </button>
+
+        {/*
+          The shortcut. It carries no password of its own — it asks the browser
+          for the one it saved for this origin, which is why it can exist on a
+          deployed admin portal at all.
+        */}
+        {stage === 'CREDENTIALS' && quickLoginReady ? (
+          <button
+            type="button"
+            className="btn btn--ghost btn--block"
+            disabled={submitting || lockedFor > 0}
+            onClick={() => void signInWithSavedPassword()}
+          >
+            دخول سريع بكلمة المرور المحفوظة
+          </button>
+        ) : null}
 
         {stage === 'MFA' ? (
           <button

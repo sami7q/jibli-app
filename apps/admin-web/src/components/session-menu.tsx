@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { forgetQuickLogin } from '@jibli/ui-web';
 import { apiRequest } from '@/lib/api';
 import { Icon } from './icon';
 
@@ -35,6 +36,15 @@ export function SessionMenu({ userName, userRoleAr }: { userName: string; userRo
       // call fails the user must still land on the sign-in page rather than be
       // left looking signed in.
     }
+
+    /*
+     * Signing out says "I am done here". A saved password that fills itself in
+     * silently on the next load quietly undoes that, which matters most on the
+     * shared tablet this sign-out button exists for. The password stays in the
+     * browser; it just stops being offered without asking.
+     */
+    await forgetQuickLogin();
+
     router.replace('/login');
   }, [router]);
 
