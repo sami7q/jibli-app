@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AdminShell } from '@/components/shell';
+import { CollectionPanel } from '@/components/collection-panel';
+import { Dropdown } from '@/components/dropdown';
 import { Badge, Card, ErrorState, Money, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
@@ -21,6 +23,11 @@ import { useAdminSession } from '@/hooks/use-session';
  * The reconciliation panel sits at the top rather than the bottom: if the
  * invariants are failing, every figure below is suspect and the operator should
  * know that before reading them.
+ *
+ * Collection lives here too, under the reports rather than beside the
+ * statements, because "how much have we earned" and "go and collect it" are the
+ * same sitting: an operator reading the outstanding figure is the operator who
+ * decides to ring a restaurant about it.
  */
 export default function FinanceReportsPage() {
   const session = useAdminSession();
@@ -55,22 +62,17 @@ export default function FinanceReportsPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
-        <div className="topbar__control">
-          <label htmlFor="period" className="sr-only">
-            الفترة الزمنية
-          </label>
-          <select
-            id="period"
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
-            style={{ border: 'none', background: 'transparent', fontFamily: 'inherit', outline: 'none' }}
-          >
-            <option value={7}>آخر 7 أيام</option>
-            <option value={30}>آخر 30 يوم</option>
-            <option value={90}>آخر 90 يوم</option>
-            <option value={365}>آخر سنة</option>
-          </select>
-        </div>
+        <Dropdown
+          value={String(days)}
+          onChange={(value) => setDays(Number(value) || 30)}
+          label="الفترة"
+          options={[
+            { value: '7', label: 'آخر ٧ أيام' },
+            { value: '30', label: 'آخر ٣٠ يوماً' },
+            { value: '90', label: 'آخر ٩٠ يوماً' },
+            { value: '365', label: 'آخر سنة' },
+          ]}
+        />
       }
     >
       {/* ── Reconciliation first (plan §95) ───────────────────────────────── */}
@@ -129,6 +131,13 @@ export default function FinanceReportsPage() {
           </div>
         )}
       </Card>
+
+      {/*
+        Collection, directly under reconciliation: the outstanding figure is
+        only trustworthy when the checks above pass, and an operator should see
+        that before pressing a button that records money as received.
+      */}
+      <CollectionPanel token={token} />
 
       {/* ── Platform revenue, each figure named precisely ─────────────────── */}
       <Card title="إيرادات المنصة" icon="commissions">

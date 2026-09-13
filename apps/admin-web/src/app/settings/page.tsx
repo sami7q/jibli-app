@@ -25,6 +25,7 @@ const KEY_LABELS: Record<string, string> = {
   commission_flat_iqd: 'العمولة (د.ع لكل طلب)',
   require_mfa: 'إلزام التحقق بخطوتين لفريق المنصة',
   review_delay_minutes: 'مهلة التقييم بعد الاستلام (دقائق)',
+  banner_rotation_seconds: 'مدة عرض البنر في التطبيق (ثواني)',
   default_settlement_policy: 'دورة التسوية الافتراضية',
   default_payment_term_days: 'مهلة السداد (أيام)',
   delivery_pin_enabled: 'طلب رمز التسليم',

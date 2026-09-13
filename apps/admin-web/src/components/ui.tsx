@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icon';
+import { Dropdown } from './dropdown';
 
 /**
  * Shared Admin Portal primitives.
@@ -296,7 +297,7 @@ export function Select<T extends string>({
   onChange,
   options,
   label,
-  allLabel = 'الكل',
+  allLabel,
 }: {
   value: T | '';
   onChange: (value: T | '') => void;
@@ -304,32 +305,21 @@ export function Select<T extends string>({
   label: string;
   allLabel?: string;
 }) {
-  const id = `select-${label.replace(/\s/g, '-')}`;
+  /*
+   * A thin wrapper over `Dropdown`, kept so the twelve screens that already
+   * call `Select` did not all have to change at once. The native control it
+   * used to render had no visible border and opened upward near the bottom of
+   * the window; see dropdown.tsx for why that is worth replacing rather than
+   * restyling.
+   */
   return (
-    <div className="topbar__control">
-      <label htmlFor={id} className="sr-only">
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value as T | '')}
-        style={{
-          border: 'none',
-          background: 'transparent',
-          fontFamily: 'inherit',
-          fontSize: 'var(--text-sm)',
-          outline: 'none',
-        }}
-      >
-        <option value="">{allLabel}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
+    <Dropdown
+      value={value}
+      onChange={onChange}
+      options={options}
+      label={label}
+      {...(allLabel === undefined ? {} : { allLabel })}
+    />
   );
 }
 

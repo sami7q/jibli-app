@@ -11,6 +11,8 @@ import { registerAdminCouponRoutes } from './coupons.js';
 import { registerAdminPortalUserRoutes } from './portal-users.js';
 import { registerAdminSupportRoutes } from './support.js';
 import { registerAdminReviewRoutes } from './reviews.js';
+import { registerAdminStorefrontRoutes } from './storefront.js';
+import { registerAdminCollectionRoutes } from './collection.js';
 
 /**
  * Admin Portal API surface (plan §67, §69, §73, §87).
@@ -31,4 +33,6 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: AppContext): void
   registerAdminPortalUserRoutes(app, ctx);
   registerAdminSupportRoutes(app, ctx);
   registerAdminReviewRoutes(app, ctx);
+  registerAdminStorefrontRoutes(app, ctx);
+  registerAdminCollectionRoutes(app, ctx);
 }

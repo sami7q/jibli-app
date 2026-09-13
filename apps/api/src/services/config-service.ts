@@ -27,6 +27,8 @@ export const CONFIG_DEFAULTS = {
    * doorstep measures the last thirty seconds of a meal nobody has eaten yet.
    */
   review_delay_minutes: 15,
+  /** How long each banner holds the screen in the customer app. */
+  banner_rotation_seconds: 5,
   default_settlement_policy: 'HALF_MONTH',
   default_payment_term_days: 7,
   delivery_pin_enabled: true,

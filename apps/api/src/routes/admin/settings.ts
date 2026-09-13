@@ -40,6 +40,7 @@ const CONFIG_SCHEMAS: Record<ConfigKey, z.ZodTypeAny> = {
   commission_flat_iqd: z.number().int().min(0).max(100_000),
   require_mfa: z.boolean(),
   review_delay_minutes: z.number().int().min(0).max(1440),
+  banner_rotation_seconds: z.number().int().min(2).max(60),
   default_settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']),
   default_payment_term_days: z.number().int().min(0).max(90),
   delivery_pin_enabled: z.boolean(),

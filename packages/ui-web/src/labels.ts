@@ -127,6 +127,7 @@ export const ADMIN_NAV = [
       { href: '/restaurants', labelAr: 'المطاعم', icon: 'restaurants' },
       { href: '/applications', labelAr: 'طلبات الانضمام', icon: 'applications' },
       { href: '/categories', labelAr: 'التصنيفات', icon: 'categories' },
+      { href: '/appearance', labelAr: 'شكل التطبيق', icon: 'live' },
     ],
   },
   {

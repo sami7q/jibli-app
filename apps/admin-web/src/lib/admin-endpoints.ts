@@ -51,6 +51,61 @@ export interface AreaCoverage {
 }
 
 /** Commission earned and outstanding, grouped three ways over one filtered set. */
+export interface AppCategory {
+  id: string;
+  key: string;
+  name_ar: string;
+  emoji: string | null;
+  image_asset_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  restaurant_count: number;
+}
+
+export interface AppBanner {
+  id: string;
+  title_ar: string;
+  subtitle_ar: string | null;
+  image_asset_id: string | null;
+  link_type: 'NONE' | 'CATEGORY' | 'RESTAURANT' | 'URL';
+  link_value: string | null;
+  sort_order: number;
+  is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_live: boolean;
+}
+
+export interface Collectable {
+  restaurant_id: string;
+  display_name: string;
+  partner_code: string;
+  order_count: number;
+  commission_iqd: number;
+  gross_sales_iqd: number;
+  oldest_order_at: string | null;
+  newest_order_at: string | null;
+}
+
+export interface CollectionArchive {
+  total_collected_iqd: number;
+  collections: {
+    settlement_id: string;
+    restaurant_id: string;
+    restaurant_name: string;
+    partner_code: string;
+    period_start: string;
+    period_end: string;
+    order_count: number;
+    gross_sales_iqd: number;
+    amount_iqd: number;
+    collected_at: string | null;
+    method: string | null;
+    reference: string | null;
+    recorded_by: string | null;
+  }[];
+}
+
 export interface AdminNotification {
   id: string;
   kind: string;
@@ -648,6 +703,99 @@ export const admin = {
       `/api/v1/admin/finance/commission-overview${qs(filters)}`,
       { accessToken: token },
     ),
+
+  // ── Categories and banners ────────────────────────────────────────────────
+
+  categories: (token: string) =>
+    apiRequest<AppCategory[]>('/api/v1/admin/categories', { accessToken: token }),
+
+  createCategory: (
+    token: string,
+    body: { key: string; name_ar: string; emoji?: string; image_asset_id?: string },
+  ) =>
+    apiRequest<{ id: string }>('/api/v1/admin/categories', {
+      method: 'POST',
+      accessToken: token,
+      body,
+    }),
+
+  updateCategory: (
+    token: string,
+    id: string,
+    body: {
+      name_ar?: string;
+      emoji?: string | null;
+      image_asset_id?: string | null;
+      is_active?: boolean;
+    },
+  ) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/admin/categories/${id}`, {
+      method: 'PATCH',
+      accessToken: token,
+      body,
+    }),
+
+  deleteCategory: (token: string, id: string) =>
+    apiRequest<{ deleted: boolean }>(`/api/v1/admin/categories/${id}`, {
+      method: 'DELETE',
+      accessToken: token,
+    }),
+
+  reorderCategories: (token: string, ids: string[]) =>
+    apiRequest<{ ordered: number }>('/api/v1/admin/categories/order', {
+      method: 'POST',
+      accessToken: token,
+      body: { ids },
+    }),
+
+  banners: (token: string) =>
+    apiRequest<AppBanner[]>('/api/v1/admin/banners', { accessToken: token }),
+
+  createBanner: (token: string, body: Record<string, unknown>) =>
+    apiRequest<{ id: string }>('/api/v1/admin/banners', {
+      method: 'POST',
+      accessToken: token,
+      body,
+    }),
+
+  updateBanner: (token: string, id: string, body: Record<string, unknown>) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/admin/banners/${id}`, {
+      method: 'PATCH',
+      accessToken: token,
+      body,
+    }),
+
+  deleteBanner: (token: string, id: string) =>
+    apiRequest<{ deleted: boolean }>(`/api/v1/admin/banners/${id}`, {
+      method: 'DELETE',
+      accessToken: token,
+    }),
+
+  reorderBanners: (token: string, ids: string[]) =>
+    apiRequest<{ ordered: number }>('/api/v1/admin/banners/order', {
+      method: 'POST',
+      accessToken: token,
+      body: { ids },
+    }),
+
+  // ── Collecting commission ─────────────────────────────────────────────────
+
+  collectable: (token: string) =>
+    apiRequest<Collectable[]>('/api/v1/admin/finance/collectable', { accessToken: token }),
+
+  collect: (
+    token: string,
+    body: { restaurant_id: string; method: string; reference?: string; note?: string },
+  ) =>
+    apiRequest<{ settlement_id: string; order_count: number; collected_iqd: number; note_ar: string }>(
+      '/api/v1/admin/finance/collect',
+      { method: 'POST', accessToken: token, body },
+    ),
+
+  collections: (token: string, filters: Record<string, string | undefined> = {}) =>
+    apiRequest<CollectionArchive>(`/api/v1/admin/finance/collections${qs(filters)}`, {
+      accessToken: token,
+    }),
 
   // ── Notifications ─────────────────────────────────────────────────────────
 

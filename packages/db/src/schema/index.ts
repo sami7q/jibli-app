@@ -9,3 +9,4 @@ export * from './inventory.js';
 export * from './finance.js';
 export * from './platform.js';
 export * from './support.js';
+export * from './storefront.js';

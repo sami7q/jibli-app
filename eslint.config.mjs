@@ -76,7 +76,11 @@ export default tseslint.config(
   },
   {
     // Database migrations run from a CLI and report progress to stdout.
-    files: ['packages/db/src/migrate.ts', 'packages/db/src/reset.ts'],
+    files: [
+      'packages/db/src/migrate.ts',
+      'packages/db/src/reset.ts',
+      'packages/db/src/schema-drift.ts',
+    ],
     rules: { 'no-console': 'off' },
   },
   prettier,

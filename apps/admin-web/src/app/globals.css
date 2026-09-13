@@ -1984,3 +1984,599 @@ html {
   color: var(--jibli-warning-700);
   fill: currentColor;
 }
+
+/* ── Dropdown ─────────────────────────────────────────────────────────────── */
+
+.dropdown {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 9rem;
+}
+
+.dropdown__label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding-inline-start: 2px;
+}
+
+/* A real border, because the control it replaces had none and read as text. */
+.dropdown__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  inline-size: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong, var(--border-subtle));
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: start;
+}
+
+.dropdown__trigger:hover:not(:disabled) {
+  border-color: var(--jibli-orange-500);
+}
+
+.dropdown__trigger:focus-visible {
+  outline: 2px solid var(--jibli-orange-500);
+  outline-offset: 1px;
+}
+
+.dropdown__trigger--open {
+  border-color: var(--jibli-orange-500);
+  box-shadow: 0 0 0 3px var(--jibli-orange-50);
+}
+
+.dropdown__trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dropdown__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown__value--empty {
+  color: var(--text-muted);
+}
+
+.dropdown__chevron {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  /* Points down, and turns to point up while the list is open. */
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.dropdown__trigger--open .dropdown__chevron {
+  transform: rotate(90deg);
+}
+
+/* Anchored below the trigger and staying there; it scrolls rather than flips. */
+.dropdown__list {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline: 0;
+  z-index: 50;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-block-size: 16rem;
+  overflow-y: auto;
+  background: var(--surface-card);
+  border: 1px solid var(--jibli-orange-500);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
+}
+
+.dropdown__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dropdown__option > span:first-child {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown__option--active {
+  background: var(--surface-sunken);
+}
+
+.dropdown__option--selected {
+  color: var(--jibli-orange-700);
+  font-weight: 600;
+}
+
+.dropdown__note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dropdown__tick {
+  inline-size: 0.9rem;
+  block-size: 0.9rem;
+  flex-shrink: 0;
+  color: var(--jibli-orange-600);
+}
+
+/* ── Coverage table ───────────────────────────────────────────────────────── */
+
+.area-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.area-table__name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.area-table__expand {
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+}
+
+/* Keeps a governorate with no cities aligned with the ones that expand. */
+.area-table__spacer {
+  inline-size: 1.25rem;
+}
+
+.area-table__link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.area-table__link:hover {
+  color: var(--jibli-orange-600);
+}
+
+.area-table__link--city {
+  font-weight: 400;
+  padding-inline-start: 1.7rem;
+}
+
+.area-table__city td {
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+}
+
+.area-table__row--on td {
+  box-shadow: inset 0 0 0 1px var(--jibli-orange-500);
+}
+
+.area-table tfoot td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-strong);
+}
+
+/* ── Categories ───────────────────────────────────────────────────────────── */
+
+.cats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+/* Hidden categories stay legible — they are still editable rows, not debris. */
+.cat--off {
+  background: var(--surface-sunken);
+}
+
+.cat--off .cat__face,
+.cat--off .cat__body {
+  opacity: 0.6;
+}
+
+.cat__order {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.cat__move {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  line-height: 0;
+}
+
+.cat__move:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.cat__move:hover:not(:disabled) {
+  color: var(--jibli-orange-600);
+}
+
+.cat__move-icon {
+  inline-size: 1rem;
+  block-size: 1rem;
+  transform: rotate(-90deg);
+}
+
+.cat__move-icon--up {
+  transform: rotate(90deg);
+}
+
+.cat__position {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cat__face {
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.cat__face img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.cat__emoji {
+  font-size: 1.5rem;
+}
+
+.cat__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cat__key {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.cat__count {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.cat__empty {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.cat__state,
+.cat__actions {
+  flex-shrink: 0;
+}
+
+.cat__actions {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.cats__note {
+  margin-block: var(--space-4) 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+@media (max-width: 60rem) {
+  .cat {
+    flex-wrap: wrap;
+  }
+
+  .cat__body {
+    flex-basis: 40%;
+  }
+}
+
+/* ── App appearance ───────────────────────────────────────────────────────── */
+
+.appearance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.appearance__main,
+.appearance__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* The preview follows while the list below it is scrolled. */
+.appearance__side {
+  position: sticky;
+  inset-block-start: var(--space-4);
+}
+
+@media (max-width: 68rem) {
+  .appearance {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .appearance__side {
+    position: static;
+  }
+}
+
+.banner__thumb {
+  inline-size: 5rem;
+  block-size: 2.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.banner__thumb img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.banner__window {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-block-start: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cat-strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-block-end: var(--space-2);
+}
+
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cat-chip__face {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+}
+
+.cat-chip__face img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* ── Phone preview ────────────────────────────────────────────────────────── */
+
+.phone {
+  inline-size: 100%;
+  max-inline-size: 17rem;
+  margin-inline: auto;
+  border: 8px solid #1b1b1f;
+  border-radius: 1.9rem;
+  background: #1b1b1f;
+  overflow: hidden;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.22);
+}
+
+.phone__notch {
+  block-size: 1.1rem;
+  display: grid;
+  place-items: center;
+}
+
+.phone__notch::after {
+  content: '';
+  inline-size: 4.5rem;
+  block-size: 0.35rem;
+  border-radius: 999px;
+  background: #000;
+  display: block;
+}
+
+.phone__screen {
+  background: var(--surface-page, #fff);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-block-size: 21rem;
+}
+
+.phone__banner {
+  position: relative;
+  aspect-ratio: 2 / 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+
+.phone__banner img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.phone__banner-fallback {
+  inline-size: 100%;
+  block-size: 100%;
+  background: linear-gradient(135deg, var(--jibli-orange-500), var(--jibli-orange-700));
+}
+
+/* A scrim, so Arabic over a photograph stays readable whatever the photograph. */
+.phone__banner-text {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  padding: var(--space-2);
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.66));
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.phone__banner-text strong {
+  font-size: var(--text-sm);
+}
+
+.phone__banner-text span {
+  font-size: var(--text-xs);
+  opacity: 0.9;
+}
+
+.phone__banner-empty {
+  display: grid;
+  place-items: center;
+  block-size: 100%;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.phone__dots {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.phone__dots span {
+  inline-size: 5px;
+  block-size: 5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.phone__dots .is-on {
+  background: var(--jibli-orange-500);
+  inline-size: 14px;
+}
+
+.phone__cats {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-block: 2px;
+}
+
+.phone__cat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  inline-size: 3.2rem;
+  flex-shrink: 0;
+}
+
+.phone__cat-face {
+  inline-size: 2.4rem;
+  block-size: 2.4rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 1.1rem;
+}
+
+.phone__cat-face img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.phone__cat-name {
+  font-size: 0.58rem;
+  text-align: center;
+  line-height: 1.25;
+  color: var(--text-secondary);
+}
+
+/* Stand-ins for the restaurant cards below the fold. */
+.phone__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-block-start: auto;
+}
+
+.phone__skeleton span {
+  block-size: 3.2rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}

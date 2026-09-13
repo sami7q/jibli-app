@@ -171,6 +171,16 @@ export type CapabilityPatch = Partial<Record<`${GeographyCapability}_enabled` | 
 // ── Endpoints ──────────────────────────────────────────────────────────────
 
 export const adminApi = {
+  /**
+   * Where an uploaded image is served from.
+   *
+   * Built here rather than returned per row: the id is what the database
+   * stores, and every screen that shows a logo or a category picture needs the
+   * same URL from it. A field on each response would be the same string
+   * repeated a hundred times over the wire.
+   */
+  assetUrl: (assetId: string) => `${API_BASE}/api/v1/assets/${assetId}`,
+
   /** Posts a data URL and returns the stored asset. Shared shape with the restaurant portal. */
   uploadImage: (
     token: string,
