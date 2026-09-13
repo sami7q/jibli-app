@@ -428,9 +428,17 @@ export const api = {
   updateProfile: (payload: { full_name?: string; governorate_id?: string; city_id?: string }) =>
     apiRequest<{ updated: boolean }>('/api/v1/profile', { method: 'PATCH', body: payload }),
 
+  /**
+   * Restaurants in a city.
+   *
+   * Public, and said so explicitly: discovery works signed-out (App Store
+   * 5.1.1(ii)), and declaring it saves a keychain read on the request the home
+   * screen makes most often.
+   */
   restaurants: (cityId: string, search?: string) =>
     apiRequest<RestaurantCard[]>(
       `/api/v1/restaurants?city_id=${cityId}${search ? `&q=${encodeURIComponent(search)}` : ''}`,
+      { authenticated: false },
     ),
 
   placeOrder: (payload: unknown, key: string) =>

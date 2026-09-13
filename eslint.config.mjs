@@ -58,9 +58,16 @@ export default tseslint.config(
     },
   },
   {
-    // .cjs files run in CommonJS under Node — `module`, `require` and friends
-    // are real there, not undeclared globals.
-    files: ['**/*.cjs'],
+    /*
+     * .cjs files run in CommonJS under Node — `module`, `require` and friends
+     * are real there, not undeclared globals.
+     *
+     * The mobile app's `babel.config.js` and `metro.config.js` are the same
+     * thing under a `.js` name: both tools load them with `require`, and
+     * neither can be ESM, so they are listed here rather than given a
+     * `no-undef` exemption that would hide a genuine typo.
+     */
+    files: ['**/*.cjs', 'apps/mobile/babel.config.js', 'apps/mobile/metro.config.js'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: {
@@ -73,6 +80,7 @@ export default tseslint.config(
         console: 'readonly',
       },
     },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {
     // Database migrations run from a CLI and report progress to stdout.

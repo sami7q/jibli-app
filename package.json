@@ -31,7 +31,7 @@
     "infra:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker/docker-compose.yml down",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "bundle": "node scripts/bundle.mjs api && node scripts/bundle.mjs worker",
+    "bundle": "node scripts/bundle.mjs api && node scripts/bundle.mjs worker && pnpm --filter @jibli/mobile bundle",
     "deploy:migrate": "pnpm --filter @jibli/db migrate && pnpm --filter @jibli/db seed",
     "deploy:check": "pnpm -r typecheck && pnpm lint && pnpm test && pnpm build && pnpm bundle"
   },

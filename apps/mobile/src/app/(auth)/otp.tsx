@@ -24,12 +24,21 @@ const OTP_LENGTH = 4;
  */
 export default function OtpScreen() {
   const router = useRouter();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone, devCode } = useLocalSearchParams<{ phone: string; devCode?: string }>();
 
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [resendIn, setResendIn] = useState(45);
+  /**
+   * The code, when the server sent it.
+   *
+   * Only a server running with APP_ENV=local does that; staging and production
+   * never put an OTP in a response or a log. So this block cannot appear to a
+   * real customer — it exists because without it, signing into a locally-run
+   * API means reading the server console on every attempt.
+   */
+  const [devHint, setDevHint] = useState<string | null>(devCode ?? null);
 
   const inputs = useRef<(TextInput | null)[]>([]);
 
@@ -110,6 +119,7 @@ export default function OtpScreen() {
     try {
       const result = await api.requestOtp(phone);
       setResendIn(result.resend_after_seconds);
+      setDevHint(result.dev_code ?? null);
       setError(null);
     } catch (caught) {
       if (caught instanceof ApiError) {
@@ -152,6 +162,20 @@ export default function OtpScreen() {
           />
         ))}
       </View>
+
+      {devHint ? (
+        <Pressable
+          onPress={() => {
+            setDigits(devHint.slice(0, OTP_LENGTH).split(''));
+            void submit(devHint.slice(0, OTP_LENGTH));
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`استخدام رمز التطوير ${devHint}`}
+          style={styles.devHint}
+        >
+          <Text style={styles.devHintText}>وضع التطوير — الرمز: {devHint} (اضغط للتعبئة)</Text>
+        </Pressable>
+      ) : null}
 
       {isSubmitting ? <ActivityIndicator color={color.brand} /> : null}
 
@@ -212,6 +236,16 @@ const styles = StyleSheet.create({
     color: color.textPrimary,
   },
   codeBoxFilled: { borderColor: color.brand, backgroundColor: color.brandSoft },
+
+  devHint: {
+    backgroundColor: color.warningSoft,
+    borderRadius: radius.sm,
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    minHeight: TAP_TARGET,
+    justifyContent: 'center',
+  },
+  devHintText: { ...text.small, color: color.warningStrong, textAlign: 'center' },
 
   error: {
     ...text.small,

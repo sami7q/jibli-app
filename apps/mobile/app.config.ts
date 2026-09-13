@@ -21,6 +21,22 @@ const config: ExpoConfig = {
   extra: {
     forceRTL: true,
     /*
+     * Where the app talks to.
+     *
+     * This is read when the config is evaluated — when `expo start` boots or a
+     * build runs — so the value is baked into the binary, not looked up at
+     * runtime. It had no entry here at all, which meant `src/lib/api.ts` fell
+     * through to `http://localhost:4000`: an app that works on the machine
+     * that built it and on no other device, failing with a network error that
+     * says nothing about the cause.
+     *
+     * The default is the deployed API rather than localhost for the same
+     * reason: the common case is a phone, and a phone cannot reach the
+     * developer's localhost. Point it elsewhere with EXPO_PUBLIC_API_URL —
+     * `http://<your LAN ip>:4000` for a local server, never `localhost`.
+     */
+    apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'https://jibli-api.onrender.com',
+    /*
      * Reachable from inside the app, not only from the store listing.
      *
      * App Review checks that the privacy policy is linked in-app (5.1.1), and
@@ -45,16 +61,18 @@ const config: ExpoConfig = {
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
       // Foreground-only, and only to help place a delivery pin (plan §13).
-      NSLocationWhenInUseUsageDescription:
-        'نستخدم موقعك لتحديد عنوان التوصيل بدقة. يمكنك أيضاً اختيار الموقع يدوياً.',
       /*
-       * No NSCameraUsageDescription.
+       * No purpose strings, because this build uses no gated capability.
        *
-       * It used to claim delivery-proof photography, which the *customer* app
-       * never does — that is Driver Mode's job, and it does not ship in this
-       * binary. A purpose string for a capability the app does not use is
-       * itself a rejection, and it also shows up in the App Privacy label as a
-       * data type Jibli does not collect.
+       * It previously declared camera access for delivery-proof photography —
+       * Driver Mode's job, not the customer app's — and location for a
+       * delivery pin. `expo-location` is not even a dependency, so the app
+       * cannot ask for a position; the entry only ever added a "Location" line
+       * to the store's privacy label for something that never happens.
+       *
+       * A purpose string for an unused capability is a rejection in its own
+       * right (5.1.1), and both stores read these as declarations of what the
+       * app does. They come back with the feature, not before it.
        */
     },
   },
@@ -64,8 +82,14 @@ const config: ExpoConfig = {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#FF5400',
     },
-    permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION', 'POST_NOTIFICATIONS'],
-    // Never ACCESS_BACKGROUND_LOCATION: Release 1 does not track drivers.
+    /*
+     * Only what the app uses. Notifications are real — `expo-notifications`
+     * registers a token after sign-in — while the two location permissions
+     * were declared for a map picker that does not exist in this binary.
+     *
+     * Never ACCESS_BACKGROUND_LOCATION: Release 1 does not track drivers.
+     */
+    permissions: ['POST_NOTIFICATIONS'],
   },
   plugins: [
     'expo-router',
@@ -77,7 +101,18 @@ const config: ExpoConfig = {
      */
     ['expo-splash-screen', { backgroundColor: '#FF5400', image: './assets/splash.png' }],
   ],
-  experiments: { typedRoutes: true },
+  experiments: {
+    typedRoutes: true,
+    /*
+     * Off deliberately. Metro would otherwise apply `tsconfig.json`'s `paths`
+     * to runtime resolution, and this project pins `react` there so that TS
+     * resolves the React 18 typings — which would make the bundler resolve
+     * `react` to `@types/react`, a package containing no JavaScript. The app
+     * failed to bundle at all. The `@/` alias is handled by Babel instead;
+     * see babel.config.js.
+     */
+    tsconfigPaths: false,
+  },
 };
 
 export default config;

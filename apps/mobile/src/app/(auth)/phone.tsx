@@ -56,8 +56,18 @@ export default function PhoneScreen() {
     setError(null);
 
     try {
-      await api.requestOtp(parsed.value);
-      router.push({ pathname: '/(auth)/otp', params: { phone: parsed.value } });
+      const result = await api.requestOtp(parsed.value);
+      /*
+       * `dev_code` is carried through only because the server chose to send it,
+       * and it does that solely when APP_ENV is `local` (otp-service.ts) — the
+       * plan forbids logging or returning OTP values anywhere else. Passing it
+       * along means a developer running the API locally can sign in without an
+       * SMS gateway; against staging or production the field is simply absent.
+       */
+      router.push({
+        pathname: '/(auth)/otp',
+        params: { phone: parsed.value, ...(result.dev_code ? { devCode: result.dev_code } : {}) },
+      });
     } catch (caught) {
       if (caught instanceof ApiError) {
         // The server's Arabic message is authoritative — it knows whether this

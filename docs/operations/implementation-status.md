@@ -136,18 +136,32 @@ satisfied from code alone.
 
 These were never among the five, but they block a usable product:
 
-1. **Portal and app screens.** The Admin Portal has 2 of ~15 pages, the
-   Restaurant Portal 2 of 10, and the mobile app has no customer ordering flow
-   at all. Navigation, API clients and types exist; the UIs do not.
-   **This is now the largest gap.**
+1. **Portal screens.** The Admin Portal has grown well past its original 2 of
+   ~15 pages; the Restaurant Portal still trails it.
+   **The customer app is no longer part of this gap** — welcome, home,
+   restaurant and menu, cart, checkout, order detail and tracking, account,
+   favourites and a four-tab shell are built against the live API. See
+   [`docs/mobile/integration.md`](../mobile/integration.md) for what connects to
+   what, and [`docs/mobile/running-the-app.md`](../mobile/running-the-app.md)
+   for how to put it on a screen.
+   What remains there is **device time**: it bundles for both platforms and has
+   never run on hardware.
 2. **Push provider.** Still the console stub. Notifications are recorded in
    `notification_deliveries` and dispatched, but nothing reaches a real device.
+   The app registers its token with `POST /api/v1/devices` and is waiting.
+2b. **SMS provider.** `OTP_PROVIDER=console` on staging, and the code is
+   neither returned nor logged outside `APP_ENV=local` — so **nobody can sign
+   into the deployed app**. Guest browsing works without it, which is what makes
+   the app reviewable today, but a real customer cannot get an account until a
+   gateway is wired.
 3. **File uploads.** Schema, visibility model and security requirements defined;
    no signed-URL issuer implemented.
 4. **Restaurant self-onboarding wizard UI** — the API command exists.
 5. **Coupons**: schema, funding-source arithmetic and validation complete; no
    redemption endpoint.
-6. **Reviews and favourites**: schema and constraints only.
+6. **Reviews and favourites**: both now have endpoints and app screens —
+   `GET/PUT/DELETE /api/v1/favorites`, the rating sheet behind
+   `review-eligibility`. What is left is the Admin-side view of review content.
 7. **Exports**: CSV formula-injection escaping exists; no export job.
 
 ---
