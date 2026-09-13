@@ -60,7 +60,9 @@ const PATHS: Record<IconName, string> = {
   menu: 'M5 3v8a2 2 0 0 0 4 0V3M7 11v10M19 3c-1.5 2-2 4-2 6s.5 3 2 3v9',
   inventory: 'M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5 12 12l9-4.5M12 12v9',
   profits: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
-  commissions: 'M19 5 5 19M7.5 8a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5zM16.5 21a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z',
+  // A banknote, not a percent sign: the commission is a fixed amount per order.
+  commissions:
+    'M3 7h18a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM12 14.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8zM6 12h.01M18 12h.01',
   settlements: 'M3 8h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM3 8l2-4h14l2 4M16 14h2',
   drivers: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3.5 3-6 7-6s7 2.5 7 6M17 8h5M19.5 5.5v5',
   staff: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3.3 2.7-5.5 6-5.5S14 16.7 14 20M17 11a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM16 14.5c3 0 6 1.8 6 5.5',
