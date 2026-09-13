@@ -14,9 +14,14 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
  * Drizzle's `arrayContains` builds the second of those, so it typechecks
  * perfectly and fails at runtime. That is worth one named helper rather than
  * three call sites each rediscovering it.
+ *
+ * The `::text` is not decoration. A value arrives as a bind parameter with no
+ * declared type, and `jsonb_build_array($1)` is polymorphic, so Postgres
+ * answers "could not determine data type of parameter $1" and the request
+ * 500s. The column form below needs no cast because a column already has one.
  */
 export function jsonbArrayContains(column: PgColumn, value: string): SQL {
-  return sql`${column} @> jsonb_build_array(${value})`;
+  return sql`${column} @> jsonb_build_array(${value}::text)`;
 }
 
 /**
