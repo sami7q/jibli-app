@@ -252,6 +252,34 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
       .orderBy(sql`${restaurants.ratingAverage} DESC NULLS LAST`, asc(menuItems.sortOrder))
       .limit(query.limit);
 
+    /*
+     * Which of these dishes cannot be added with one tap.
+     *
+     * The restaurant page has computed this since it was written, and search
+     * did not — so the «+» beside a search result added a dish with a required
+     * size or bread straight to the cart, and the customer found out at
+     * checkout, where the quote refused the whole order with
+     * MODIFIER_SELECTION_INVALID and no way to tell which line was at fault.
+     * One query for the whole page rather than the modifier groups of every
+     * dish, because all the row needs to know is whether to open the sheet.
+     */
+    const itemIds = rows.map((row) => row.itemId);
+    const requiredRows =
+      itemIds.length > 0
+        ? await ctx.db
+            .selectDistinct({ itemId: itemModifierGroups.itemId })
+            .from(itemModifierGroups)
+            .innerJoin(modifierGroups, eq(itemModifierGroups.groupId, modifierGroups.id))
+            .where(
+              and(
+                inArray(itemModifierGroups.itemId, itemIds),
+                eq(modifierGroups.isActive, true),
+                eq(modifierGroups.isRequired, true),
+              ),
+            )
+        : [];
+    const requiresChoice = new Set(requiredRows.map((row) => row.itemId));
+
     const hoursByBranch = await loadHours(ctx, [...new Set(rows.map((row) => row.branchId))]);
 
     const dishes = rows.map((row) => {
@@ -272,6 +300,8 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
         image_asset_id: row.imageAssetId,
         is_available: row.isAvailable,
         is_popular: row.isPopular,
+        /** A size, a bread — the sheet has to be opened rather than the row tapped. */
+        requires_choice: requiresChoice.has(row.itemId),
         restaurant: {
           id: row.restaurantId,
           branch_id: row.branchId,

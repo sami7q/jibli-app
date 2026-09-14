@@ -683,6 +683,7 @@ function CategoryTile({
  */
 function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
   const { add } = useCart();
+  const router = useRouter();
   const orderable = dish.restaurant.accepts_orders && dish.is_available;
 
   // A View, not a Pressable: the plus below is its own control, and a button
@@ -762,6 +763,21 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
         {orderable ? (
           <Pressable
             onPress={() => {
+              /*
+               * A dish with a required choice cannot be added from here.
+               *
+               * Adding it produced a cart line with no size or bread chosen,
+               * which the quote refuses — so the customer only found out at
+               * checkout, facing «اختيارات الإضافات غير صحيحة» over a whole
+               * order with nothing naming the line at fault. The sheet needs
+               * the restaurant and the item's groups, so the row sends them to
+               * the menu with the dish named and it opens there.
+               */
+              if (dish.requires_choice) {
+                router.push(`/restaurant/${dish.restaurant.id}?item=${dish.id}`);
+                return;
+              }
+
               const result = add(
                 {
                   restaurantId: dish.restaurant.id,
@@ -787,7 +803,11 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
               }
             }}
             accessibilityRole="button"
-            accessibilityLabel={`إضافة ${dish.name_ar} إلى السلة`}
+            accessibilityLabel={
+              dish.requires_choice
+                ? `اختيار خيارات ${dish.name_ar}`
+                : `إضافة ${dish.name_ar} إلى السلة`
+            }
             hitSlop={space[2]}
             style={({ pressed }) => [
               {
@@ -806,7 +826,14 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
               pressed ? { opacity: 0.75 } : null,
             ]}
           >
-            <MaterialCommunityIcons name="plus" size={18} color={palette.white} />
+            {/* A chevron, not a plus: this one opens something rather than
+                adding something, and drawing them the same is how a customer
+                learns that «+» sometimes lies. */}
+            <MaterialCommunityIcons
+              name={dish.requires_choice ? 'chevron-left' : 'plus'}
+              size={18}
+              color={palette.white}
+            />
           </Pressable>
         ) : null}
       </View>

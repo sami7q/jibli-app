@@ -475,6 +475,13 @@ export interface DishResult {
   image_asset_id: string | null;
   is_available: boolean;
   is_popular: boolean;
+  /**
+   * The dish carries a required choice — a size, a bread.
+   *
+   * One-tap add produces a line the kitchen cannot fill and the quote refuses
+   * the whole order, so the row opens the item instead of adding it.
+   */
+  requires_choice: boolean;
   restaurant: {
     id: string;
     branch_id: string;

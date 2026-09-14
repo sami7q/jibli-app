@@ -226,10 +226,7 @@ export default function CheckoutScreen() {
           {quote.isLoading ? (
             <Skeleton height={112} />
           ) : quote.isError ? (
-            <ErrorState
-              message={quote.error instanceof ApiError ? quote.error.messageAr : 'تعذّر حساب الطلب'}
-              onRetry={() => void quote.refetch()}
-            />
+            <QuoteError error={quote.error} onRetry={() => void quote.refetch()} />
           ) : quote.data ? (
             <View style={{ gap: space[2] }}>
               <SummaryRow
@@ -565,6 +562,77 @@ function AddressSheet({
         placeholder="قرب صيدلية النور"
       />
     </Sheet>
+  );
+}
+
+/**
+ * A refused quote, with the line that caused it.
+ *
+ * Every one of these used to be «تعذّر حساب الطلب» over a «إعادة المحاولة»
+ * that would fail identically forever, because most of them are not transient:
+ * a dish went out of stock, a price moved, or — the one that put this here — a
+ * cart line is missing a required choice, which retrying cannot fix and
+ * nothing on the screen named. The server already says which item and which
+ * group in `details`; this reads it and offers the only two things that
+ * actually resolve it.
+ */
+function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const router = useRouter();
+  const { cart, remove } = useCart();
+
+  const api = error instanceof ApiError ? error : null;
+  const details = (api?.details ?? {}) as { menuItemId?: unknown; groupNameAr?: unknown };
+  const menuItemId = typeof details.menuItemId === 'string' ? details.menuItemId : null;
+  const groupNameAr = typeof details.groupNameAr === 'string' ? details.groupNameAr : null;
+
+  const line = menuItemId
+    ? (cart?.lines.find((entry) => entry.menuItemId === menuItemId) ?? null)
+    : null;
+
+  if (!line || !cart) {
+    return (
+      <ErrorState message={api?.messageAr ?? 'تعذّر حساب الطلب'} onRetry={onRetry} />
+    );
+  }
+
+  return (
+    <View
+      style={{
+        padding: space[4],
+        borderRadius: radius.lg,
+        backgroundColor: color.dangerSoft,
+        borderWidth: 1,
+        borderColor: color.danger,
+        gap: space[3],
+      }}
+    >
+      <Text variant="smallBold" tone="danger">
+        {api?.messageAr ?? 'تعذّر حساب الطلب'}
+      </Text>
+
+      <Text variant="small" tone="secondary">
+        {groupNameAr
+          ? `«${line.nameAr}» يحتاج اختيار ${groupNameAr} قبل الطلب.`
+          : `المشكلة في «${line.nameAr}».`}
+      </Text>
+
+      <Row gap={space[2]}>
+        <Button
+          label="اختيار الخيارات"
+          onPress={() =>
+            router.push(`/restaurant/${cart.restaurantId}?item=${line.menuItemId}`)
+          }
+        />
+        <Button
+          label="حذف الصنف"
+          variant="secondary"
+          onPress={() => {
+            remove(line.key);
+            onRetry();
+          }}
+        />
+      </Row>
+    </View>
   );
 }
 

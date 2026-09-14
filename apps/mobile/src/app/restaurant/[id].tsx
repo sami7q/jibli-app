@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,12 +25,14 @@ import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
  * ordered from no matter what this screen renders.
  */
 export default function RestaurantScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, item: itemToOpen } = useLocalSearchParams<{ id: string; item?: string }>();
   const router = useRouter();
   const { cart, itemCount, subtotalIqd } = useCart();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
+  /** So arriving with `?item=` opens the sheet once and not again on every render. */
+  const autoOpened = useRef(false);
 
   /*
    * Where each category section starts, measured as it lays out.
@@ -57,6 +59,26 @@ export default function RestaurantScreen() {
     queryFn: () => api.restaurant(id),
     enabled: Boolean(id),
   });
+
+  /*
+   * Arriving from a search result that needs a choice.
+   *
+   * The row on the home screen cannot open the sheet itself — the sheet needs
+   * the restaurant, its menu and the item's groups — so it sends the customer
+   * here with the dish named, and the sheet opens on top of the menu the
+   * moment it loads. Once: re-opening on every render would trap anyone who
+   * closed it.
+   */
+  useEffect(() => {
+    if (autoOpened.current || !itemToOpen || !restaurant.data) return;
+
+    const found = restaurant.data.categories
+      .flatMap((category) => category.items)
+      .find((item) => item.id === itemToOpen);
+
+    autoOpened.current = true;
+    if (found) setOpenItem(found);
+  }, [itemToOpen, restaurant.data]);
 
   /**
    * One tap, one item, no sheet.
