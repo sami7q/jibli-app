@@ -10,7 +10,7 @@ import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
-import { RatingPill, Sheet, Stepper } from '@/ui/catalog';
+import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
 
 /**
  * Restaurant detail and menu (`6.html`).
@@ -927,53 +927,3 @@ function ItemSheet({
   );
 }
 
-/** The floating cart bar. */
-function CartBar({
-  count,
-  totalIqd,
-  onPress,
-}: {
-  count: number;
-  totalIqd: number;
-  onPress: () => void;
-}) {
-  return (
-    <View
-      style={{
-        position: 'absolute',
-        bottom: space[6],
-        insetInlineStart: space[4],
-        insetInlineEnd: space[4],
-      }}
-    >
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={`عرض السلة، ${count} صنف`}
-        style={({ pressed }) => [
-          {
-            minHeight: TAP_TARGET + 8,
-            borderRadius: radius.full,
-            backgroundColor: color.brand,
-            paddingHorizontal: space[4],
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          },
-          shadow.lg,
-          pressed ? { opacity: 0.9 } : null,
-        ]}
-      >
-        <Row gap={space[2]}>
-          <MaterialCommunityIcons name="cart-outline" size={20} color={palette.white} />
-          <Text variant="smallBold" tone="inverse">
-            {count} صنف
-          </Text>
-        </Row>
-        <Text variant="bodyBold" tone="inverse">
-          {formatIqdArabic(iqd(totalIqd))}
-        </Text>
-      </Pressable>
-    </View>
-  );
-}

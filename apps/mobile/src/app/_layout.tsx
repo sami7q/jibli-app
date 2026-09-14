@@ -19,6 +19,7 @@ import { AreaProvider } from '@/lib/area';
 import { CartProvider } from '@/lib/cart';
 import { OfflineBanner, startNetworkWatch } from '@/lib/network';
 import { ActiveOrderBar, OrderWatchProvider } from '@/lib/order-watch';
+import { GlobalCartBar } from '@/lib/cart-dock';
 import { ErrorBoundary } from '@/lib/error-boundary';
 import { color, enforceRtl, palette } from '@/theme';
 
@@ -105,6 +106,7 @@ export default function RootLayout() {
                     * to float above.
                     */}
                   <ActiveOrderBar />
+                  <GlobalCartBar />
                 </OrderWatchProvider>
               </CartProvider>
             </AreaProvider>

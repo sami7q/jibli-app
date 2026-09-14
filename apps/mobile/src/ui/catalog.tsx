@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { formatIqdArabic, iqd } from '@jibli/money';
 import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
 import { Row, Text } from './index';
 
@@ -686,6 +687,70 @@ export function PromoBanner({
     >
       {body}
     </Pressable>
+  );
+}
+
+/**
+ * The floating cart bar.
+ *
+ * Lived inside the restaurant screen, which is why adding a dish from the home
+ * search — the other place the app offers a «+» — produced no visible cart at
+ * all: the item went in and the screen said nothing. Shared now, so the two
+ * places that can add both show the same thing.
+ *
+ * `bottom` is the caller's, because what sits under it differs: a tab bar on
+ * the home screen, nothing on a restaurant page.
+ */
+export function CartBar({
+  count,
+  totalIqd,
+  onPress,
+  bottom = space[6],
+}: {
+  count: number;
+  totalIqd: number;
+  onPress: () => void;
+  bottom?: number;
+}) {
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        bottom,
+        // Equal insets, so physical sides are unambiguous in either direction.
+        left: space[4],
+        right: space[4],
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`عرض السلة، ${count} صنف`}
+        style={({ pressed }) => [
+          {
+            minHeight: TAP_TARGET + 8,
+            borderRadius: radius.full,
+            backgroundColor: color.brand,
+            paddingHorizontal: space[4],
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          },
+          shadow.lg,
+          pressed ? { opacity: 0.9 } : null,
+        ]}
+      >
+        <Row gap={space[2]}>
+          <MaterialCommunityIcons name="cart-outline" size={20} color={palette.white} />
+          <Text variant="smallBold" tone="inverse">
+            {count} صنف
+          </Text>
+        </Row>
+        <Text variant="bodyBold" tone="inverse">
+          {formatIqdArabic(iqd(totalIqd))}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 

@@ -15,6 +15,7 @@ import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
 import { playChime } from './chime';
 import { useSession } from './session';
+import { useCart } from './cart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, shadow, space, TAB_BAR_HEIGHT } from '@/theme';
 import { Row, Text } from '@/ui';
@@ -363,11 +364,23 @@ const SCREENS_WITH_THEIR_OWN_DOCK = new Set(['(auth)', '(driver)', 'cart', 'chec
 
 export function ActiveOrderBar() {
   const { active, announcement } = useOrderWatch();
+  const { itemCount } = useCart();
   const router = useRouter();
   const segments = useSegments() as readonly string[];
   const insets = useSafeAreaInsets();
 
   if (SCREENS_WITH_THEIR_OWN_DOCK.has(segments[0] ?? '')) return null;
+
+  /*
+   * A cart in progress takes the dock, unless something just happened.
+   *
+   * The other half of the rule stated in `cart-dock.tsx`: one thing floats at
+   * a time. An announcement is news and clears itself after eight seconds, so
+   * it outranks everything; a resting «طلبك الآن: قيد التحضير» does not
+   * outrank a customer who is in the middle of building an order, and the
+   * order is still one tap away under «طلباتي» or the bell.
+   */
+  if (itemCount > 0 && !announcement) return null;
 
   /*
    * Over the order screen the announcement stays and the resting card goes.
