@@ -6,9 +6,19 @@
  * in either means the map a reviewer sees in a browser and the map a customer
  * sees on a phone are the same map, down to the marker.
  *
- * Leaflet from a CDN and tiles from OpenStreetMap. No key, no account, no SDK
- * in the binary — and the attribution is non-negotiable, which is why it is in
- * the markup and not a setting.
+ * Leaflet from a CDN, and tiles from wherever `EXPO_PUBLIC_MAP_TILE_URL`
+ * points. No key, no account, no SDK in the binary — and the attribution is
+ * non-negotiable, which is why it is drawn from the same configuration rather
+ * than left to a caller to remember.
+ *
+ * The default is OpenStreetMap's own tile server, and the default is for
+ * development only. The OSMF Tile Usage Policy is explicit that
+ * `tile.openstreetmap.org` is a donated resource, that applications must not
+ * hardcode it, and that a distributed app needs its own tile source — the
+ * limit is the policy rather than the traffic. A picking session is about
+ * forty-five tiles, so a thousand customers saving two addresses each is under
+ * a hundred thousand requests in total and fits inside every commercial free
+ * tier there is; the point is to be on one, with a key, before launch.
  *
  * Both CDN files carry a Subresource Integrity digest, computed from the bytes
  * unpkg actually served rather than copied from a page. This document runs
@@ -25,6 +35,19 @@ export type MapPickerMessage = {
 
 /** Baghdad, Tahrir Square. Somewhere real to open when there is nothing saved. */
 const FALLBACK = { latitude: 33.3128, longitude: 44.3615 };
+
+/**
+ * Where the tiles come from, and who to credit for them.
+ *
+ * Both are `EXPO_PUBLIC_`, so they are read when the config is evaluated and
+ * baked into the binary — which is what makes swapping MapTiler or Stadia in
+ * a rebuild rather than a release of new code.
+ */
+const TILE_URL =
+  process.env.EXPO_PUBLIC_MAP_TILE_URL ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+const TILE_ATTRIBUTION =
+  process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? '&copy; OpenStreetMap';
 
 export function MAP_PICKER_HTML(latitude: number | null, longitude: number | null): string {
   const hasPin = typeof latitude === 'number' && typeof longitude === 'number';
@@ -83,9 +106,9 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
     var map = L.map('map', { zoomControl: true, attributionControl: true })
       .setView([${lat}, ${lon}], ${hasPin ? 17 : 13});
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('${TILE_URL}', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
+      attribution: '${TILE_ATTRIBUTION}'
     }).addTo(map);
 
     /*

@@ -73,6 +73,13 @@ export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPick
         scrollEnabled={false}
         javaScriptEnabled
         domStorageEnabled={false}
+        /*
+         * Every tile policy worth reading asks an application to identify
+         * itself, so that an operator with a problem has somebody to contact
+         * before they block a whole address range. A WebView otherwise sends
+         * the system browser's string and nothing says Jibli.
+         */
+        userAgent="Jibli/1.0 (+https://jibli.iq; delivery app; map picker)"
         style={{ flex: 1, backgroundColor: 'transparent' }}
       />
 

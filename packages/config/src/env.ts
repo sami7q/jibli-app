@@ -62,7 +62,7 @@ const authSchema = z.object({
 });
 
 const otpSchema = z.object({
-  OTP_PROVIDER: z.enum(['console', 'mock', 'sms_gateway']).default('console'),
+  OTP_PROVIDER: z.enum(['console', 'mock', 'sms_gateway', 'whatsapp']).default('console'),
   OTP_LENGTH: z.coerce.number().int().min(4).max(8).default(4),
   OTP_TTL_SECONDS: z.coerce.number().int().min(30).default(300),
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(15).default(45),
@@ -122,6 +122,41 @@ const otpSchema = z.object({
   SMS_GATEWAY_BODY_FIELD: z.string().optional(),
   SMS_GATEWAY_SENDER_FIELD: z.string().optional(),
   SMS_GATEWAY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
+
+  /*
+   * WhatsApp, through Meta's Cloud API.
+   *
+   * The delivery channel an Iraqi customer actually reads. An SMS aggregator
+   * here means a contract, a per-message price and three networks that deliver
+   * unevenly; an authentication template costs a fraction of that and lands in
+   * an app that is already open.
+   *
+   * None of these is a field name to be guessed at — every one comes from the
+   * WhatsApp Manager, and the schema refuses the provider without them rather
+   * than letting a deployment boot and fail at the first sign-in.
+   */
+  /** From WhatsApp Manager. The sender's id, not its phone number. */
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  /**
+   * A permanent System User token.
+   *
+   * The temporary one the dashboard offers first lasts 24 hours, and a token
+   * that expires overnight means nobody can sign in the next morning.
+   */
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  /** The approved AUTHENTICATION template. Utility and marketing are refused. */
+  WHATSAPP_TEMPLATE_NAME: z.string().default('otp_code'),
+  /** Exactly as registered — `ar`, `ar_EG`, `en_US`. A near-miss is 132001. */
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().default('ar'),
+  /**
+   * Whether the template has a copy-code button.
+   *
+   * Meta's authentication templates almost always do, and the button needs the
+   * code as its own parameter. Default true, because the default template does.
+   */
+  WHATSAPP_HAS_COPY_BUTTON: booleanish.default(true),
+  WHATSAPP_API_VERSION: z.string().default('v21.0'),
+  WHATSAPP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
   /**
    * Staging safety valve: comma-separated E.164 allowlist. When set, OTP delivery to
    * any other number is refused so staging cannot text real customers (plan §7).
@@ -209,11 +244,11 @@ export const apiEnvSchema = baseSchema
             'production requires a real Redis: an in-process cache cannot rate limit across instances',
         });
       }
-      if (env.OTP_PROVIDER !== 'sms_gateway') {
+      if (env.OTP_PROVIDER !== 'sms_gateway' && env.OTP_PROVIDER !== 'whatsapp') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['OTP_PROVIDER'],
-          message: 'production requires a real OTP provider',
+          message: 'production requires a real OTP provider: sms_gateway or whatsapp',
         });
       }
       if (env.PUSH_PROVIDER === 'console') {
@@ -250,6 +285,24 @@ export const apiEnvSchema = baseSchema
         code: z.ZodIssueCode.custom,
         path: ['SMS_GATEWAY_URL'],
         message: 'sms_gateway provider requires SMS_GATEWAY_URL and SMS_GATEWAY_API_KEY',
+      });
+    }
+
+    /*
+     * Refused at boot rather than at the first sign-in.
+     *
+     * A deployment missing one of these starts happily, serves every other
+     * route, and fails only when a customer tries to get in — which is the
+     * worst possible moment to discover a configuration mistake.
+     */
+    if (
+      env.OTP_PROVIDER === 'whatsapp' &&
+      (!env.WHATSAPP_PHONE_NUMBER_ID || !env.WHATSAPP_ACCESS_TOKEN)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['WHATSAPP_PHONE_NUMBER_ID'],
+        message: 'whatsapp provider requires WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN',
       });
     }
   });

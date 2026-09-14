@@ -93,6 +93,18 @@ services:
       - key: TRUST_PROXY
         value: 'true'
 
+      # `console` until a WhatsApp Business Account exists. To switch, set these
+      # four in the Render dashboard and change this value to `whatsapp` — the
+      # provider is built and tested, it is the Meta account that is pending:
+      #
+      #   OTP_PROVIDER=whatsapp
+      #   WHATSAPP_PHONE_NUMBER_ID   (WhatsApp Manager — the sender id)
+      #   WHATSAPP_ACCESS_TOKEN      (a PERMANENT System User token)
+      #   WHATSAPP_TEMPLATE_NAME     (an approved AUTHENTICATION template)
+      #
+      # The env schema refuses to boot with `whatsapp` and the first two
+      # missing, so a half-finished switch fails loudly at deploy rather than
+      # quietly at somebody's first sign-in.
       - key: OTP_PROVIDER
         value: console
       # The demo account, and nothing else, can sign in here.

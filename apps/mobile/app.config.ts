@@ -61,6 +61,20 @@ const config: ExpoConfig = {
      * screen, and both are configuration rather than code so that changing a
      * support number does not need a release.
      */
+    /*
+     * Where the map's tiles come from.
+     *
+     * Read here only so the value is visible in one place with the rest of the
+     * app's configuration; `map-picker-html.ts` reads the same variables. The
+     * default is OpenStreetMap's donated server, which its usage policy allows
+     * for development and not for a distributed app — so a launch build sets
+     * these to a provider with a key. MapTiler, Stadia and Thunderforest all
+     * have free tiers far above what this needs: a picking session is about
+     * forty-five tiles, and a thousand customers saving two addresses each
+     * comes to under a hundred thousand requests in total.
+     */
+    mapTileUrl: process.env.EXPO_PUBLIC_MAP_TILE_URL ?? null,
+    mapTileAttribution: process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? null,
     supportPhone: process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '+9647700000000',
     privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://jibli.iq/privacy',
     termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://jibli.iq/terms',

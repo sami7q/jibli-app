@@ -6,6 +6,7 @@ import {
   ConsolePushProvider,
   ConsoleSmsProvider,
   HttpSmsGatewayProvider,
+  WhatsAppOtpProvider,
   type SmsProvider,
 } from '@jibli/notifications';
 import { createRedis, type AppContext } from './lib/context.js';
@@ -31,6 +32,32 @@ import { buildServer } from './server.js';
  * being able to text a real customer (plan §7).
  */
 function buildSmsProvider(env: ApiEnv, logger: Logger): SmsProvider {
+  /*
+   * WhatsApp first, because it is what the market reads.
+   *
+   * The order is not a preference between two equal things: an SMS aggregator
+   * in Iraq means a contract and a per-message price across three networks
+   * that deliver unevenly, and WhatsApp is already open on the phone. The SMS
+   * gateway stays as the fallback it has always been — some numbers are not on
+   * WhatsApp, and a business that loses those customers has chosen to.
+   */
+  if (env.OTP_PROVIDER === 'whatsapp') {
+    return wrapWithAllowlist(
+      new WhatsAppOtpProvider(logger, {
+        // The env schema refuses to validate `whatsapp` without these two.
+        phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID as string,
+        accessToken: env.WHATSAPP_ACCESS_TOKEN as string,
+        templateName: env.WHATSAPP_TEMPLATE_NAME,
+        templateLanguage: env.WHATSAPP_TEMPLATE_LANGUAGE,
+        hasCopyCodeButton: env.WHATSAPP_HAS_COPY_BUTTON,
+        apiVersion: env.WHATSAPP_API_VERSION,
+        timeoutMs: env.WHATSAPP_TIMEOUT_MS,
+      }),
+      env,
+      logger,
+    );
+  }
+
   const base: SmsProvider =
     env.OTP_PROVIDER === 'sms_gateway'
       ? new HttpSmsGatewayProvider(logger, {
@@ -48,6 +75,17 @@ function buildSmsProvider(env: ApiEnv, logger: Logger): SmsProvider {
         })
       : new ConsoleSmsProvider(logger, env.APP_ENV === 'local');
 
+  return wrapWithAllowlist(base, env, logger);
+}
+
+/**
+ * The staging safety valve, applied to whichever provider was chosen.
+ *
+ * Lifted out when WhatsApp joined: a second provider meant a second copy of
+ * this, and a copy is exactly how one of the two ends up able to message a
+ * real customer from a staging box.
+ */
+function wrapWithAllowlist(base: SmsProvider, env: ApiEnv, logger: Logger): SmsProvider {
   const allowlist = (env.OTP_PHONE_ALLOWLIST ?? '')
     .split(',')
     .map((entry) => entry.trim())
@@ -56,7 +94,7 @@ function buildSmsProvider(env: ApiEnv, logger: Logger): SmsProvider {
   if (env.APP_ENV !== 'production' && allowlist.length > 0) {
     logger.info(
       { event: 'sms.allowlist_active', count: allowlist.length, provider: base.name },
-      'SMS restricted to the configured allowlist',
+      'OTP delivery restricted to the configured allowlist',
     );
     return new AllowlistSmsProvider(base, allowlist, logger);
   }
