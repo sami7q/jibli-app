@@ -468,6 +468,15 @@ const reason = result.error ?? '';
 const hint = (() => {
   if (reason.includes('HTTP_401') || reason.includes('HTTP_403'))
     return 'The key was rejected. Check SMS_GATEWAY_API_KEY, and that SMS_GATEWAY_AUTH_SCHEME matches how the vendor wants it sent (bearer / header / body).';
+  /*
+   * Trial mode is checked before credit, because the vendor's own wording
+   * mentions credit and the two are not the same problem. A trial account can
+   * be refused while showing a healthy balance — the grant is not purchased
+   * credit — so "you are out of credit" sends the reader to a dashboard that
+   * disagrees with the error and tells them nothing.
+   */
+  if (reason.toLowerCase().includes('trial'))
+    return 'The vendor account is still in TRIAL mode: it will only send to the account holder\u2019s own verified number, whatever balance the dashboard shows — a trial grant is not purchased credit. No customer can sign in until a real top-up lifts it, so clear this before switching the gateway on anywhere real.';
   if (reason.toLowerCase().includes('credit') || reason.includes('HTTP_402'))
     return 'The account is out of credit. Top it up in the vendor dashboard.';
   if (reason.includes('HTTP_429'))

@@ -30,7 +30,23 @@ thousands of messages a month. Not before.
 
 1. Sign up at [otpiq.com](https://otpiq.com) and create a project.
 2. Copy the project API key — it begins `sk_live_`.
-3. Add credit.
+3. **Add credit — a real top-up, and this is the step that blocks launch.**
+   A new project starts in **trial mode**, and a trial project will only send
+   to the account holder's own verified number:
+
+   ```
+   HTTP_400: Account is in trial mode, you can only send sms to your own phone
+   number for verification, add credit to send to other numbers
+   ```
+
+   The trap is that the dashboard shows a balance throughout — a trial grant
+   sits in the same field as purchased credit, so the account reads as funded
+   while refusing every customer. A verification against your own number
+   succeeds and proves the integration; the first real customer is refused.
+   Nothing is charged for the refusal.
+
+   Clear it before switching the gateway on anywhere a customer can reach.
+
 4. **Leave the sender id alone.** `SMS_GATEWAY_SENDER_ID` unset means OTPIQ's
    own approved sender is used, which is what delivered the verification above
    with nothing registered on the account. Register `Jibli` in the dashboard if
@@ -202,6 +218,13 @@ then the code it sent. Compare that against the handset:
 | `????` or boxes     | Unicode is off. Ask the vendor which field turns Arabic on, add it to `SMS_GATEWAY_EXTRA_FIELDS`.                                                              |
 | A _different_ code  | The gateway generated its own. In mode B, `smsType` is not `custom`; in mode A, `BODY_MODE` is not `code`, so the whole sentence went where the code belonged. |
 | Nothing             | Sender id unapproved, number barred for A2P, or a dead route. Check the delivery report against the message id it printed.                                     |
+
+One refusal is worth knowing in advance, because it is the one that separates
+"the integration works" from "customers can sign in":
+
+| Refusal                     | Meaning                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `Account is in trial mode…` | Only the account holder's own number can receive anything. The balance shown is a grant, not purchased credit. Top up for real. |
 
 A refusal is diagnosed in place — the gateway's own words, plus what to do
 about them. `HTTP_400: Insufficient credit` names the problem; a bare
