@@ -124,6 +124,54 @@ const otpSchema = z.object({
   SMS_GATEWAY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
 
   /*
+   * The four settings that decide whether a real Iraqi aggregator works.
+   *
+   * Everything above describes what to call a field. These describe the shape
+   * of the call itself, and each corresponds to a way the integration fails
+   * silently rather than loudly — which is the only kind of failure that
+   * matters for a code somebody is waiting on.
+   */
+  /**
+   * How the number is written: `+9647701234567`, `9647701234567`, or the
+   * national `07701234567` the customer would dial. The commonest reason a
+   * correctly-configured gateway accepts every request and delivers nothing.
+   */
+  SMS_GATEWAY_NUMBER_FORMAT: z.enum(['e164', 'e164_no_plus', 'national']).default('e164'),
+  /** Roughly a third of this market is a GET endpoint with the message in the query. */
+  SMS_GATEWAY_METHOD: z.enum(['POST', 'GET']).default('POST'),
+  SMS_GATEWAY_ENCODING: z.enum(['json', 'form']).default('json'),
+  /**
+   * Vendor constants, as JSON: `{"type":"unicode","route":"4"}`.
+   *
+   * Arabic needs one of these on most gateways, and without it the message
+   * arrives as question marks — a failure nobody notices until a customer says
+   * the code made no sense.
+   */
+  SMS_GATEWAY_EXTRA_FIELDS: z.string().optional(),
+  /**
+   * What a successful body looks like, for the gateways that answer 200 with
+   * an error inside. Leave unset and any 2xx counts as sent, which is the
+   * behaviour this had before the option existed.
+   */
+  /**
+   * Whether the body field carries the message or only the code.
+   *
+   * `code` is what makes OTPIQ's `smsType=verification` work, and with it
+   * WhatsApp — which refuses free text from a business and carries only an
+   * approved template. The vendor owns the wording in that mode; what it buys
+   * is a channel at a fraction of the price of SMS.
+   */
+  SMS_GATEWAY_BODY_MODE: z.enum(['text', 'code']).default('text'),
+  SMS_GATEWAY_SUCCESS_FIELD: z.string().optional(),
+  SMS_GATEWAY_SUCCESS_VALUE: z.string().optional(),
+  /**
+   * Where the gateway returns the id it gave the message — `smsId` on OTPIQ,
+   * `data.messageId` on the ones that use an envelope. Guessed from the usual
+   * names when unset; an unmatched id costs a delivery report, not a send.
+   */
+  SMS_GATEWAY_MESSAGE_ID_FIELD: z.string().optional(),
+
+  /*
    * WhatsApp, through Meta's Cloud API.
    *
    * The delivery channel an Iraqi customer actually reads. An SMS aggregator
@@ -286,6 +334,28 @@ export const apiEnvSchema = baseSchema
         path: ['SMS_GATEWAY_URL'],
         message: 'sms_gateway provider requires SMS_GATEWAY_URL and SMS_GATEWAY_API_KEY',
       });
+    }
+
+    /*
+     * Checked at boot, because the alternative is a runtime throw inside the
+     * one code path a customer is waiting on.
+     */
+    if (env.SMS_GATEWAY_EXTRA_FIELDS) {
+      try {
+        const parsed: unknown = JSON.parse(env.SMS_GATEWAY_EXTRA_FIELDS);
+        const flat =
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          !Array.isArray(parsed) &&
+          Object.values(parsed).every((value) => typeof value === 'string');
+        if (!flat) throw new Error('not a flat string map');
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SMS_GATEWAY_EXTRA_FIELDS'],
+          message: 'must be a JSON object of string values, e.g. {"type":"unicode"}',
+        });
+      }
     }
 
     /*

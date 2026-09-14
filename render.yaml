@@ -93,18 +93,53 @@ services:
       - key: TRUST_PROXY
         value: 'true'
 
-      # `console` until a WhatsApp Business Account exists. To switch, set these
-      # four in the Render dashboard and change this value to `whatsapp` — the
-      # provider is built and tested, it is the Meta account that is pending:
+      # `console` until a real account exists with one of the two providers
+      # below. Both are built and tested; what is pending is the vendor
+      # account, not the code.
+      #
+      # ── SMS, via OTPIQ (the shorter road) ──
+      #
+      # Self-service signup, prices in IQD, prepaid, no contract — against
+      # weeks of business verification for the alternatives. Set these in the
+      # Render dashboard and change this value to `sms_gateway`:
+      #
+      #   OTP_PROVIDER=sms_gateway
+      #   SMS_GATEWAY_URL=https://api.otpiq.com/api/sms
+      #   SMS_GATEWAY_API_KEY           (the project key, sk_live_…)
+      #   SMS_GATEWAY_TO_FIELD=phoneNumber
+      #   SMS_GATEWAY_SENDER_FIELD=senderId
+      #   SMS_GATEWAY_NUMBER_FORMAT=e164_no_plus
+      #   SMS_GATEWAY_BODY_FIELD=verificationCode
+      #   SMS_GATEWAY_BODY_MODE=code
+      #   SMS_GATEWAY_EXTRA_FIELDS={"smsType":"verification","provider":"auto"}
+      #
+      # `provider=auto` tries WhatsApp, then Telegram, then SMS — roughly a
+      # tenth of the SMS price for the common case, and it degrades on its own
+      # for a customer who is not on WhatsApp. It requires `BODY_MODE=code`:
+      # WhatsApp carries an approved template with the code in a slot, never
+      # free text, so we send the digits and OTPIQ owns the wording.
+      #
+      # To keep our own Arabic wording instead — at the full SMS price, SMS
+      # only — use BODY_FIELD=customMessage, BODY_MODE=text and
+      # EXTRA_FIELDS={"smsType":"custom","provider":"sms"}. There `smsType` is
+      # the load-bearing one: without `custom`, OTPIQ generates a code of its
+      # own, the customer receives one this API never stored, and no sign-in
+      # can succeed while every request still returns 200 OK.
+      #
+      # Prove it locally first, one channel at a time:
+      #   pnpm sms:test +9647XXXXXXXXX --via whatsapp
+      #   pnpm sms:test +9647XXXXXXXXX --via auto
+      #
+      # ── WhatsApp, via Meta ──
       #
       #   OTP_PROVIDER=whatsapp
       #   WHATSAPP_PHONE_NUMBER_ID   (WhatsApp Manager — the sender id)
       #   WHATSAPP_ACCESS_TOKEN      (a PERMANENT System User token)
       #   WHATSAPP_TEMPLATE_NAME     (an approved AUTHENTICATION template)
       #
-      # The env schema refuses to boot with `whatsapp` and the first two
-      # missing, so a half-finished switch fails loudly at deploy rather than
-      # quietly at somebody's first sign-in.
+      # The env schema refuses to boot with either provider and its required
+      # values missing, so a half-finished switch fails loudly at deploy
+      # rather than quietly at somebody's first sign-in.
       - key: OTP_PROVIDER
         value: console
       # The demo account, and nothing else, can sign in here.

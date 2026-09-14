@@ -149,11 +149,19 @@ These were never among the five, but they block a usable product:
 2. **Push provider.** Still the console stub. Notifications are recorded in
    `notification_deliveries` and dispatched, but nothing reaches a real device.
    The app registers its token with `POST /api/v1/devices` and is waiting.
-2b. **SMS provider.** `OTP_PROVIDER=console` on staging, and the code is
-   neither returned nor logged outside `APP_ENV=local` — so **nobody can sign
-   into the deployed app**. Guest browsing works without it, which is what makes
-   the app reviewable today, but a real customer cannot get an account until a
-   gateway is wired.
+2b. **SMS provider — code complete, account pending.** The HTTP gateway
+   provider handles the shapes real Iraqi aggregators actually use: number
+   format (`+964…` / `964…` / `07…`), POST JSON, POST form or GET, vendor
+   constants for Arabic, a success field for gateways that answer 200 with an
+   error inside, and configurable field names throughout. A refusal carries the
+   gateway's own reason into the log rather than a bare status code.
+   `pnpm sms:test +9647XXXXXXXXX` sends one real message through the same class
+   and diagnoses what came back, without a database or a running API.
+   What is left is **the vendor account**: staging still runs
+   `OTP_PROVIDER=console`, so nobody can sign into the deployed app except the
+   `OTP_TEST_PHONES` demo number. See
+   [`sms-otp.md`](./sms-otp.md) — OTPIQ is self-service and can be connected in
+   an afternoon.
 3. **File uploads.** Schema, visibility model and security requirements defined;
    no signed-URL issuer implemented.
 4. **Restaurant self-onboarding wizard UI** — the API command exists.

@@ -28,6 +28,7 @@
     "dev:admin": "pnpm --filter @jibli/admin-web dev",
     "dev:restaurant": "pnpm --filter @jibli/restaurant-web dev",
     "dev:mobile": "pnpm --filter @jibli/mobile start",
+    "sms:test": "tsx scripts/send-test-sms.mts",
     "infra:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker/docker-compose.yml down",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",

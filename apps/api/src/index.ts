@@ -72,6 +72,18 @@ function buildSmsProvider(env: ApiEnv, logger: Logger): SmsProvider {
           bodyField: env.SMS_GATEWAY_BODY_FIELD,
           senderField: env.SMS_GATEWAY_SENDER_FIELD,
           timeoutMs: env.SMS_GATEWAY_TIMEOUT_MS,
+          numberFormat: env.SMS_GATEWAY_NUMBER_FORMAT,
+          method: env.SMS_GATEWAY_METHOD,
+          encoding: env.SMS_GATEWAY_ENCODING,
+          // Validated at boot by the env schema, so this parse cannot throw
+          // inside the one code path a customer is waiting on.
+          extraFields: env.SMS_GATEWAY_EXTRA_FIELDS
+            ? (JSON.parse(env.SMS_GATEWAY_EXTRA_FIELDS) as Record<string, string>)
+            : undefined,
+          bodyMode: env.SMS_GATEWAY_BODY_MODE,
+          successField: env.SMS_GATEWAY_SUCCESS_FIELD,
+          successValue: env.SMS_GATEWAY_SUCCESS_VALUE,
+          messageIdField: env.SMS_GATEWAY_MESSAGE_ID_FIELD,
         })
       : new ConsoleSmsProvider(logger, env.APP_ENV === 'local');
 

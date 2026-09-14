@@ -48,6 +48,74 @@ export class ConsoleSmsProvider implements SmsProvider {
 }
 
 /**
+ * The verification code, read back out of the rendered Arabic sentence.
+ *
+ * Two providers need the code rather than the message: Meta's authentication
+ * template takes it as a parameter, and OTP-specialised gateways like OTPIQ
+ * take it as `verificationCode`. Both are handed a finished body by a caller
+ * that has no idea either of them exists.
+ *
+ * One definition rather than one per provider, because two regexes that must
+ * agree about what a code looks like will eventually stop agreeing, and the
+ * symptom would be a channel that silently sends the wrong digits.
+ */
+export function extractOtpCode(body: string): string | null {
+  const match = /(\d{4,8})/.exec(body);
+  return match?.[1] ?? null;
+}
+
+/**
+ * A value out of a possibly-nested response body: `smsId`, or `data.messageId`.
+ *
+ * Gateways that wrap their answer in an envelope are common enough that a flat
+ * lookup would send a correctly-configured deployment back to reading raw
+ * responses to find out why its sends report no id.
+ */
+function readPath(source: Record<string, unknown> | null, path: string): unknown {
+  if (!source) return undefined;
+  return path.split('.').reduce<unknown>((value, segment) => {
+    if (value === null || typeof value !== 'object') return undefined;
+    return (value as Record<string, unknown>)[segment];
+  }, source);
+}
+
+/**
+ * The gateway's own reason for a refusal, short enough to belong in a log line.
+ *
+ * `HTTP_400` on its own cannot be acted on: an unapproved sender id, an
+ * exhausted balance and a malformed number are three different problems with
+ * three different fixes and one status code between them. The gateway says
+ * which in the body — OTPIQ answers `{"error":"Insufficient credit, please add
+ * more credit"}` — and reading a body that is about to be discarded anyway is
+ * the difference between a deployment that can be fixed and one that can only
+ * be guessed at.
+ *
+ * Bounded on both sides: the read cannot hang the send, because the same abort
+ * signal governs it, and the string cannot flood a log, because it is
+ * truncated here.
+ */
+async function describeRefusal(response: Response): Promise<string | undefined> {
+  try {
+    const text = (await response.text()).trim();
+    if (!text) return undefined;
+
+    // Most answer JSON, and name the field `error` or `message` about equally
+    // often. Falling through to the raw text covers the ones that do neither.
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      const reason = parsed.error ?? parsed.message ?? parsed.error_message;
+      if (typeof reason === 'string' && reason.length > 0) return reason.slice(0, 200);
+    } catch {
+      /* not JSON, in which case the text is itself the reason */
+    }
+
+    return text.slice(0, 200);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * A real SMS gateway, over HTTP.
  *
  * `OTP_PROVIDER=sms_gateway` has been a valid setting since the config was
@@ -79,8 +147,106 @@ export class HttpSmsGatewayProvider implements SmsProvider {
       readonly apiKeyHeader?: string | undefined;
       readonly apiKeyField?: string | undefined;
       readonly timeoutMs?: number | undefined;
+      /**
+       * How the number is written on the wire.
+       *
+       * The single most common reason a correctly-configured gateway silently
+       * delivers nothing. Iraqi aggregators disagree: some want E.164 with the
+       * plus, some reject the plus, and several want the national trunk form
+       * the customer would dial — `07701234567`. All three are the same number
+       * and none of them is guessable from a vendor's documentation, which
+       * usually shows one example and calls it obvious.
+       */
+      readonly numberFormat?: 'e164' | 'e164_no_plus' | 'national' | undefined;
+      /**
+       * POST with a JSON body, POST a form, or GET a query string.
+       *
+       * Roughly a third of the aggregators in this market are a GET endpoint
+       * with the message in the query — an older shape, and not a wrong one.
+       * Without this the provider could only ever talk to the third that
+       * happen to take JSON.
+       */
+      readonly method?: 'POST' | 'GET' | undefined;
+      readonly encoding?: 'json' | 'form' | undefined;
+      /**
+       * Constants the vendor needs and nobody else does.
+       *
+       * `type=unicode`, `route=4`, `dcs=8`, `unicodeMessage=1` — every gateway
+       * has one or two of these and every one names them differently. They are
+       * the difference between an Arabic message arriving and arriving as
+       * question marks, which is a failure nobody notices until a customer
+       * says the code did not make sense.
+       */
+      readonly extraFields?: Readonly<Record<string, string>> | undefined;
+      /**
+       * What a successful answer looks like, when 200 is not enough.
+       *
+       * Plenty of aggregators answer `200 OK` with `{"status":"error"}` in the
+       * body — out of credit, sender id not approved, number barred — and a
+       * provider that reads only the status code records those as sent. The
+       * customer waits for a code that was never dispatched and the log says
+       * everything worked, which is the worst failure mode this class can
+       * have.
+       *
+       * Optional, and checked only when set: an unconfigured gateway keeps the
+       * old behaviour rather than having a guess imposed on it.
+       */
+      readonly successField?: string | undefined;
+      /** The value that field must hold. Compared as text, case-insensitively. */
+      readonly successValue?: string | undefined;
+      /**
+       * Whether the body field carries the message, or only the code.
+       *
+       * `text` is an ordinary SMS gateway: it is handed a finished sentence
+       * and sends it verbatim.
+       *
+       * `code` is the OTP-specialised shape — OTPIQ's `smsType=verification`,
+       * and most gateways that offer a verification endpoint. There the
+       * gateway owns the wording and wants the digits alone, which is what
+       * makes WhatsApp reachable through it at all: WhatsApp refuses free
+       * text from a business and will only carry an approved template with a
+       * slot in it.
+       *
+       * The trade is real and worth stating. In `code` mode the customer sees
+       * the vendor's approved sentence rather than `NOTIFICATION_TEMPLATES`,
+       * so the Arabic wording is no longer ours. What it buys is a channel
+       * that costs a fraction of SMS and arrives in an app that is already
+       * open.
+       */
+      readonly bodyMode?: 'text' | 'code' | undefined;
+      /**
+       * Where the gateway puts the id it assigns the message.
+       *
+       * Guessed from the usual handful of names when unset, which covers most
+       * gateways and misses the rest. An id that is not picked up is not a
+       * failed send — only a delivery report that cannot be matched to it
+       * later — so this is a convenience, not a correctness setting.
+       *
+       * Dotted paths reach into an envelope: `data.messageId`.
+       */
+      readonly messageIdField?: string | undefined;
     },
   ) {}
+
+  /**
+   * The recipient, in the shape this particular gateway expects.
+   *
+   * `+9647701234567` is the stored truth; everything else is a rendering of
+   * it. National form drops the country code and restores the trunk zero,
+   * which is what an Iraqi number looks like written down.
+   */
+  private formatNumber(e164: string): string {
+    switch (this.config.numberFormat ?? 'e164') {
+      case 'e164_no_plus':
+        return e164.replace(/^\+/, '');
+      case 'national': {
+        const digits = e164.replace(/^\+?964/, '');
+        return digits.startsWith('0') ? digits : `0${digits}`;
+      }
+      default:
+        return e164;
+    }
+  }
 
   async send(message: SmsMessage): Promise<{
     ok: boolean;
@@ -92,16 +258,45 @@ export class HttpSmsGatewayProvider implements SmsProvider {
     const senderField = this.config.senderField ?? 'sender';
     const scheme = this.config.authScheme ?? 'bearer';
 
+    /*
+     * In `code` mode a body with no digits in it is not a verification
+     * message, and sending it would spend a message on a gateway that would
+     * reject it — or worse, accept it and deliver nothing a customer can type
+     * in. Refused here, permanently, rather than retried.
+     */
+    let outgoingBody = message.body;
+    if (this.config.bodyMode === 'code') {
+      const code = extractOtpCode(message.body);
+      if (!code) {
+        this.logger.error(
+          { event: 'sms.send_failed', provider: this.name, reason: 'NO_CODE_IN_BODY' },
+          'Gateway is in code mode and the message carried no verification code',
+        );
+        return { ok: false, error: 'NO_CODE_IN_BODY' };
+      }
+      outgoingBody = code;
+    }
+
     const payload: Record<string, string> = {
-      [toField]: message.toE164,
-      [bodyField]: message.body,
+      [toField]: this.formatNumber(message.toE164),
+      [bodyField]: outgoingBody,
       ...(this.config.senderId ? { [senderField]: this.config.senderId } : {}),
       ...(scheme === 'body' ? { [this.config.apiKeyField ?? 'api_key']: this.config.apiKey } : {}),
+      // Last, so a vendor's own constants win over a name this provider
+      // happened to pick as a default.
+      ...(this.config.extraFields ?? {}),
     };
 
+    const encoding = this.config.encoding ?? 'json';
+
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       Accept: 'application/json',
+      ...(this.config.method === 'GET'
+        ? {}
+        : {
+            'Content-Type':
+              encoding === 'form' ? 'application/x-www-form-urlencoded' : 'application/json',
+          }),
       ...(scheme === 'bearer' ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
       ...(scheme === 'header'
         ? { [this.config.apiKeyHeader ?? 'X-API-Key']: this.config.apiKey }
@@ -168,11 +363,34 @@ export class HttpSmsGatewayProvider implements SmsProvider {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 8000);
 
+    const method = this.config.method ?? 'POST';
+    const encoding = this.config.encoding ?? 'json';
+
+    /*
+     * A GET carries everything in the query, so there is no body to send — and
+     * `URLSearchParams` is what encodes an Arabic message correctly for both
+     * shapes. Hand-built query strings are where an OTP turns into mojibake.
+     */
+    const query = new URLSearchParams(payload).toString();
+
+    /*
+     * `&` when the configured URL already has a query of its own — several
+     * gateways carry the account id there — because a second `?` collapses the
+     * whole query into one unparseable parameter and the gateway answers with
+     * a validation error naming a field that was sent correctly.
+     */
+    const url =
+      method === 'GET'
+        ? `${this.config.url}${this.config.url.includes('?') ? '&' : '?'}${query}`
+        : this.config.url;
+
     try {
-      const response = await fetch(this.config.url, {
-        method: 'POST',
+      const response = await fetch(url, {
+        method,
         headers,
-        body: JSON.stringify(payload),
+        ...(method === 'GET'
+          ? {}
+          : { body: encoding === 'form' ? query : JSON.stringify(payload) }),
         signal: controller.signal,
       });
 
@@ -180,22 +398,56 @@ export class HttpSmsGatewayProvider implements SmsProvider {
         // A gateway that returns an id lets a delivery report be matched later;
         // one that does not is still a successful send.
         let id: string | undefined;
+        let parsed: Record<string, unknown> | null = null;
         try {
-          const parsed = (await response.json()) as Record<string, unknown>;
-          const candidate = parsed.message_id ?? parsed.messageId ?? parsed.id;
+          parsed = (await response.json()) as Record<string, unknown>;
+          const candidate = this.config.messageIdField
+            ? readPath(parsed, this.config.messageIdField)
+            : (parsed.message_id ?? parsed.messageId ?? parsed.smsId ?? parsed.id);
           if (typeof candidate === 'string') id = candidate;
+          // Numeric ids are common and are still ids.
+          else if (typeof candidate === 'number') id = String(candidate);
         } catch {
           /* not JSON, which several gateways are not */
         }
+
+        /*
+         * A refusal dressed as a 200.
+         *
+         * Only when the deployment said what success looks like. Reported as
+         * permanent because that is what these are — no credit, an unapproved
+         * sender id, a barred number — and retrying spends the customer's
+         * patience on an answer that will not change.
+         */
+        if (this.config.successField) {
+          const actual = readPath(parsed, this.config.successField);
+          const expected = this.config.successValue;
+          const matches =
+            expected === undefined
+              ? actual !== undefined && actual !== null && actual !== false
+              : String(actual).toLowerCase() === expected.toLowerCase();
+
+          if (!matches) {
+            return {
+              ok: false,
+              permanent: true,
+              status: response.status,
+              error: `GATEWAY_SAID_${String(actual ?? 'NOTHING').slice(0, 40)}`,
+            };
+          }
+        }
+
         return { ok: true, permanent: true, ...(id ? { id } : {}) };
       }
+
+      const detail = await describeRefusal(response);
 
       return {
         ok: false,
         // 4xx is the gateway's answer; 5xx might be a bad minute.
         permanent: response.status < 500,
         status: response.status,
-        error: `HTTP_${response.status}`,
+        error: detail ? `HTTP_${response.status}: ${detail}` : `HTTP_${response.status}`,
       };
     } catch (error) {
       return {
@@ -272,19 +524,17 @@ export class WhatsAppOtpProvider implements SmsProvider {
    *
    * Deliberately not a new interface. Changing `SmsProvider` to carry a code
    * would push a WhatsApp detail into the console provider, the allowlist and
-   * every caller, to save one regex in the one place that needs it.
+   * every caller, to save one regex in the one place that needs it — and it is
+   * no longer one place, so `extractOtpCode` is shared with the SMS gateway's
+   * `code` mode rather than copied into it.
    */
-  private extractCode(body: string): string | null {
-    const match = /(\d{4,8})/.exec(body);
-    return match?.[1] ?? null;
-  }
 
   async send(message: SmsMessage): Promise<{
     ok: boolean;
     providerMessageId?: string;
     error?: string;
   }> {
-    const code = this.extractCode(message.body);
+    const code = extractOtpCode(message.body);
     if (!code) {
       // Neither retryable nor the network's fault: this provider was handed
       // something that is not a verification message.
