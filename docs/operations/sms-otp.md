@@ -133,6 +133,11 @@ What makes that conclusive is the state of the account at the time: no WABA
 connected and `GET /api/sender-ids` returning `{"success":true,"data":[]}` —
 nothing registered at all. OTPIQ carried it on its own approved sender.
 
+The message arrived on the handset immediately, carrying **the same code the
+API had generated and stored**. That is the link no status field can prove: it
+rules out the failure where the vendor substitutes a code of its own, which
+returns 200, reports `delivered`, and makes every sign-in impossible.
+
 The cost is the second half of the proof. 25 IQD is the authentication-template
 rate; an SMS on the same number would have been 80–250. The channel is not
 inferred from the price, but the price agrees with it.
