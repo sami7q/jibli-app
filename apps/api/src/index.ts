@@ -1,4 +1,4 @@
-import { loadApiEnv, EnvValidationError, type ApiEnv } from '@jibli/config';
+import { loadApiEnv, loadDotEnv, EnvValidationError, type ApiEnv } from '@jibli/config';
 import { createLogger, type Logger } from '@jibli/logger';
 import { closeDatabase, getDatabase } from '@jibli/db';
 import {
@@ -115,6 +115,20 @@ function wrapWithAllowlist(base: SmsProvider, env: ApiEnv, logger: Logger): SmsP
 }
 
 async function main(): Promise<void> {
+  /*
+   * A `.env` on a laptop, and nothing in production.
+   *
+   * Before this, the only way to configure a local API was to export every
+   * variable into the shell first, so in practice the API ran on defaults —
+   * and the default OTP provider logs that a code was issued and sends
+   * nothing. Sign-in appears to work all the way to the countdown and no
+   * message ever arrives, which is the hardest kind of failure to find because
+   * every part of it is behaving as designed.
+   *
+   * Real environment variables still win, so this cannot change a deployment.
+   */
+  const dotenv = loadDotEnv();
+
   let env;
   try {
     env = loadApiEnv();
@@ -133,6 +147,30 @@ async function main(): Promise<void> {
     level: env.LOG_LEVEL,
     pretty: env.APP_ENV === 'local',
   });
+
+  // Which file, and how many values — so a stale `.env` shadowing the shell is
+  // visible in the first lines of the log rather than inferred hours later.
+  if (dotenv.path) {
+    logger.info(
+      { event: 'env.dotenv_loaded', path: dotenv.path, count: dotenv.loaded },
+      'Loaded environment from .env',
+    );
+  }
+
+  /*
+   * The provider is stated at boot, every boot.
+   *
+   * `console` is a working, deliberate setting — and it is also what a
+   * misconfigured deployment falls back to, where it generates codes nobody
+   * can receive while every request returns success. One line removes the
+   * ambiguity.
+   */
+  logger.info(
+    { event: 'otp.provider', provider: env.OTP_PROVIDER },
+    env.OTP_PROVIDER === 'console' || env.OTP_PROVIDER === 'mock'
+      ? `OTP provider is "${env.OTP_PROVIDER}" — no message will reach a real phone`
+      : `OTP provider is "${env.OTP_PROVIDER}"`,
+  );
 
   const db = getDatabase({
     connectionString: env.DATABASE_URL,

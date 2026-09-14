@@ -20,7 +20,7 @@
  * It sends a real message and spends real credit. That is the point of it.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,6 +29,7 @@ import {
   NOTIFICATION_TEMPLATES,
   extractOtpCode,
 } from '../packages/notifications/src/index.js';
+import { loadDotEnv } from '../packages/config/src/dotenv.js';
 import {
   toE164Iraq,
   formatIraqiPhoneNational,
@@ -73,39 +74,6 @@ function maskSecret(value: string): string {
 }
 
 // ── A .env file, since this repo has no convention for one ────────────────────
-
-/**
- * Read `KEY=value` lines into the environment without adding a dependency.
- *
- * Only fills what is not already set, so `SMS_GATEWAY_API_KEY=... pnpm sms:test`
- * beats the file — which is how a second vendor gets tried without editing
- * anything.
- */
-function loadEnvFile(path: string): number {
-  let count = 0;
-  for (const raw of readFileSync(path, 'utf8').split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-
-    const eq = line.indexOf('=');
-    if (eq === -1) continue;
-
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    if (key && process.env[key] === undefined) {
-      process.env[key] = value;
-      count += 1;
-    }
-  }
-  return count;
-}
 
 // ── Arguments ────────────────────────────────────────────────────────────────
 
@@ -162,7 +130,8 @@ console.log(`\n${bold('Jibli — SMS gateway check')}\n`);
 const envPath = envFileArg ? resolve(root, envFileArg) : resolve(root, '.env');
 
 if (existsSync(envPath)) {
-  const loaded = loadEnvFile(envPath);
+  // The same loader the API boots with, so a file that works here works there.
+  const { loaded } = loadDotEnv({ path: envPath, allowInProduction: true });
   row('env file', `${envFileArg ?? '.env'} ${dim(`(${loaded} variables)`)}`);
 } else if (envFileArg) {
   die(`No such file: ${envFileArg}`);
