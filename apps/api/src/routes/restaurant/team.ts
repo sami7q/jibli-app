@@ -349,6 +349,51 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
         }
 
         /*
+         * Membership first, and as its own check.
+         *
+         * It used to double as the guard: the UPDATE ran, and zero rows back
+         * meant "not this restaurant's driver". That worked only while every
+         * field lived on the membership row. The moment one of them did not —
+         * availability is on the driver identity — a body carrying just that
+         * field produced an `UPDATE ... SET` with nothing in it, which Drizzle
+         * refuses, and the whole request came back as a bare INTERNAL_ERROR.
+         */
+        const [link] = await tx
+          .select({ id: restaurantDrivers.id })
+          .from(restaurantDrivers)
+          .where(
+            and(
+              eq(restaurantDrivers.restaurantId, restaurantId),
+              eq(restaurantDrivers.driverId, driverId),
+            ),
+          )
+          .limit(1);
+
+        if (!link) {
+          throw new AppError(ERROR_CODES.DRIVER_NOT_IN_RESTAURANT, { details: { driverId } });
+        }
+
+        const membershipPatch = {
+          ...(body.can_collect_cash !== undefined
+            ? { canCollectCash: body.can_collect_cash }
+            : {}),
+          ...(body.is_active !== undefined
+            ? {
+                isActive: body.is_active,
+                deactivatedAt: body.is_active ? null : new Date(),
+              }
+            : {}),
+          ...(body.internal_note !== undefined ? { internalNote: body.internal_note } : {}),
+        };
+
+        if (Object.keys(membershipPatch).length > 0) {
+          await tx
+            .update(restaurantDrivers)
+            .set(membershipPatch)
+            .where(eq(restaurantDrivers.id, link.id));
+        }
+
+        /*
          * Availability lives on the driver identity, not on the membership, so
          * a driver shared between two restaurants is marked on shift for both.
          * That is what the column means — "this person is working now" is not a
@@ -359,32 +404,6 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
             .update(drivers)
             .set({ availability: body.availability, updatedAt: new Date() })
             .where(eq(drivers.id, driverId));
-        }
-
-        const updated = await tx
-          .update(restaurantDrivers)
-          .set({
-            ...(body.can_collect_cash !== undefined
-              ? { canCollectCash: body.can_collect_cash }
-              : {}),
-            ...(body.is_active !== undefined
-              ? {
-                  isActive: body.is_active,
-                  deactivatedAt: body.is_active ? null : new Date(),
-                }
-              : {}),
-            ...(body.internal_note !== undefined ? { internalNote: body.internal_note } : {}),
-          })
-          .where(
-            and(
-              eq(restaurantDrivers.restaurantId, restaurantId),
-              eq(restaurantDrivers.driverId, driverId),
-            ),
-          )
-          .returning({ id: restaurantDrivers.id });
-
-        if (updated.length === 0) {
-          throw new AppError(ERROR_CODES.DRIVER_NOT_IN_RESTAURANT, { details: { driverId } });
         }
       });
 
