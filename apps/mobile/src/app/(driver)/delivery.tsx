@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import * as Clipboard from 'expo-clipboard';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { normalizeDigits } from '@jibli/validation';
 import { apiRequest, ApiError, idempotencyKey, NetworkError } from '@/lib/api';
+import { notify } from '@/lib/dialog';
 import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
@@ -64,7 +64,7 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
    */
   const openNavigation = async (url: string | null, appName: string) => {
     if (!url) {
-      Alert.alert(
+      notify(
         'تعذّر فتح الخريطة',
         `لا توجد إحداثيات صالحة لهذا العنوان. يمكنك نسخ العنوان أو الاتصال بالعميل.`,
       );
@@ -73,14 +73,14 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('تعذّر فتح التطبيق', `تأكد من تثبيت ${appName} أو استخدم نسخ العنوان.`);
+      notify('تعذّر فتح التطبيق', `تأكد من تثبيت ${appName} أو استخدم نسخ العنوان.`);
     }
   };
 
   const copyAddress = async () => {
     if (!task.navigation.copyableAddress) return;
     await Clipboard.setStringAsync(task.navigation.copyableAddress);
-    Alert.alert('تم النسخ', 'تم نسخ العنوان إلى الحافظة');
+    notify('تم النسخ', 'تم نسخ العنوان إلى الحافظة');
   };
 
   const callCustomer = () => {

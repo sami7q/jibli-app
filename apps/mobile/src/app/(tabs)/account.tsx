@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Linking, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
 import { useIsGuest, useSession } from '@/lib/session';
+import { confirmAsync, notify } from '@/lib/dialog';
 import { color, palette, radius, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
@@ -28,6 +29,10 @@ export default function AccountScreen() {
   const router = useRouter();
   const { state, signOut } = useSession();
   const isGuest = useIsGuest();
+  /** Whether this account already carries the courier mode. */
+  const isDriver =
+    (state.status === 'ready' || state.status === 'needs-profile') &&
+    state.me.modes.includes('DRIVER');
   const { area } = useArea();
 
   const [pickingArea, setPickingArea] = useState(false);
@@ -40,7 +45,7 @@ export default function AccountScreen() {
 
   const open = (url: string) => {
     void Linking.openURL(url).catch(() =>
-      Alert.alert('تعذّر الفتح', 'لم نتمكن من فتح الرابط على هذا الجهاز.'),
+      notify('تعذّر الفتح', 'لم نتمكن من فتح الرابط على هذا الجهاز.'),
     );
   };
 
@@ -132,6 +137,26 @@ export default function AccountScreen() {
            */
           onPress={() => router.push('/(driver)/apply')}
         />
+
+        {/*
+          * The way in for somebody who already delivers.
+          *
+          * A driver whose restaurant created their account and handed them a
+          * username has nothing to apply for — and «الانضمام كمندوب» is the
+          * wrong row for them. It shows the delivery screen when this account
+          * already carries the mode, and the sign-in when it does not, because
+          * a courier borrowing a customer's phone is the ordinary case.
+          */}
+        <ListRow
+          label={isDriver ? 'وضع المندوب' : 'دخول المندوبين'}
+          sublabel={
+            isDriver ? 'طلبات التوصيل المعيّنة لك' : 'لديك اسم مستخدم من المطعم؟ ادخل من هنا'
+          }
+          icon={<MaterialCommunityIcons name="moped" size={20} color={color.brand} />}
+          onPress={() =>
+            router.push(isDriver ? '/(driver)/delivery' : '/(auth)/driver-login')
+          }
+        />
       </Group>
 
       <Group title="المساعدة">
@@ -163,10 +188,14 @@ export default function AccountScreen() {
             label="تسجيل الخروج"
             icon={<MaterialCommunityIcons name="logout" size={20} color={color.textSecondary} />}
             onPress={() =>
-              Alert.alert('تسجيل الخروج؟', 'ستحتاج إلى رمز تحقق جديد لتسجيل الدخول مرة أخرى.', [
-                { text: 'تراجع', style: 'cancel' },
-                { text: 'خروج', style: 'destructive', onPress: () => void signOut() },
-              ])
+              void confirmAsync({
+                title: 'تسجيل الخروج؟',
+                message: 'ستحتاج إلى رمز تحقق جديد لتسجيل الدخول مرة أخرى.',
+                confirmLabel: 'خروج',
+                destructive: true,
+              }).then((yes) => {
+                if (yes) void signOut();
+              })
             }
           />
           <ListRow
@@ -241,10 +270,10 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
       onClose();
       // Clears the keystore and drops the app back to the welcome screen.
       await signOut();
-      Alert.alert('تم حذف الحساب', 'نأسف لرحيلك. يمكنك إنشاء حساب جديد في أي وقت.');
+      notify('تم حذف الحساب', 'نأسف لرحيلك. يمكنك إنشاء حساب جديد في أي وقت.');
     },
     onError: (error) =>
-      Alert.alert(
+      notify(
         'تعذّر حذف الحساب',
         error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى لاحقاً.',
       ),

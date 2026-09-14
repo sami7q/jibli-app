@@ -106,7 +106,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     try {
       const me = await apiRequest<Me>('/api/v1/auth/me');
-      commit(me.profile_completed ? { status: 'ready', me } : { status: 'needs-profile', me });
+
+      /*
+       * A driver is not held by the customer profile flow.
+       *
+       * The mandatory profile exists so that an order has a name, a
+       * governorate and a city behind it (plan §11) — and a courier signing in
+       * to deliver is not placing one. Without this exemption a driver whose
+       * account the restaurant created lands on «أكمل ملفك» and cannot leave,
+       * because the screen they want is behind the gate.
+       *
+       * Nothing is loosened by it: the server refuses to quote or place an
+       * order without a complete profile regardless, and `ApiError.needsProfile`
+       * routes them here the moment they try to order.
+       */
+      const heldByProfile = !me.profile_completed && !me.modes.includes('DRIVER');
+      commit(heldByProfile ? { status: 'needs-profile', me } : { status: 'ready', me });
     } catch (error) {
       if (error instanceof NetworkError) {
         commit({ status: 'offline-ready', me: null });

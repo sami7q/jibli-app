@@ -580,14 +580,16 @@ export function PromoBanner({
          * differently on each one: 1.88:1 on an SE, 2.15:1 on a Pro Max. A
          * designer exports one image and it lost a different slice of itself
          * per device, which is the kind of thing that only shows up once
-         * somebody puts two phones side by side. Two-to-one is the ratio these
-         * are drawn at, and now every screen shows the same picture.
+         * somebody puts two phones side by side. Sixteen-to-nine is the ratio
+         * these are drawn at — a shade taller than the 2:1 it started on,
+         * which read as a strip rather than a picture — and every screen now
+         * shows the same crop of it.
          *
          * The inset variant keeps its fixed height: it is a card in a column
          * of cards, and matching its neighbours matters more there than
          * matching itself across devices.
          */
-        ...(fullBleed ? { aspectRatio: 2 } : { height: 164 }),
+        ...(fullBleed ? { aspectRatio: 16 / 9 } : { height: 164 }),
         borderRadius: fullBleed ? 0 : radius['2xl'],
         overflow: 'hidden',
         backgroundColor: color.brand,

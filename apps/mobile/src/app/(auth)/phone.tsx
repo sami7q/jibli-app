@@ -301,6 +301,29 @@ export default function PhoneScreen() {
           سياسة الخصوصية
         </Text>
       </Text>
+
+      {/*
+        * The couriers' door, at the bottom and quiet.
+        *
+        * Almost everybody arriving here is a customer with a phone number, so
+        * this is the last line rather than a second button beside the first —
+        * but it has to exist somewhere a driver can find without being told,
+        * and «سجّل بالرقم» is not a door they have a key to: their account was
+        * created by a restaurant, with a username and a password.
+        */}
+      <Pressable
+        onPress={() => router.push('/(auth)/driver-login')}
+        accessibilityRole="button"
+        accessibilityLabel="دخول المندوبين"
+        style={({ pressed }) => [
+          { minHeight: TAP_TARGET, alignItems: 'center', justifyContent: 'center' },
+          pressed ? { opacity: 0.7 } : null,
+        ]}
+      >
+        <Text style={styles.driverLink}>
+          <MaterialCommunityIcons name="moped" size={15} /> دخول المندوبين
+        </Text>
+      </Pressable>
     </KeyboardAvoidingView>
   );
 }
@@ -449,6 +472,11 @@ const styles = StyleSheet.create({
   },
   googleLabel: { ...text.bodyBold, color: color.textPrimary },
 
+  driverLink: {
+    ...text.small,
+    color: color.textSecondary,
+    fontWeight: '700',
+  },
   legal: { ...text.small, color: color.textMuted, textAlign: 'center' },
   link: { color: color.textBrand },
 });

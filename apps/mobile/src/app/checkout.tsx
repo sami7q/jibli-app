@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { registerForPush } from '@/lib/push';
 import { useArea } from '@/lib/area';
 import { captureCurrentLocation, LOCATION_MESSAGES_AR, type Coordinates } from '@/lib/location';
 import { useCart, useOrderLines } from '@/lib/cart';
+import { notify } from '@/lib/dialog';
 import { color, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Sheet, SummaryRow } from '@/ui/catalog';
@@ -117,17 +118,17 @@ export default function CheckoutScreen() {
         // PRICE_CHANGED and MINIMUM_ORDER_NOT_MET are answers, not failures:
         // re-quote so the customer sees the new number and decides again.
         void quote.refetch();
-        Alert.alert('تعذّر إتمام الطلب', error.messageAr);
+        notify('تعذّر إتمام الطلب', error.messageAr);
         return;
       }
       if (error instanceof NetworkError) {
-        Alert.alert(
+        notify(
           'انقطع الاتصال',
           'لم نتمكن من تأكيد الطلب. تحقّق من «طلباتي» قبل المحاولة مرة أخرى.',
         );
         return;
       }
-      Alert.alert('خطأ غير متوقع', 'حاول مرة أخرى.');
+      notify('خطأ غير متوقع', 'حاول مرة أخرى.');
     },
   });
 
@@ -437,7 +438,7 @@ function AddressSheet({
       setCoordinates(outcome.coordinates);
       return;
     }
-    Alert.alert('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
+    notify('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
   };
 
   const create = useMutation({
@@ -461,7 +462,7 @@ function AddressSheet({
       }),
     onSuccess: onCreated,
     onError: (error) => {
-      Alert.alert(
+      notify(
         'تعذّر حفظ العنوان',
         error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
       );

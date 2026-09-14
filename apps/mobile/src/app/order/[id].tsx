@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { Button, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
 import { DriverCard, StatusTimeline, SummaryRow, type TimelineStep } from '@/ui/catalog';
 import { RateOrderSheet } from '@/ui/rate-order';
 import { isLiveOrderStatus, ORDER_JOURNEY } from '@/lib/order-watch';
+import { confirmAsync, notify } from '@/lib/dialog';
 
 /**
  * The order, from placed to delivered (`7.html` and `8.html`).
@@ -64,7 +65,7 @@ export default function OrderScreen() {
       void queryClient.invalidateQueries({ queryKey: ['my-orders'] });
     },
     onError: (error) =>
-      Alert.alert(
+      notify(
         'تعذّر الإلغاء',
         error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
       ),
@@ -294,10 +295,14 @@ export default function OrderScreen() {
         {CANCELLABLE.includes(data.status) ? (
           <Pressable
             onPress={() =>
-              Alert.alert('إلغاء الطلب', 'هل تريد إلغاء هذا الطلب؟', [
-                { text: 'تراجع', style: 'cancel' },
-                { text: 'إلغاء الطلب', style: 'destructive', onPress: () => cancel.mutate() },
-              ])
+              void confirmAsync({
+                title: 'إلغاء الطلب',
+                message: 'هل تريد إلغاء هذا الطلب؟',
+                confirmLabel: 'إلغاء الطلب',
+                destructive: true,
+              }).then((yes) => {
+                if (yes) cancel.mutate();
+              })
             }
             disabled={cancel.isPending}
             accessibilityRole="button"

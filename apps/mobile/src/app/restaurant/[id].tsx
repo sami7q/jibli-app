@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
+import { notify } from '@/lib/dialog';
 import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
@@ -112,7 +113,7 @@ export default function RestaurantScreen() {
     );
 
     if (result === 'replaced') {
-      Alert.alert('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
+      notify('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
     }
   };
 
@@ -864,7 +865,7 @@ function ItemSheet({
     );
 
     if (result === 'replaced') {
-      Alert.alert('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
+      notify('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
     }
 
     reset();

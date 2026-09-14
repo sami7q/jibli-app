@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Image,
   Pressable,
@@ -24,6 +23,7 @@ import { useArea } from '@/lib/area';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
+import { notify } from '@/lib/dialog';
 import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
@@ -134,9 +134,9 @@ export default function HomeScreen() {
         * edges reads as a mistake.
         */}
       {searching ? null : storefront.isLoading ? (
-        // The same 2:1 the real banner uses, so the layout does not jump by a
-        // few pixels the moment the carousel replaces it.
-        <Skeleton height={windowWidth / 2} style={{ marginTop: space[4] }} />
+        // The same 16:9 the real banner uses, so the layout does not jump the
+        // moment the carousel replaces it.
+        <Skeleton height={(windowWidth * 9) / 16} style={{ marginTop: space[4] }} />
       ) : (
         <BannerCarousel
           banners={storefront.data?.banners ?? []}
@@ -796,7 +796,7 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
                 },
               );
               if (result === 'replaced') {
-                Alert.alert(
+                notify(
                   'تم تفريغ السلة',
                   'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.',
                 );

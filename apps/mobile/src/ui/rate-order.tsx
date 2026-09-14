@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { api, ApiError } from '@/lib/api';
+import { notify } from '@/lib/dialog';
 import { color, palette, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, Row, Text } from './index';
 import { Sheet } from './catalog';
@@ -42,7 +43,7 @@ export function RateOrderSheet({
       onSubmitted();
     },
     onError: (error) =>
-      Alert.alert(
+      notify(
         'تعذّر إرسال التقييم',
         error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
       ),

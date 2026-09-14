@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { api, ApiError } from '@/lib/api';
 import { useIsGuest } from '@/lib/session';
+import { notify } from '@/lib/dialog';
 import { color, palette, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, EmptyState, Row, Screen, Skeleton, Text } from '@/ui';
 
@@ -82,7 +83,7 @@ export default function DriverApplyScreen() {
       }),
     onSuccess: () => void application.refetch(),
     onError: (error) =>
-      Alert.alert(
+      notify(
         'تعذّر إرسال الطلب',
         error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
       ),

@@ -569,6 +569,27 @@ export const api = {
       authenticated: false,
     }),
 
+  /**
+   * Sign in with a username and a password — couriers only, in practice.
+   *
+   * A driver's account is created by the restaurant that hired them, and the
+   * restaurant issues the credentials; there is no OTP to a number that may
+   * belong to a shared handset. `client: 'mobile'` is what makes the refresh
+   * token come back in the body rather than as a cookie the app cannot read.
+   */
+  passwordSignIn: (username: string, password: string) =>
+    apiRequest<{
+      access_token: string;
+      refresh_token: string;
+      portal: 'ADMIN' | 'RESTAURANT' | 'DRIVER';
+      mfa_required: boolean;
+      user: { id: string; username: string };
+    }>('/api/v1/auth/login', {
+      method: 'POST',
+      body: { username, password, client: 'mobile' },
+      authenticated: false,
+    }),
+
   /** Attach a verified phone to the account already signed in. */
   linkPhone: (phone: string, code: string) =>
     apiRequest<{

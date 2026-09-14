@@ -173,9 +173,23 @@ function Gate() {
       return;
     }
 
-    // Signed in and complete, but still sitting on a sign-in screen: this is
-    // the hop after a successful OTP.
-    if ((state.status === 'ready' || state.status === 'offline-ready') && inAuth) {
+    /*
+     * Signed in and complete, but still sitting on a sign-in screen: this is
+     * the hop after a successful OTP.
+     *
+     * The courier sign-in is the exception, and it has to be an explicit one.
+     * That screen sends its own user to `/(driver)/delivery`, and effects run
+     * child-first — so without this the Gate would win the race every time and
+     * land a driver on the customer home screen a tick before their own screen
+     * could ask for anything.
+     */
+    const onDriverLogin = path[1] === 'driver-login';
+
+    if (
+      (state.status === 'ready' || state.status === 'offline-ready') &&
+      inAuth &&
+      !onDriverLogin
+    ) {
       router.replace('/(tabs)');
     }
   }, [state, segments, router]);

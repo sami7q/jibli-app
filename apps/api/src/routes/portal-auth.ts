@@ -49,6 +49,19 @@ const loginSchema = z.object({
    * ever asked — so an older client that does not send the field is unchanged.
    */
   remember_me: z.boolean().default(true),
+  /**
+   * Who is asking.
+   *
+   * A browser gets its refresh token as an HttpOnly cookie it cannot read —
+   * that is the whole point of the arrangement, and it is why no portal holds
+   * one. A phone has no cookie jar worth relying on and the app already holds
+   * a refresh token from the OTP flow, in the device keystore, so for `mobile`
+   * the token comes back in the body instead.
+   *
+   * Not a weakening: it is the same contract `/auth/otp/verify` has always had
+   * for the same client. The cookie is still set for `web` and only for `web`.
+   */
+  client: z.enum(['web', 'mobile']).default('web'),
 });
 
 /**
@@ -333,13 +346,16 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         userAgent: agent,
       });
 
-      setRefreshCookie(reply, ctx, session.refreshToken, body.remember_me);
+      if (body.client === 'web') {
+        setRefreshCookie(reply, ctx, session.refreshToken, body.remember_me);
+      }
 
       return reply.send(
         success(
           {
             access_token: session.accessToken,
             expires_in_seconds: session.expiresInSeconds,
+            ...(body.client === 'mobile' ? { refresh_token: session.refreshToken } : {}),
             mfa_required: false,
             user: {
               id: user.id,
