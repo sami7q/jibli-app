@@ -53,6 +53,21 @@ wire.
 
 Then one of the two modes below.
 
+### Which key
+
+Project settings in the dashboard offers two, and they behave differently in a
+way that matters here.
+
+`sk_live_…` sends to the number in the request. `sk_dev_…` is bound to one
+"development phone number" and **ignores the number in the request entirely**,
+redirecting every message to that one handset.
+
+Use `sk_live_` to verify the integration. A dev key would silently pass the one
+question `SMS_GATEWAY_NUMBER_FORMAT` exists to answer — it never reads the
+number we send, so a wrong format could not fail. Verify with a live key
+against your own handset, then switch to a dev key while building screens, so
+a loop in the app cannot text a customer.
+
 ## Which mode: who writes the sentence
 
 This is the decision that matters, and it is not really about wording — it
