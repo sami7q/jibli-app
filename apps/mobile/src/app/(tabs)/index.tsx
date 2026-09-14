@@ -22,7 +22,8 @@ import {
 } from '@/lib/api';
 import { useArea } from '@/lib/area';
 import { useCart } from '@/lib/cart';
-import { useIsGuest, useMe } from '@/lib/session';
+import { useIsGuest } from '@/lib/session';
+import { useUnseenCount } from '@/lib/notification-inbox';
 import { color, palette, radius, space, TAP_TARGET } from '@/theme';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
@@ -42,7 +43,6 @@ import { AreaPicker } from '@/ui/area-picker';
  * in the header, which is the comp's location row doing real work.
  */
 export default function HomeScreen() {
-  const me = useMe();
   const isGuest = useIsGuest();
   const router = useRouter();
   const { area, isResolving } = useArea();
@@ -108,7 +108,6 @@ export default function HomeScreen() {
         areaLabel={area?.cityNameAr ?? null}
         isResolving={isResolving}
         onPressArea={() => setPickingArea(true)}
-        greeting={me?.full_name ?? null}
         isGuest={isGuest}
         onPressSignIn={() => router.push('/(auth)/phone')}
       />
@@ -283,14 +282,12 @@ function Header({
   areaLabel,
   isResolving,
   onPressArea,
-  greeting,
   isGuest,
   onPressSignIn,
 }: {
   areaLabel: string | null;
   isResolving: boolean;
   onPressArea: () => void;
-  greeting: string | null;
   isGuest: boolean;
   onPressSignIn: () => void;
 }) {
@@ -360,15 +357,73 @@ function Header({
               تسجيل الدخول
             </Text>
           </Pressable>
-        ) : greeting ? (
-          <IconTile size={40} tone="neutral">
-            <Text variant="bodyBold" tone="secondary">
-              {greeting.slice(0, 1)}
-            </Text>
-          </IconTile>
-        ) : null}
+        ) : (
+          <NotificationBell />
+        )}
       </Row>
     </View>
+  );
+}
+
+/**
+ * The way back to an update nobody was looking at when it arrived.
+ *
+ * It replaces the initial-in-a-circle that stood here, which was decoration:
+ * it was not pressable, it repeated a name the account tab already shows, and
+ * it occupied the one corner every app puts its notifications in.
+ *
+ * The count comes from the same feed the screen behind it renders, so the
+ * badge and the list can never disagree about how many there are.
+ */
+function NotificationBell() {
+  const router = useRouter();
+
+  const feed = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => api.notifications(),
+    staleTime: 30_000,
+  });
+
+  const unseen = useUnseenCount(feed.data);
+
+  return (
+    <Pressable
+      onPress={() => router.push('/notifications')}
+      accessibilityRole="button"
+      accessibilityLabel={unseen > 0 ? `الإشعارات، ${unseen} جديد` : 'الإشعارات'}
+      style={({ pressed }) => [pressed ? { opacity: 0.7 } : null]}
+    >
+      <IconTile size={40} tone="neutral">
+        <MaterialCommunityIcons
+          name={unseen > 0 ? 'bell-badge' : 'bell-outline'}
+          size={20}
+          color={unseen > 0 ? color.brand : color.textSecondary}
+        />
+      </IconTile>
+
+      {unseen > 0 ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: -4,
+            left: -4,
+            minWidth: 18,
+            height: 18,
+            paddingHorizontal: 4,
+            borderRadius: radius.full,
+            backgroundColor: color.brand,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 2,
+            borderColor: color.surfaceCard,
+          }}
+        >
+          <Text variant="caption" tone="inverse" style={{ fontSize: 10, lineHeight: 12 }}>
+            {unseen > 9 ? '+9' : String(unseen)}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 

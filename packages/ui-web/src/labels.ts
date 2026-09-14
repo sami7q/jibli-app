@@ -1,10 +1,12 @@
 import type {
   CouponFundingSource,
   CouponType,
+  DriverAvailability,
   ExpenseCategory,
   RestaurantRole,
   SettlementStatus,
   PlatformRole,
+  VehicleType,
 } from '@jibli/contracts';
 
 /**
@@ -34,6 +36,30 @@ export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   OVERDUE: 'متأخر',
   DISPUTED: 'قيد الاعتراض',
   VOID: 'ملغي',
+};
+
+/**
+ * Driver availability, typed on the enum rather than on `string`.
+ *
+ * The order board and the drivers page each carried their own map keyed on
+ * `string`, and both were wrong in the same way: they listed an `ONLINE` that
+ * the enum does not have and omitted `AVAILABLE`, `ON_DELIVERY` and `BREAK`.
+ * A driver in any of those three rendered as a raw English word to an Arabic
+ * user. Typed on `DriverAvailability`, a new state now fails the build instead.
+ */
+export const DRIVER_AVAILABILITY_LABELS: Record<DriverAvailability, string> = {
+  OFFLINE: 'خارج الدوام',
+  AVAILABLE: 'متاح',
+  BUSY: 'مشغول',
+  ON_DELIVERY: 'في توصيل',
+  BREAK: 'استراحة',
+};
+
+export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
+  MOTORCYCLE: 'دراجة نارية',
+  CAR: 'سيارة',
+  BICYCLE: 'دراجة هوائية',
+  ON_FOOT: 'مشياً',
 };
 
 export const RESTAURANT_ROLE_LABELS: Record<RestaurantRole, string> = {

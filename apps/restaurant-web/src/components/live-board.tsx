@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { DriverAvailability, VehicleType } from '@jibli/contracts';
 import {
   ACTIONS_AR,
+  DRIVER_AVAILABILITY_LABELS,
   EMPTY_STATES_AR,
   ORDER_LANES,
+  VEHICLE_TYPE_LABELS,
   money,
   ordersCountAr,
   relativeAr,
 } from '@jibli/ui-web';
-import { ApiError, restaurantApi, type LiveOrder } from '@/lib/api';
+import { ApiError, restaurantApi, type EligibleDriver, type LiveOrder } from '@/lib/api';
 import { OrderAlertManager, type AlertState } from '@/lib/order-alerts';
 import { useRealtime } from '@/hooks/use-realtime';
 import { Icon } from './icon';
@@ -252,6 +255,7 @@ function OrderCard({
   onChanged: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [pickingDriver, setPickingDriver] = useState(false);
 
   const runCommand = useMutation({
     mutationFn: async (action: 'accept' | 'reject' | 'prepare' | 'ready') => {
@@ -391,13 +395,181 @@ function OrderCard({
         ) : null}
 
         {order.status === 'READY' && !order.driver ? (
-          <button type="button" className="btn btn--primary btn--block">
+          <button
+            type="button"
+            className="btn btn--primary btn--block"
+            onClick={() => setPickingDriver(true)}
+          >
             {ACTIONS_AR.assignDriver}
           </button>
         ) : null}
       </div>
+
+      {pickingDriver ? (
+        <DriverPicker
+          auth={auth}
+          orderId={order.id}
+          orderNumber={order.public_order_number}
+          onClose={() => setPickingDriver(false)}
+          onAssigned={() => {
+            setPickingDriver(false);
+            setError(null);
+            onChanged();
+          }}
+        />
+      ) : null}
     </article>
   );
+}
+
+/**
+ * Choosing who carries the order.
+ *
+ * The button that opens this had no `onClick` at all — it rendered, it
+ * highlighted on hover, and it did nothing, which is the worst failure a
+ * control can have because it looks like the server ignored you. The two API
+ * calls behind it (`/drivers/eligible` and `/orders/:id/assign-driver`) and
+ * their client functions had been written and were never called from anywhere.
+ *
+ * Everything the server checks is shown rather than hidden: a driver who is
+ * off shift or already carrying their limit stays on the list, disabled, with
+ * the reason next to their name. A list that silently omits half the team
+ * leaves a manager wondering where their driver went.
+ */
+function DriverPicker({
+  auth,
+  orderId,
+  orderNumber,
+  onClose,
+  onAssigned,
+}: {
+  auth: Auth;
+  orderId: string;
+  orderNumber: string;
+  onClose: () => void;
+  onAssigned: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+
+  const drivers = useQuery({
+    queryKey: ['eligible-drivers', auth.restaurantId, orderId],
+    queryFn: () => restaurantApi.eligibleDrivers(auth),
+    // Availability changes minute to minute; a cached list would offer someone
+    // who has since gone off shift.
+    staleTime: 0,
+  });
+
+  const assign = useMutation({
+    mutationFn: (driverId: string) => restaurantApi.assignDriver(auth, orderId, driverId),
+    onSuccess: onAssigned,
+    onError: (assignError: unknown) => {
+      setChosen(null);
+      setError(assignError instanceof ApiError ? assignError.messageAr : 'تعذّر تعيين السائق');
+    },
+  });
+
+  const list = drivers.data ?? [];
+  const assignable = list.filter((driver) => driver.assignable);
+
+  return (
+    <div
+      className="dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="assign-title"
+      // The backdrop closes; a click inside must not bubble out to it.
+      onClick={onClose}
+    >
+      <div className="dialog" onClick={(event) => event.stopPropagation()}>
+        <h2 id="assign-title">
+          تعيين سائق للطلب <span className="ltr-inline">#{orderNumber}</span>
+        </h2>
+
+        {error ? (
+          <p className="alert-bar alert-bar--danger" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        {drivers.isLoading ? <p>جارٍ تحميل السائقين…</p> : null}
+
+        {drivers.isError ? (
+          <p className="alert-bar alert-bar--danger" role="alert">
+            تعذّر تحميل قائمة السائقين.{' '}
+            <button type="button" className="btn btn--ghost" onClick={() => void drivers.refetch()}>
+              إعادة المحاولة
+            </button>
+          </p>
+        ) : null}
+
+        {!drivers.isLoading && !drivers.isError && list.length === 0 ? (
+          <div className="empty">
+            <p>لا يوجد سائقون مرتبطون بالمطعم بعد.</p>
+            <a className="btn btn--primary" href="/drivers">
+              إدارة السائقين
+            </a>
+          </div>
+        ) : null}
+
+        {list.length > 0 && assignable.length === 0 ? (
+          <p className="alert-bar alert-bar--warning" role="status">
+            لا يوجد سائق متاح الآن — جميع السائقين خارج الدوام أو مشغولون بطلبات أخرى.
+          </p>
+        ) : null}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {list.map((driver) => (
+            <button
+              key={driver.id}
+              type="button"
+              className="btn btn--secondary"
+              disabled={!driver.assignable || assign.isPending}
+              onClick={() => {
+                setChosen(driver.id);
+                assign.mutate(driver.id);
+              }}
+              style={{
+                justifyContent: 'space-between',
+                textAlign: 'start',
+                opacity: driver.assignable ? 1 : 0.55,
+              }}
+            >
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <strong>{driver.name}</strong>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                  {driverStatusAr(driver)}
+                </span>
+              </span>
+              <span style={{ fontSize: 'var(--text-xs)' }}>
+                {assign.isPending && chosen === driver.id ? 'جارٍ التعيين…' : 'تعيين'}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="dialog__actions">
+          <button type="button" className="btn btn--ghost" onClick={onClose}>
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Why a driver can or cannot take this order, in one line. */
+function driverStatusAr(driver: EligibleDriver): string {
+  const vehicle = VEHICLE_TYPE_LABELS[driver.vehicle_type as VehicleType] ?? driver.vehicle_type;
+  const availability =
+    DRIVER_AVAILABILITY_LABELS[driver.availability as DriverAvailability] ?? driver.availability;
+
+  const parts: string[] = [vehicle, availability];
+
+  if (driver.active_assignments > 0) parts.push(`${driver.active_assignments} طلب جارٍ`);
+  if (!driver.can_collect_cash) parts.push('لا يستلم نقداً');
+
+  return parts.join(' · ');
 }
 
 export { ordersCountAr };

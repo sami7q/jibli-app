@@ -49,7 +49,7 @@ export function PortalPage({
   }
 
   if (session.status === 'unauthenticated') {
-    return <SignedOut reason={session.reason} />;
+    return <SignedOut reason={session.reason} account={session.account} />;
   }
 
   const denied = permission !== undefined && !session.can(permission);

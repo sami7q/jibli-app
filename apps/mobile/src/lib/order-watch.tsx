@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
+import { playChime } from './chime';
 import { useSession } from './session';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, shadow, space, TAB_BAR_HEIGHT } from '@/theme';
@@ -106,7 +107,7 @@ export function useOrderWatch(): OrderWatch {
  * wrong at both ends: nobody needs to be told their delivered order was
  * "updated to delivered".
  */
-function announcementFor(status: OrderStatus): string {
+export function announcementFor(status: OrderStatus): string {
   switch (status) {
     case 'ACCEPTED':
       return 'قبل المطعم طلبك وسيبدأ التحضير';
@@ -216,6 +217,18 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
 
       const order = list.find((o) => o.id === id);
       const text = announcementFor(status as OrderStatus);
+
+      /*
+       * Sound and the inbox, together with the bar.
+       *
+       * The chime is the part a customer who is not looking at the screen
+       * actually receives, and the refetch is what puts the same update in the
+       * notification centre — so the three surfaces never disagree about what
+       * happened.
+       */
+      void playChime();
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+
       setAnnouncement({
         orderId: id,
         orderNumber: order?.public_order_number ?? '',
@@ -228,7 +241,7 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
       // that a queue would be more machinery than the case deserves.
       break;
     }
-  }, [orders.data]);
+  }, [orders.data, queryClient]);
 
   // The bar settles back to the plain status line; it is an announcement, not
   // a permanent header.

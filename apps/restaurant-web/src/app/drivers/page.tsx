@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { VEHICLE_TYPES, type VehicleType } from '@jibli/contracts';
-import { money } from '@jibli/ui-web';
+import { DRIVER_AVAILABILITY_LABELS, VEHICLE_TYPE_LABELS, money } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError, newIdempotencyKey } from '@/lib/api';
@@ -23,18 +23,16 @@ import { portal, type DriverCashRow, type PortalDriver } from '@/lib/portal-endp
  *     confusion is expensive when it happens.
  */
 
-const VEHICLE_LABELS: Record<VehicleType, string> = {
-  MOTORCYCLE: 'دراجة نارية',
-  CAR: 'سيارة',
-  BICYCLE: 'دراجة هوائية',
-  ON_FOOT: 'مشياً',
-};
-
-const AVAILABILITY_LABELS: Record<string, string> = {
-  ONLINE: 'متاح',
-  BUSY: 'مشغول',
-  OFFLINE: 'غير متصل',
-};
+/*
+ * Both maps moved to `@jibli/ui-web/labels`, typed on their enums.
+ *
+ * The copy that lived here was keyed on `string` and listed an `ONLINE` the
+ * enum has never had, while `AVAILABLE`, `ON_DELIVERY` and `BREAK` fell
+ * through to the raw English. The order board needed the same words, which is
+ * the point at which a second copy stops being a shortcut.
+ */
+const VEHICLE_LABELS = VEHICLE_TYPE_LABELS;
+const AVAILABILITY_LABELS: Record<string, string> = DRIVER_AVAILABILITY_LABELS;
 
 export default function DriversPage() {
   return (

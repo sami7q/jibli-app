@@ -69,6 +69,24 @@ const cancelSchema = z.object({
   note: z.string().max(300).optional(),
 });
 
+/**
+ * Transitions worth telling a customer about.
+ *
+ * Everything an order does that they would notice, and nothing that is an
+ * internal restatement of a step they have already been told about.
+ */
+const CUSTOMER_VISIBLE_STATUSES = [
+  'PLACED',
+  'ACCEPTED',
+  'PREPARING',
+  'READY',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'COMPLETED',
+  'REJECTED',
+  'CANCELLED',
+] as const;
+
 export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void {
   /**
    * Authoritative quote (plan §22).
@@ -244,6 +262,69 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
             (row.restaurantSnapshot as Record<string, unknown> | null)?.displayName ?? null,
         })),
         { request_id: request.requestId, has_more: rows.length === query.limit },
+      ),
+    );
+  });
+
+  /**
+   * The customer's notification feed.
+   *
+   * Built from `order_status_history`, which `transitionOrder` writes inside
+   * the same transaction as the status change — not from
+   * `notification_deliveries`, which the worker writes afterwards. The
+   * difference matters: a feed sourced from the delivery table is empty
+   * whenever the worker is down or not deployed, and a notification centre
+   * that is sometimes empty for reasons the customer cannot see is worse than
+   * none. This one is a view of what actually happened to their orders, so it
+   * cannot disagree with the order screen and cannot go missing.
+   *
+   * Read state is not stored here. It is one timestamp per device, kept by the
+   * app, which is the honest scope for a bell: reading a notification on a
+   * phone says nothing about a tablet.
+   */
+  app.get('/api/v1/notifications', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
+    const query = z
+      .object({ limit: z.coerce.number().int().min(1).max(100).default(40) })
+      .parse(request.query);
+
+    const rows = await ctx.db
+      .select({
+        id: orderStatusHistory.id,
+        orderId: orders.id,
+        publicOrderNumber: orders.publicOrderNumber,
+        status: orderStatusHistory.toStatus,
+        at: orderStatusHistory.createdAt,
+        restaurantSnapshot: orders.restaurantLocationSnapshotJson,
+      })
+      .from(orderStatusHistory)
+      .innerJoin(orders, eq(orderStatusHistory.orderId, orders.id))
+      .where(
+        and(
+          eq(orders.userId, principal.userId),
+          /*
+           * PENDING_RESTAURANT is the same moment as PLACED seen from the
+           * kitchen's side, and a customer told twice that one order was sent
+           * learns to distrust the bell.
+           */
+          inArray(orderStatusHistory.toStatus, [...CUSTOMER_VISIBLE_STATUSES]),
+        ),
+      )
+      .orderBy(desc(orderStatusHistory.createdAt))
+      .limit(query.limit);
+
+    return reply.send(
+      success(
+        rows.map((row) => ({
+          id: row.id,
+          order_id: row.orderId,
+          public_order_number: row.publicOrderNumber,
+          status: row.status,
+          restaurant_name:
+            (row.restaurantSnapshot as Record<string, unknown> | null)?.displayName ?? null,
+          at: row.at.toISOString(),
+        })),
+        { request_id: request.requestId },
       ),
     );
   });

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { RestaurantPermission, RestaurantRole } from '@jibli/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '@/lib/api';
 
 /**
@@ -24,7 +25,19 @@ export interface PortalRestaurant {
 
 export type SessionState =
   | { status: 'loading' }
-  | { status: 'unauthenticated'; reason?: string }
+  | {
+      status: 'unauthenticated';
+      reason?: string;
+      /**
+       * Who is signed in, when somebody is.
+       *
+       * Only ever set for NO_RESTAURANT_MEMBERSHIP, which is the one failure
+       * where the session is perfectly valid — so the screen can name the
+       * account instead of leaving the reader to guess which of their logins
+       * this is.
+       */
+      account?: string;
+    }
   | {
       status: 'authenticated';
       accessToken: string;
@@ -97,8 +110,9 @@ interface LoadedSession {
  */
 function useSessionState(active: boolean): SessionState {
   const [loaded, setLoaded] = useState<LoadedSession | null>(null);
-  const [failure, setFailure] = useState<{ reason?: string } | null>(null);
+  const [failure, setFailure] = useState<{ reason?: string; account?: string } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!active) return undefined;
@@ -126,7 +140,10 @@ function useSessionState(active: boolean): SessionState {
         if (me.restaurants.length === 0) {
           // Authenticated, but not a member of any restaurant — the portal has
           // nothing to show, and saying so beats an empty dashboard.
-          setFailure({ reason: 'NO_RESTAURANT_MEMBERSHIP' });
+          setFailure({
+            reason: 'NO_RESTAURANT_MEMBERSHIP',
+            account: me.user.full_name ?? undefined,
+          });
           setLoaded(null);
           return;
         }
@@ -158,10 +175,24 @@ function useSessionState(active: boolean): SessionState {
     };
   }, [active]);
 
-  const switchRestaurant = useCallback((restaurantId: string) => {
-    writeSelected(restaurantId);
-    setSelectedId(restaurantId);
-  }, []);
+  const switchRestaurant = useCallback(
+    (restaurantId: string) => {
+      writeSelected(restaurantId);
+      setSelectedId(restaurantId);
+
+      /*
+       * Drop everything fetched for the previous restaurant.
+       *
+       * Every query key already carries the restaurant id, so the wrong branch
+       * is never *displayed* — but its rows stay in the cache, and switching
+       * back paints them instantly from a snapshot that may be hours old
+       * before the refetch lands. On a screen about live orders and money, a
+       * stale first paint is the kind of thing somebody acts on.
+       */
+      queryClient.clear();
+    },
+    [queryClient],
+  );
 
   return useMemo<SessionState>(() => {
     if (failure) return { status: 'unauthenticated', ...failure };

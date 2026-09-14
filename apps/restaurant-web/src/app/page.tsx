@@ -34,7 +34,7 @@ export default function DashboardPage() {
   }
 
   if (session.status === 'unauthenticated') {
-    return <SignedOut reason={session.reason} />;
+    return <SignedOut reason={session.reason} account={session.account} />;
   }
 
   const auth = { accessToken: session.accessToken, restaurantId: session.restaurantId };

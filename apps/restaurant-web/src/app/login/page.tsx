@@ -62,6 +62,14 @@ function LoginForm() {
   const [mfaCode, setMfaCode] = useState('');
   const [stage, setStage] = useState<'CREDENTIALS' | 'MFA'>('CREDENTIALS');
   const [revealPassword, setRevealPassword] = useState(false);
+  /*
+   * «تذكرني», on by default because that is what the portal did before the box
+   * existed — ticking nothing must not silently shorten anybody's session.
+   * Untick it and the refresh cookie loses its `maxAge`, so the browser drops
+   * it on exit: the case this is for is the till in the kitchen that three
+   * people use.
+   */
+  const [rememberMe, setRememberMe] = useState(true);
   const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -143,6 +151,7 @@ function LoginForm() {
         body: {
           username: credentials.username.trim(),
           password: credentials.password,
+          remember_me: rememberMe,
           ...(stage === 'MFA' ? { mfa_code: mfaCode.trim() } : {}),
         },
       });
@@ -324,6 +333,33 @@ function LoginForm() {
                 </span>
               ) : null}
             </div>
+
+            <label
+              htmlFor="login-remember"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+              }}
+            >
+              <input
+                id="login-remember"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+                style={{ width: 18, height: 18, accentColor: 'var(--jibli-orange-500)' }}
+              />
+              <span>
+                تذكّرني على هذا الجهاز
+                <span className="field__hint" style={{ display: 'block' }}>
+                  {rememberMe
+                    ? 'تبقى الجلسة مفتوحة ولا تحتاج تسجيل الدخول في كل مرة.'
+                    : 'ستُغلق الجلسة عند إغلاق المتصفح — الأنسب لجهاز مشترك.'}
+                </span>
+              </span>
+            </label>
           </>
         ) : (
           <div className="field">

@@ -98,7 +98,10 @@ function framePage(appOrigin) {
   body {
     margin: 0; min-height: 100vh;
     display: flex; flex-direction: column; align-items: center; gap: 20px;
-    padding: 24px 16px 40px;
+    /* Centred rather than top-aligned: a scaled-down phone pinned to the top
+       left a window's worth of empty grey under it and read as misaligned. */
+    justify-content: center;
+    padding: 20px 16px 28px;
     background: #14161a;
     color: #e5e7eb;
     font: 14px/1.6 "Segoe UI", system-ui, sans-serif;
@@ -152,10 +155,23 @@ function framePage(appOrigin) {
     const [w, h] = size.value.split('x').map(Number);
     phone.style.width = w + 'px';
     phone.style.height = h + 'px';
+
     // Keep it on screen on a laptop, without changing the layout the app sees.
-    const room = window.innerHeight - 190;
-    phone.style.transform = h > room ? 'scale(' + (room / h).toFixed(3) + ')' : 'none';
+    const room = window.innerHeight - 150;
+    const scale = h > room ? room / h : 1;
+    phone.style.transform = scale === 1 ? 'none' : 'scale(' + scale.toFixed(3) + ')';
     phone.style.transformOrigin = 'top center';
+
+    /*
+     * A transform does not change the space the element reserves.
+     *
+     * Scaled to 80%, the phone still occupied its full 844px in the layout, so
+     * a fifth of that height sat under it as dead grey and the frame looked
+     * shoved against the top of the window. Pulling the leftover back is what
+     * lets the page's centring actually centre what is drawn.
+     */
+    phone.style.marginBottom = Math.round(h * (scale - 1)) + 'px';
+
     localStorage.setItem('jibli.preview.size', size.value);
   }
 

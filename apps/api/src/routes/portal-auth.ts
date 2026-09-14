@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import {
   ADMIN_PASSWORD_MIN_LENGTH,
@@ -44,6 +44,11 @@ const loginSchema = z.object({
   password: z.string().min(1).max(256),
   /** Present on the second leg, once MFA has been challenged. */
   mfa_code: z.string().min(6).max(10).optional(),
+  /**
+   * «تذكرني». Defaults to true, which is what the portal did before it was
+   * ever asked — so an older client that does not send the field is unchanged.
+   */
+  remember_me: z.boolean().default(true),
 });
 
 /**
@@ -68,22 +73,63 @@ const LOCKOUT_MINUTES = 15;
  * navigation into the portal. 'none' would be required for a true cross-site
  * POST, which is exactly what we do not want to allow.
  */
-function setRefreshCookie(reply: FastifyReply, ctx: AppContext, token: string): void {
+function setRefreshCookie(
+  reply: FastifyReply,
+  ctx: AppContext,
+  token: string,
+  /**
+   * Whether «تذكرني» was ticked.
+   *
+   * Ticked, the cookie carries `maxAge` and survives closing the browser —
+   * which is what it has always done, so an unchanged client behaves exactly
+   * as before. Unticked, `maxAge` is omitted and the browser drops it on exit:
+   * the portal is used from tills and shared kitchen terminals, where "stay
+   * signed in" is the setting somebody needs to be able to say no to.
+   */
+  remember: boolean,
+): void {
   void reply.setCookie(ctx.env.SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: ctx.env.APP_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: ctx.env.REFRESH_TOKEN_TTL_SECONDS,
+    ...(remember ? { maxAge: ctx.env.REFRESH_TOKEN_TTL_SECONDS } : {}),
+    ...(ctx.env.SESSION_COOKIE_DOMAIN ? { domain: ctx.env.SESSION_COOKIE_DOMAIN } : {}),
+  });
+
+  /*
+   * A readable companion carrying only the choice, never the token.
+   *
+   * Rotation re-issues the cookie on every refresh, and that handler has no
+   * idea what was ticked at sign-in — so without this, a session-only choice
+   * would quietly become a thirty-day one at the first rotation. The flag is
+   * not a secret: it says nothing except which of the two a person picked.
+   */
+  void reply.setCookie(REMEMBER_COOKIE, remember ? '1' : '0', {
+    httpOnly: false,
+    secure: ctx.env.APP_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    ...(remember ? { maxAge: ctx.env.REFRESH_TOKEN_TTL_SECONDS } : {}),
     ...(ctx.env.SESSION_COOKIE_DOMAIN ? { domain: ctx.env.SESSION_COOKIE_DOMAIN } : {}),
   });
 }
 
+/** Names the choice, not the session. Read on rotation to preserve it. */
+const REMEMBER_COOKIE = 'jibli_remember';
+
+/** What was ticked at sign-in. Defaults to remembering, as it always did. */
+function wasRemembered(request: FastifyRequest): boolean {
+  return request.cookies[REMEMBER_COOKIE] !== '0';
+}
+
 export function clearRefreshCookie(reply: FastifyReply, ctx: AppContext): void {
-  void reply.clearCookie(ctx.env.SESSION_COOKIE_NAME, {
-    path: '/',
-    ...(ctx.env.SESSION_COOKIE_DOMAIN ? { domain: ctx.env.SESSION_COOKIE_DOMAIN } : {}),
-  });
+  for (const name of [ctx.env.SESSION_COOKIE_NAME, REMEMBER_COOKIE]) {
+    void reply.clearCookie(name, {
+      path: '/',
+      ...(ctx.env.SESSION_COOKIE_DOMAIN ? { domain: ctx.env.SESSION_COOKIE_DOMAIN } : {}),
+    });
+  }
 }
 
 export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -274,7 +320,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         userAgent: agent,
       });
 
-      setRefreshCookie(reply, ctx, session.refreshToken);
+      setRefreshCookie(reply, ctx, session.refreshToken, body.remember_me);
 
       return reply.send(
         success(
@@ -348,7 +394,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
       throw error;
     }
 
-    setRefreshCookie(reply, ctx, session.refreshToken);
+    setRefreshCookie(reply, ctx, session.refreshToken, wasRemembered(request));
 
     return reply.send(
       success(
@@ -496,7 +542,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         mfaVerified: principal.mfaAt !== null,
       });
 
-      setRefreshCookie(reply, ctx, session.refreshToken);
+      setRefreshCookie(reply, ctx, session.refreshToken, wasRemembered(request));
 
       return reply.send(
         success(

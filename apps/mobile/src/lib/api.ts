@@ -489,6 +489,16 @@ export interface DishResult {
   };
 }
 
+/** One entry in the notification centre. */
+export interface OrderNotification {
+  id: string;
+  order_id: string;
+  public_order_number: string;
+  status: OrderStatus;
+  restaurant_name: string | null;
+  at: string;
+}
+
 /** A favourite, in the same shape as a discovery card. */
 export type FavoriteCard = RestaurantCard & { favorited_at: string };
 
@@ -718,6 +728,15 @@ export const api = {
     apiRequest<
       { order_id: string; restaurant_name: string; delivered_at: string; opens_at: string }[]
     >('/api/v1/reviews/pending'),
+
+  /**
+   * The notification feed — every status an order of theirs has reached.
+   *
+   * Server-derived from the order status history, so it is the same truth the
+   * order screen shows and it survives a reinstall. Read state is local.
+   */
+  notifications: () =>
+    apiRequest<OrderNotification[]>('/api/v1/notifications'),
 
   submitReview: (orderId: string, rating: number, comment?: string) =>
     apiRequest<{ submitted: boolean }>(`/api/v1/orders/${orderId}/review`, {
