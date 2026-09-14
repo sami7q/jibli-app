@@ -39,6 +39,7 @@ export default function PhoneScreen() {
   const [rawInput, setRawInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
+  const [devAvailable, setDevAvailable] = useState(true);
   const { signIn } = useSession();
 
   // Validate against the same rules the server uses, so the button state and
@@ -51,6 +52,42 @@ export default function PhoneScreen() {
     // shows exactly what will be sent.
     setRawInput(normalizeDigits(value).replace(/\D/g, '').slice(0, 11));
     if (error) setError(null);
+  };
+
+  /**
+   * One tap to a signed-in session, in development only.
+   *
+   * Requests a code for a fixed number and verifies it in the same gesture.
+   * It is drawn only when the server answers with `dev_code`, which it does
+   * solely for the mock provider or a local run — so there is no build in which
+   * a customer can see this, and no flag to remember to turn off.
+   */
+  const handleDevSignIn = async () => {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const code = await devCode();
+      if (!code) {
+        setError('الدخول السريع متاح فقط عندما يعمل الخادم في وضع التطوير.');
+        setDevAvailable(false);
+        return;
+      }
+
+      const result = await api.verifyOtp(DEV_PHONE, code);
+      await signIn({
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+        userId: result.user.id,
+      });
+      router.replace(result.next_step === 'COMPLETE_PROFILE' ? '/(auth)/profile' : '/(tabs)');
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError ? caught.messageAr : 'تعذّر الدخول السريع. جرّب الرقم يدوياً.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleGoogle = async () => {
@@ -207,6 +244,26 @@ export default function PhoneScreen() {
       </Pressable>
 
       {/*
+        * The development shortcut.
+        *
+        * Rendered only when the bundle itself is a development one, and it
+        * still checks with the server before signing anyone in — a release
+        * build has `__DEV__` false and never draws it.
+        */}
+      {__DEV__ && devAvailable ? (
+        <Pressable
+          onPress={handleDevSignIn}
+          disabled={isSubmitting}
+          accessibilityRole="button"
+          accessibilityLabel="دخول سريع لوضع التطوير"
+          style={({ pressed }) => [styles.devButton, pressed ? { opacity: 0.8 } : null]}
+        >
+          <Text style={styles.devButtonTitle}>دخول سريع — وضع التطوير</Text>
+          <Text style={styles.devButtonText}>{DEV_PHONE_DISPLAY}</Text>
+        </Pressable>
+      ) : null}
+
+      {/*
         * Google, when it is configured.
         *
         * It signs the customer in but does not give Jibli a number a driver
@@ -246,6 +303,49 @@ export default function PhoneScreen() {
       </Text>
     </KeyboardAvoidingView>
   );
+}
+
+/**
+ * The number the development shortcut signs in as.
+ *
+ * A real Iraqi format so it passes the same validation every other number
+ * does — a test account that skips validation tests nothing.
+ */
+const DEV_PHONE = '+9647712345678';
+const DEV_PHONE_DISPLAY = '+964 771 234 5678';
+
+/**
+ * The last code the server handed back.
+ *
+ * The resend cooldown and the per-number hourly cap are real protections and
+ * apply to this number like any other — so a second tap inside the cooldown,
+ * or a sixth inside an hour, is refused. That is precisely what someone
+ * testing does, and being locked out of your own preview for an hour is worse
+ * than the two taps this replaced.
+ *
+ * Both refusals throw before the service invalidates the outstanding
+ * challenge, so the code already issued is still live; the mock provider's
+ * code is fixed in any case. Reusing it turns the refusal into a no-op.
+ *
+ * The limits themselves stay untouched. A local server raises them by
+ * configuration (see `docs/mobile/running-the-app.md`), which is the actual
+ * fix — this is only what keeps the button honest when it hits one.
+ */
+let lastDevCode: string | null = null;
+
+const RATE_LIMIT_CODES = new Set(['OTP_COOLDOWN_ACTIVE', 'OTP_RATE_LIMITED']);
+
+async function devCode(): Promise<string | null> {
+  try {
+    const requested = await api.requestOtp(DEV_PHONE);
+    lastDevCode = requested.dev_code ?? null;
+    return lastDevCode;
+  } catch (caught) {
+    if (caught instanceof ApiError && RATE_LIMIT_CODES.has(caught.code) && lastDevCode) {
+      return lastDevCode;
+    }
+    throw caught;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -316,6 +416,25 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: palette.ink[300] },
   buttonText: { ...text.bodyBold, color: palette.white },
+
+  devButton: {
+    alignSelf: 'stretch',
+    backgroundColor: color.warningSoft,
+    borderWidth: 1,
+    borderColor: palette.warning[500],
+    borderRadius: radius.md,
+    minHeight: TAP_TARGET + 8,
+    justifyContent: 'center',
+    paddingHorizontal: space[4],
+    gap: 2,
+  },
+  devButtonTitle: { ...text.bodyBold, color: palette.warning[700], textAlign: 'center' },
+  devButtonText: {
+    ...text.small,
+    color: palette.warning[700],
+    textAlign: 'center',
+    writingDirection: 'ltr',
+  },
 
   alternatives: { gap: space[3], alignItems: 'stretch' },
   divider: { ...text.small, color: color.textMuted, textAlign: 'center' },

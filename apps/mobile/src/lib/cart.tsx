@@ -6,7 +6,7 @@ import {
   useReducer,
   type ReactNode,
 } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { dropSecure, putSecure, readSecure } from './secure-session';
 import { CART_KEY, reduceCart, type Cart, type CartLine } from './cart-state';
 
 export { reduceCart, type Cart, type CartLine, type CartAction } from './cart-state';
@@ -40,7 +40,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true;
-    void SecureStore.getItemAsync(CART_KEY)
+    void readSecure(CART_KEY)
       .then((stored) => {
         if (!alive || !stored) return;
         dispatch({ type: 'restore', cart: JSON.parse(stored) as Cart });
@@ -60,9 +60,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
    * lose the order.
    */
   useEffect(() => {
-    const write = cart
-      ? SecureStore.setItemAsync(CART_KEY, JSON.stringify(cart))
-      : SecureStore.deleteItemAsync(CART_KEY);
+    const write = cart ? putSecure(CART_KEY, JSON.stringify(cart)) : dropSecure(CART_KEY);
     void write.catch(() => {
       /* Storage failure must not take the session with it. */
     });

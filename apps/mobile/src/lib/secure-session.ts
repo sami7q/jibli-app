@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 /**
@@ -24,6 +25,49 @@ const OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
+/**
+ * The browser has no keystore.
+ *
+ * `expo-secure-store` ships an empty object for web — calling `setItemAsync`
+ * there throws "not a function", which surfaced as an unexplained «حدث خطأ غير
+ * متوقع» the moment anyone tried to sign in from `expo start --web`. The
+ * preview could show every screen and complete nothing.
+ *
+ * `localStorage` is the only thing a browser offers, and it is genuinely worse:
+ * readable by any script on the origin, and not encrypted at rest. That is
+ * acceptable for exactly one thing — a developer reviewing screens on their own
+ * machine — and for nothing else, which is why this is a web-only branch and
+ * the app is never shipped to the web.
+ */
+const isWeb = Platform.OS === 'web';
+
+const webStore = {
+  set(key: string, value: string): void {
+    globalThis.localStorage?.setItem(key, value);
+  },
+  get(key: string): string | null {
+    return globalThis.localStorage?.getItem(key) ?? null;
+  },
+  remove(key: string): void {
+    globalThis.localStorage?.removeItem(key);
+  },
+};
+
+export async function putSecure(key: string, value: string): Promise<void> {
+  if (isWeb) return void webStore.set(key, value);
+  await SecureStore.setItemAsync(key, value, OPTIONS);
+}
+
+export async function readSecure(key: string): Promise<string | null> {
+  if (isWeb) return webStore.get(key);
+  return SecureStore.getItemAsync(key, OPTIONS);
+}
+
+export async function dropSecure(key: string): Promise<void> {
+  if (isWeb) return void webStore.remove(key);
+  await SecureStore.deleteItemAsync(key, OPTIONS);
+}
+
 export interface StoredSession {
   readonly accessToken: string;
   readonly refreshToken: string;
@@ -32,18 +76,18 @@ export interface StoredSession {
 
 export async function saveSession(session: StoredSession): Promise<void> {
   await Promise.all([
-    SecureStore.setItemAsync(ACCESS_TOKEN_KEY, session.accessToken, OPTIONS),
-    SecureStore.setItemAsync(REFRESH_TOKEN_KEY, session.refreshToken, OPTIONS),
-    SecureStore.setItemAsync(USER_ID_KEY, session.userId, OPTIONS),
+    putSecure(ACCESS_TOKEN_KEY, session.accessToken),
+    putSecure(REFRESH_TOKEN_KEY, session.refreshToken),
+    putSecure(USER_ID_KEY, session.userId),
   ]);
 }
 
 export async function loadSession(): Promise<StoredSession | null> {
   try {
     const [accessToken, refreshToken, userId] = await Promise.all([
-      SecureStore.getItemAsync(ACCESS_TOKEN_KEY, OPTIONS),
-      SecureStore.getItemAsync(REFRESH_TOKEN_KEY, OPTIONS),
-      SecureStore.getItemAsync(USER_ID_KEY, OPTIONS),
+      readSecure(ACCESS_TOKEN_KEY),
+      readSecure(REFRESH_TOKEN_KEY),
+      readSecure(USER_ID_KEY),
     ]);
 
     if (!accessToken || !refreshToken || !userId) return null;
@@ -57,9 +101,9 @@ export async function loadSession(): Promise<StoredSession | null> {
 
 export async function clearSession(): Promise<void> {
   await Promise.all([
-    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY, OPTIONS),
-    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, OPTIONS),
-    SecureStore.deleteItemAsync(USER_ID_KEY, OPTIONS),
+    dropSecure(ACCESS_TOKEN_KEY),
+    dropSecure(REFRESH_TOKEN_KEY),
+    dropSecure(USER_ID_KEY),
   ]);
 }
 
@@ -78,7 +122,7 @@ const GUEST_KEY = 'jibli.browsing_as_guest';
  */
 export async function rememberGuestChoice(): Promise<void> {
   try {
-    await SecureStore.setItemAsync(GUEST_KEY, '1', OPTIONS);
+    await putSecure(GUEST_KEY, '1');
   } catch {
     // A choice we could not persist still holds for this launch.
   }
@@ -86,7 +130,7 @@ export async function rememberGuestChoice(): Promise<void> {
 
 export async function loadGuestChoice(): Promise<boolean> {
   try {
-    return (await SecureStore.getItemAsync(GUEST_KEY, OPTIONS)) === '1';
+    return (await readSecure(GUEST_KEY)) === '1';
   } catch {
     return false;
   }
@@ -94,7 +138,7 @@ export async function loadGuestChoice(): Promise<boolean> {
 
 export async function forgetGuestChoice(): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(GUEST_KEY, OPTIONS);
+    await dropSecure(GUEST_KEY);
   } catch {
     // Nothing to do: the next read fails closed to "not a guest".
   }
@@ -113,7 +157,7 @@ const AREA_KEY = 'jibli.delivery_area';
  */
 export async function saveArea(serialized: string): Promise<void> {
   try {
-    await SecureStore.setItemAsync(AREA_KEY, serialized, OPTIONS);
+    await putSecure(AREA_KEY, serialized);
   } catch {
     // The choice still holds for this launch.
   }
@@ -121,7 +165,7 @@ export async function saveArea(serialized: string): Promise<void> {
 
 export async function loadArea(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(AREA_KEY, OPTIONS);
+    return await readSecure(AREA_KEY);
   } catch {
     return null;
   }
@@ -132,7 +176,7 @@ export async function loadArea(): Promise<string | null> {
  */
 export async function updateTokens(accessToken: string, refreshToken: string): Promise<void> {
   await Promise.all([
-    SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken, OPTIONS),
-    SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken, OPTIONS),
+    putSecure(ACCESS_TOKEN_KEY, accessToken),
+    putSecure(REFRESH_TOKEN_KEY, refreshToken),
   ]);
 }

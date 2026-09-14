@@ -84,7 +84,8 @@ menus and the cart all work signed-out. This is what guest mode bought, and it
 is enough to review almost every screen.
 
 **b. Run the API locally.** Then `APP_ENV=local` returns the code in the
-response and the OTP screen shows it with a "tap to fill" button:
+response, the sign-in screen grows a one-tap «دخول سريع» button (§11), and the
+OTP screen shows the code with a "tap to fill" button:
 
 ```bash
 pnpm infra:up                               # Postgres + Redis in Docker
@@ -253,6 +254,13 @@ each solves a problem that only exists in a browser:
 - **RTL is handled.** `I18nManager.forceRTL` is a no-op on web, so `enforceRtl()`
   sets `dir="rtl"` on the document as well. Without it the preview would lay out
   left-to-right and every header would look mirrored from what a device shows.
+- **Sessions fall back to `localStorage`.** `expo-secure-store` ships literally
+  `export default {}` for web, so `setItemAsync` is not a function there and
+  every sign-in died on «حدث خطأ غير متوقع» — the preview could show every
+  screen and complete nothing. `secure-session.ts` branches on
+  `Platform.OS === 'web'`. The fallback is genuinely worse — readable by any
+  script on the origin, not encrypted at rest — which is why it is a web-only
+  branch and the app is never shipped to the web.
 
 It is a review tool, not a target — React Native Web is a different renderer, so
 fonts, safe areas and gestures are all approximations. But it earns its keep:
@@ -293,6 +301,14 @@ $env:REDIS_URL          = "memory://local"
 $env:OTP_PROVIDER       = "mock"
 $env:OTP_MOCK_CODE      = "1234"
 $env:API_HOST           = "0.0.0.0"
+# Reviewing the app means signing in dozens of times an hour, and the
+# production limits (5/hour per number) lock you out of your own preview
+# after five taps. The limits exist to protect the SMS budget; the mock
+# provider sends no SMS. Local only — the defaults are what ship.
+$env:OTP_RESEND_COOLDOWN_SECONDS = "15"
+$env:OTP_MAX_PER_PHONE_HOUR      = "500"
+$env:OTP_MAX_PER_PHONE_DAY       = "2000"
+$env:OTP_MAX_PER_IP_HOUR         = "2000"
 $env:JWT_ACCESS_SECRET  = "<any 32+ characters>"
 $env:JWT_REFRESH_SECRET = "<any other 32+ characters>"
 $env:OTP_HASH_PEPPER    = "<any 32+ characters>"
@@ -309,6 +325,17 @@ replaces the generated code rather than bypassing verification, so expiry,
 attempt counting and rate limits all behave exactly as in production — and it
 is refused in production too.
 
+**The raised OTP limits are the only values here that differ from production,
+and they are worth understanding before copying them anywhere else.** The
+defaults are five sends per number per hour; reviewing the app means signing in
+far more often than that, and the sixth tap locks you out of your own preview
+until the hour rolls over. The limits exist to protect the SMS budget and to
+make number enumeration expensive — neither applies when the provider sends no
+SMS. **Set them only on a local server.** The app also keeps the last code it
+was given and reuses it when a request comes back rate-limited, so the shortcut
+degrades into a no-op instead of an error; the refusal happens before the
+service invalidates the outstanding challenge, so that code is still live.
+
 Then point the app at it:
 
 ```powershell
@@ -322,16 +349,29 @@ ip>:4000` instead — never `localhost`, which on a phone is the phone.
 
 ### The test account
 
-Sign in with **any** Iraqi number and the code **1234**. One was created and
-used to place a real order end to end:
+Sign in with **any** Iraqi number and the code **1234**. One account is set up
+and ready to order from — profile completed, default address saved:
 
 | | |
 |---|---|
-| Phone | `+964 771 234 567` |
+| Phone | `+964 771 234 5678` |
 | Code | `1234` |
 | Name | حساب تجريبي |
-| Address | الكرادة، شارع ٦٢، قرب صيدلية النور |
+| Area | بغداد / بغداد |
+| Address | الكرادة، شارع ٦٢، قرب صيدلية النور (default) |
 | Order placed | `JB9505061` — بطاطا مقلية ×2, 5,000 + 500 service = **5,500** |
+
+**One tap gets you in.** The sign-in screen carries a «دخول سريع — وضع
+التطوير» button that requests the code for that number and submits it in the
+same gesture, landing straight on the home screen. It is drawn only when
+`__DEV__` is true *and* the server actually answers with a code — which it does
+solely for `APP_ENV=local` or the mock provider — so there is no build in which
+a customer can see it and no flag to remember to turn off.
+
+It goes through the real OTP path rather than around it: the challenge is
+stored, hashed, expired, attempt-counted and rate-limited exactly as in
+production. That is the point — a shortcut that skipped verification would
+prove the flow works while never running it.
 
 **Deleting it** is itself a test worth running: «حسابي» → «حذف حسابي». It will
 refuse while the order is in flight — cancel the order first from «طلباتي» —

@@ -25,6 +25,19 @@ vi.mock('expo-secure-store', () => ({
   deleteItemAsync: async (key: string) => void store.delete(key),
 }));
 
+/*
+ * React Native's published source is Flow, not TypeScript, and Vite's parser
+ * stops on `import typeof` the moment anything in the graph reaches for it —
+ * the whole suite fails to collect, with an error that names no file.
+ *
+ * `secure-session` imports `Platform` to tell a browser from a device. Under
+ * the test runner it is neither, and `'ios'` is the branch worth exercising:
+ * the keystore path, which is what actually ships.
+ */
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios', select: (spec: Record<string, unknown>) => spec.ios ?? spec.default },
+}));
+
 vi.mock('expo-constants', () => ({
   default: { expoConfig: { version: '1.2.3', extra: { apiUrl: 'https://api.test' } } },
 }));

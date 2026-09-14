@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  type TextStyle,
   TextInput,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { formatIraqiPhoneDisplay, normalizeDigits } from '@jibli/validation';
+import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { saveSession } from '@/lib/secure-session';
 import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
@@ -25,6 +28,15 @@ const OTP_LENGTH = 4;
 export default function OtpScreen() {
   const router = useRouter();
   const { phone, devCode } = useLocalSearchParams<{ phone: string; devCode?: string }>();
+
+  /*
+   * Which box takes the next digit.
+   *
+   * Four identical empty boxes say nothing about where typing lands, and on a
+   * phone there is no caret to give it away — the web preview only looked
+   * right because the browser drew its own focus ring, which no device does.
+   */
+  const [focused, setFocused] = useState<number | null>(0);
 
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState<string | null>(null);
@@ -134,10 +146,17 @@ export default function OtpScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>تحقق من رقمك</Text>
-      <Text style={styles.subtitle}>
-        أدخل رمز التحقق المرسل إلى{'\n'}
-        <Text style={styles.phone}>{phone ? formatIraqiPhoneDisplay(phone) : ''}</Text>
-      </Text>
+      <Text style={styles.subtitle}>أدخل رمز التحقق المرسل إلى</Text>
+      {/*
+        * The number on its own line, isolated.
+        *
+        * `+964 771 234 5678` inside an Arabic sentence came out as
+        * `5678 234 771 964+`: the bidi algorithm orders the Latin runs by the
+        * paragraph's direction, and a nested Text inherits it. A separate
+        * element with its own LTR direction stops the segments being reordered
+        * — the same reason `Ltr` exists for order numbers.
+        */}
+      <Ltr variant="bodyBold">{phone ? formatIraqiPhoneDisplay(phone) : ''}</Ltr>
 
       <View style={styles.codeRow}>
         {digits.map((digit, index) => (
@@ -146,9 +165,15 @@ export default function OtpScreen() {
             ref={(element) => {
               inputs.current[index] = element;
             }}
-            style={[styles.codeBox, digit ? styles.codeBoxFilled : null]}
+            style={[
+              styles.codeBox,
+              digit ? styles.codeBoxFilled : null,
+              focused === index ? styles.codeBoxFocused : null,
+            ]}
             value={digit}
             onChangeText={(value) => handleDigit(index, value)}
+            onFocus={() => setFocused(index)}
+            onBlur={() => setFocused((current) => (current === index ? null : current))}
             onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
             keyboardType="number-pad"
             maxLength={1}
@@ -163,17 +188,28 @@ export default function OtpScreen() {
         ))}
       </View>
 
+      {/*
+        * One tap, signed in.
+        *
+        * Only appears when the *server* sent the code, which it does solely
+        * for the mock provider or a local run — so this cannot appear to a
+        * customer. It fills the boxes and submits in the same gesture, because
+        * "fill it and then press confirm" is two taps to prove nothing.
+        */}
       {devHint ? (
         <Pressable
           onPress={() => {
-            setDigits(devHint.slice(0, OTP_LENGTH).split(''));
-            void submit(devHint.slice(0, OTP_LENGTH));
+            const filled = devHint.slice(0, OTP_LENGTH);
+            setDigits(filled.split(''));
+            void submit(filled);
           }}
+          disabled={isSubmitting}
           accessibilityRole="button"
-          accessibilityLabel={`استخدام رمز التطوير ${devHint}`}
-          style={styles.devHint}
+          accessibilityLabel={`تسجيل الدخول برمز التطوير ${devHint}`}
+          style={({ pressed }) => [styles.devHint, pressed ? { opacity: 0.8 } : null]}
         >
-          <Text style={styles.devHintText}>وضع التطوير — الرمز: {devHint} (اضغط للتعبئة)</Text>
+          <Text style={styles.devHintTitle}>دخول سريع — وضع التطوير</Text>
+          <Text style={styles.devHintText}>اضغط هنا لتسجيل الدخول بالرمز {devHint}</Text>
         </Pressable>
       ) : null}
 
@@ -211,6 +247,16 @@ export default function OtpScreen() {
   );
 }
 
+/*
+ * The browser draws a black rectangle over the rounded box on focus, which is
+ * what made the code entry look unfinished in the web preview. `outlineStyle`
+ * is react-native-web's own property and is absent from React Native's style
+ * types, so it is applied only where it exists.
+ */
+const SUPPRESS_WEB_OUTLINE = (
+  Platform.OS === 'web' ? { outlineStyle: 'none' } : {}
+) as TextStyle;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -224,28 +270,49 @@ const styles = StyleSheet.create({
   subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
   phone: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
 
-  codeRow: { flexDirection: 'row', gap: space[3], marginVertical: space[4] },
+  /*
+   * The boxes run left to right, against the page.
+   *
+   * A verification code is a number, and a number is read left to right in
+   * every script — typing 1 and watching it land in the rightmost box, then 2
+   * to its left, is the confusion this removes. `row-reverse` under a
+   * forced-RTL layout is what produces left-to-right.
+   */
+  codeRow: {
+    flexDirection: 'row-reverse',
+    gap: space[3],
+    marginVertical: space[5],
+    alignSelf: 'center',
+  },
   codeBox: {
-    width: 56,
-    height: 64,
-    borderWidth: 1.5,
+    width: 62,
+    height: 72,
+    borderWidth: 2,
     borderColor: color.borderSubtle,
-    borderRadius: radius.md,
-    backgroundColor: palette.ink[50],
-    ...text.h1,
+    borderRadius: radius.lg,
+    backgroundColor: color.surfaceCard,
+    ...text.display,
     color: color.textPrimary,
+    textAlign: 'center',
+    ...SUPPRESS_WEB_OUTLINE,
   },
   codeBoxFilled: { borderColor: color.brand, backgroundColor: color.brandSoft },
+  codeBoxFocused: { borderColor: color.brandStrong, backgroundColor: color.surfaceCard },
 
   devHint: {
     backgroundColor: color.warningSoft,
-    borderRadius: radius.sm,
-    paddingVertical: space[2],
-    paddingHorizontal: space[3],
-    minHeight: TAP_TARGET,
+    borderWidth: 1,
+    borderColor: palette.warning[500],
+    borderRadius: radius.lg,
+    paddingVertical: space[3],
+    paddingHorizontal: space[4],
+    minHeight: TAP_TARGET + 8,
     justifyContent: 'center',
+    alignSelf: 'stretch',
+    gap: 2,
   },
-  devHintText: { ...text.small, color: color.warningStrong, textAlign: 'center' },
+  devHintTitle: { ...text.bodyBold, color: palette.warning[700], textAlign: 'center' },
+  devHintText: { ...text.small, color: palette.warning[700], textAlign: 'center' },
 
   error: {
     ...text.small,
