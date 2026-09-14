@@ -8,13 +8,13 @@ the gaps by hitting them.
 
 ## The five pilot-blocking gaps — now addressed
 
-| # | Gap | Resolution |
-| --- | --- | --- |
-| 1 | No realtime gateway | WebSocket gateway at `/api/v1/realtime` relaying the outbox via Redis pub/sub. Channels are granted from session membership, never requested by the client. Polling remains as a 60s safety net and tightens to 8s when the socket is down. |
-| 2 | No MFA enrolment | Two-phase TOTP enrolment, recovery codes, replay protection, lockout. Verified against the RFC 6238 test vectors. Roles that mandate MFA cannot opt out. |
-| 3 | Inventory not reserved at placement | `reserveInventoryForOrder` runs inside the PlaceOrder transaction with `FOR UPDATE` row locks taken in deterministic ID order. Release and consumption share one implementation. |
-| 4 | No E2E tests | 13 end-to-end tests asserting the production-blocking invariants against real database constraints. |
-| 5 | Sound unverified on real devices | `/alert-test` harness driving the real alert manager, with an 8-point checklist and a copyable QA report. |
+| #   | Gap                                 | Resolution                                                                                                                                                                                                                                  |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | No realtime gateway                 | WebSocket gateway at `/api/v1/realtime` relaying the outbox via Redis pub/sub. Channels are granted from session membership, never requested by the client. Polling remains as a 60s safety net and tightens to 8s when the socket is down. |
+| 2   | No MFA enrolment                    | Two-phase TOTP enrolment, recovery codes, replay protection, lockout. Verified against the RFC 6238 test vectors. Roles that mandate MFA cannot opt out.                                                                                    |
+| 3   | Inventory not reserved at placement | `reserveInventoryForOrder` runs inside the PlaceOrder transaction with `FOR UPDATE` row locks taken in deterministic ID order. Release and consumption share one implementation.                                                            |
+| 4   | No E2E tests                        | 13 end-to-end tests asserting the production-blocking invariants against real database constraints.                                                                                                                                         |
+| 5   | Sound unverified on real devices    | `/alert-test` harness driving the real alert manager, with an 8-point checklist and a copyable QA report.                                                                                                                                   |
 
 ### What "addressed" does and does not mean
 
@@ -121,7 +121,7 @@ satisfied from code alone.
 - Reservation at placement under row locks, release on rejection or
   cancellation, consumption at delivery — one shared implementation for all
   three, so they cannot drift apart.
-- Low-stock evaluated on *available* stock and emitted through the outbox.
+- Low-stock evaluated on _available_ stock and emitted through the outbox.
 
 ### Finance (Phase 8)
 
@@ -149,19 +149,21 @@ These were never among the five, but they block a usable product:
 2. **Push provider.** Still the console stub. Notifications are recorded in
    `notification_deliveries` and dispatched, but nothing reaches a real device.
    The app registers its token with `POST /api/v1/devices` and is waiting.
-2b. **SMS provider — code complete, account pending.** The HTTP gateway
-   provider handles the shapes real Iraqi aggregators actually use: number
-   format (`+964…` / `964…` / `07…`), POST JSON, POST form or GET, vendor
-   constants for Arabic, a success field for gateways that answer 200 with an
-   error inside, and configurable field names throughout. A refusal carries the
+   2b. **OTP delivery — working, against a live account.** The HTTP gateway
+   provider handles the shapes real Iraqi aggregators use: number format
+   (`+964…` / `964…` / `07…`), POST JSON, POST form or GET, vendor constants
+   for Arabic, a success field for gateways that answer 200 with an error
+   inside, and configurable field names throughout. A refusal carries the
    gateway's own reason into the log rather than a bare status code.
-   `pnpm sms:test +9647XXXXXXXXX` sends one real message through the same class
-   and diagnoses what came back, without a database or a running API.
-   What is left is **the vendor account**: staging still runs
-   `OTP_PROVIDER=console`, so nobody can sign into the deployed app except the
-   `OTP_TEST_PHONES` demo number. See
-   [`sms-otp.md`](./sms-otp.md) — OTPIQ is self-service and can be connected in
-   an afternoon.
+   `SMS_GATEWAY_BODY_MODE=code` sends the code alone instead of the rendered
+   message, which is the only shape WhatsApp accepts.
+   **Verified end to end against OTPIQ**: a real message to an Iraqi number came
+   back `delivered` over `whatsapp` at 25 IQD, with no Meta business account and
+   no WABA connected — so the cheap channel needs no verification and no
+   contract. `pnpm sms:test <number> --via whatsapp` repeats it in one command.
+   What is left is **the switch**: staging still runs `OTP_PROVIDER=console`
+   because the key is not in the Render dashboard yet. See
+   [`sms-otp.md`](./sms-otp.md).
 3. **File uploads.** Schema, visibility model and security requirements defined;
    no signed-URL issuer implemented.
 4. **Restaurant self-onboarding wizard UI** — the API command exists.
@@ -178,17 +180,17 @@ These were never among the five, but they block a usable product:
 
 **241 unit tests passing** across 9 suites, plus **13 E2E tests** that run in CI:
 
-| Suite | Tests | Covers |
-| --- | --- | --- |
-| `money/money` | 23 | Integer IQD, basis points, rounding, allocation |
-| `money/order-total` | 19 | Commission, discount funding, delivery-fee ownership |
-| `validation` | 40 | Arabic normalisation, Iraqi phone forms, CSV injection |
-| `geography` | 28 | Parent override, capability assertions, dataset integrity |
-| `domain/settlement-period` | 26 | Baghdad boundaries, month lengths, year rollover |
-| `domain/working-hours` | 27 | Overnight shifts, split shifts, exceptions, busy mode |
-| `domain/quote` | 24 | Pricing, tenant isolation, modifier rules, tampering |
-| `domain/stock` | 31 | Fixed-precision arithmetic, races, recipes |
-| `auth/mfa` | 23 | TOTP against RFC 6238 vectors, replay, recovery codes |
+| Suite                      | Tests | Covers                                                    |
+| -------------------------- | ----- | --------------------------------------------------------- |
+| `money/money`              | 23    | Integer IQD, basis points, rounding, allocation           |
+| `money/order-total`        | 19    | Commission, discount funding, delivery-fee ownership      |
+| `validation`               | 40    | Arabic normalisation, Iraqi phone forms, CSV injection    |
+| `geography`                | 28    | Parent override, capability assertions, dataset integrity |
+| `domain/settlement-period` | 26    | Baghdad boundaries, month lengths, year rollover          |
+| `domain/working-hours`     | 27    | Overnight shifts, split shifts, exceptions, busy mode     |
+| `domain/quote`             | 24    | Pricing, tenant isolation, modifier rules, tampering      |
+| `domain/stock`             | 31    | Fixed-precision arithmetic, races, recipes                |
+| `auth/mfa`                 | 23    | TOTP against RFC 6238 vectors, replay, recovery codes     |
 
 E2E (`pnpm test:e2e`, needs `TEST_DATABASE_URL`) asserts:
 

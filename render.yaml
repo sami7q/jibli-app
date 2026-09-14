@@ -97,11 +97,15 @@ services:
       # below. Both are built and tested; what is pending is the vendor
       # account, not the code.
       #
-      # ── SMS, via OTPIQ (the shorter road) ──
+      # ── OTPIQ (verified working — this is the one to switch on) ──
       #
-      # Self-service signup, prices in IQD, prepaid, no contract — against
-      # weeks of business verification for the alternatives. Set these in the
-      # Render dashboard and change this value to `sms_gateway`:
+      # A real message to an Iraqi number came back `delivered` over WhatsApp
+      # at 25 IQD, with no Meta business account and no WABA connected. The
+      # cheap channel needs no verification and no contract; the alternatives
+      # want weeks of business verification before the first message.
+      #
+      # Set these in the Render dashboard and change this value to
+      # `sms_gateway`:
       #
       #   OTP_PROVIDER=sms_gateway
       #   SMS_GATEWAY_URL=https://api.otpiq.com/api/sms

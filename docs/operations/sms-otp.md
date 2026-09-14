@@ -31,10 +31,12 @@ thousands of messages a month. Not before.
 1. Sign up at [otpiq.com](https://otpiq.com) and create a project.
 2. Copy the project API key — it begins `sk_live_`.
 3. Add credit.
-4. **Leave the sender id alone for now.** Register `Jibli` in the dashboard and
-   wait for approval, but do not set `SMS_GATEWAY_SENDER_ID` until it is
-   approved — an unapproved sender id is rejected outright, and OTPIQ's own
-   approved sender works in the meantime.
+4. **Leave the sender id alone.** `SMS_GATEWAY_SENDER_ID` unset means OTPIQ's
+   own approved sender is used, which is what delivered the verification above
+   with nothing registered on the account. Register `Jibli` in the dashboard if
+   you want your name on the SMS leg, and set the variable only once
+   `GET /api/sender-ids` reports it `accepted` — an unapproved sender id is
+   rejected outright, and that is a sign-in nobody can complete.
 
 Then set, locally in `.env` or in the Render dashboard:
 
@@ -112,28 +114,60 @@ SMS_GATEWAY_EXTRA_FIELDS={"smsType":"custom","provider":"sms"}
 the customer receives a code this API never stored, and no sign-in can ever
 succeed — while every request returns `200 OK`.
 
-## Does WhatsApp need a Meta account?
+## Does WhatsApp need a Meta account? No — measured
 
-OTPIQ's send endpoint treats `whatsappAccountId`, `whatsappPhoneId` and
-`templateName` as **optional**, describing them as "for using custom WhatsApp
-sender" — which implies a default sender of OTPIQ's own for everyone else.
-Their _campaigns_ endpoint is different: it requires `phoneNumberId`, so bulk
-marketing does need your own WhatsApp Business Account.
+**No Meta business account, no WhatsApp Business Account, and no verification.**
+Established by sending one, not by reading the documentation:
 
-Documentation is not proof, and the answer decides whether weeks of Meta
-business verification are on the path. One send settles it:
+```json
+{
+  "status": "delivered",
+  "lastChannel": "whatsapp",
+  "channelFlow": [{ "channel": "whatsapp", "tried": true, "success": true }],
+  "cost": 25,
+  "isFinalStatus": true
+}
+```
+
+What makes that conclusive is the state of the account at the time: no WABA
+connected and `GET /api/sender-ids` returning `{"success":true,"data":[]}` —
+nothing registered at all. OTPIQ carried it on its own approved sender.
+
+The cost is the second half of the proof. 25 IQD is the authentication-template
+rate; an SMS on the same number would have been 80–250. The channel is not
+inferred from the price, but the price agrees with it.
+
+Their _campaigns_ endpoint is genuinely different — it requires `phoneNumberId`,
+so bulk marketing does need your own WABA. Verification does not.
+
+Re-test if OTPIQ changes their terms, with:
 
 ```sh
 pnpm sms:test +9647XXXXXXXXX --via whatsapp
 ```
 
-- **It arrives** — no Meta account is needed. Use mode A with `provider=auto`.
-- **It is refused** and the reason names a sender, a WABA or a template — their
-  shared sender is not available for this. Either connect a WhatsApp Business
-  Account through the dashboard, or stay on `provider=sms`.
+## Confirming a send actually landed
 
-Either way `provider=auto` is safe to deploy: if WhatsApp is unavailable to the
-account it falls through to SMS on its own.
+Accepted is not delivered, and the gateway will say so if asked. Every send
+returns a message id; `GET /api/sms/track/{smsId}` turns it into a final
+status and — the useful part — the channel that carried it:
+
+```sh
+curl -H "Authorization: Bearer $SMS_GATEWAY_API_KEY" \
+  https://api.otpiq.com/api/sms/track/sms-…
+```
+
+`status` runs `pending` → `sent` → `delivered` → `read`, or `failed`.
+`channelFlow` shows each channel tried and whether it worked, which is how a
+`provider=auto` send reveals whether it reached WhatsApp or fell through to
+SMS. `isFinalStatus` says whether it can still change.
+
+Two other endpoints are worth knowing, both free:
+
+|                       |                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `GET /api/info`       | project name and remaining credit — the cheapest way to prove a key works             |
+| `GET /api/sender-ids` | registered senders and their per-carrier prices; `accepted` is the only usable status |
 
 ## Proving it before trusting it
 
