@@ -96,6 +96,12 @@ function DriversScreen({
     onSuccess: invalidate,
   });
 
+  const setAvailability = useMutation({
+    mutationFn: ({ id, availability }: { id: string; availability: 'AVAILABLE' | 'OFFLINE' }) =>
+      portal.updateDriver(auth, id, { availability }),
+    onSuccess: invalidate,
+  });
+
   const activationError =
     activate.error instanceof ApiError
       ? ((activate.error.details as { messageHint?: string } | undefined)?.messageHint ??
@@ -227,16 +233,55 @@ function DriversScreen({
                         ) : (
                           <span className="badge badge--warning">بانتظار التفعيل</span>
                         )
+                      ) : driver.availability === 'AVAILABLE' ||
+                        driver.availability === 'OFFLINE' ? (
+                        /*
+                         * On shift or not, as a switch.
+                         *
+                         * Activating a driver was not enough on its own:
+                         * `assignable` also requires availability, which only
+                         * the driver could set from Driver Mode — so a driver
+                         * standing in the kitchen without the app was activated
+                         * and still could not be given an order. The manager
+                         * can see who is there.
+                         *
+                         * BUSY and ON_DELIVERY stay read-only badges below:
+                         * they are derived from live assignments, and letting
+                         * them be typed over would make the board lie about why
+                         * somebody cannot take an order.
+                         */
+                        canManage ? (
+                          <button
+                            type="button"
+                            className={`badge badge--${
+                              driver.availability === 'AVAILABLE' ? 'ready' : 'done'
+                            }`}
+                            style={{ border: 'none', cursor: 'pointer' }}
+                            disabled={setAvailability.isPending}
+                            aria-label={`${driver.full_name ?? 'المندوب'}: ${
+                              AVAILABILITY_LABELS[driver.availability]
+                            }. اضغط للتغيير`}
+                            onClick={() =>
+                              setAvailability.mutate({
+                                id: driver.id,
+                                availability:
+                                  driver.availability === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE',
+                              })
+                            }
+                          >
+                            {AVAILABILITY_LABELS[driver.availability]}
+                          </button>
+                        ) : (
+                          <span
+                            className={`badge badge--${
+                              driver.availability === 'AVAILABLE' ? 'ready' : 'done'
+                            }`}
+                          >
+                            {AVAILABILITY_LABELS[driver.availability]}
+                          </span>
+                        )
                       ) : (
-                        <span
-                          className={`badge badge--${
-                            driver.availability === 'ONLINE'
-                              ? 'ready'
-                              : driver.availability === 'BUSY'
-                                ? 'progress'
-                                : 'done'
-                          }`}
-                        >
+                        <span className="badge badge--progress">
                           {AVAILABILITY_LABELS[driver.availability] ?? driver.availability}
                         </span>
                       )}

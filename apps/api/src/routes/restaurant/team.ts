@@ -306,6 +306,21 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
           can_collect_cash: z.boolean().optional(),
           is_active: z.boolean().optional(),
           internal_note: z.string().max(200).optional(),
+          /**
+           * On shift or not.
+           *
+           * Availability is the driver's own statement in Driver Mode, and for
+           * a driver who uses the app it stays that way. But `assignable`
+           * requires it, and a restaurant whose driver is standing in the
+           * kitchen without the app installed could activate him and still not
+           * hand him anything — the same dead end one layer down. The manager
+           * can see who is there, so the manager may say so.
+           *
+           * Only the two states a person can assert about themselves. BUSY and
+           * ON_DELIVERY are derived from live assignments: setting them by hand
+           * would let the board lie about why somebody cannot take an order.
+           */
+          availability: z.enum(['AVAILABLE', 'OFFLINE']).optional(),
         })
         .parse(request.body);
 
@@ -331,6 +346,19 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
               },
             });
           }
+        }
+
+        /*
+         * Availability lives on the driver identity, not on the membership, so
+         * a driver shared between two restaurants is marked on shift for both.
+         * That is what the column means — "this person is working now" is not a
+         * per-restaurant fact — and release 1 has no shared drivers to trouble.
+         */
+        if (body.availability !== undefined) {
+          await tx
+            .update(drivers)
+            .set({ availability: body.availability, updatedAt: new Date() })
+            .where(eq(drivers.id, driverId));
         }
 
         const updated = await tx
