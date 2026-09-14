@@ -246,13 +246,26 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         throw new AppError(ERROR_CODES.ACCOUNT_SUSPENDED, { details: { status: user.status } });
       }
 
-      // A portal login must land somewhere. Someone with neither a platform
-      // role nor a restaurant membership has no portal to enter.
+      /*
+       * A portal login must land somewhere.
+       *
+       * Three surfaces, now that drivers have one. A driver signs in with a
+       * username and a password the restaurant issued rather than with an OTP,
+       * because the phone a delivery runs on is often a shared handset and the
+       * SMS goes to whoever is carrying it — and because a restaurant that can
+       * hire a driver should be able to hand them their login without waiting
+       * on a code from anywhere.
+       *
+       * `capabilities.driverId` is only set for a driver whose account is
+       * ACTIVE, so a pending or suspended one is refused here by the same rule
+       * that refuses a customer.
+       */
       const capabilities = await loadCapabilities(ctx, user.id);
       const isPlatform = capabilities.platformRoles.length > 0;
       const restaurantIds = Object.keys(capabilities.restaurantRoles);
+      const isDriver = capabilities.driverId !== null;
 
-      if (!isPlatform && restaurantIds.length === 0) {
+      if (!isPlatform && restaurantIds.length === 0 && !isDriver) {
         throw await reject('NO_PORTAL_ACCESS', user.id);
       }
 
@@ -353,9 +366,12 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
              */
             mfa_enrolment_required:
               isPlatform && !mfaEnabled && (await getConfig(ctx, 'require_mfa', false)),
-            /* Where the browser should go. A user with both kinds of access is
-             * sent to Admin, which is the more privileged surface. */
-            portal: isPlatform ? 'ADMIN' : 'RESTAURANT',
+            /*
+             * Where the browser should go, most privileged first. Somebody who
+             * is both a restaurant manager and one of its drivers lands in the
+             * portal that can do more; the driver screen is a link away.
+             */
+            portal: isPlatform ? 'ADMIN' : restaurantIds.length > 0 ? 'RESTAURANT' : 'DRIVER',
           },
           { request_id: request.requestId },
         ),

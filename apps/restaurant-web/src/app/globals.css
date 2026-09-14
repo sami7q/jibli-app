@@ -475,9 +475,24 @@
   background: #fee4e2;
 }
 
+/*
+  Solid, not a tint.
+
+  It was success-50 on success-700 — the quietest thing the button system can
+  draw — and its only real user is «تم التجهيز» on the order board, which is
+  the primary action of that card and the step that says the food is cooked.
+  A tint reads as a secondary option beside the filled buttons for accepting
+  and refusing an order, which is the wrong rank for the action a kitchen
+  presses most.
+*/
 .btn--success {
-  background: var(--jibli-success-50);
-  color: var(--jibli-success-700);
+  background: var(--jibli-success-500);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn--success:hover:not(:disabled) {
+  background: var(--jibli-success-700);
 }
 
 .btn--block {
@@ -1699,4 +1714,92 @@
 .review__body--empty {
   color: var(--text-muted);
   font-size: var(--text-sm);
+}
+
+/* ── Driver screen ──────────────────────────────────────────────────────────
+ *
+ * A phone layout inside a portal built for laptops. It shares the tokens, the
+ * buttons and the badges — a courier looking at a Jibli screen should see the
+ * same Jibli — but nothing else: no sidebar, no topbar, no cards in a grid.
+ * One column, capped at a comfortable reading width so it is not absurd on the
+ * desktop somebody will inevitably open it on.
+ */
+.driver {
+  min-height: 100vh;
+  background: var(--surface-page);
+  display: flex;
+  flex-direction: column;
+}
+
+.driver__bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.driver__body {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.driver__task {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-sm);
+}
+
+.driver__task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.driver__task-title {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+.driver__task-meta {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.driver__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.driver__call {
+  font-size: var(--text-sm);
+  color: var(--jibli-orange-600);
+  text-decoration: none;
+}
+
+.driver__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border-subtle);
 }

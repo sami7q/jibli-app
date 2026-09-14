@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -10,8 +10,19 @@ import {
   VEHICLE_TYPES,
   success,
 } from '@jibli/contracts';
-import { assertRestaurantPermission } from '@jibli/auth';
-import { displayNameSchema, iraqiPhoneSchema, reasonSchema, uuidSchema } from '@jibli/validation';
+import {
+  assertRestaurantPermission,
+  generatePortalPassword,
+  hashPassword,
+  PASSWORD_MIN_LENGTH,
+} from '@jibli/auth';
+import {
+  displayNameSchema,
+  iraqiPhoneSchema,
+  reasonSchema,
+  usernameSchema,
+  uuidSchema,
+} from '@jibli/validation';
 import { AUDIT_ACTIONS, computeCustody, enqueueOutboxEvent, writeAudit } from '@jibli/domain';
 import {
   deliveryAssignments,
@@ -503,6 +514,121 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
       });
 
       return reply.send(success({ status }, { request_id: request.requestId }));
+    },
+  );
+
+  /**
+   * Issue a driver their sign-in.
+   *
+   * A driver added here has a phone number and nothing else, and the only door
+   * into the app was an OTP to that number. On a delivery phone that is often
+   * the wrong door: the handset is shared, the code goes to whoever is holding
+   * it, and a restaurant that has just hired somebody has to wait on an SMS to
+   * put them to work. A username and a password the restaurant hands over in
+   * person is the thing it was always going to do anyway.
+   *
+   * The password is generated, returned exactly once, and stored only as a
+   * hash — the same contract `bootstrap-admin` has. `must_change_password` is
+   * deliberately NOT set: this is read off a screen and repeated aloud to
+   * somebody standing there, and forcing a change on a courier's first shift,
+   * on a phone, in the street, is how the account ends up written on the wall.
+   * Rotating it is one call away, and the restaurant owns that decision.
+   */
+  app.post(
+    '/api/v1/restaurant-portal/drivers/:driverId/credentials',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { principal, restaurantId } = restaurantScope(request);
+      assertRestaurantPermission(principal, restaurantId, 'driver.manage');
+      const { driverId } = z.object({ driverId: uuidSchema }).parse(request.params);
+      const body = z.object({ username: usernameSchema }).parse(request.body);
+
+      const password = generatePortalPassword({
+        minLength: PASSWORD_MIN_LENGTH,
+        username: body.username,
+      });
+      const passwordHash = await hashPassword(password);
+
+      await ctx.db.transaction(async (tx) => {
+        const [link] = await tx
+          .select({ id: restaurantDrivers.id })
+          .from(restaurantDrivers)
+          .where(
+            and(
+              eq(restaurantDrivers.restaurantId, restaurantId),
+              eq(restaurantDrivers.driverId, driverId),
+            ),
+          )
+          .limit(1);
+
+        if (!link) {
+          throw new AppError(ERROR_CODES.DRIVER_NOT_IN_RESTAURANT, { details: { driverId } });
+        }
+
+        const [driver] = await tx
+          .select({ userId: drivers.userId })
+          .from(drivers)
+          .where(eq(drivers.id, driverId))
+          .limit(1);
+
+        if (!driver) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'driver' } });
+
+        /*
+         * A username is unique across every account in the system, so the
+         * collision has to be reported as one rather than left to a constraint
+         * error that reads as a server fault.
+         */
+        const [taken] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(and(sql`lower(${users.username}) = ${body.username}`, isNull(users.deletedAt)))
+          .limit(1);
+
+        if (taken && taken.id !== driver.userId) {
+          throw new AppError(ERROR_CODES.CONFLICT, {
+            details: {
+              reason: 'USERNAME_TAKEN',
+              messageHint: 'اسم المستخدم محجوز، اختر اسماً آخر',
+            },
+          });
+        }
+
+        await tx
+          .update(users)
+          .set({
+            username: body.username,
+            passwordHash,
+            passwordChangedAt: new Date(),
+            mustChangePassword: false,
+            failedLoginCount: 0,
+            lockedUntil: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, driver.userId));
+
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: AUDIT_ACTIONS.DRIVER_CREDENTIALS,
+          entityType: 'driver',
+          entityId: driverId,
+          // Never the password, and never its hash.
+          after: { username: body.username, restaurantId },
+          ip: clientIp(request),
+          userAgent: userAgent(request),
+          requestId: request.requestId,
+        });
+      });
+
+      return reply.send(
+        success(
+          {
+            username: body.username,
+            password,
+            note_ar: 'تظهر كلمة المرور مرة واحدة فقط — سلّمها للمندوب الآن.',
+          },
+          { request_id: request.requestId },
+        ),
+      );
     },
   );
 

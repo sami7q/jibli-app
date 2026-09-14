@@ -641,6 +641,18 @@ export const portal = {
       method: 'POST',
     }),
 
+  /**
+   * Issue a driver their username and password.
+   *
+   * The password comes back exactly once and is stored only as a hash, so the
+   * screen that calls this has to show it before it navigates anywhere.
+   */
+  issueDriverCredentials: (auth: Auth, id: string, username: string) =>
+    apiRequest<{ username: string; password: string; note_ar: string }>(
+      `/api/v1/restaurant-portal/drivers/${id}/credentials`,
+      { ...scoped(auth), method: 'POST', body: { username } },
+    ),
+
   updateDriver: (auth: Auth, id: string, body: unknown) =>
     apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/drivers/${id}`, {
       ...scoped(auth),

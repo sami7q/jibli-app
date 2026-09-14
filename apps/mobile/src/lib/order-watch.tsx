@@ -104,25 +104,35 @@ export function useOrderWatch(): OrderWatch {
 /**
  * What to say when a status changes.
  *
- * The plain «تم تحديث طلبك إلى كذا» is right for the middle of the journey and
- * wrong at both ends: nobody needs to be told their delivered order was
- * "updated to delivered".
+ * A sentence per status, because the fallback was a template — «تم تحديث طلبك
+ * إلى «قيد التحضير»» — and a template reads like a machine printing an enum
+ * with quotation marks around it. It was also wrong at the ends of the
+ * journey: «تم تحديث طلبك إلى «تم إرسال الطلب»» says the same thing twice, and
+ * nobody needs to be told their delivered order was updated to delivered.
+ *
+ * Short, present tense, and about the food rather than about the record. This
+ * is the line a customer reads on a lock screen with one eye.
  */
 export function announcementFor(status: OrderStatus): string {
   switch (status) {
+    case 'PLACED':
+    case 'PENDING_RESTAURANT':
+      return 'وصل طلبك إلى المطعم';
     case 'ACCEPTED':
-      return 'قبل المطعم طلبك وسيبدأ التحضير';
+      return 'قبل المطعم طلبك';
+    case 'PREPARING':
+      return 'طلبك قيد التحضير';
+    case 'READY':
+      return 'طلبك جاهز وبانتظار المندوب';
     case 'OUT_FOR_DELIVERY':
-      return 'طلبك في الطريق إليك الآن';
+      return 'طلبك في الطريق إليك';
     case 'DELIVERED':
     case 'COMPLETED':
       return 'تم تسليم طلبك — بالعافية';
     case 'REJECTED':
-      return 'للأسف تعذّر على المطعم قبول طلبك';
+      return 'تعذّر على المطعم قبول طلبك';
     case 'CANCELLED':
       return 'تم إلغاء طلبك';
-    default:
-      return `تم تحديث طلبك إلى «${ORDER_STATUS_LABELS[status]}»`;
   }
 }
 

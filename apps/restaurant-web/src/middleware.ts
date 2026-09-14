@@ -16,7 +16,13 @@ export default createPortalMiddleware({
    * Left out of this list it would be guarded like the rest of the portal and
    * redirect the exact visitor it exists for to a sign-in form they cannot use.
    */
-  publicPaths: ['/login', '/change-password', '/apply'],
+  /*
+   * `/driver/login` is the couriers' door. It sits under the same deployment
+   * because a driver portal is three screens and its own Vercel project would
+   * be three screens with a build pipeline attached — but it is a different
+   * audience with a different session, so it needs its own public path.
+   */
+  publicPaths: ['/login', '/change-password', '/apply', '/driver/login'],
 });
 
 /*

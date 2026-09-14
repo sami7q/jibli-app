@@ -89,21 +89,43 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[10] }}
           showsVerticalScrollIndicator={false}
         >
+          {/*
+            * One card per day with hairlines between the rows, not one
+            * bordered box per notification.
+            *
+            * Nine cards stacked with nine borders and nine shadows is a wall
+            * of boxes — the eye has to parse the furniture before it reaches a
+            * sentence. Every notification list on a phone is grouped rows
+            * under a date, and the reason is that it disappears and leaves
+            * only the words.
+            */}
           {grouped.map((group) => (
             <View key={group.label} style={{ gap: space[2] }}>
-              <Text variant="caption" tone="muted">
+              <Text variant="caption" tone="muted" style={{ paddingHorizontal: space[1] }}>
                 {group.label}
               </Text>
-              {group.entries.map((entry) => (
-                <NotificationRow
-                  key={entry.id}
-                  entry={entry}
-                  // Anything newer than the last visit is marked, so the eye
-                  // finds what arrived while the app was closed.
-                  unseen={unseen.has(entry.id)}
-                  onPress={() => router.push(`/order/${entry.order_id}`)}
-                />
-              ))}
+
+              <View
+                style={{
+                  backgroundColor: color.surfaceCard,
+                  borderRadius: radius.lg,
+                  borderWidth: 1,
+                  borderColor: color.borderSubtle,
+                  overflow: 'hidden',
+                }}
+              >
+                {group.entries.map((entry, index) => (
+                  <NotificationRow
+                    key={entry.id}
+                    entry={entry}
+                    // Anything newer than the last visit is marked, so the eye
+                    // finds what arrived while the app was closed.
+                    unseen={unseen.has(entry.id)}
+                    first={index === 0}
+                    onPress={() => router.push(`/order/${entry.order_id}`)}
+                  />
+                ))}
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -115,10 +137,12 @@ export default function NotificationsScreen() {
 function NotificationRow({
   entry,
   unseen,
+  first,
   onPress,
 }: {
   entry: OrderNotification;
   unseen: boolean;
+  first: boolean;
   onPress: () => void;
 }) {
   const tone = toneFor(entry.status);
@@ -133,42 +157,66 @@ function NotificationRow({
           flexDirection: 'row',
           alignItems: 'center',
           gap: space[3],
-          padding: space[3],
-          borderRadius: radius.lg,
+          paddingHorizontal: space[3],
+          paddingVertical: space[3],
+          // A hairline between rows rather than a border around each.
+          borderTopWidth: first ? 0 : 1,
+          borderTopColor: color.borderSubtle,
           backgroundColor: unseen ? color.brandSoft : color.surfaceCard,
-          borderWidth: 1,
-          borderColor: unseen ? color.brand : color.borderSubtle,
         },
         pressed ? { opacity: 0.85 } : null,
       ]}
     >
       <View
         style={{
-          width: 38,
-          height: 38,
+          width: 40,
+          height: 40,
           borderRadius: radius.full,
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: tone.soft,
         }}
       >
-        <MaterialCommunityIcons name={tone.icon} size={19} color={tone.strong} />
+        <MaterialCommunityIcons name={tone.icon} size={20} color={tone.strong} />
       </View>
 
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text variant="smallBold" numberOfLines={1}>
+      <View style={{ flex: 1, gap: 3 }}>
+        <Text variant="smallBold" numberOfLines={2}>
           {announcementFor(entry.status)}
         </Text>
-        <Text variant="caption" tone="muted" numberOfLines={1}>
-          {[entry.restaurant_name, entry.public_order_number].filter(Boolean).join(' · ')}
-        </Text>
+        <Row gap={space[2]}>
+          <Text variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+            {entry.restaurant_name ?? 'المطعم'}
+          </Text>
+          <Text variant="caption" tone="muted">
+            ·
+          </Text>
+          <Ltr>
+            <Text variant="caption" tone="muted">
+              {formatClock(entry.at)}
+            </Text>
+          </Ltr>
+        </Row>
       </View>
 
-      <Ltr>
-        <Text variant="caption" tone="muted">
-          {formatClock(entry.at)}
-        </Text>
-      </Ltr>
+      {/*
+        * A dot for unread, not a coloured card.
+        *
+        * The order number left with it: it is nine characters of Latin in the
+        * middle of an Arabic line, and a customer scanning their notifications
+        * is not matching reference numbers — it is on the order itself, one tap
+        * away, where somebody reading it out on the phone will actually need it.
+        */}
+      {unseen ? (
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: radius.full,
+            backgroundColor: color.brand,
+          }}
+        />
+      ) : null}
     </Pressable>
   );
 }

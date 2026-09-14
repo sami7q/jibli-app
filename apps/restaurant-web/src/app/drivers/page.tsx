@@ -65,6 +65,7 @@ function DriversScreen({
   const [editing, setEditing] = useState<PortalDriver | null>(null);
   const [deactivating, setDeactivating] = useState<PortalDriver | null>(null);
   const [handover, setHandover] = useState<DriverCashRow | null>(null);
+  const [issuing, setIssuing] = useState<PortalDriver | null>(null);
 
   const drivers = useQuery({
     queryKey: ['drivers', auth.restaurantId],
@@ -321,6 +322,19 @@ function DriversScreen({
                           >
                             تعديل
                           </button>
+                          {/*
+                            * The login, issued here because this is where the
+                            * restaurant hires. A driver added by phone had no
+                            * way into anything but an OTP to that number, and
+                            * a delivery handset is usually shared.
+                            */}
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => setIssuing(driver)}
+                          >
+                            بيانات الدخول
+                          </button>
                           {driver.is_active ? (
                             <button
                               type="button"
@@ -387,6 +401,14 @@ function DriversScreen({
             invalidate();
           }}
           onCancel={() => setAdding(false)}
+        />
+      ) : null}
+
+      {issuing ? (
+        <CredentialsDialog
+          auth={auth}
+          driver={issuing}
+          onClose={() => setIssuing(null)}
         />
       ) : null}
 
@@ -793,6 +815,148 @@ function DriverDialog({
       </div>
     </div>
   );
+}
+
+/**
+ * Issuing a courier their sign-in.
+ *
+ * Two states and no third: pick a username, then read the password out. It is
+ * shown exactly once because that is the only way it is stored — a hash — and
+ * a screen that pretends otherwise teaches people to close it and come back
+ * later for a thing that no longer exists.
+ *
+ * Re-running this for a driver who already has one is a reset, deliberately.
+ * A courier who has forgotten their password needs a way back in that does not
+ * involve anybody reading a database.
+ */
+function CredentialsDialog({
+  auth,
+  driver,
+  onClose,
+}: {
+  auth: PortalAuth;
+  driver: PortalDriver;
+  onClose: () => void;
+}) {
+  /*
+   * Seeded from the phone number, which is the one identifier the restaurant
+   * and the courier already share — and typing a username into a form is the
+   * step at which somebody invents `driver1`.
+   */
+  const [username, setUsername] = useState(() => suggestUsername(driver.phone));
+  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const issue = useMutation({
+    mutationFn: () => portal.issueDriverCredentials(auth, driver.id, username.trim()),
+    onSuccess: (result) => setIssued({ username: result.username, password: result.password }),
+  });
+
+  const copy = async (): Promise<void> => {
+    if (!issued) return;
+    try {
+      await navigator.clipboard.writeText(
+        [
+          'جيبلي — دخول المندوبين',
+          `اسم المستخدم: ${issued.username}`,
+          `كلمة المرور: ${issued.password}`,
+        ].join('\n'),
+      );
+      setCopied(true);
+    } catch {
+      // No clipboard permission. The values are on screen either way.
+    }
+  };
+
+  return (
+    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="cred-title">
+      <div className="dialog">
+        <h2 id="cred-title">بيانات دخول {driver.full_name ?? 'المندوب'}</h2>
+
+        {issued ? (
+          <>
+            <p className="alert-bar alert-bar--warning" role="status">
+              تظهر كلمة المرور مرة واحدة فقط. سلّمها للمندوب الآن — لا يمكن عرضها لاحقاً، لكن
+              يمكنك إصدار غيرها في أي وقت.
+            </p>
+
+            <div className="field">
+              <label htmlFor="cred-user">اسم المستخدم</label>
+              <input id="cred-user" dir="ltr" readOnly value={issued.username} />
+            </div>
+
+            <div className="field">
+              <label htmlFor="cred-pass">كلمة المرور</label>
+              <input id="cred-pass" dir="ltr" readOnly value={issued.password} />
+            </div>
+
+            <p className="field__hint">
+              يدخل المندوب من <span className="ltr-inline">/driver/login</span> على نفس الرابط.
+            </p>
+
+            <div className="dialog__actions">
+              <button type="button" className="btn btn--primary" onClick={() => void copy()}>
+                {copied ? 'تم النسخ' : 'نسخ البيانات'}
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={onClose}>
+                إغلاق
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
+              اختر اسم مستخدم للمندوب. تُولَّد كلمة المرور تلقائياً وتُعرض مرة واحدة.
+            </p>
+
+            <div className="field">
+              <label htmlFor="cred-username">اسم المستخدم</label>
+              <input
+                id="cred-username"
+                dir="ltr"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+              <span className="field__hint">
+                أحرف إنجليزية صغيرة وأرقام و . _ - فقط، ثلاثة أحرف فأكثر.
+              </span>
+            </div>
+
+            {issue.isError ? (
+              <p className="alert-bar alert-bar--danger" role="alert">
+                {issue.error instanceof ApiError
+                  ? ((issue.error.details as { messageHint?: string } | undefined)?.messageHint ??
+                    issue.error.messageAr)
+                  : 'تعذّر إصدار البيانات'}
+              </p>
+            ) : null}
+
+            <div className="dialog__actions">
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={issue.isPending || username.trim().length < 3}
+                onClick={() => issue.mutate()}
+              >
+                {issue.isPending ? 'جارٍ الإصدار…' : 'إصدار بيانات الدخول'}
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={onClose}>
+                إلغاء
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** `+9647701234567` becomes `d7701234567` — unique, typable, and not a name. */
+function suggestUsername(phone: string): string {
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  return digits ? `d${digits}` : '';
 }
 
 function EditDriverDialog({

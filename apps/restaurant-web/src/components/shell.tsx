@@ -159,8 +159,33 @@ function NotificationBell({ count }: { count: number }) {
         ? 'طلب جديد واحد بانتظار القبول'
         : `${count} طلبات جديدة بانتظار القبول`;
 
+  /*
+   * It went to `/`, which on `/` is nothing at all.
+   *
+   * The badge counts orders waiting for a decision, and the dashboard is where
+   * they are — so from anywhere else this is a link home, and once home it has
+   * to keep going: to the «طلبات جديدة» lane, which is the thing the number is
+   * about and which sits below two cards on a laptop. A control that reports a
+   * count and does not take you to what it counted is the one that gets
+   * ignored fastest.
+   */
+  const goToNewOrders = (event: React.MouseEvent<HTMLAnchorElement>): void => {
+    if (window.location.pathname !== '/') return; // let the link navigate
+    event.preventDefault();
+    const lane = document.getElementById('lane-PENDING_RESTAURANT');
+    (lane ?? document.getElementById('live-orders'))?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  };
+
   return (
-    <Link href="/" className="bell" aria-label={label}>
+    <Link
+      href="/#lane-PENDING_RESTAURANT"
+      className="bell"
+      aria-label={label}
+      onClick={goToNewOrders}
+    >
       <Icon name="bell" className="nav__icon" aria-hidden />
       {count > 0 ? (
         <span className="bell__badge" aria-hidden>

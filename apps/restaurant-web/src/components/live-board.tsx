@@ -127,7 +127,7 @@ export function LiveBoard({ auth }: { auth: Auth }) {
   const isDegraded = !isRealtimeHealthy && !isOffline;
 
   return (
-    <section className="card" aria-label="الطلبات المباشرة">
+    <section className="card" id="live-orders" aria-label="الطلبات المباشرة">
       <div className="card__header">
         <div>
           <h2 className="card__title">
@@ -199,7 +199,7 @@ export function LiveBoard({ auth }: { auth: Auth }) {
         {ORDER_LANES.map((lane) => {
           const laneOrders = lanes.get(lane.key) ?? [];
           return (
-            <div className="lane" key={lane.key}>
+            <div className="lane" id={`lane-${lane.key}`} key={lane.key}>
               <div className={`lane__header lane__header--${lane.tone}`}>
                 <span>{lane.labelAr}</span>
                 <span className="numeric">({laneOrders.length})</span>
@@ -389,9 +389,17 @@ function OrderCard({
         ) : null}
 
         {order.status === 'PREPARING' ? (
+          /*
+           * Green, because it is the one action on this card that finishes
+           * something. It was a ghost button — the quietest style the portal
+           * has — for the step that says the food is cooked, sitting under a
+           * row of filled buttons for accepting and refusing. The lane it
+           * moves the order into is «جاهز», which the board already draws in
+           * green; the button that gets it there should agree.
+           */
           <button
             type="button"
-            className="btn btn--ghost btn--block"
+            className="btn btn--success btn--block"
             disabled={runCommand.isPending}
             onClick={() => runCommand.mutate('ready')}
           >
