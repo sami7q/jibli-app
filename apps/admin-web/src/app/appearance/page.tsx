@@ -470,17 +470,28 @@ function PhonePreview({
                 fullBleed` draws it on the device. */}
             <div className="phone__banner">
               {current ? (
-                <>
-                  {current.image_asset_id ? (
-                    <img src={adminApi.assetUrl(current.image_asset_id)} alt="" />
-                  ) : (
+                current.image_asset_id ? (
+                  /*
+                   * Artwork only, exactly as the app draws it.
+                   *
+                   * The title and subtitle are still stored and still edited
+                   * above — they name the banner in this list and are what a
+                   * screen reader announces — but an uploaded banner already
+                   * carries its own headline in its own typography, and
+                   * printing the stored one over it gives the customer two.
+                   * A preview that shows text the device will not draw is a
+                   * preview lying about the one thing it is for.
+                   */
+                  <img src={adminApi.assetUrl(current.image_asset_id)} alt="" />
+                ) : (
+                  <>
                     <div className="phone__banner-fallback" aria-hidden />
-                  )}
-                  <div className="phone__banner-text">
-                    <strong>{current.title_ar}</strong>
-                    {current.subtitle_ar ? <span>{current.subtitle_ar}</span> : null}
-                  </div>
-                </>
+                    <div className="phone__banner-text">
+                      <strong>{current.title_ar}</strong>
+                      {current.subtitle_ar ? <span>{current.subtitle_ar}</span> : null}
+                    </div>
+                  </>
+                )
               ) : (
                 <div className="phone__banner-empty">لا بنرات ظاهرة الآن</div>
               )}
@@ -602,7 +613,7 @@ function BannerDialog({
         />
 
         <div className="field">
-          <label htmlFor="banner-title-input">العنوان</label>
+          <label htmlFor="banner-title-input">اسم البنر</label>
           <input
             id="banner-title-input"
             value={title}
@@ -610,6 +621,16 @@ function BannerDialog({
             placeholder="خصم ٢٠٪ على المشاوي"
             maxLength={80}
           />
+          {/*
+            Renamed from «العنوان», which promised something the app no longer
+            does. With artwork uploaded the customer sees the image and nothing
+            else — the picture already carries its own headline — so this text
+            names the row here, and is what a screen reader announces. It is
+            drawn to the customer only for a banner with no image at all.
+          */}
+          <span className="field__hint">
+            للتعريف داخل اللوحة. لا يظهر فوق الصورة للعميل — الصورة وحدها ما يراه.
+          </span>
         </div>
 
         <div className="field">
@@ -621,6 +642,9 @@ function BannerDialog({
             placeholder="حتى نهاية الأسبوع"
             maxLength={140}
           />
+          <span className="field__hint">
+            يظهر للعميل فقط إذا كان البنر بلا صورة.
+          </span>
         </div>
 
         <Dropdown

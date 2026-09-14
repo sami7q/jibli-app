@@ -553,6 +553,22 @@ export function PromoBanner({
    */
   fullBleed?: boolean;
 }) {
+  /*
+   * A banner with artwork is the artwork, and nothing else.
+   *
+   * These are designed images: the one on the home screen already says «في
+   * غضون ٢٠ دقيقة» in its own typography, over its own photograph, arranged by
+   * whoever made it. Drawing the stored title on top of that produces two
+   * headlines fighting for the same corner — and the stored title is usually
+   * not a headline at all but a label the operator typed to find the row again
+   * in Admin. It stays exactly where it is useful: naming the banner in the
+   * portal, and read aloud as this control's accessibility label.
+   *
+   * Without artwork there is nothing else to look at, so the orange card with
+   * its words is the whole design and is unchanged.
+   */
+  const artworkSpeaksForItself = Boolean(imageUrl);
+
   const body = (
     <View
       style={{
@@ -570,76 +586,78 @@ export function PromoBanner({
         />
       ) : null}
 
-      {/*
-       * The scrim runs from the text's edge outward, not top-to-bottom: the
-       * words sit on the start side and the art on the end side, so that is
-       * where the darkness has to be. Under RTL the start side is the right,
-       * which is why the stops are written for `x: 1 → 0` and the whole banner
-       * is laid out with logical properties.
-       */}
-      <LinearGradient
-        colors={
-          imageUrl
-            ? ['rgba(17,24,39,0.82)', 'rgba(17,24,39,0.35)', 'rgba(17,24,39,0.05)']
-            : [palette.orange[600], palette.orange[500], palette.orange[400]]
-        }
-        start={{ x: 1, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={{ position: 'absolute', width: '100%', height: '100%' }}
-      />
+      {artworkSpeaksForItself ? null : (
+        <>
+          {/*
+           * The scrim and the words are one thing, so they live or die
+           * together. It exists to make text readable and for no other reason
+           * — over artwork with nothing written on it, it is a stain on
+           * somebody's design. Here it is the background itself rather than a
+           * veil over one, and it runs from the start side outward because
+           * that is where the words are: under RTL the start side is the
+           * right, which is why the stops read `x: 1 → 0`.
+           */}
+          <LinearGradient
+            colors={[palette.orange[600], palette.orange[500], palette.orange[400]]}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={{ position: 'absolute', width: '100%', height: '100%' }}
+          />
 
-      <View
-        style={{
-          flex: 1,
-          paddingHorizontal: fullBleed ? space[5] : space[4],
-          paddingVertical: space[4],
-          gap: space[1],
-          justifyContent: 'center',
-        }}
-      >
-        {badge ? (
           <View
             style={{
-              alignSelf: 'flex-start',
-              backgroundColor: 'rgba(255,255,255,0.22)',
-              borderRadius: radius.full,
-              paddingHorizontal: space[2],
-              paddingVertical: 3,
+              flex: 1,
+              paddingHorizontal: fullBleed ? space[5] : space[4],
+              paddingVertical: space[4],
+              gap: space[1],
+              justifyContent: 'center',
             }}
           >
-            <Text variant="caption" tone="inverse">
-              {badge}
+            {badge ? (
+              <View
+                style={{
+                  alignSelf: 'flex-start',
+                  backgroundColor: 'rgba(255,255,255,0.22)',
+                  borderRadius: radius.full,
+                  paddingHorizontal: space[2],
+                  paddingVertical: 3,
+                }}
+              >
+                <Text variant="caption" tone="inverse">
+                  {badge}
+                </Text>
+              </View>
+            ) : null}
+
+            <Text variant="h2" tone="inverse" numberOfLines={2} style={{ maxWidth: '70%' }}>
+              {title}
             </Text>
+
+            {subtitle ? (
+              <Text variant="small" tone="inverse" numberOfLines={2} style={{ maxWidth: '70%' }}>
+                {subtitle}
+              </Text>
+            ) : null}
+
+            {ctaLabel ? (
+              <View
+                style={{
+                  alignSelf: 'flex-start',
+                  marginTop: space[2],
+                  backgroundColor: color.surfaceCard,
+                  borderRadius: radius.full,
+                  paddingHorizontal: space[4],
+                  paddingVertical: space[2],
+                }}
+              >
+                <Text variant="smallBold" tone="brand">
+                  {ctaLabel}
+                </Text>
+              </View>
+            ) : null}
           </View>
-        ) : null}
-
-        <Text variant="h2" tone="inverse" numberOfLines={2} style={{ maxWidth: '70%' }}>
-          {title}
-        </Text>
-
-        {subtitle ? (
-          <Text variant="small" tone="inverse" numberOfLines={2} style={{ maxWidth: '70%' }}>
-            {subtitle}
-          </Text>
-        ) : null}
-
-        {ctaLabel ? (
-          <View
-            style={{
-              alignSelf: 'flex-start',
-              marginTop: space[2],
-              backgroundColor: color.surfaceCard,
-              borderRadius: radius.full,
-              paddingHorizontal: space[4],
-              paddingVertical: space[2],
-            }}
-          >
-            <Text variant="smallBold" tone="brand">
-              {ctaLabel}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+        </>
+      )}
     </View>
   );
 
