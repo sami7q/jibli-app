@@ -91,6 +91,19 @@ function DriversScreen({
     },
   });
 
+  const activate = useMutation({
+    mutationFn: (id: string) => portal.activateDriver(auth, id),
+    onSuccess: invalidate,
+  });
+
+  const activationError =
+    activate.error instanceof ApiError
+      ? ((activate.error.details as { messageHint?: string } | undefined)?.messageHint ??
+        activate.error.messageAr)
+      : activate.error
+        ? 'تعذّر تفعيل المندوب'
+        : null;
+
   if (drivers.isError) {
     return (
       <ErrorState
@@ -144,6 +157,12 @@ function DriversScreen({
       </Card>
 
       <Card title="قائمة المندوبين">
+        {activationError ? (
+          <p className="alert-bar alert-bar--danger" role="alert">
+            {activationError}
+          </p>
+        ) : null}
+
         {rows.length === 0 ? (
           <div className="empty">
             <p style={{ margin: 0, fontWeight: 600 }}>لم تُضف مندوبين بعد</p>
@@ -185,9 +204,29 @@ function DriversScreen({
                       {!driver.is_active ? (
                         <span className="badge badge--neutral">موقوف</span>
                       ) : !driver.activated ? (
-                        // Created by the restaurant but the driver has not yet
-                        // signed in, so they cannot receive an assignment.
-                        <span className="badge badge--warning">بانتظار التفعيل</span>
+                        /*
+                         * A button, not a badge.
+                         *
+                         * It used to say «بانتظار التفعيل» and wait for
+                         * something that never came: nothing in the system set
+                         * `activated_at`, so a driver added here could never be
+                         * assigned an order and the screen gave no hint why.
+                         * The restaurant knows this person; it activates them.
+                         */
+                        canManage ? (
+                          <button
+                            type="button"
+                            className="btn btn--primary btn--sm"
+                            disabled={activate.isPending}
+                            onClick={() => activate.mutate(driver.id)}
+                          >
+                            {activate.isPending && activate.variables === driver.id
+                              ? 'جارٍ التفعيل…'
+                              : 'تفعيل المندوب'}
+                          </button>
+                        ) : (
+                          <span className="badge badge--warning">بانتظار التفعيل</span>
+                        )
                       ) : (
                         <span
                           className={`badge badge--${

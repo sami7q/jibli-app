@@ -364,6 +364,101 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
     },
   );
 
+  /**
+   * Activate a driver the restaurant added.
+   *
+   * Nothing in the system set `activated_at` or moved a driver out of
+   * `PENDING_ACTIVATION` — not this portal, not Admin, not the driver's own
+   * sign-in. And `/drivers/eligible` filters on `status = 'ACTIVE'`, so every
+   * driver ever created was invisible to the assignment picker and no order
+   * could be handed to anybody. The whole delivery leg was a dead end, and the
+   * symptom was an empty list with nothing to explain it.
+   *
+   * It belongs to the restaurant rather than to Admin. Jibli does not employ
+   * these people: the restaurant recruits them, knows them, and is the party
+   * asserting that this phone number belongs to somebody who has agreed to
+   * carry its orders. Routing that assertion through a platform operator adds
+   * a queue and no judgement — the operator has never met the driver.
+   *
+   * Two boundaries hold. Only `PENDING_ACTIVATION` may be activated here, so a
+   * restaurant cannot lift a `SUSPENDED` that the platform imposed — that is
+   * the one driver state which is not the restaurant's to decide. And the
+   * driver must already be attached to this restaurant, so activation cannot
+   * reach somebody else's team.
+   */
+  app.post(
+    '/api/v1/restaurant-portal/drivers/:driverId/activate',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { principal, restaurantId } = restaurantScope(request);
+      assertRestaurantPermission(principal, restaurantId, 'driver.manage');
+      const { driverId } = z.object({ driverId: uuidSchema }).parse(request.params);
+
+      const status = await ctx.db.transaction(async (tx) => {
+        const [link] = await tx
+          .select({ id: restaurantDrivers.id })
+          .from(restaurantDrivers)
+          .where(
+            and(
+              eq(restaurantDrivers.restaurantId, restaurantId),
+              eq(restaurantDrivers.driverId, driverId),
+            ),
+          )
+          .limit(1);
+
+        if (!link) {
+          throw new AppError(ERROR_CODES.DRIVER_NOT_IN_RESTAURANT, { details: { driverId } });
+        }
+
+        const [driver] = await tx
+          .select({ status: drivers.status })
+          .from(drivers)
+          .where(eq(drivers.id, driverId))
+          .limit(1);
+
+        if (!driver) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'driver' } });
+
+        // Already working: say so plainly rather than failing. Pressing the
+        // button twice is not an error worth a red banner.
+        if (driver.status === 'ACTIVE') return 'ACTIVE' as const;
+
+        if (driver.status !== 'PENDING_ACTIVATION') {
+          throw new AppError(ERROR_CODES.CONFLICT, {
+            details: {
+              reason: 'DRIVER_NOT_PENDING',
+              status: driver.status,
+              messageHint: 'هذا الحساب موقوف من إدارة جيبلي — راجع الدعم.',
+            },
+          });
+        }
+
+        await tx
+          .update(drivers)
+          .set({
+            status: 'ACTIVE',
+            activatedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(drivers.id, driverId));
+
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: AUDIT_ACTIONS.DRIVER_ACTIVATE,
+          entityType: 'driver',
+          entityId: driverId,
+          after: { status: 'ACTIVE', restaurantId },
+          ip: clientIp(request),
+          userAgent: userAgent(request),
+          requestId: request.requestId,
+        });
+
+        return 'ACTIVE' as const;
+      });
+
+      return reply.send(success({ status }, { request_id: request.requestId }));
+    },
+  );
+
   // ── Staff (plan §61, §86) ─────────────────────────────────────────────────
 
   app.get(

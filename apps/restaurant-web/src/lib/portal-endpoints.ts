@@ -16,6 +16,8 @@ export interface MenuItem {
   cost_price_iqd?: number;
   margin_iqd?: number;
   sku: string | null;
+  /** The dish photo. Null until somebody uploads one. */
+  image_asset_id: string | null;
   is_active: boolean;
   is_available: boolean;
   unavailable_by_inventory: boolean;
@@ -624,6 +626,21 @@ export const portal = {
       body,
     }),
 
+  /**
+   * Put a driver to work.
+   *
+   * The restaurant's own call, not Admin's: it recruited this person and is
+   * the party asserting they have agreed to carry its orders. Until this
+   * existed nothing anywhere set `activated_at`, so every driver stayed
+   * `PENDING_ACTIVATION` and the assignment picker — which filters on ACTIVE —
+   * was empty for every restaurant.
+   */
+  activateDriver: (auth: Auth, id: string) =>
+    apiRequest<{ status: string }>(`/api/v1/restaurant-portal/drivers/${id}/activate`, {
+      ...scoped(auth),
+      method: 'POST',
+    }),
+
   updateDriver: (auth: Auth, id: string, body: unknown) =>
     apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/drivers/${id}`, {
       ...scoped(auth),
@@ -650,7 +667,10 @@ export const portal = {
 
   // ── Settings ────────────────────────────────────────────────────────────
   /** Posts a data URL and returns the stored asset. Same contract as Admin. */
-  uploadImage: (auth: Auth, body: { data: string; purpose?: 'RESTAURANT_LOGO' }) =>
+  uploadImage: (
+    auth: Auth,
+    body: { data: string; purpose?: 'RESTAURANT_LOGO' | 'RESTAURANT_COVER' | 'MENU_ITEM' },
+  ) =>
     apiRequest<{ asset_id: string; url: string }>('/api/v1/uploads', {
       ...scoped(auth),
       method: 'POST',

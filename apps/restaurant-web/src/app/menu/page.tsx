@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { money } from '@jibli/ui-web';
+import { LogoUpload, money } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
-import { ApiError } from '@/lib/api';
+import { ApiError, assetUrl } from '@/lib/api';
 import { portal, type MenuCategory, type MenuItem } from '@/lib/portal-endpoints';
 
 /**
@@ -281,17 +281,37 @@ function CategoryCard({
               {category.items.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <strong>{item.name_ar}</strong>
-                    {item.is_popular ? (
-                      <span style={{ marginInlineStart: 6 }} title="الأكثر طلباً">
-                        🔥
-                      </span>
-                    ) : null}
-                    {item.description_ar ? (
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                        {item.description_ar}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-3)',
+                      }}
+                    >
+                      {/*
+                        * The photo, or the absence of one, at a glance.
+                        *
+                        * A dashed empty square rather than nothing: a menu
+                        * where three dishes have pictures and nine do not
+                        * looks worse in the app than one where none do, and
+                        * this is the only place that gap is visible.
+                        */}
+                      <ItemThumbnail item={item} />
+
+                      <div>
+                        <strong>{item.name_ar}</strong>
+                        {item.is_popular ? (
+                          <span style={{ marginInlineStart: 6 }} title="الأكثر طلباً">
+                            🔥
+                          </span>
+                        ) : null}
+                        {item.description_ar ? (
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                            {item.description_ar}
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
+                    </div>
                   </td>
                   <td className="numeric">{money(item.base_price_iqd)}</td>
                   {canSeeCost ? (
@@ -471,6 +491,45 @@ function CategoryDialog({
   );
 }
 
+/** 44px square: the photo if there is one, a dashed placeholder if not. */
+function ItemThumbnail({ item }: { item: MenuItem }) {
+  const shared = {
+    width: 44,
+    height: 44,
+    borderRadius: 'var(--radius-md)',
+    flexShrink: 0,
+  } as const;
+
+  if (!item.image_asset_id) {
+    return (
+      <div
+        aria-label="بلا صورة"
+        title="بلا صورة — أضف واحدة من «تعديل»"
+        style={{
+          ...shared,
+          border: '1px dashed var(--border-strong)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--text-muted)',
+          fontSize: 'var(--text-xs)',
+        }}
+      >
+        ＋
+      </div>
+    );
+  }
+
+  return (
+    // A plain <img>: next/image would need the API host in `remotePatterns`,
+    // and these are already downscaled in the browser on the way in.
+    <img
+      src={assetUrl(item.image_asset_id)}
+      alt={item.name_ar}
+      style={{ ...shared, objectFit: 'cover', border: '1px solid var(--border-subtle)' }}
+    />
+  );
+}
+
 function ItemDialog({
   auth,
   categoryId,
@@ -491,6 +550,15 @@ function ItemDialog({
   const [price, setPrice] = useState(item?.base_price_iqd ?? 0);
   const [cost, setCost] = useState(item?.cost_price_iqd ?? 0);
   const [isPopular, setIsPopular] = useState(item?.is_popular ?? false);
+  /*
+   * `undefined` means "unchanged", `null` means "remove the photo". Collapsing
+   * the two would make clearing an image impossible: the PATCH treats an
+   * absent key as no change, which is what lets the other fields be partial.
+   */
+  const [imageAssetId, setImageAssetId] = useState<string | null | undefined>(undefined);
+  const [imagePreview, setImagePreview] = useState<string | null>(
+    item?.image_asset_id ? assetUrl(item.image_asset_id) : null,
+  );
 
   const save = useMutation({
     mutationFn: () => {
@@ -500,6 +568,7 @@ function ItemDialog({
         description_ar: descriptionAr.trim() || undefined,
         base_price_iqd: price,
         ...(canSeeCost && cost > 0 ? { cost_price_iqd: cost } : {}),
+        ...(imageAssetId !== undefined ? { image_asset_id: imageAssetId } : {}),
         is_popular: isPopular,
       };
       // Both calls return different shapes; the dialog only cares that it
@@ -529,6 +598,26 @@ function ItemDialog({
             placeholder="كباب عراقي"
           />
         </div>
+
+        {/*
+          * The photo, above the description and below the name.
+          *
+          * The column and the customer app's `image_asset_id` have both existed
+          * since the schema was written, and nothing ever wrote one — so every
+          * dish in the app rendered as a grey block. The same uploader the
+          * logo uses: it downscales in the browser before sending, which is
+          * what keeps a 12-megapixel phone photo from becoming a 5 MB request.
+          */}
+        <LogoUpload
+          value={imagePreview}
+          label="صورة الصنف (اختياري)"
+          hint="PNG أو JPG أو WebP، حتى ٥ ميغابايت. تُصغَّر تلقائياً قبل الرفع."
+          upload={(dataUrl) => portal.uploadImage(auth, { data: dataUrl, purpose: 'MENU_ITEM' })}
+          onChange={(assetId, previewUrl) => {
+            setImageAssetId(assetId);
+            setImagePreview(previewUrl);
+          }}
+        />
 
         <div className="field">
           <label htmlFor="item-desc">الوصف (اختياري)</label>

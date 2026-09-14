@@ -78,7 +78,11 @@ export interface StoreAssetParams {
   readonly base64: string;
   readonly ownerUserId: string;
   readonly restaurantId?: string | null;
-  readonly purpose: 'RESTAURANT_LOGO' | 'RESTAURANT_COVER';
+  /**
+   * What the image is for. Only ever the storage-key prefix, so adding one is
+   * a widening rather than a migration — the assets table stores no purpose.
+   */
+  readonly purpose: 'RESTAURANT_LOGO' | 'RESTAURANT_COVER' | 'MENU_ITEM';
 }
 
 export interface StoredAsset {

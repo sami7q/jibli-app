@@ -11,6 +11,13 @@
  *
  * Browsers block uninitiated autoplay, so the audio context is created only
  * after an explicit user gesture — the `تفعيل تنبيهات الطلبات` button.
+ *
+ * The choice survives a reload. It used to live in this object and nowhere
+ * else, so every refresh — and the order board is a screen that gets refreshed
+ * all day — rebuilt the manager with alerts off and put the activation banner
+ * back in front of somebody who had already answered it. Being asked the same
+ * question every few minutes is how a person learns to ignore a banner, which
+ * is the opposite of what an alert about a waiting order needs.
  */
 
 export type AlertPermission = 'unknown' | 'granted' | 'denied';
@@ -31,6 +38,27 @@ export interface AlertState {
 
 const DEFAULT_REPEAT_MS = 20_000;
 const DEFAULT_ESCALATE_MS = 60_000;
+
+/** Per browser, per device. Not an account setting — it is about this machine. */
+const ENABLED_KEY = 'jibli.portal.orderAlerts';
+
+function readStoredChoice(): boolean {
+  try {
+    return window.localStorage.getItem(ENABLED_KEY) === '1';
+  } catch {
+    // Private mode or blocked site data: fall back to asking, which is the
+    // safe direction — it costs a click, not a missed order.
+    return false;
+  }
+}
+
+function writeStoredChoice(enabled: boolean): void {
+  try {
+    window.localStorage.setItem(ENABLED_KEY, enabled ? '1' : '0');
+  } catch {
+    /* The manager still works for this page load. */
+  }
+}
 
 export class OrderAlertManager {
   private audioContext: AudioContext | null = null;
@@ -63,14 +91,7 @@ export class OrderAlertManager {
     this.originalTitle = document.title;
 
     try {
-      const AudioCtor =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtor) {
-        this.audioContext = new AudioCtor();
-        // Safari starts suspended even inside a gesture unless resumed.
-        if (this.audioContext.state === 'suspended') await this.audioContext.resume();
-      }
+      await this.openAudio();
       this.enabled = true;
     } catch {
       // Audio unavailable is not fatal: the visual alert still works.
@@ -85,18 +106,88 @@ export class OrderAlertManager {
       }
     }
 
+    writeStoredChoice(this.enabled);
     this.startLoop();
     this.emit();
     return this.state();
   }
 
-  disable(): void {
+  /**
+   * Re-arm a choice already made, without asking again.
+   *
+   * Called on mount rather than from a click, so the context it opens may be
+   * born suspended — Chrome refuses to start one outside a gesture. That is
+   * handled rather than worked around: the loop runs, the visual alert and the
+   * title badge work immediately, and the first tap anywhere on the page
+   * resumes the audio. On the order board, that tap happens within seconds.
+   */
+  restore(): AlertState {
+    if (typeof window === 'undefined' || !readStoredChoice()) return this.state();
+
+    this.originalTitle = document.title;
+    this.enabled = true;
+
+    void this.openAudio().catch(() => {
+      /* Suspended is expected here; the gesture listener below fixes it. */
+    });
+    this.armGestureResume();
+
+    this.startLoop();
+    this.emit();
+    return this.state();
+  }
+
+  /**
+   * Stop alerting.
+   *
+   * `remember: false` is teardown — the board unmounting, a navigation — and
+   * must not look like the operator turning alerts off, or leaving the page
+   * would silently undo their choice and the banner would be back on return.
+   */
+  disable(remember = false): void {
     this.enabled = false;
     this.stopLoop();
+    this.disarmGestureResume();
     void this.audioContext?.close();
     this.audioContext = null;
     this.restoreTitle();
+    if (remember) writeStoredChoice(false);
     this.emit();
+  }
+
+  private async openAudio(): Promise<void> {
+    const AudioCtor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return;
+
+    this.audioContext ??= new AudioCtor();
+    // Safari starts suspended even inside a gesture unless resumed.
+    if (this.audioContext.state === 'suspended') await this.audioContext.resume();
+  }
+
+  private gestureResume: (() => void) | null = null;
+
+  private armGestureResume(): void {
+    if (this.gestureResume) return;
+
+    const resume = (): void => {
+      void this.openAudio().catch(() => undefined);
+      this.disarmGestureResume();
+    };
+
+    this.gestureResume = resume;
+    // `pointerdown` and `keydown` between them cover a mouse, a finger and a
+    // keyboard. Once is enough: the context stays running afterwards.
+    document.addEventListener('pointerdown', resume, { once: true });
+    document.addEventListener('keydown', resume, { once: true });
+  }
+
+  private disarmGestureResume(): void {
+    if (!this.gestureResume) return;
+    document.removeEventListener('pointerdown', this.gestureResume);
+    document.removeEventListener('keydown', this.gestureResume);
+    this.gestureResume = null;
   }
 
   /**

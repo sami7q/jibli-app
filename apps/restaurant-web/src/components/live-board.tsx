@@ -95,8 +95,14 @@ export function LiveBoard({ auth }: { auth: Auth }) {
     alertManager.current?.syncPending(pendingIds);
   }, [orders]);
 
+  /*
+   * Pick the choice back up on mount, and put it down on unmount without
+   * forgetting it. `disable()` defaults to not remembering precisely so this
+   * cleanup cannot be mistaken for the operator switching alerts off.
+   */
   useEffect(() => {
     const manager = alertManager.current;
+    manager?.restore();
     return () => manager?.disable();
   }, []);
 

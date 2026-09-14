@@ -18,7 +18,7 @@ import { maxAssetBytes, readAsset, storeAsset } from '../services/asset-service.
 const uploadSchema = z.object({
   /** Data URL or bare base64; the service tolerates either. */
   data: z.string().min(16),
-  purpose: z.enum(['RESTAURANT_LOGO', 'RESTAURANT_COVER']).default('RESTAURANT_LOGO'),
+  purpose: z.enum(['RESTAURANT_LOGO', 'RESTAURANT_COVER', 'MENU_ITEM']).default('RESTAURANT_LOGO'),
   restaurant_id: uuidSchema.optional(),
 });
 

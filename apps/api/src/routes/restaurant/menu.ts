@@ -43,6 +43,16 @@ const itemSchema = z.object({
   preparation_minutes_override: z.number().int().min(1).max(240).optional(),
   is_popular: z.boolean().default(false),
   sort_order: z.number().int().min(0).max(999).default(0),
+  /**
+   * A picture of the dish, uploaded through `/api/v1/uploads`.
+   *
+   * The column has existed since the schema was written and the customer app
+   * has always read `image_asset_id` — nothing ever wrote one, so every card
+   * in the app fell back to a grey block. Nullable on purpose: passing `null`
+   * is how an item goes back to having no photo, which a bare `optional()`
+   * could not express.
+   */
+  image_asset_id: uuidSchema.nullable().optional(),
 });
 
 /** Bump the menu version so open carts can detect staleness (plan §116). */
@@ -121,6 +131,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
                     ? { margin_iqd: item.basePriceIqd - item.costPriceIqd }
                     : {}),
                   sku: item.sku,
+                  image_asset_id: item.imageAssetId,
                   is_active: item.isActive,
                   is_available: item.isAvailable,
                   // Distinguishes "staff turned this off" from "stock ran out",
@@ -276,6 +287,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
           costPriceIqd: body.cost_price_iqd ?? null,
           sku: body.sku ?? null,
           preparationMinutesOverride: body.preparation_minutes_override ?? null,
+          imageAssetId: body.image_asset_id ?? null,
           isPopular: body.is_popular,
           sortOrder: body.sort_order,
         });
@@ -312,6 +324,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
             ...(body.preparation_minutes_override !== undefined
               ? { preparationMinutesOverride: body.preparation_minutes_override }
               : {}),
+            ...(body.image_asset_id !== undefined ? { imageAssetId: body.image_asset_id } : {}),
             ...(body.is_popular !== undefined ? { isPopular: body.is_popular } : {}),
             ...(body.sort_order !== undefined ? { sortOrder: body.sort_order } : {}),
             ...(body.is_active !== undefined ? { isActive: body.is_active } : {}),

@@ -24,6 +24,18 @@ const API_BASE =
     ? ''
     : (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000');
 
+/**
+ * Where an uploaded image is served from.
+ *
+ * Built from the id rather than returned per row, because the id is what the
+ * database stores and every screen showing a logo or a dish photo needs the
+ * same URL from it. Public by design — the customer app fetches these without
+ * a token, so requiring one here would mean a menu nobody can see.
+ */
+export function assetUrl(assetId: string): string {
+  return `${API_BASE}/api/v1/assets/${assetId}`;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly code: ErrorCode,

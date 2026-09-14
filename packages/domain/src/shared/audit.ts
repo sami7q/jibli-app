@@ -121,6 +121,7 @@ export const AUDIT_ACTIONS = {
   ORDER_OVERRIDE: 'order.override',
   DELIVERY_PIN_OVERRIDE: 'delivery.pin.override',
   DRIVER_CREATE: 'driver.create',
+  DRIVER_ACTIVATE: 'driver.activate',
   DRIVER_SUSPEND: 'driver.suspend',
   CUSTOMER_BLOCK: 'customer.block',
   CUSTOMER_PHONE_UNMASK: 'customer.phone.unmask',
