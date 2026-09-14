@@ -93,6 +93,14 @@ export const text = {
   small: type(fontSize.sm, fontWeight.regular, lineHeight.normal),
   smallBold: type(fontSize.sm, fontWeight.semibold, lineHeight.normal),
   caption: type(fontSize.xs, fontWeight.medium, lineHeight.normal),
+  /*
+   * The same size as `caption`, heavier.
+   *
+   * Emphasis at this size has to come from weight alone: stepping up to
+   * `smallBold` changes the size too, and a label that grows when selected
+   * reflows the row under the finger that selected it.
+   */
+  captionBold: type(fontSize.xs, fontWeight.bold, lineHeight.normal),
 } as const;
 
 /**

@@ -24,7 +24,7 @@ import { useArea } from '@/lib/area';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
-import { color, palette, radius, space, TAP_TARGET } from '@/theme';
+import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
@@ -537,7 +537,7 @@ function CategoryStrip({
   if (categories.length === 0) return null;
 
   return (
-    <View style={{ paddingTop: space[5], gap: space[2] }}>
+    <View style={{ paddingTop: space[5], gap: space[3] }}>
       <Row justify="space-between" style={{ paddingHorizontal: space[4] }}>
         <Text variant="h3">التصنيفات</Text>
         <Text variant="caption" tone="muted">
@@ -548,47 +548,125 @@ function CategoryStrip({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: space[4], gap: space[3], paddingVertical: 4 }}
+        contentContainerStyle={{
+          paddingHorizontal: space[4],
+          gap: space[3],
+          // Room for the selected ring's shadow, which a tight container clips.
+          paddingVertical: space[1],
+        }}
       >
-        {categories.map((entry) => {
-          const active = selected === entry.key;
-
-          return (
-            <Pressable
-              key={entry.key}
-              onPress={() => onSelect(active ? null : entry.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={entry.name_ar}
-              style={{ alignItems: 'center', gap: space[1], width: 72 }}
-            >
-              <IconTile size={64} active={active}>
-                {entry.image_asset_id ? (
-                  <Image
-                    source={{ uri: assetUrl(entry.image_asset_id) }}
-                    style={{ width: 44, height: 44, borderRadius: radius.md }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text variant="h2">{entry.emoji ?? '🍽️'}</Text>
-                )}
-              </IconTile>
-
-              {/* Two lines: a third of the real category list — «أسماك
-                  ومأكولات بحرية» — does not fit on one at this width. */}
-              <Text
-                variant="caption"
-                align="center"
-                tone={active ? 'brand' : 'secondary'}
-                numberOfLines={2}
-              >
-                {entry.name_ar}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {categories.map((entry) => (
+          <CategoryTile
+            key={entry.key}
+            category={entry}
+            active={selected === entry.key}
+            onPress={() => onSelect(selected === entry.key ? null : entry.key)}
+          />
+        ))}
       </ScrollView>
     </View>
+  );
+}
+
+/** Every tile is this wide, so the labels form a row rather than a ragged edge. */
+const CATEGORY_TILE = 78;
+const CATEGORY_SLOT = 88;
+
+/**
+ * One category: a photograph, at a size worth photographing for.
+ *
+ * Three things were wrong with the strip this replaces, and they compounded.
+ * The picture was 44px inside a 64px chip, so a third of the tile was padding
+ * and the food was the size of a favicon. Selecting a category then filled
+ * that chip with solid brand orange — *behind* a photo that covers it, so the
+ * one visible effect was on the sliver of padding around the edge, and on an
+ * emoji category the fill swallowed the emoji whole. And the labels ran to two
+ * lines only when they had to, leaving every tile at a different height and
+ * the bottom of the row looking torn.
+ *
+ * So: the image fills its tile edge to edge, selection is a ring around the
+ * picture rather than a wash over it, and the label occupies a fixed two-line
+ * block whether it needs one line or two.
+ *
+ * Not `IconTile`. That is a chip that holds an icon — small, tinted, with the
+ * icon floating inside it — and this is a photograph with a selected state.
+ * Bending one component to be both would have meant an `image` mode where
+ * half its props stop applying.
+ */
+function CategoryTile({
+  category,
+  active,
+  onPress,
+}: {
+  category: NonNullable<Awaited<ReturnType<typeof api.storefront>>>['categories'][number];
+  active: boolean;
+  onPress: () => void;
+}) {
+  const hasImage = Boolean(category.image_asset_id);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={category.name_ar}
+      style={({ pressed }) => [
+        { alignItems: 'center', gap: space[2], width: CATEGORY_SLOT },
+        pressed ? { opacity: 0.8 } : null,
+      ]}
+    >
+      <View
+        style={[
+          {
+            width: CATEGORY_TILE,
+            height: CATEGORY_TILE,
+            borderRadius: radius.xl,
+            overflow: 'hidden',
+            alignItems: 'center',
+            justifyContent: 'center',
+            // Only ever seen behind an emoji: a photograph covers it entirely.
+            backgroundColor: hasImage ? color.surfaceSunken : color.brandSoft,
+            /*
+             * The ring is drawn inside the tile rather than as an outer glow,
+             * so selecting something never nudges its neighbours sideways —
+             * a row that shifts under the finger is the reason a second tap
+             * lands on the wrong category.
+             */
+            borderWidth: active ? 3 : 1,
+            borderColor: active ? color.brand : color.borderSubtle,
+          },
+          active ? shadow.md : null,
+        ]}
+      >
+        {category.image_asset_id ? (
+          <Image
+            source={{ uri: assetUrl(category.image_asset_id) }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={{ fontSize: 34, lineHeight: 42 }}>{category.emoji ?? '🍽️'}</Text>
+        )}
+      </View>
+
+      {/*
+       * A fixed block, not a line that grows.
+       *
+       * A third of the real category list — «أسماك ومأكولات بحرية» — needs two
+       * lines at this width, and reserving them for everybody is what keeps
+       * the tiles a row instead of a staircase.
+       */}
+      <View style={{ height: 32, justifyContent: 'flex-start' }}>
+        <Text
+          variant={active ? 'captionBold' : 'caption'}
+          align="center"
+          tone={active ? 'brand' : 'secondary'}
+          numberOfLines={2}
+        >
+          {category.name_ar}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
