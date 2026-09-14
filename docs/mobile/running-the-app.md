@@ -278,7 +278,68 @@ Three integrations get asked about, so they are written down plainly.
 
 ---
 
-## 11. What is deployed, and where
+## 11. Running the API locally, and a test account
+
+The deployed API cannot sign anyone in: it has no SMS gateway, and the code is
+neither returned nor logged outside `APP_ENV=local`. To test ordering before
+launch, run the API yourself.
+
+### No Docker needed
+
+```powershell
+$env:DATABASE_URL       = "<the Neon pooled URL>"
+$env:APP_ENV            = "local"
+$env:REDIS_URL          = "memory://local"
+$env:OTP_PROVIDER       = "mock"
+$env:OTP_MOCK_CODE      = "1234"
+$env:API_HOST           = "0.0.0.0"
+$env:JWT_ACCESS_SECRET  = "<any 32+ characters>"
+$env:JWT_REFRESH_SECRET = "<any other 32+ characters>"
+$env:OTP_HASH_PEPPER    = "<any 32+ characters>"
+pnpm --filter @jibli/api dev
+```
+
+`memory://local` runs an in-process Redis substitute, so the API starts with no
+Docker and no Redis. It is **refused in production** by the env schema: counters
+that live in one process and vanish on restart are not rate limiting, and a
+publish that reaches one instance is not realtime.
+
+`OTP_PROVIDER=mock` makes the code a fixed `1234` for **any** number. It
+replaces the generated code rather than bypassing verification, so expiry,
+attempt counting and rate limits all behave exactly as in production — and it
+is refused in production too.
+
+Then point the app at it:
+
+```powershell
+$env:JIBLI_PROXY_UPSTREAM = "http://localhost:4000"
+pnpm --filter @jibli/mobile proxy     # terminal 2
+pnpm --filter @jibli/mobile web       # terminal 3  → http://localhost:4010
+```
+
+For a phone over Expo Go, set `EXPO_PUBLIC_API_URL` to `http://<your LAN
+ip>:4000` instead — never `localhost`, which on a phone is the phone.
+
+### The test account
+
+Sign in with **any** Iraqi number and the code **1234**. One was created and
+used to place a real order end to end:
+
+| | |
+|---|---|
+| Phone | `+964 771 234 567` |
+| Code | `1234` |
+| Name | حساب تجريبي |
+| Address | الكرادة، شارع ٦٢، قرب صيدلية النور |
+| Order placed | `JB9505061` — بطاطا مقلية ×2, 5,000 + 500 service = **5,500** |
+
+**Deleting it** is itself a test worth running: «حسابي» → «حذف حسابي». It will
+refuse while the order is in flight — cancel the order first from «طلباتي» —
+which is the guard doing its job, not a bug.
+
+---
+
+## 12. What is deployed, and where
 
 | Piece | Where | Verified |
 |---|---|---|

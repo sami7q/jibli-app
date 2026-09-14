@@ -91,7 +91,15 @@ async function main(): Promise<void> {
   });
 
   const redis = createRedis(env, logger);
+
+  /*
+   * The real client is lazy and must be told to connect. The in-process
+   * substitute is already connected when it is constructed and answers a
+   * second request by throwing — which is not a failure, it is the state we
+   * wanted. Everything else still stops the boot.
+   */
   await redis.connect().catch((error: Error) => {
+    if (/already connect/i.test(error.message)) return;
     logger.error({ err: error.message }, 'Failed to connect to Redis at startup');
     throw error;
   });

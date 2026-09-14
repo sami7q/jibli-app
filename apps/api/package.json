@@ -39,6 +39,7 @@
   "devDependencies": {
     "@jibli/test-utils": "workspace:*",
     "@types/ws": "^8.5.13",
+    "ioredis-mock": "^8.13.1",
     "tsx": "^4.19.2"
   }
 }

@@ -35,6 +35,15 @@ const baseSchema = z.object({
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   DATABASE_SSL: booleanish.default(false),
 
+  /**
+   * Redis, or `memory://` for a single-process development run.
+   *
+   * The URL says which: `memory://local` runs an in-process substitute so the
+   * API starts on a machine with no Docker and no Redis, which is what a
+   * developer on Windows usually has. It is refused in production below —
+   * rate-limit counters and the realtime channel that only one process can see
+   * are not rate limiting and not realtime.
+   */
   REDIS_URL: z.string().url(),
   REDIS_NAMESPACE: z.string().default('jibli:local'),
 });
@@ -176,6 +185,14 @@ export const apiEnvSchema = baseSchema
       });
     }
     if (env.APP_ENV === 'production') {
+      if (env.REDIS_URL.startsWith('memory:')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['REDIS_URL'],
+          message:
+            'production requires a real Redis: an in-process cache cannot rate limit across instances',
+        });
+      }
       if (env.OTP_PROVIDER !== 'sms_gateway') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

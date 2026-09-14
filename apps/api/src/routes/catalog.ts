@@ -357,6 +357,44 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
       )
       .orderBy(asc(menuItems.sortOrder));
 
+    /*
+     * Which items carry a required choice.
+     *
+     * The app offers a one-tap add straight to the cart, and for a dish with a
+     * required group — a size, a bread — that add produces a line the kitchen
+     * cannot fill and the server rejects with MODIFIER_SELECTION_INVALID. The
+     * flag is what lets the row know to open the sheet instead, without
+     * fetching every group for every dish up front.
+     */
+    const itemIds = items.map((item) => item.id);
+    const requiredGroups =
+      itemIds.length > 0
+        ? await ctx.db
+            .selectDistinct({ itemId: itemModifierGroups.itemId })
+            .from(itemModifierGroups)
+            .innerJoin(modifierGroups, eq(itemModifierGroups.groupId, modifierGroups.id))
+            .where(
+              and(
+                inArray(itemModifierGroups.itemId, itemIds),
+                eq(modifierGroups.isActive, true),
+                eq(modifierGroups.isRequired, true),
+              ),
+            )
+        : [];
+    const requiresChoice = new Set(requiredGroups.map((row) => row.itemId));
+
+    const anyGroups =
+      itemIds.length > 0
+        ? await ctx.db
+            .selectDistinct({ itemId: itemModifierGroups.itemId })
+            .from(itemModifierGroups)
+            .innerJoin(modifierGroups, eq(itemModifierGroups.groupId, modifierGroups.id))
+            .where(
+              and(inArray(itemModifierGroups.itemId, itemIds), eq(modifierGroups.isActive, true)),
+            )
+        : [];
+    const hasOptions = new Set(anyGroups.map((row) => row.itemId));
+
     const hoursByBranch = await loadHours(ctx, [row.branch.id]);
     const hours = hoursByBranch.get(row.branch.id) ?? { rules: [], exceptions: [] };
     const openState = evaluateOpenState({
@@ -411,6 +449,9 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
                 image_asset_id: item.imageAssetId,
                 is_available: item.isAvailable,
                 is_popular: item.isPopular,
+                has_options: hasOptions.has(item.id),
+                /** True when the sheet must be opened rather than quick-added. */
+                requires_choice: requiresChoice.has(item.id),
                 // Cost price is restaurant-private and never leaves here (plan §39).
               })),
           })),

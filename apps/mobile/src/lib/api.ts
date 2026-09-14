@@ -312,6 +312,15 @@ export interface MenuItem {
   image_asset_id: string | null;
   is_available: boolean;
   is_popular: boolean;
+  has_options: boolean;
+  /**
+   * A required choice — a size, a bread — so the sheet must be opened.
+   *
+   * Adding such an item straight to the cart produces a line the kitchen
+   * cannot fill, and the server refuses it at the quote with
+   * MODIFIER_SELECTION_INVALID.
+   */
+  requires_choice: boolean;
 }
 
 export interface MenuCategory {

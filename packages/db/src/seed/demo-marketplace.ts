@@ -13,6 +13,7 @@ import {
   modifiers,
   providers,
   restaurantBranches,
+  restaurantCommissionConfigs,
   restaurantMembers,
   restaurants,
   users,
@@ -53,6 +54,15 @@ import {
 
 /** Every demo row carries this, so it can be found and removed as a set. */
 export const DEMO_PARTNER_PREFIX = 'DEMO-';
+
+/**
+ * What a demo restaurant pays Jibli per order.
+ *
+ * The same 500 as the platform default. Kept explicit rather than read from
+ * `platform_config` because a commission is a deal struck with one restaurant,
+ * and a demo that silently inherits a changed default would misprice itself.
+ */
+const DEMO_COMMISSION_FLAT_IQD = 500;
 
 /** Password for every seeded portal owner. Demo data, stated plainly. */
 const DEMO_PASSWORD = 'Jibli!Demo2026';
@@ -742,6 +752,37 @@ export async function seedDemoMarketplace(
           opensAtMinute: range ? at(range[0]) : 0,
           closesAtMinute: range ? at(range[1]) : 0,
           isClosed: range === null,
+        });
+      }
+
+      /*
+       * The commission this restaurant pays, without which it cannot be
+       * ordered from at all.
+       *
+       * `resolveCommissionFee` refuses to guess: a restaurant with no active
+       * config raises COMMISSION_CONFIG_MISSING and the quote fails. That is
+       * right — money is not inferred — but it meant the whole demo
+       * marketplace was browsable and unorderable, and nothing caught it until
+       * an order was actually attempted.
+       *
+       * Dated a day in the past so it is already active whatever the clock
+       * says when the seed runs.
+       */
+      const [activeCommission] = await tx
+        .select({ id: restaurantCommissionConfigs.id })
+        .from(restaurantCommissionConfigs)
+        .where(eq(restaurantCommissionConfigs.restaurantId, restaurantId))
+        .limit(1);
+
+      if (!activeCommission) {
+        await tx.insert(restaurantCommissionConfigs).values({
+          id: uuidv7(),
+          restaurantId,
+          commissionFlatIqd: DEMO_COMMISSION_FLAT_IQD,
+          settlementPolicy: 'HALF_MONTH',
+          paymentTermDays: 7,
+          effectiveFrom: new Date(Date.now() - 24 * 60 * 60 * 1000),
+          note: 'Demo marketplace default',
         });
       }
 

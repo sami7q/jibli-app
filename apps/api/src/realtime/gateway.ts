@@ -5,6 +5,29 @@ import { verifyAccessToken } from '@jibli/auth';
 import { channels } from '@jibli/contracts';
 import type { AppContext } from '../lib/context.js';
 
+
+/**
+ * The subscriber's own connection.
+ *
+ * Built through the same branch the application client uses, so a development
+ * run on `memory://` gets the in-process substitute here too — otherwise this
+ * tries to dial a host called "local" and floods the log with ENOENT while the
+ * rest of the API works fine.
+ */
+function createRealtimeSubscriber(ctx: AppContext): Redis {
+  if (ctx.env.REDIS_URL.startsWith('memory:')) {
+    // A publish and its subscriber must share one store, and `duplicate()` on
+    // the substitute returns a client backed by the same data.
+    return ctx.redis.duplicate();
+  }
+
+  return new Redis(ctx.env.REDIS_URL, {
+    keyPrefix: `${ctx.env.REDIS_NAMESPACE}:`,
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+  });
+}
+
 /**
  * Realtime gateway (plan §31, §63, §110).
  *
@@ -61,17 +84,17 @@ export async function registerRealtimeGateway(
    * it can issue no other commands. Sharing the application's client would
    * break every cache read and rate-limit check in the process.
    */
-  const subscriber = new Redis(ctx.env.REDIS_URL, {
-    keyPrefix: `${ctx.env.REDIS_NAMESPACE}:`,
-    maxRetriesPerRequest: null,
-    lazyConnect: true,
-  });
+  const subscriber = createRealtimeSubscriber(ctx);
 
   subscriber.on('error', (error: Error) => {
     ctx.logger.error({ event: 'realtime.redis_error', err: error.message }, 'Realtime Redis error');
   });
 
-  await subscriber.connect();
+  // The in-process substitute is connected on construction and answers a
+  // second request by throwing; that is the state we wanted, not a failure.
+  await subscriber.connect().catch((error: Error) => {
+    if (!/already connect/i.test(error.message)) throw error;
+  });
 
   /** Relay a published message to every socket subscribed to that channel. */
   subscriber.on('message', (channel: string, payload: string) => {

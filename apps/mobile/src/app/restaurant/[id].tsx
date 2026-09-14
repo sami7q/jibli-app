@@ -596,6 +596,14 @@ function MenuItemRow({
   onQuickAdd: () => void;
 }) {
   const unavailable = disabled || !item.is_available;
+  /*
+   * The plus is only offered where it cannot produce a broken line.
+   *
+   * A dish with a required group has to go through the sheet; adding it
+   * directly makes an order the kitchen cannot fill, which the server rejects
+   * at the quote — after the customer has already filled a basket.
+   */
+  const quickAddable = !unavailable && !item.requires_choice;
 
   /*
    * The card is a View, not a Pressable.
@@ -652,9 +660,16 @@ function MenuItemRow({
           </Text>
         ) : null}
 
-        <Text variant="smallBold" tone="brand">
-          {formatIqdArabic(iqd(item.price_iqd))}
-        </Text>
+        <Row gap={space[2]}>
+          <Text variant="smallBold" tone="brand">
+            {formatIqdArabic(iqd(item.price_iqd))}
+          </Text>
+          {item.requires_choice && !unavailable ? (
+            <Text variant="caption" tone="muted">
+              · اختر الحجم
+            </Text>
+          ) : null}
+        </Row>
 
         {!item.is_available ? (
           <Text variant="caption" tone="danger">
@@ -697,7 +712,7 @@ function MenuItemRow({
           * the row opens the dish, tapping the plus adds it, and nesting them
           * would make one swallow the other.
           */}
-        {!unavailable ? (
+        {quickAddable ? (
           <Pressable
             onPress={onQuickAdd}
             accessibilityRole="button"
