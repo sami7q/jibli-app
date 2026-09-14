@@ -415,53 +415,118 @@ function PhonePreview({
   return (
     <Card title="المعاينة" icon="live" subtitle="كما تظهر في التطبيق">
       <div className="phone">
-        <div className="phone__notch" aria-hidden />
+        {/* The rail buttons. Pure decoration, and the cheapest signal that this
+            is a device and not a browser panel. */}
+        <span className="phone__key phone__key--silent" aria-hidden />
+        <span className="phone__key phone__key--up" aria-hidden />
+        <span className="phone__key phone__key--down" aria-hidden />
+        <span className="phone__key phone__key--power" aria-hidden />
+
         <div className="phone__screen">
-          <div className="phone__banner">
-            {current ? (
-              <>
-                {current.image_asset_id ? (
-                  <img src={adminApi.assetUrl(current.image_asset_id)} alt="" />
-                ) : (
-                  <div className="phone__banner-fallback" aria-hidden />
-                )}
-                <div className="phone__banner-text">
-                  <strong>{current.title_ar}</strong>
-                  {current.subtitle_ar ? <span>{current.subtitle_ar}</span> : null}
-                </div>
-              </>
-            ) : (
-              <div className="phone__banner-empty">لا بنرات ظاهرة الآن</div>
-            )}
+          {/*
+            The status bar belongs to the operating system, not to Jibli — but
+            leaving it out is what made this read as a web panel with rounded
+            corners. 9:41 is the convention every device mockup uses.
+          */}
+          <div className="phone__status" aria-hidden>
+            <span className="phone__clock">9:41</span>
+            <span className="phone__island" />
+            <svg className="phone__signal" viewBox="0 0 44 12" fill="currentColor">
+              <rect x="0" y="7" width="3" height="5" rx="1" />
+              <rect x="5" y="5" width="3" height="7" rx="1" />
+              <rect x="10" y="3" width="3" height="9" rx="1" />
+              <rect x="15" y="1" width="3" height="11" rx="1" />
+              <path d="M23 4.4a7 7 0 0 1 8 0l-1.2 1.5a5 5 0 0 0-5.6 0Zm2 2.6a3.4 3.4 0 0 1 4 0L27 10Z" />
+              <rect x="34" y="2" width="8" height="8" rx="2" opacity="0.45" />
+              <rect x="34" y="2" width="6" height="8" rx="2" />
+            </svg>
           </div>
 
-          {banners.length > 1 ? (
-            <div className="phone__dots" aria-hidden>
-              {banners.map((banner, dot) => (
-                <span key={banner.id} className={dot === index ? 'is-on' : undefined} />
+          <div className="phone__app">
+            {/*
+              Header and search, because the banner does not sit at the top of
+              the screen in the app — it sits under them, and a preview that
+              puts it first is showing a layout nobody will see.
+            */}
+            <div className="phone__header" aria-hidden>
+              <span className="phone__area">
+                بغداد
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <span className="phone__logo">جيبلي</span>
+            </div>
+
+            <div className="phone__search" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+              </svg>
+              ابحث عن مطعم أو وجبة…
+            </div>
+
+            {/* Edge to edge and square-cornered, exactly as `PromoBanner
+                fullBleed` draws it on the device. */}
+            <div className="phone__banner">
+              {current ? (
+                <>
+                  {current.image_asset_id ? (
+                    <img src={adminApi.assetUrl(current.image_asset_id)} alt="" />
+                  ) : (
+                    <div className="phone__banner-fallback" aria-hidden />
+                  )}
+                  <div className="phone__banner-text">
+                    <strong>{current.title_ar}</strong>
+                    {current.subtitle_ar ? <span>{current.subtitle_ar}</span> : null}
+                  </div>
+                </>
+              ) : (
+                <div className="phone__banner-empty">لا بنرات ظاهرة الآن</div>
+              )}
+            </div>
+
+            {banners.length > 1 ? (
+              <div className="phone__dots" aria-hidden>
+                {banners.map((banner, dot) => (
+                  <span key={banner.id} className={dot === index ? 'is-on' : undefined} />
+                ))}
+              </div>
+            ) : null}
+
+            <div className="phone__cats">
+              {categories.slice(0, 8).map((category) => (
+                <span key={category.id} className="phone__cat">
+                  <span className="phone__cat-face">
+                    {category.image_asset_id ? (
+                      <img src={adminApi.assetUrl(category.image_asset_id)} alt="" />
+                    ) : (
+                      <span aria-hidden>{category.emoji ?? '🍽️'}</span>
+                    )}
+                  </span>
+                  <span className="phone__cat-name">{category.name_ar}</span>
+                </span>
               ))}
             </div>
-          ) : null}
 
-          <div className="phone__cats">
-            {categories.slice(0, 8).map((category) => (
-              <span key={category.id} className="phone__cat">
-                <span className="phone__cat-face">
-                  {category.image_asset_id ? (
-                    <img src={adminApi.assetUrl(category.image_asset_id)} alt="" />
-                  ) : (
-                    <span aria-hidden>{category.emoji ?? '🍽️'}</span>
-                  )}
-                </span>
-                <span className="phone__cat-name">{category.name_ar}</span>
+            {/* Stand-ins for the restaurant cards. They exist so the banner is
+                judged against content below it, the way it will be. */}
+            <div className="phone__skeleton" aria-hidden>
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+
+          <div className="phone__tabs" aria-hidden>
+            {['الرئيسية', 'المفضلة', 'طلباتي', 'حسابي'].map((tab, position) => (
+              <span key={tab} className={position === 0 ? 'is-on' : undefined}>
+                {tab}
               </span>
             ))}
           </div>
 
-          <div className="phone__skeleton" aria-hidden>
-            <span />
-            <span />
-          </div>
+          <span className="phone__home" aria-hidden />
         </div>
       </div>
     </Card>
