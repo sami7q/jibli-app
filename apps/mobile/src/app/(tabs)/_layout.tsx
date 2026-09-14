@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { color, radius, space, TAP_TARGET, text } from '@/theme';
+import { color, radius, space, TAB_BAR_HEIGHT, text } from '@/theme';
 
 /**
  * The shell.
@@ -29,8 +29,7 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: color.surfaceCard,
           borderTopColor: color.borderSubtle,
-          // Room for the home indicator on iOS, where the bar sits over it.
-          height: TAP_TARGET + (Platform.OS === 'ios' ? 34 : 14),
+          height: TAB_BAR_HEIGHT,
           paddingTop: space[1],
         },
         tabBarLabelStyle: text.caption,

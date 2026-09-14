@@ -33,6 +33,18 @@ export { color, palette, radius, space, fontSize, fontWeight, duration };
 export const TAP_TARGET = tapTarget.native;
 
 /**
+ * How tall the bottom tab bar is.
+ *
+ * Here rather than in the tabs layout because two things need it and only one
+ * of them draws it: anything floating above the bar — a live-order card, a
+ * toast — has to know where the bar ends, and a second copy of the number is
+ * how such a thing ends up half a centimetre out on one platform.
+ *
+ * The iOS figure covers the home indicator, which the bar sits over.
+ */
+export const TAB_BAR_HEIGHT = TAP_TARGET + (Platform.OS === 'ios' ? 34 : 14);
+
+/**
  * One bundled font file per weight, named by the family React Native will ask
  * for.
  *

@@ -7,9 +7,10 @@ import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError } from '@/lib/api';
 import { color, palette, radius, space, TAP_TARGET } from '@/theme';
-import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
+import { Button, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
 import { DriverCard, StatusTimeline, SummaryRow, type TimelineStep } from '@/ui/catalog';
 import { RateOrderSheet } from '@/ui/rate-order';
+import { isLiveOrderStatus, ORDER_JOURNEY } from '@/lib/order-watch';
 
 /**
  * The order, from placed to delivered (`7.html` and `8.html`).
@@ -24,30 +25,12 @@ import { RateOrderSheet } from '@/ui/rate-order';
  * or by the driver in Driver Mode. Nothing here is polled from a guess.
  */
 
-/** The journey, in the order it happens. Terminal states are handled apart. */
-const JOURNEY: OrderStatus[] = [
-  'PLACED',
-  'ACCEPTED',
-  'PREPARING',
-  'READY',
-  'OUT_FOR_DELIVERY',
-  'DELIVERED',
-];
-
 /** Statuses the customer may still cancel from; the server decides finally. */
 const CANCELLABLE: OrderStatus[] = ['PLACED', 'PENDING_RESTAURANT'];
 
-const LIVE: OrderStatus[] = [
-  'PLACED',
-  'PENDING_RESTAURANT',
-  'ACCEPTED',
-  'PREPARING',
-  'READY',
-  'OUT_FOR_DELIVERY',
-];
 
 export default function OrderScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, placed } = useLocalSearchParams<{ id: string; placed?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [rating, setRating] = useState(false);
@@ -65,7 +48,7 @@ export default function OrderScreen() {
      * while someone is actually watching it.
      */
     refetchInterval: (query) =>
-      query.state.data && LIVE.includes(query.state.data.status) ? 20_000 : false,
+      query.state.data && isLiveOrderStatus(query.state.data.status) ? 20_000 : false,
   });
 
   const eligibility = useQuery({
@@ -78,7 +61,7 @@ export default function OrderScreen() {
     mutationFn: () => api.cancelOrder(id, 'CUSTOMER_CHANGED_MIND'),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['order', id] });
-      void queryClient.invalidateQueries({ queryKey: ['orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-orders'] });
     },
     onError: (error) =>
       Alert.alert(
@@ -112,9 +95,9 @@ export default function OrderScreen() {
     }
 
     const current = data.status === 'COMPLETED' ? 'DELIVERED' : data.status;
-    const currentIndex = JOURNEY.indexOf(current as OrderStatus);
+    const currentIndex = ORDER_JOURNEY.indexOf(current as never);
 
-    return JOURNEY.map((status, index) => ({
+    return ORDER_JOURNEY.map((status, index) => ({
       label: ORDER_STATUS_LABELS[status],
       at: formatTime(reachedAt.get(status) ?? (status === 'PLACED' ? data.placed_at : null)),
       state: index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'pending',
@@ -143,6 +126,15 @@ export default function OrderScreen() {
   }
 
   const data = order.data;
+
+  /*
+   * Only while it is still true. A customer who leaves the screen open until
+   * the restaurant accepts should see the order moving, not a stale banner
+   * congratulating them on sending it.
+   */
+  const justPlaced =
+    placed === '1' && (data.status === 'PLACED' || data.status === 'PENDING_RESTAURANT');
+
   const restaurantName =
     typeof data.restaurant?.name_ar === 'string' ? data.restaurant.name_ar : 'المطعم';
 
@@ -165,6 +157,18 @@ export default function OrderScreen() {
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[10] }}
         showsVerticalScrollIndicator={false}
       >
+        {/*
+          * The answer to «هل وصل طلبي؟», given before anything else.
+          *
+          * The screen used to open on a status timeline with a full-width red
+          * «إلغاء الطلب» under it, and that is the wrong first impression of a
+          * successful order: the loudest thing on the page was the way out of
+          * it. The confirmation is drawn only for the hop straight from
+          * checkout — coming back to the same order an hour later, it would be
+          * telling the customer something they did themselves.
+          */}
+        {justPlaced ? <PlacedConfirmation orderNumber={data.public_order_number} /> : null}
+
         <StatusBanner status={data.status} etaMinutes={data.estimated_preparation_minutes} />
 
         {/*
@@ -278,19 +282,40 @@ export default function OrderScreen() {
           </Row>
         ) : null}
 
+        {/*
+          * A way out, not an invitation.
+          *
+          * This was a filled red full-width button — the single most prominent
+          * control on a screen whose news is good — and a destructive action
+          * drawn like a primary one is an action people take by mistake and by
+          * suggestion. It is still one tap away and still says exactly what it
+          * does; it simply no longer outranks the order it would cancel.
+          */}
         {CANCELLABLE.includes(data.status) ? (
-          <Button
-            label="إلغاء الطلب"
-            variant="danger"
-            block
-            loading={cancel.isPending}
+          <Pressable
             onPress={() =>
               Alert.alert('إلغاء الطلب', 'هل تريد إلغاء هذا الطلب؟', [
                 { text: 'تراجع', style: 'cancel' },
                 { text: 'إلغاء الطلب', style: 'destructive', onPress: () => cancel.mutate() },
               ])
             }
-          />
+            disabled={cancel.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="إلغاء الطلب"
+            style={({ pressed }) => [
+              {
+                minHeight: TAP_TARGET,
+                justifyContent: 'center',
+                alignItems: 'center',
+                opacity: cancel.isPending ? 0.5 : 1,
+              },
+              pressed ? { opacity: 0.6 } : null,
+            ]}
+          >
+            <Text variant="small" tone="danger">
+              {cancel.isPending ? 'جارٍ الإلغاء…' : 'إلغاء الطلب'}
+            </Text>
+          </Pressable>
         ) : null}
       </ScrollView>
 
@@ -305,6 +330,46 @@ export default function OrderScreen() {
         }}
       />
     </Screen>
+  );
+}
+
+/**
+ * «تم إرسال طلبك» — the screen's first sentence, on the hop from checkout.
+ *
+ * It carries the order number because that is the one thing a customer will be
+ * asked for on the phone, and it says an update is coming so that waiting feels
+ * like waiting rather than like nothing happening.
+ */
+function PlacedConfirmation({ orderNumber }: { orderNumber: string }) {
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={{
+        padding: space[4],
+        borderRadius: radius.lg,
+        backgroundColor: color.successSoft,
+        borderWidth: 1,
+        borderColor: color.success,
+        alignItems: 'center',
+        gap: space[2],
+      }}
+    >
+      <MaterialCommunityIcons name="check-circle" size={40} color={color.success} />
+      <Text variant="h3" tone="success" align="center">
+        تم إرسال طلبك بنجاح
+      </Text>
+      <Text variant="small" tone="secondary" align="center">
+        وصل طلبك إلى المطعم، وسيصلك إشعار بكل تحديث على حالته.
+      </Text>
+      <Row gap={space[1]}>
+        <Text variant="caption" tone="muted">
+          رقم الطلب
+        </Text>
+        <Ltr>
+          <Text variant="smallBold">{orderNumber}</Text>
+        </Ltr>
+      </Row>
+    </View>
   );
 }
 

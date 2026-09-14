@@ -18,6 +18,7 @@ import { SessionProvider, useSession } from '@/lib/session';
 import { AreaProvider } from '@/lib/area';
 import { CartProvider } from '@/lib/cart';
 import { OfflineBanner, startNetworkWatch } from '@/lib/network';
+import { ActiveOrderBar, OrderWatchProvider } from '@/lib/order-watch';
 import { ErrorBoundary } from '@/lib/error-boundary';
 import { color, enforceRtl, palette } from '@/theme';
 
@@ -87,9 +88,24 @@ export default function RootLayout() {
           <SessionProvider>
             <AreaProvider>
               <CartProvider>
-                <StatusBar style="dark" />
-                <OfflineBanner />
-                <Gate />
+                {/*
+                  * Inside the router's tree and outside every screen: the bar
+                  * has to survive navigation to be worth anything, and the
+                  * watcher behind it has to keep polling while the customer is
+                  * three screens away reading a different menu.
+                  */}
+                <OrderWatchProvider>
+                  <StatusBar style="dark" />
+                  <OfflineBanner />
+                  <Gate />
+                  {/*
+                    * After the screens, not before them. The card floats over
+                    * whatever is showing, and React Native stacks by order —
+                    * drawn first, it would sit under every screen it is meant
+                    * to float above.
+                    */}
+                  <ActiveOrderBar />
+                </OrderWatchProvider>
               </CartProvider>
             </AreaProvider>
           </SessionProvider>

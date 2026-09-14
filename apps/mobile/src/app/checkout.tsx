@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, idempotencyKey, NetworkError, type Address } from '@/lib/api';
+import { registerForPush } from '@/lib/push';
 import { useArea } from '@/lib/area';
 import { captureCurrentLocation, LOCATION_MESSAGES_AR, type Coordinates } from '@/lib/location';
 import { useCart, useOrderLines } from '@/lib/cart';
@@ -91,8 +92,25 @@ export default function CheckoutScreen() {
       ),
     onSuccess: (order) => {
       clear();
-      void queryClient.invalidateQueries({ queryKey: ['orders'] });
-      router.replace(`/order/${order.order_id}`);
+      void queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+
+      /*
+       * The moment to ask for notifications, and the only one.
+       *
+       * `registerForPush` was written for exactly this call and nothing ever
+       * made it — so the permission the app declares was never requested, no
+       * token ever reached the server, and every "your order was accepted" the
+       * worker produced had nowhere to go. Asked here rather than at launch
+       * because "tell me when my food arrives" is a question with an obvious
+       * answer only once there is food on the way. It never rejects, and it is
+       * deliberately not awaited: a customer who declines has still placed a
+       * perfectly good order and should be looking at it already.
+       */
+      void registerForPush();
+
+      // `placed=1` is what turns the order screen's header into a confirmation
+      // rather than a status it silently already had.
+      router.replace(`/order/${order.order_id}?placed=1`);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
