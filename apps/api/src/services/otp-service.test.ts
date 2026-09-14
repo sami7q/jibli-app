@@ -24,6 +24,8 @@ interface Captured {
   codeHash: string;
   smsBodies: string[];
   providerNames: string[];
+  /** Redis keys that were incremented or written, in order. */
+  counters: string[];
 }
 
 /**
@@ -33,7 +35,11 @@ interface Captured {
  * stubbed rather than mocked so the test fails on a changed call shape instead
  * of silently passing.
  */
-function makeContext(extraEnv: Record<string, string> = {}): {
+function makeContext(
+  extraEnv: Record<string, string> = {},
+  /** Pretend the cooldown is armed and the hourly counter is past the cap. */
+  limitsExhausted = false,
+): {
   ctx: AppContext;
   captured: Captured;
 } {
@@ -42,6 +48,7 @@ function makeContext(extraEnv: Record<string, string> = {}): {
     codeHash: '',
     smsBodies: [],
     providerNames: [],
+    counters: [],
   };
 
   const env = loadApiEnv({
@@ -67,10 +74,19 @@ function makeContext(extraEnv: Record<string, string> = {}): {
   };
 
   const redis = {
-    ttl: async () => -2,
-    incr: async () => 1,
+    ttl: async (key: string) => {
+      captured.counters.push(`ttl ${key}`);
+      return limitsExhausted ? 30 : -2;
+    },
+    incr: async (key: string) => {
+      captured.counters.push(`incr ${key}`);
+      return limitsExhausted ? 99 : 1;
+    },
     expire: async () => 1,
-    set: async () => 'OK',
+    set: async (key: string) => {
+      captured.counters.push(`set ${key}`);
+      return 'OK';
+    },
   };
 
   const logger = {
@@ -143,6 +159,44 @@ describe('requestOtp() with OTP_TEST_PHONES', () => {
     await request(ctx, OTHER_PHONE);
 
     expect(captured.providerNames).toEqual(['sms_gateway']);
+  });
+
+  it('is not refused by a cooldown or an exhausted hourly cap', async () => {
+    const { ctx, captured } = makeContext({ OTP_TEST_PHONES: TEST_PHONE }, true);
+
+    // The stub says the cooldown is armed and the counter is far past the cap.
+    // For a number that sends no SMS, the limits guard a budget that does not
+    // exist, and the only thing they can do is lock the reviewer out.
+    await expect(request(ctx, TEST_PHONE)).resolves.toMatchObject({
+      devCode: '1234',
+      resendAfterSeconds: 0,
+    });
+
+    expect(captured.counters.some((c) => c.includes('otp:cooldown'))).toBe(false);
+    expect(captured.counters.some((c) => c.includes('otp:phone:'))).toBe(false);
+  });
+
+  it('still counts the request against the caller IP', async () => {
+    const { ctx, captured } = makeContext({ OTP_TEST_PHONES: TEST_PHONE });
+
+    // That cap protects the server rather than an SMS budget, and the URL is
+    // public — so it applies to a test number like any other.
+    await requestOtp(ctx, {
+      phoneE164: TEST_PHONE,
+      ip: '10.0.0.1',
+      userAgent: null,
+      requestId: 'r2',
+    }).catch(() => undefined);
+
+    expect(captured.counters).toContain('incr otp:ip:h:10.0.0.1');
+  });
+
+  it('still refuses an unlisted number once its cooldown is armed', async () => {
+    const { ctx } = makeContext({ OTP_TEST_PHONES: TEST_PHONE }, true);
+
+    await expect(request(ctx, OTHER_PHONE)).rejects.toMatchObject({
+      code: 'OTP_COOLDOWN_ACTIVE',
+    });
   });
 
   it('changes nothing when the list is empty', async () => {

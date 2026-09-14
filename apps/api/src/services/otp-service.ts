@@ -72,33 +72,52 @@ export async function requestOtp(
   const { env } = ctx;
   const phone = input.phoneE164;
 
+  /*
+   * A listed test number is exempt from the per-number limits.
+   *
+   * Both limits exist for reasons that do not apply to it. The cooldown and
+   * the hourly cap protect an SMS budget — a test number never reaches a
+   * gateway, so there is no budget to protect. The caps also make number
+   * enumeration expensive — the code here is a constant that is written down
+   * in the documentation, so there is nothing to enumerate.
+   *
+   * What the limit did achieve was locking the reviewer out of the demo
+   * account for an hour after five taps, which is the only effect it could
+   * ever have had here. The per-IP cap below still applies: that one protects
+   * the server rather than the budget, and the URL is public.
+   */
+  const isTestPhone = parseCsv(env.OTP_TEST_PHONES).includes(phone);
+
   // 1. Cooldown — stops a tap-happy user (or a script) from burning SMS budget.
-  const cooldownTtl = await ctx.redis.ttl(keys.cooldown(phone));
-  if (cooldownTtl > 0) {
-    throw new AppError(ERROR_CODES.OTP_COOLDOWN_ACTIVE, {
-      details: { resendAfterSeconds: cooldownTtl },
-    });
+  if (!isTestPhone) {
+    const cooldownTtl = await ctx.redis.ttl(keys.cooldown(phone));
+    if (cooldownTtl > 0) {
+      throw new AppError(ERROR_CODES.OTP_COOLDOWN_ACTIVE, {
+        details: { resendAfterSeconds: cooldownTtl },
+      });
+    }
+
+    // 2. Volume limits per number.
+    const perHour = await incrementWithWindow(ctx, keys.perPhoneHour(phone), 3600);
+    if (perHour > env.OTP_MAX_PER_PHONE_HOUR) {
+      ctx.logger.warn(
+        { event: 'otp.rate_limited', scope: 'phone_hour', phone: maskPhoneForLog(phone) },
+        'OTP hourly limit exceeded',
+      );
+      throw new AppError(ERROR_CODES.OTP_RATE_LIMITED, { details: { window: 'hour' } });
+    }
+
+    const perDay = await incrementWithWindow(ctx, keys.perPhoneDay(phone), 86_400);
+    if (perDay > env.OTP_MAX_PER_PHONE_DAY) {
+      ctx.logger.warn(
+        { event: 'otp.rate_limited', scope: 'phone_day', phone: maskPhoneForLog(phone) },
+        'OTP daily limit exceeded',
+      );
+      throw new AppError(ERROR_CODES.OTP_RATE_LIMITED, { details: { window: 'day' } });
+    }
   }
 
-  // 2. Volume limits per number and per IP.
-  const perHour = await incrementWithWindow(ctx, keys.perPhoneHour(phone), 3600);
-  if (perHour > env.OTP_MAX_PER_PHONE_HOUR) {
-    ctx.logger.warn(
-      { event: 'otp.rate_limited', scope: 'phone_hour', phone: maskPhoneForLog(phone) },
-      'OTP hourly limit exceeded',
-    );
-    throw new AppError(ERROR_CODES.OTP_RATE_LIMITED, { details: { window: 'hour' } });
-  }
-
-  const perDay = await incrementWithWindow(ctx, keys.perPhoneDay(phone), 86_400);
-  if (perDay > env.OTP_MAX_PER_PHONE_DAY) {
-    ctx.logger.warn(
-      { event: 'otp.rate_limited', scope: 'phone_day', phone: maskPhoneForLog(phone) },
-      'OTP daily limit exceeded',
-    );
-    throw new AppError(ERROR_CODES.OTP_RATE_LIMITED, { details: { window: 'day' } });
-  }
-
+  // 3. Volume limit per IP — always, test number or not.
   if (input.ip) {
     const perIp = await incrementWithWindow(ctx, keys.perIpHour(input.ip), 3600);
     if (perIp > env.OTP_MAX_PER_IP_HOUR) {
@@ -107,7 +126,7 @@ export async function requestOtp(
     }
   }
 
-  // 3. Invalidate any outstanding challenge, so only the newest code works.
+  // 4. Invalidate any outstanding challenge, so only the newest code works.
   await ctx.db
     .update(otpChallenges)
     .set({ consumedAt: new Date() })
@@ -133,7 +152,6 @@ export async function requestOtp(
    * on a public URL to fix that is too much; opening the demo account is
    * enough, and it is refused in production too.
    */
-  const isTestPhone = parseCsv(env.OTP_TEST_PHONES).includes(phone);
   const fixedCode = env.OTP_PROVIDER === 'mock' || isTestPhone;
   const code = fixedCode
     ? env.OTP_MOCK_CODE.slice(0, env.OTP_LENGTH).padEnd(env.OTP_LENGTH, '0')
@@ -154,7 +172,7 @@ export async function requestOtp(
   });
 
   /*
-   * 4. Deliver. The staging allowlist wraps the provider so a non-production
+   * 5. Deliver. The staging allowlist wraps the provider so a non-production
    *    deployment cannot text an arbitrary real number (plan §7).
    *
    *    A test number never reaches the real gateway. Its code is a constant
@@ -182,7 +200,10 @@ export async function requestOtp(
     throw new AppError(ERROR_CODES.OTP_DELIVERY_FAILED);
   }
 
-  await ctx.redis.set(keys.cooldown(phone), '1', 'EX', env.OTP_RESEND_COOLDOWN_SECONDS);
+  // No cooldown is armed for a test number, so the next tap is not refused.
+  if (!isTestPhone) {
+    await ctx.redis.set(keys.cooldown(phone), '1', 'EX', env.OTP_RESEND_COOLDOWN_SECONDS);
+  }
 
   ctx.logger.info(
     { event: 'otp.requested', phone: maskPhoneForLog(phone), requestId: input.requestId },
@@ -190,7 +211,9 @@ export async function requestOtp(
   );
 
   return {
-    resendAfterSeconds: env.OTP_RESEND_COOLDOWN_SECONDS,
+    // Zero for a test number: the screen's countdown mirrors the server's
+    // cooldown, and there is none to mirror.
+    resendAfterSeconds: isTestPhone ? 0 : env.OTP_RESEND_COOLDOWN_SECONDS,
     expiresInSeconds: env.OTP_TTL_SECONDS,
     /*
      * Returned when a developer is meant to see it: local development, the
