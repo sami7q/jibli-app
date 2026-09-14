@@ -8,7 +8,7 @@ import {
   ORDER_CANCELLATION_REASONS,
   success,
 } from '@jibli/contracts';
-import { assertProfileComplete } from '@jibli/auth';
+import { assertPhoneVerified, assertProfileComplete } from '@jibli/auth';
 import {
   idempotencyKeySchema,
   quantitySchema,
@@ -78,6 +78,7 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
    */
   app.post('/api/v1/checkout/quote', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
+    assertPhoneVerified(principal);
     assertProfileComplete(principal);
     const body = quoteSchema.parse(request.body);
 
@@ -130,6 +131,7 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
    */
   app.post('/api/v1/orders', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
+    assertPhoneVerified(principal);
     assertProfileComplete(principal);
 
     const body = placeOrderSchema.parse(request.body);

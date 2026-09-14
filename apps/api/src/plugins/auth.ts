@@ -47,6 +47,7 @@ async function resolvePrincipal(
       id: users.id,
       status: users.status,
       profileCompletedAt: users.profileCompletedAt,
+      phoneVerifiedAt: users.phoneVerifiedAt,
       deletedAt: users.deletedAt,
     })
     .from(users)
@@ -96,6 +97,7 @@ async function resolvePrincipal(
     // A suspended driver keeps their customer identity but loses Driver Mode.
     driverId: driver && driver.status === 'ACTIVE' ? driver.id : null,
     profileCompleted: user.profileCompletedAt !== null,
+    phoneVerified: user.phoneVerifiedAt !== null,
     mfaAt: claims.mfaAt ? new Date(claims.mfaAt) : null,
   };
 }

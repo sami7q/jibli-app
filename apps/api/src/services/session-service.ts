@@ -38,6 +38,13 @@ export interface SessionCapabilities {
   readonly fullName: string | null;
   /** Portal sign-in name. Null for a phone-only customer or driver. */
   readonly username: string | null;
+  /**
+   * Whether a phone number has been proved.
+   *
+   * A Google sign-in does not prove one, and an order needs a number a driver
+   * can call — so this gates checkout, not the session.
+   */
+  readonly phoneVerified: boolean;
   /** Which app modes the client should offer (plan §47). */
   readonly modes: ('CUSTOMER' | 'DRIVER')[];
   /**
@@ -68,6 +75,7 @@ export async function loadCapabilities(
       profileCompletedAt: users.profileCompletedAt,
       fullName: users.fullName,
       username: users.username,
+      phoneVerifiedAt: users.phoneVerifiedAt,
       governorateId: users.profileGovernorateId,
       governorateNameAr: governorates.nameAr,
       cityId: users.profileCityId,
@@ -115,6 +123,7 @@ export async function loadCapabilities(
     profileCompleted: user?.profileCompletedAt !== null && user?.profileCompletedAt !== undefined,
     fullName: user?.fullName ?? null,
     username: user?.username ?? null,
+    phoneVerified: user?.phoneVerifiedAt != null,
     modes,
     area:
       user?.cityId && user.cityNameAr && user.governorateId && user.governorateNameAr

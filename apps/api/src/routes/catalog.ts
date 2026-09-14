@@ -173,6 +173,137 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
     );
   });
 
+  /**
+   * Search dishes across a city — «دجاج» finds every chicken dish on offer.
+   *
+   * Discovery searched restaurant names only, so a customer who wants chicken
+   * and does not know which restaurant sells it finds nothing. This searches
+   * the menu and answers with dishes, each carrying the restaurant it belongs
+   * to, so the result is something that can be ordered rather than a list of
+   * places that might have it.
+   *
+   * Ordered open-first, then by rating: the customer wants dinner now, and a
+   * dish from a kitchen that is shut is a worse answer than one from a kitchen
+   * that is cooking, whatever its name.
+   */
+  app.get('/api/v1/menu/search', async (request, reply) => {
+    const query = z
+      .object({
+        city_id: uuidSchema,
+        q: searchQuerySchema,
+        limit: z.coerce.number().int().min(1).max(60).default(30),
+      })
+      .parse(request.query);
+
+    const term = `%${query.q}%`;
+    const normalized = `%${normalizeArabicForSearch(query.q)}%`;
+
+    const rows = await ctx.db
+      .select({
+        itemId: menuItems.id,
+        nameAr: menuItems.nameAr,
+        descriptionAr: menuItems.descriptionAr,
+        priceIqd: menuItems.basePriceIqd,
+        imageAssetId: menuItems.imageAssetId,
+        isAvailable: menuItems.isAvailable,
+        isPopular: menuItems.isPopular,
+        restaurantId: restaurants.id,
+        branchId: restaurantBranches.id,
+        restaurantName: restaurants.displayName,
+        coverAssetId: restaurants.coverAssetId,
+        ratingAverage: restaurants.ratingAverage,
+        deliveryFeeIqd: restaurantBranches.deliveryFeeIqd,
+        minimumOrderIqd: restaurants.minimumOrderIqd,
+        basePreparationMinutes: restaurantBranches.basePreparationMinutes,
+        acceptsOrders: restaurantBranches.acceptsOrders,
+        busyMode: restaurantBranches.busyMode,
+        busyModeExpiresAt: restaurantBranches.busyModeExpiresAt,
+      })
+      .from(menuItems)
+      .innerJoin(restaurants, eq(menuItems.restaurantId, restaurants.id))
+      .innerJoin(restaurantBranches, eq(restaurantBranches.restaurantId, restaurants.id))
+      .innerJoin(cities, eq(restaurantBranches.cityId, cities.id))
+      .innerJoin(governorates, eq(cities.governorateId, governorates.id))
+      .where(
+        and(
+          // The same marketplace eligibility as discovery: a dish from a
+          // suspended restaurant must not be findable by another route.
+          eq(restaurantBranches.cityId, query.city_id),
+          eq(restaurantBranches.isActive, true),
+          eq(restaurants.onboardingStatus, 'APPROVED'),
+          eq(restaurants.operationalStatus, 'ACTIVE'),
+          eq(cities.isEnabled, true),
+          eq(cities.orderingEnabled, true),
+          eq(governorates.isEnabled, true),
+          eq(governorates.orderingEnabled, true),
+          eq(menuItems.isActive, true),
+          isNull(menuItems.deletedAt),
+          isNull(restaurants.deletedAt),
+          isNull(restaurantBranches.deletedAt),
+          or(
+            ilike(menuItems.nameAr, term),
+            ilike(menuItems.nameAr, normalized),
+            ilike(menuItems.descriptionAr, term),
+            // The restaurant's own name, so «برجر بغداد» finds its whole menu.
+            ilike(restaurants.displayName, term),
+          ),
+        ),
+      )
+      .orderBy(sql`${restaurants.ratingAverage} DESC NULLS LAST`, asc(menuItems.sortOrder))
+      .limit(query.limit);
+
+    const hoursByBranch = await loadHours(ctx, [...new Set(rows.map((row) => row.branchId))]);
+
+    const dishes = rows.map((row) => {
+      const hours = hoursByBranch.get(row.branchId) ?? { rules: [], exceptions: [] };
+      const openState = evaluateOpenState({
+        rules: hours.rules,
+        exceptions: hours.exceptions,
+        busyMode: row.busyMode,
+        busyModeExpiresAt: row.busyModeExpiresAt,
+        basePreparationMinutes: row.basePreparationMinutes,
+      });
+
+      return {
+        id: row.itemId,
+        name_ar: row.nameAr,
+        description_ar: row.descriptionAr,
+        price_iqd: row.priceIqd,
+        image_asset_id: row.imageAssetId,
+        is_available: row.isAvailable,
+        is_popular: row.isPopular,
+        restaurant: {
+          id: row.restaurantId,
+          branch_id: row.branchId,
+          display_name: row.restaurantName,
+          cover_asset_id: row.coverAssetId,
+          rating: row.ratingAverage,
+          delivery_fee_iqd: row.deliveryFeeIqd,
+          minimum_order_iqd: row.minimumOrderIqd,
+          estimated_preparation_minutes: openState.estimatedPreparationMinutes,
+          is_open: openState.isOpen,
+          accepts_orders: row.acceptsOrders && openState.acceptsOrders,
+        },
+      };
+    });
+
+    /*
+     * Open kitchens first.
+     *
+     * Not expressible in ORDER BY — whether a branch is open comes out of the
+     * working-hours evaluation above — so it is applied to the page that was
+     * fetched. Within each group the SQL order holds, so rating still decides.
+     */
+    const data = [...dishes].sort(
+      (left, right) =>
+        Number(right.restaurant.accepts_orders) - Number(left.restaurant.accepts_orders),
+    );
+
+    return reply.send(
+      success(data, { request_id: request.requestId, page_size: query.limit }),
+    );
+  });
+
   /** Restaurant detail with its full menu. */
   app.get('/api/v1/restaurants/:restaurantId', async (request, reply) => {
     const { restaurantId } = z.object({ restaurantId: uuidSchema }).parse(request.params);

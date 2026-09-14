@@ -37,6 +37,23 @@ const config: ExpoConfig = {
      */
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'https://jibli-api.onrender.com',
     /*
+     * Google sign-in, off until these are filled in.
+     *
+     * Three ids for one application, because Google issues one per platform.
+     * They are not secrets — they ship in every client — but they differ
+     * between a development project and a production one, so they are
+     * configuration rather than constants. The sign-in screen hides the button
+     * when they are absent: a Google button that fails is worse than none.
+     *
+     * Shipping this on iOS obliges Sign in with Apple beside it (App Store
+     * guideline 4.8). That work is not done.
+     */
+    google: {
+      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+      androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    },
+    /*
      * Reachable from inside the app, not only from the store listing.
      *
      * App Review checks that the privacy policy is linked in-app (5.1.1), and

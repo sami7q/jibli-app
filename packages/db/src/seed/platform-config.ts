@@ -27,7 +27,7 @@ const DEFAULTS: readonly ConfigSeed[] = [
   },
   {
     key: 'platform_service_fee_iqd',
-    value: 1000,
+    value: 500,
     descriptionAr: 'رسوم الخدمة التي يدفعها العميل لكل طلب',
     isSensitive: true,
   },

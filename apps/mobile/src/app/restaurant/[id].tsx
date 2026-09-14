@@ -50,11 +50,49 @@ export default function RestaurantScreen() {
     }
   };
 
+  const { add } = useCart();
+
   const restaurant = useQuery({
     queryKey: ['restaurant', id],
     queryFn: () => api.restaurant(id),
     enabled: Boolean(id),
   });
+
+  /**
+   * One tap, one item, no sheet.
+   *
+   * Straight to the cart at the listed price with no options chosen — which is
+   * correct for a dish that has none, and is what most dishes are. An item
+   * whose options include a required group still has to go through the sheet,
+   * so this is only offered where it cannot produce an order the kitchen
+   * cannot fill; see `quickAddable` below.
+   */
+  const quickAdd = (item: MenuItem) => {
+    const detail = restaurant.data;
+    if (!detail) return;
+
+    const result = add(
+      {
+        restaurantId: detail.id,
+        branchId: detail.branch_id,
+        restaurantName: detail.display_name,
+        deliveryFeeIqd: detail.delivery_fee_iqd,
+        minimumOrderIqd: detail.minimum_order_iqd,
+      },
+      {
+        menuItemId: item.id,
+        nameAr: item.name_ar,
+        unitPriceIqd: item.price_iqd,
+        quantity: 1,
+        imageAssetId: item.image_asset_id,
+        notes: null,
+      },
+    );
+
+    if (result === 'replaced') {
+      Alert.alert('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
+    }
+  };
 
   const categories = restaurant.data?.categories ?? [];
   const shownCategories = useMemo(
@@ -188,6 +226,7 @@ export default function RestaurantScreen() {
                       item={item}
                       disabled={!detail.orderable}
                       onPress={() => setOpenItem(item)}
+                      onQuickAdd={() => quickAdd(item)}
                     />
                   ))}
                 </View>
@@ -542,35 +581,51 @@ function MenuItemRow({
   item,
   disabled,
   onPress,
+  onQuickAdd,
 }: {
   item: MenuItem;
   disabled: boolean;
   onPress: () => void;
+  /**
+   * Add straight to the cart, skipping the sheet.
+   *
+   * Most dishes have no options at all — a salad, a bottle of water — and for
+   * those the sheet opens, shows a price the row already showed, and closes.
+   * The plus does the whole job in one tap.
+   */
+  onQuickAdd: () => void;
 }) {
   const unavailable = disabled || !item.is_available;
 
+  /*
+   * The card is a View, not a Pressable.
+   *
+   * The plus is its own control, and a button inside a button is invalid on
+   * the web and ambiguous on a phone — whichever one wins the touch, the other
+   * is unreachable. So the text area is the pressable that opens the dish, and
+   * the plus sits beside it as a sibling.
+   */
   return (
-    <Pressable
-      onPress={unavailable ? undefined : onPress}
-      disabled={unavailable}
-      accessibilityRole="button"
-      accessibilityLabel={item.name_ar}
-      accessibilityState={{ disabled: unavailable }}
-      style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          gap: space[3],
-          padding: space[3],
-          backgroundColor: color.surfaceCard,
-          borderRadius: radius.lg,
-          borderWidth: 1,
-          borderColor: color.borderSubtle,
-          opacity: unavailable ? 0.55 : 1,
-        },
-        pressed ? { opacity: 0.8 } : null,
-      ]}
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: space[3],
+        padding: space[3],
+        backgroundColor: color.surfaceCard,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: color.borderSubtle,
+        opacity: unavailable ? 0.55 : 1,
+      }}
     >
-      <View style={{ flex: 1, gap: space[1] }}>
+      <Pressable
+        onPress={unavailable ? undefined : onPress}
+        disabled={unavailable}
+        accessibilityRole="button"
+        accessibilityLabel={item.name_ar}
+        accessibilityState={{ disabled: unavailable }}
+        style={({ pressed }) => [{ flex: 1, gap: space[1] }, pressed ? { opacity: 0.7 } : null]}
+      >
         <Row gap={space[2]}>
           <Text variant="bodyBold" numberOfLines={1} style={{ flexShrink: 1 }}>
             {item.name_ar}
@@ -606,34 +661,71 @@ function MenuItemRow({
             غير متوفر حالياً
           </Text>
         ) : null}
-      </View>
+      </Pressable>
 
-      <View
-        style={{
-          width: 88,
-          height: 88,
-          borderRadius: radius.md,
-          overflow: 'hidden',
-          backgroundColor: color.surfaceSunken,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {item.image_asset_id ? (
-          <Image
-            source={{ uri: assetUrl(item.image_asset_id) }}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
-        ) : (
-          <MaterialCommunityIcons
-            name="silverware-fork-knife"
-            size={24}
-            color={palette.orange[300]}
-          />
-        )}
+      <View>
+        <View
+          style={{
+            width: 88,
+            height: 88,
+            borderRadius: radius.md,
+            overflow: 'hidden',
+            backgroundColor: color.brandSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {item.image_asset_id ? (
+            <Image
+              source={{ uri: assetUrl(item.image_asset_id) }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <MaterialCommunityIcons
+              name="silverware-fork-knife"
+              size={24}
+              color={palette.orange[300]}
+            />
+          )}
+        </View>
+
+        {/*
+          * The plus, over the corner of the picture.
+          *
+          * Its own Pressable rather than a control inside the row's: tapping
+          * the row opens the dish, tapping the plus adds it, and nesting them
+          * would make one swallow the other.
+          */}
+        {!unavailable ? (
+          <Pressable
+            onPress={onQuickAdd}
+            accessibilityRole="button"
+            accessibilityLabel={`إضافة ${item.name_ar} إلى السلة`}
+            hitSlop={space[2]}
+            style={({ pressed }) => [
+              {
+                position: 'absolute',
+                bottom: -space[2],
+                insetInlineStart: -space[2],
+                width: 34,
+                height: 34,
+                borderRadius: radius.full,
+                backgroundColor: color.brand,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: color.surfaceCard,
+              },
+              shadow.sm,
+              pressed ? { opacity: 0.75 } : null,
+            ]}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color={palette.white} />
+          </Pressable>
+        ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -12,8 +13,15 @@ import { useQuery } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { api, ApiError, assetUrl, type RestaurantCard as RestaurantSummary } from '@/lib/api';
+import {
+  api,
+  ApiError,
+  assetUrl,
+  type DishResult,
+  type RestaurantCard as RestaurantSummary,
+} from '@/lib/api';
 import { useArea } from '@/lib/area';
+import { useCart } from '@/lib/cart';
 import { useIsGuest, useMe } from '@/lib/session';
 import { color, palette, radius, space, TAP_TARGET } from '@/theme';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
@@ -56,24 +64,41 @@ export default function HomeScreen() {
     enabled: Boolean(area?.cityId),
   });
 
+  const term = search.trim();
+
   /*
-   * Filtering runs here rather than as a request per keystroke.
+   * Searching means searching the menu, not the sign above the door.
    *
-   * A city's restaurant list is tens of rows, not thousands, and it is already
-   * in memory — so the search feels instant and costs nothing. The server's
-   * `q` parameter stays for the day a city is large enough to need it.
+   * Someone who types «دجاج» wants chicken; they do not know, and should not
+   * have to know, which restaurant sells it. So a search asks the server for
+   * dishes across the whole city and the answer is something orderable —
+   * with open kitchens first, because a dish from a shut one is a worse
+   * answer whatever its rating.
+   *
+   * Debounced, because this one is a real request per keystroke otherwise.
    */
-  const shown = useMemo(() => {
-    const term = search.trim();
-    return (restaurants.data ?? []).filter((restaurant) => {
-      if (category && !restaurant.cuisine_tags.includes(category)) return false;
-      if (!term) return true;
-      return (
-        restaurant.display_name.includes(term) ||
-        restaurant.cuisine_tags.some((tag) => tag.includes(term))
-      );
-    });
-  }, [restaurants.data, category, search]);
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(term), 300);
+    return () => clearTimeout(timer);
+  }, [term]);
+
+  const dishes = useQuery({
+    queryKey: ['dish-search', area?.cityId, debounced],
+    queryFn: () => api.searchDishes(area?.cityId as string, debounced),
+    enabled: Boolean(area?.cityId) && debounced.length >= 2,
+  });
+
+  /** The category filter still runs locally; the list is tens of rows. */
+  const shown = useMemo(
+    () =>
+      (restaurants.data ?? []).filter(
+        (restaurant) => !category || restaurant.cuisine_tags.includes(category),
+      ),
+    [restaurants.data, category],
+  );
+
+  const searching = term.length >= 2;
 
   const categories = storefront.data?.categories ?? [];
 
@@ -88,27 +113,37 @@ export default function HomeScreen() {
         onPressSignIn={() => router.push('/(auth)/phone')}
       />
 
-      <View style={{ paddingHorizontal: space[4], paddingTop: space[3], gap: space[5] }}>
+      <View style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="ابحث عن مطعم أو صنف…"
+          placeholder="ابحث عن مطعم أو وجبة…"
           returnKeyType="search"
-          accessibilityLabel="البحث عن مطعم"
+          accessibilityLabel="البحث عن مطعم أو وجبة"
         />
-
-        {storefront.isLoading ? (
-          <Skeleton height={164} style={{ borderRadius: radius['2xl'] }} />
-        ) : (
-          <BannerCarousel
-            banners={storefront.data?.banners ?? []}
-            seconds={storefront.data?.banner_rotation_seconds ?? 5}
-            onOpenCategory={setCategory}
-          />
-        )}
       </View>
 
-      {storefront.isLoading ? (
+      {/*
+        * The banner runs edge to edge.
+        *
+        * It was inset by the page gutter like everything else, which made an
+        * advertisement look like a card — the one thing on the screen that is
+        * paid for, framed smaller than the restaurant cards under it. Full
+        * bleed is what every delivery app does with this slot, and it is why
+        * the corner radius drops here too: a rounded rectangle touching both
+        * edges reads as a mistake.
+        */}
+      {searching ? null : storefront.isLoading ? (
+        <Skeleton height={200} style={{ marginTop: space[4] }} />
+      ) : (
+        <BannerCarousel
+          banners={storefront.data?.banners ?? []}
+          seconds={storefront.data?.banner_rotation_seconds ?? 5}
+          onOpenCategory={setCategory}
+        />
+      )}
+
+      {searching ? null : storefront.isLoading ? (
         <View style={{ padding: space[4] }}>
           <Skeleton height={92} />
         </View>
@@ -120,12 +155,19 @@ export default function HomeScreen() {
         <Row justify="space-between" align="flex-start">
           <View style={{ flex: 1 }}>
             <Text variant="h3">
-              {category
-                ? (categories.find((entry) => entry.key === category)?.name_ar ?? 'مطاعم التصنيف')
-                : 'المطاعم القريبة منك'}
+              {searching
+                ? `نتائج البحث عن «${term}»`
+                : category
+                  ? (categories.find((entry) => entry.key === category)?.name_ar ??
+                    'مطاعم التصنيف')
+                  : 'المطاعم القريبة منك'}
             </Text>
             <Text variant="caption" tone="muted">
-              {area ? `أفضل المطاعم في ${area.cityNameAr}` : 'اختر منطقتك لعرض المطاعم'}
+              {searching
+                ? 'الوجبات المتاحة الآن أولاً'
+                : area
+                  ? `أفضل المطاعم في ${area.cityNameAr}`
+                  : 'اختر منطقتك لعرض المطاعم'}
             </Text>
           </View>
 
@@ -146,7 +188,29 @@ export default function HomeScreen() {
       </View>
 
       <View style={{ padding: space[4], gap: space[4] }}>
-        {isResolving ? (
+        {searching ? (
+          dishes.isLoading ? (
+            <>
+              <Skeleton height={96} style={{ borderRadius: radius.lg }} />
+              <Skeleton height={96} style={{ borderRadius: radius.lg }} />
+            </>
+          ) : dishes.isError ? (
+            <ErrorState
+              message={dishes.error instanceof ApiError ? dishes.error.messageAr : 'تعذّر البحث'}
+              onRetry={() => void dishes.refetch()}
+            />
+          ) : (dishes.data ?? []).length === 0 ? (
+            <EmptyState
+              title="لا نتائج"
+              body={`لم نجد وجبة أو مطعماً باسم «${term}» في ${area?.cityNameAr ?? 'منطقتك'}.`}
+              action={{ label: 'مسح البحث', onPress: () => setSearch('') }}
+            />
+          ) : (
+            (dishes.data ?? []).map((dish) => (
+              <DishRow key={dish.id} dish={dish} onOpen={() => router.push(`/restaurant/${dish.restaurant.id}`)} />
+            ))
+          )
+        ) : isResolving ? (
           <Skeleton height={248} style={{ borderRadius: radius.xl }} />
         ) : !area ? (
           <EmptyState
@@ -329,8 +393,10 @@ function BannerCarousel({
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const slide = width - space[4] * 2;
-  const stride = slide + space[3];
+  // One screen per slide, so a swipe lands on the next banner rather than
+  // halfway between two.
+  const slide = width;
+  const stride = width;
 
   useEffect(() => {
     if (paused || banners.length < 2) return;
@@ -352,15 +418,15 @@ function BannerCarousel({
   if (banners.length === 0) return null;
 
   return (
-    <View style={{ gap: space[2] }}>
+    <View style={{ gap: space[2], paddingTop: space[4] }}>
       <FlatList
         ref={list}
         data={banners}
         horizontal
+        pagingEnabled
         snapToInterval={stride}
         decelerationRate="fast"
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: space[3] }}
         // Once the customer takes hold of it, it is theirs.
         onScrollBeginDrag={() => setPaused(true)}
         onMomentumScrollEnd={(event) => {
@@ -370,6 +436,7 @@ function BannerCarousel({
         renderItem={({ item }) => (
           <View style={{ width: slide }}>
             <PromoBanner
+              fullBleed
               title={item.title_ar}
               subtitle={item.subtitle_ar}
               imageUrl={item.image_asset_id ? assetUrl(item.image_asset_id) : null}
@@ -466,6 +533,147 @@ function CategoryStrip({
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * One search result: the dish, and the restaurant that sells it.
+ *
+ * The restaurant is the second line rather than the first because the customer
+ * searched for food. A closed kitchen's dish is still shown — it may be what
+ * they want tomorrow — but it is dimmed and says so, and it sorts below every
+ * open one.
+ */
+function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
+  const { add } = useCart();
+  const orderable = dish.restaurant.accepts_orders && dish.is_available;
+
+  // A View, not a Pressable: the plus below is its own control, and a button
+  // inside a button is invalid on the web and ambiguous on a phone.
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: space[3],
+        padding: space[3],
+        backgroundColor: color.surfaceCard,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: color.borderSubtle,
+        opacity: orderable ? 1 : 0.62,
+      }}
+    >
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`${dish.name_ar} من ${dish.restaurant.display_name}`}
+        style={({ pressed }) => [{ flex: 1, gap: space[1] }, pressed ? { opacity: 0.7 } : null]}
+      >
+        <Text variant="bodyBold" numberOfLines={1}>
+          {dish.name_ar}
+        </Text>
+
+        <Row gap={space[1]}>
+          <MaterialCommunityIcons name="store-outline" size={14} color={color.textMuted} />
+          <Text variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+            {dish.restaurant.display_name}
+          </Text>
+          {!dish.restaurant.accepts_orders ? (
+            <Text variant="caption" tone="danger">
+              · مغلق الآن
+            </Text>
+          ) : null}
+        </Row>
+
+        <Row gap={space[3]}>
+          <Text variant="smallBold" tone="brand">
+            {formatIqdArabic(iqd(dish.price_iqd))}
+          </Text>
+          <Text variant="caption" tone="secondary">
+            {dish.restaurant.estimated_preparation_minutes} دقيقة
+          </Text>
+        </Row>
+      </Pressable>
+
+      <View>
+        <View
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: radius.md,
+            overflow: 'hidden',
+            backgroundColor: color.brandSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {dish.image_asset_id ? (
+            <Image
+              source={{ uri: assetUrl(dish.image_asset_id) }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <MaterialCommunityIcons
+              name="silverware-fork-knife"
+              size={22}
+              color={palette.orange[300]}
+            />
+          )}
+        </View>
+
+        {orderable ? (
+          <Pressable
+            onPress={() => {
+              const result = add(
+                {
+                  restaurantId: dish.restaurant.id,
+                  branchId: dish.restaurant.branch_id,
+                  restaurantName: dish.restaurant.display_name,
+                  deliveryFeeIqd: dish.restaurant.delivery_fee_iqd,
+                  minimumOrderIqd: dish.restaurant.minimum_order_iqd,
+                },
+                {
+                  menuItemId: dish.id,
+                  nameAr: dish.name_ar,
+                  unitPriceIqd: dish.price_iqd,
+                  quantity: 1,
+                  imageAssetId: dish.image_asset_id,
+                  notes: null,
+                },
+              );
+              if (result === 'replaced') {
+                Alert.alert(
+                  'تم تفريغ السلة',
+                  'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.',
+                );
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`إضافة ${dish.name_ar} إلى السلة`}
+            hitSlop={space[2]}
+            style={({ pressed }) => [
+              {
+                position: 'absolute',
+                bottom: -space[2],
+                insetInlineStart: -space[2],
+                width: 32,
+                height: 32,
+                borderRadius: radius.full,
+                backgroundColor: color.brand,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: color.surfaceCard,
+              },
+              pressed ? { opacity: 0.75 } : null,
+            ]}
+          >
+            <MaterialCommunityIcons name="plus" size={18} color={palette.white} />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }

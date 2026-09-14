@@ -282,6 +282,14 @@ export interface Storefront {
     link_value: string | null;
   }[];
   banner_rotation_seconds: number;
+  /**
+   * What the customer pays Jibli per order — «رسوم الخدمة».
+   *
+   * Carried on the storefront so the cart can show the real total before an
+   * address exists. The quote is still authoritative; this is the same
+   * setting, read early.
+   */
+  service_fee_iqd: number;
 }
 
 /**
@@ -404,6 +412,29 @@ export interface OrderDetail {
   } | null;
 }
 
+/** One dish from `GET /menu/search`, carrying the restaurant that sells it. */
+export interface DishResult {
+  id: string;
+  name_ar: string;
+  description_ar: string | null;
+  price_iqd: number;
+  image_asset_id: string | null;
+  is_available: boolean;
+  is_popular: boolean;
+  restaurant: {
+    id: string;
+    branch_id: string;
+    display_name: string;
+    cover_asset_id: string | null;
+    rating: number | null;
+    delivery_fee_iqd: number;
+    minimum_order_iqd: number;
+    estimated_preparation_minutes: number;
+    is_open: boolean;
+    accepts_orders: boolean;
+  };
+}
+
 /** A favourite, in the same shape as a discovery card. */
 export type FavoriteCard = RestaurantCard & { favorited_at: string };
 
@@ -440,6 +471,40 @@ export const api = {
       body: { phone, code, deviceId },
       authenticated: false,
     }),
+
+  /**
+   * Sign in with a Google ID token obtained on the device.
+   *
+   * Google proves who they are, not a number a driver can call — so the answer
+   * carries `next_step: 'VERIFY_PHONE'` until one is linked, and the server
+   * refuses to quote or place an order before then.
+   */
+  googleSignIn: (idToken: string, deviceId?: string) =>
+    apiRequest<{
+      access_token: string;
+      refresh_token: string;
+      user: {
+        id: string;
+        is_new_user: boolean;
+        profile_completed: boolean;
+        phone_verified: boolean;
+        modes: ('CUSTOMER' | 'DRIVER')[];
+        driver_id: string | null;
+      };
+      next_step: 'HOME' | 'COMPLETE_PROFILE' | 'VERIFY_PHONE';
+    }>('/api/v1/auth/google', {
+      method: 'POST',
+      body: { id_token: idToken, ...(deviceId ? { deviceId } : {}) },
+      authenticated: false,
+    }),
+
+  /** Attach a verified phone to the account already signed in. */
+  linkPhone: (phone: string, code: string) =>
+    apiRequest<{
+      phone_verified: boolean;
+      profile_completed: boolean;
+      next_step: 'HOME' | 'COMPLETE_PROFILE';
+    }>('/api/v1/auth/phone/link', { method: 'POST', body: { phone, code } }),
 
   governorates: (capability: 'customer_signup' | 'ordering' = 'customer_signup') =>
     apiRequest<GeographyOption[]>(`/api/v1/geography/governorates?capability=${capability}`, {
@@ -497,6 +562,19 @@ export const api = {
    */
   restaurant: (restaurantId: string) =>
     apiRequest<RestaurantDetail>(`/api/v1/restaurants/${restaurantId}`, { authenticated: false }),
+
+  /**
+   * Search dishes across a city.
+   *
+   * Public, and answers with dishes rather than restaurants: someone typing
+   * «دجاج» wants chicken, not a list of places that might have some. Open
+   * kitchens come first.
+   */
+  searchDishes: (cityId: string, term: string) =>
+    apiRequest<DishResult[]>(
+      `/api/v1/menu/search?city_id=${cityId}&q=${encodeURIComponent(term)}`,
+      { authenticated: false },
+    ),
 
   /** Options for one dish, fetched when the customer opens it, not up front. */
   itemModifiers: (itemId: string) =>

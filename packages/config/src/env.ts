@@ -61,6 +61,23 @@ const otpSchema = z.object({
   OTP_MAX_PER_PHONE_HOUR: z.coerce.number().int().min(1).default(5),
   OTP_MAX_PER_PHONE_DAY: z.coerce.number().int().min(1).default(15),
   OTP_MAX_PER_IP_HOUR: z.coerce.number().int().min(1).default(30),
+  /**
+   * The fixed code the `mock` provider issues.
+   *
+   * Testing only — any phone number signs in with it, and everything else
+   * about the challenge (expiry, attempt counting, rate limits) behaves
+   * exactly as in production. The env schema refuses `mock` in production.
+   */
+  /**
+   * Google client ids allowed to sign into this backend.
+   *
+   * Comma-separated, because iOS, Android and web are three different ids for
+   * the same application and all three are legitimate audiences. Leave it
+   * empty and Google sign-in is simply off — the endpoint refuses rather than
+   * accepting a token minted for somebody else's app.
+   */
+  GOOGLE_CLIENT_IDS: z.string().optional(),
+  OTP_MOCK_CODE: z.string().regex(/^\d{4,8}$/).default('0000'),
   SMS_GATEWAY_URL: z.string().url().optional(),
   SMS_GATEWAY_API_KEY: z.string().optional(),
   SMS_GATEWAY_SENDER_ID: z.string().optional(),

@@ -108,7 +108,23 @@ export async function requestOtp(
     .set({ consumedAt: new Date() })
     .where(and(eq(otpChallenges.phoneE164, phone), isNull(otpChallenges.consumedAt)));
 
-  const code = generateNumericCode(env.OTP_LENGTH);
+  /*
+   * `mock` makes the code a fixed one — any number signs in with 0000.
+   *
+   * It replaces the *generated* code rather than short-circuiting
+   * verification, which matters: the challenge is still stored, hashed and
+   * salted the same way, still expires, still counts attempts, and is still
+   * rate limited. Every rule a real sign-in obeys is exercised; only the
+   * randomness is removed. A bypass in `verifyOtp` would have tested none of
+   * it and would have been one edit away from reaching production.
+   *
+   * And it cannot reach production: the env schema refuses to validate any
+   * provider but `sms_gateway` when APP_ENV is production.
+   */
+  const code =
+    env.OTP_PROVIDER === 'mock'
+      ? env.OTP_MOCK_CODE.slice(0, env.OTP_LENGTH).padEnd(env.OTP_LENGTH, '0')
+      : generateNumericCode(env.OTP_LENGTH);
   const challengeId = uuidv7();
   const expiresAt = new Date(Date.now() + env.OTP_TTL_SECONDS * 1000);
 
@@ -153,8 +169,12 @@ export async function requestOtp(
   return {
     resendAfterSeconds: env.OTP_RESEND_COOLDOWN_SECONDS,
     expiresInSeconds: env.OTP_TTL_SECONDS,
-    // Returned only in local development so a developer can sign in without SMS.
-    ...(env.APP_ENV === 'local' ? { devCode: code } : {}),
+    /*
+     * Returned when a developer is meant to see it: local development, or the
+     * mock provider — where the code is fixed and public anyway, so hiding it
+     * protects nothing and only makes testing slower.
+     */
+    ...(env.APP_ENV === 'local' || env.OTP_PROVIDER === 'mock' ? { devCode: code } : {}),
   };
 }
 
@@ -166,7 +186,20 @@ export interface OtpVerifyResult {
 
 export async function verifyOtp(
   ctx: AppContext,
-  input: { phoneE164: string; code: string; requestId: string },
+  input: {
+    phoneE164: string;
+    code: string;
+    requestId: string;
+    /**
+     * Attach the number to this account instead of finding one by phone.
+     *
+     * Set when a customer who signed in with Google is adding the phone an
+     * order needs. Everything before this point is identical — the same
+     * challenge, the same expiry, the same attempt counting — because the
+     * question being answered is the same: does this person hold this number?
+     */
+    linkToUserId?: string;
+  },
 ): Promise<OtpVerifyResult> {
   const now = new Date();
 
@@ -221,6 +254,47 @@ export async function verifyOtp(
     .returning({ id: otpChallenges.id });
 
   if (consumed.length === 0) throw new AppError(ERROR_CODES.OTP_INVALID);
+
+  /*
+   * Linking: the account already exists, the number is what is new.
+   *
+   * A number already on another account is refused rather than moved. Moving
+   * it would take a phone-only customer's orders, addresses and history away
+   * from them silently — and the person doing it would only have had to know
+   * their number.
+   */
+  if (input.linkToUserId) {
+    const [owner] = await ctx.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.phoneE164, input.phoneE164))
+      .limit(1);
+
+    if (owner && owner.id !== input.linkToUserId) {
+      throw new AppError(ERROR_CODES.CONFLICT, {
+        messageAr: 'هذا الرقم مرتبط بحساب آخر. سجّل الدخول به، أو استخدم رقماً غيره.',
+      });
+    }
+
+    const [linked] = await ctx.db
+      .update(users)
+      .set({ phoneE164: input.phoneE164, phoneVerifiedAt: now, lastLoginAt: now, updatedAt: now })
+      .where(eq(users.id, input.linkToUserId))
+      .returning({ id: users.id, profileCompletedAt: users.profileCompletedAt });
+
+    if (!linked) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'user' } });
+
+    ctx.logger.info(
+      { event: 'user.phone_linked', userId: linked.id, requestId: input.requestId },
+      'Phone number attached to an existing account',
+    );
+
+    return {
+      userId: linked.id,
+      isNewUser: false,
+      profileCompleted: linked.profileCompletedAt !== null,
+    };
+  }
 
   // Find or create the identity. One identity per phone: a customer who is later
   // made a driver reuses this row (plan §45).

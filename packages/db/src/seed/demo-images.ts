@@ -1,4 +1,5 @@
-import { Canvas, hexToRgb, mix, palette, rotateHue, type Rgb } from '@jibli/design-tokens';
+import { palette } from '@jibli/design-tokens';
+import { Canvas, hexToRgb, mix, rotateHue, type Rgb } from '@jibli/design-tokens/png';
 import { eq } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { uuidv7 } from '../ids.js';

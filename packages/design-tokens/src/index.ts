@@ -429,8 +429,10 @@ export function cssVariables(): CssVariable[] {
   return vars;
 }
 
-/**
- * Drawing, for the placeholder artwork the brand ships with — the app icon
- * and splash, and the demo marketplace's covers and banners.
+/*
+ * Drawing lives at `@jibli/design-tokens/png`, deliberately not re-exported
+ * here. It needs `node:zlib`, and this barrel is imported by the mobile app —
+ * re-exporting it put a Node builtin into the phone's bundle and Metro refused
+ * to build. A subpath keeps the one consumer that needs it working and every
+ * other consumer unaware of it.
  */
-export * from './png.js';

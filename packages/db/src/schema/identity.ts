@@ -36,6 +36,20 @@ export const users = pgTable(
     phoneVerifiedAt: utcTimestamp('phone_verified_at'),
     fullName: text('full_name'),
 
+    /**
+     * Identity from a third-party provider (migration 0015).
+     *
+     * `googleSub` is Google's stable subject id, never the email — a Google
+     * account can change its address, and matching on one would hand an
+     * account to whoever claims the address next. The email is stored for
+     * display and support, and is never used to deliver an OTP.
+     *
+     * Neither replaces the phone: an order needs a number a driver can call,
+     * so `phoneVerifiedAt` still gates checkout.
+     */
+    email: text('email'),
+    googleSub: text('google_sub'),
+
     /** Default discovery geography — NOT a delivery address (plan §12). */
     profileGovernorateId: fk('profile_governorate_id').references(() => governorates.id, {
       onDelete: 'restrict',
@@ -73,6 +87,9 @@ export const users = pgTable(
     uniqueIndex('users_phone_key').on(table.phoneE164),
     // Case-insensitive in the database (migration 0005 indexes lower(username)).
     uniqueIndex('users_username_key').on(table.username),
+    // Partial in the database (migration 0015): null for every phone-only
+    // customer, and a plain unique index would allow exactly one of them.
+    uniqueIndex('users_google_sub_key').on(table.googleSub),
     index('users_status_idx').on(table.status),
     index('users_profile_city_idx').on(table.profileCityId),
   ],

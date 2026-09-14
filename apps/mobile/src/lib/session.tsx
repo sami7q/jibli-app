@@ -34,6 +34,11 @@ export interface Me {
   readonly user_id: string;
   readonly full_name: string | null;
   readonly profile_completed: boolean;
+  /**
+   * False for a Google account that has not added a number yet. Browsing works;
+   * checkout does not, and the server refuses it rather than trusting this.
+   */
+  readonly phone_verified: boolean;
   readonly governorate_id: string | null;
   readonly governorate_name_ar: string | null;
   readonly city_id: string | null;

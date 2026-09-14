@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSession } from '@/lib/session';
 import { color, palette, radius, space, TAP_TARGET } from '@/theme';
 import { Screen, Text } from '@/ui';
-import { JibliWordmark } from '@/ui/brand';
+import { IraqFlag, JibliWordmark } from '@/ui/brand';
 
 /**
  * The first screen of a fresh install (`1.html`).
@@ -138,7 +138,7 @@ export default function WelcomeScreen() {
               marginTop: space[5],
             }}
           >
-            <IraqFlag />
+            <IraqFlag width={22} />
             <Text variant="caption" tone="inverse" style={{ opacity: 0.9 }}>
               صُنع للعراق
             </Text>
@@ -269,22 +269,3 @@ function Doodle({ doodle, animate }: { doodle: (typeof DOODLES)[number]; animate
   );
 }
 
-/** Three bands and a takbir, small enough that the text is a suggestion of it. */
-function IraqFlag() {
-  return (
-    <View
-      style={{
-        width: 22,
-        height: 15,
-        borderRadius: 3,
-        overflow: 'hidden',
-        borderWidth: 0.5,
-        borderColor: 'rgba(255,255,255,0.35)',
-      }}
-    >
-      <View style={{ flex: 1, backgroundColor: '#ce1126' }} />
-      <View style={{ flex: 1, backgroundColor: palette.white }} />
-      <View style={{ flex: 1, backgroundColor: '#000000' }} />
-    </View>
-  );
-}

@@ -26,6 +26,13 @@ export interface Principal {
   readonly restaurantRoles: Readonly<Record<string, RestaurantRole[]>>;
   readonly driverId: string | null;
   readonly profileCompleted: boolean;
+  /**
+   * Whether a phone number has been proved for this account.
+   *
+   * False for a fresh Google sign-in. Browsing is fine without one; placing an
+   * order is not, because an order needs a number a driver can call.
+   */
+  readonly phoneVerified: boolean;
   /** When the principal last passed an MFA challenge, if ever. */
   readonly mfaAt: Date | null;
 }
@@ -169,6 +176,23 @@ export function assertOwnsAssignment(principal: Principal, assignmentDriverId: s
 export function assertProfileComplete(principal: Principal): void {
   if (!principal.profileCompleted) {
     throw new AppError(ERROR_CODES.PROFILE_INCOMPLETE);
+  }
+}
+
+/**
+ * An order needs a number a driver can call.
+ *
+ * Google proves an identity, not a phone, so an account can be signed in and
+ * still unable to order. Enforced here rather than trusted to the app: the
+ * client routes to phone verification as a courtesy, the server refuses as a
+ * rule.
+ */
+export function assertPhoneVerified(principal: Principal): void {
+  if (!principal.phoneVerified) {
+    throw new AppError(ERROR_CODES.PROFILE_INCOMPLETE, {
+      messageAr: 'أضف رقم هاتفك وفعّله لإتمام الطلب.',
+      details: { reason: 'PHONE_NOT_VERIFIED' },
+    });
   }
 }
 

@@ -561,6 +561,20 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
           })),
           /** How long each banner holds the screen, in seconds. */
           banner_rotation_seconds: await getConfig(ctx, 'banner_rotation_seconds', 5),
+          /**
+           * What the customer pays Jibli per order, on top of the food and the
+           * delivery — «رسوم الخدمة».
+           *
+           * Sent here so the cart can show the real number before an address
+           * exists, because a total that grows by 500 between the cart and the
+           * checkout is the kind of surprise that loses the order. The
+           * authoritative figure is still the one `POST /checkout/quote`
+           * returns; this is the same value, read from the same setting.
+           *
+           * Not to be confused with `commission_flat_iqd`, which is what Jibli
+           * takes from the *restaurant* and which no customer ever sees.
+           */
+          service_fee_iqd: await getConfig(ctx, 'platform_service_fee_iqd', 500),
         },
         { request_id: request.requestId },
       ),

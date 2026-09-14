@@ -535,6 +535,7 @@ export function PromoBanner({
   ctaLabel,
   imageUrl,
   onPress,
+  fullBleed = false,
 }: {
   title: string;
   subtitle?: string | null;
@@ -542,12 +543,21 @@ export function PromoBanner({
   ctaLabel?: string | null;
   imageUrl?: string | null;
   onPress?: () => void;
+  /**
+   * Edge to edge, with no corners.
+   *
+   * The home carousel uses this: a paid slot inset by the page gutter looks
+   * smaller than the free content under it, and a rounded rectangle touching
+   * both screen edges reads as a mistake rather than a decision. Taller too —
+   * an advertisement needs room for a picture and a sentence.
+   */
+  fullBleed?: boolean;
 }) {
   const body = (
     <View
       style={{
-        height: 164,
-        borderRadius: radius['2xl'],
+        height: fullBleed ? 200 : 164,
+        borderRadius: fullBleed ? 0 : radius['2xl'],
         overflow: 'hidden',
         backgroundColor: color.brand,
       }}
@@ -578,7 +588,15 @@ export function PromoBanner({
         style={{ position: 'absolute', width: '100%', height: '100%' }}
       />
 
-      <View style={{ flex: 1, padding: space[4], gap: space[1], justifyContent: 'center' }}>
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: fullBleed ? space[5] : space[4],
+          paddingVertical: space[4],
+          gap: space[1],
+          justifyContent: 'center',
+        }}
+      >
         {badge ? (
           <View
             style={{

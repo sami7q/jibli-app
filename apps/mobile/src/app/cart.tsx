@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { assetUrl } from '@/lib/api';
+import { api, assetUrl } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
@@ -25,6 +26,21 @@ export default function CartScreen() {
   const { cart, subtotalIqd, itemCount, setQuantity, remove, clear } = useCart();
   const [notes, setNotes] = useState('');
 
+  /*
+   * The service fee, read from the storefront.
+   *
+   * The cart used to show only the subtotal and delivery, and promise the rest
+   * "at the next step" — so a 7,000 basket said 7,000 and then became 7,500 at
+   * checkout. A total that grows after the customer has decided is the kind of
+   * surprise that loses the order, and it is the same number either way.
+   */
+  const storefront = useQuery({
+    queryKey: ['storefront'],
+    queryFn: () => api.storefront(),
+    staleTime: 5 * 60_000,
+  });
+  const serviceFeeIqd = storefront.data?.service_fee_iqd ?? 0;
+
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)'));
 
   if (!cart || itemCount === 0) {
@@ -41,7 +57,7 @@ export default function CartScreen() {
   }
 
   const belowMinimum = subtotalIqd < cart.minimumOrderIqd;
-  const totalIqd = subtotalIqd + cart.deliveryFeeIqd;
+  const totalIqd = subtotalIqd + cart.deliveryFeeIqd + serviceFeeIqd;
 
   return (
     <Screen edges={['top']} padded={false}>
@@ -194,9 +210,12 @@ export default function CartScreen() {
             }
             tone={cart.deliveryFeeIqd === 0 ? 'success' : undefined}
           />
+          {serviceFeeIqd > 0 ? (
+            <SummaryRow label="رسوم الخدمة" value={formatIqdArabic(iqd(serviceFeeIqd))} />
+          ) : null}
           <SummaryRow label="الإجمالي" value={formatIqdArabic(iqd(totalIqd))} emphasis />
           <Text variant="caption" tone="muted">
-            تُحتسب رسوم الخدمة وأي خصم عند تأكيد العنوان في الخطوة التالية.
+            يُعاد احتساب الإجمالي عند تأكيد العنوان، وقد يتغيّر بخصم أو عرض.
           </Text>
         </View>
 

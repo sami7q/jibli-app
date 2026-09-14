@@ -1,4 +1,4 @@
-import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { color, palette } from '@/theme';
 
 /**
@@ -78,6 +78,40 @@ export function JibliPin({ size = 24, tint = palette.white, pinTint = color.bran
         fill={tint}
       />
       <Circle cx={80} cy={47} r={6.5} fill={pinTint} />
+    </Svg>
+  );
+}
+
+/**
+ * The flag of Iraq.
+ *
+ * Drawn rather than written as 🇮🇶, because the emoji is a pair of regional
+ * indicator letters and a font without the flag glyph renders them literally —
+ * which is what was happening: the sign-in screen showed "IQ" beside +964.
+ * Three bands and the takbir always render, on every device.
+ *
+ * The script is set in Cairo, which the app already loads, so it matches the
+ * rest of the screen rather than falling back to whatever the system picks.
+ */
+export function IraqFlag({ width = 26 }: { width?: number }) {
+  // The official ratio is 2:3.
+  const height = (width * 2) / 3;
+
+  return (
+    <Svg width={width} height={height} viewBox="0 0 900 600" accessibilityLabel="العراق">
+      <Rect x={0} y={0} width={900} height={200} fill="#ce1126" />
+      <Rect x={0} y={200} width={900} height={200} fill="#ffffff" />
+      <Rect x={0} y={400} width={900} height={200} fill="#000000" />
+      <SvgText
+        x={450}
+        y={335}
+        fill="#007a3d"
+        fontSize={110}
+        fontFamily="Cairo_700Bold"
+        textAnchor="middle"
+      >
+        الله أكبر
+      </SvgText>
     </Svg>
   );
 }

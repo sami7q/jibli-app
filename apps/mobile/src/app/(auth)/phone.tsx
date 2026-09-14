@@ -16,7 +16,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
-import { JibliWordmark } from '@/ui/brand';
+import { IraqFlag, JibliWordmark } from '@/ui/brand';
+import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
+import { useSession } from '@/lib/session';
 
 /**
  * Phone entry — the first screen of the customer journey (plan §10).
@@ -37,6 +39,7 @@ export default function PhoneScreen() {
   const [rawInput, setRawInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
+  const { signIn } = useSession();
 
   // Validate against the same rules the server uses, so the button state and
   // the server's answer agree.
@@ -48,6 +51,42 @@ export default function PhoneScreen() {
     // shows exactly what will be sent.
     setRawInput(normalizeDigits(value).replace(/\D/g, '').slice(0, 11));
     if (error) setError(null);
+  };
+
+  const handleGoogle = async () => {
+    setSubmitting(true);
+    setError(null);
+
+    const outcome = await signInWithGoogle();
+
+    if (outcome.status === 'cancelled') {
+      setSubmitting(false);
+      return;
+    }
+    if (outcome.status !== 'ok') {
+      setSubmitting(false);
+      setError('تعذّر تسجيل الدخول عبر جوجل. جرّب رقم هاتفك.');
+      return;
+    }
+
+    try {
+      const result = await api.googleSignIn(outcome.idToken);
+      await signIn({
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+        userId: result.user.id,
+      });
+      // The gate routes from here: a Google account with no phone lands on
+      // verification, which is the same screen a phone sign-in starts from.
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.messageAr
+          : 'تعذّر تسجيل الدخول عبر جوجل. جرّب رقم هاتفك.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -117,9 +156,15 @@ export default function PhoneScreen() {
           The country prefix is display chrome, not an editable field — the
           service is Iraq-only in Release 1 (plan §10).
         */}
+        {/*
+          * The flag before the code, as the comp draws it — and drawn, not
+          * 🇮🇶: that emoji is two regional-indicator letters, and a font
+          * without the flag glyph renders them literally. This screen was
+          * showing "IQ".
+          */}
         <View style={styles.prefix}>
+          <IraqFlag width={24} />
           <Text style={styles.prefixText}>+964</Text>
-          <Text style={styles.flag}>🇮🇶</Text>
         </View>
 
         <TextInput
@@ -160,6 +205,29 @@ export default function PhoneScreen() {
           <Text style={styles.buttonText}>إرسال رمز التحقق</Text>
         )}
       </Pressable>
+
+      {/*
+        * Google, when it is configured.
+        *
+        * It signs the customer in but does not give Jibli a number a driver
+        * can call, so the server answers `VERIFY_PHONE` and routes them
+        * straight back to this screen's sibling — the phone is not optional,
+        * it is only later.
+        */}
+      {isGoogleSignInConfigured() ? (
+        <View style={styles.alternatives}>
+          <Text style={styles.divider}>أو تابع باستخدام</Text>
+          <Pressable
+            onPress={handleGoogle}
+            disabled={isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel="المتابعة عبر جوجل"
+            style={({ pressed }) => [styles.googleButton, pressed ? { opacity: 0.75 } : null]}
+          >
+            <Text style={styles.googleLabel}>المتابعة عبر جوجل</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/*
        * Tappable, not decorative. App Review looks for the privacy policy to be
@@ -221,8 +289,7 @@ const styles = StyleSheet.create({
     borderEndWidth: 1,
     borderEndColor: color.borderSubtle,
   },
-  prefixText: { ...text.bodyBold, color: color.textPrimary },
-  flag: { fontSize: 18 },
+  prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
   input: {
     flex: 1,
     ...text.body,
@@ -249,6 +316,19 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: palette.ink[300] },
   buttonText: { ...text.bodyBold, color: palette.white },
+
+  alternatives: { gap: space[3], alignItems: 'stretch' },
+  divider: { ...text.small, color: color.textMuted, textAlign: 'center' },
+  googleButton: {
+    minHeight: TAP_TARGET + 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.borderStrong,
+    backgroundColor: color.surfaceCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleLabel: { ...text.bodyBold, color: color.textPrimary },
 
   legal: { ...text.small, color: color.textMuted, textAlign: 'center' },
   link: { color: color.textBrand },
