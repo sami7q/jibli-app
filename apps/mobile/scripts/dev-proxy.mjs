@@ -20,19 +20,35 @@ import { createServer } from 'node:http';
  * outline instead of stretched across a desktop window. A layout reviewed at
  * 1900px wide is not the layout anyone will use.
  *
- * Set JIBLI_PROXY_UPSTREAM to point somewhere other than the deployed API.
+ * Set JIBLI_PROXY_UPSTREAM to point somewhere other than the API it finds.
  */
 
-const UPSTREAM = (process.env.JIBLI_PROXY_UPSTREAM ?? 'https://jibli-api.onrender.com').replace(
-  /\/$/,
-  '',
-);
+/** The deployed API, used when nothing is running locally. */
+const DEPLOYED = 'https://jibli-api.onrender.com';
+/** Where `pnpm dev:api` listens. */
+const LOCAL = `http://localhost:${process.env.API_PORT ?? 4000}`;
+
 const PORT = Number(process.env.JIBLI_PROXY_PORT ?? 4010);
 /** Where `expo start --web` serves the app. */
 const APP_ORIGIN = process.env.JIBLI_APP_ORIGIN ?? 'http://localhost:8081';
 
-/** Headers a proxy must not forward verbatim. */
-const HOP_BY_HOP = new Set(['host', 'connection', 'content-length', 'accept-encoding']);
+/**
+ * Headers a proxy must not forward verbatim.
+ *
+ * `origin` and `referer` are on the list for the reason this file exists at
+ * all. Forwarding them would hand the API the browser's origin — the one its
+ * CORS allowlist does not contain — and the request would be refused upstream
+ * by the exact rule the proxy is here to sidestep. Dropping them makes the
+ * upstream see what a phone sends, which is nothing.
+ */
+const HOP_BY_HOP = new Set([
+  'host',
+  'connection',
+  'content-length',
+  'accept-encoding',
+  'origin',
+  'referer',
+]);
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -157,49 +173,172 @@ function framePage(appOrigin) {
 </html>`;
 }
 
-createServer(async (request, response) => {
+/**
+ * The API this proxy talks to.
+ *
+ * An explicit JIBLI_PROXY_UPSTREAM wins. Otherwise it looks for an API on this
+ * machine first and falls back to the deployed one — which is the order that
+ * matches what a developer means. Starting the API locally and then watching
+ * the preview talk to Render (or the reverse) is a confusing ten minutes, and
+ * the two behave differently: only a local run returns OTP codes.
+ *
+ * Probed once, at startup. Start the API afterwards and restart this.
+ */
+async function resolveUpstream() {
+  const explicit = process.env.JIBLI_PROXY_UPSTREAM;
+  if (explicit) return { url: explicit.replace(/\/$/, ''), reason: 'JIBLI_PROXY_UPSTREAM' };
+
+  try {
+    const probe = await fetch(`${LOCAL}/health/live`, { signal: AbortSignal.timeout(800) });
+    if (probe.ok) return { url: LOCAL, reason: 'a local API is running' };
+  } catch {
+    /* nothing local; the deployed API it is */
+  }
+
+  return { url: DEPLOYED, reason: 'no local API found' };
+}
+
+let upstream = { url: DEPLOYED, reason: 'not resolved yet' };
+
+/** Whether a response means "the upstream is not up yet", as opposed to an answer. */
+const isColdStart = (status) => status === 502 || status === 503 || status === 504;
+
+/**
+ * How long to keep trying before giving up.
+ *
+ * Render's free plan spins an idle service down after fifteen minutes and
+ * takes about a minute to wake it. During that minute the request either
+ * hangs, is refused, or comes back 502 from Render's edge — and the proxy
+ * used to turn every one of those into a bare 502 with a JavaScript error
+ * string in it, which the app rendered as «حدث خطأ غير متوقع». The first
+ * request of a session failing is not a bug in the app; it is a cold start,
+ * and waiting it out is the whole fix.
+ */
+const WAKE_BUDGET_MS = 90_000;
+const ATTEMPT_TIMEOUT_MS = 30_000;
+
+/**
+ * A local API gets one attempt.
+ *
+ * Nothing wakes up on localhost: a refused connection means the process is not
+ * running, and ninety seconds of retries would only delay saying so.
+ */
+const wakeBudget = () => (upstream.url.startsWith('http://localhost') ? 0 : WAKE_BUDGET_MS);
+
+let announcedWake = false;
+
+async function forward(request, body) {
+  const headers = Object.fromEntries(
+    Object.entries(request.headers).filter(([key]) => !HOP_BY_HOP.has(key)),
+  );
+
+  const deadline = Date.now() + wakeBudget();
+  let lastError = null;
+
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const result = await fetch(`${upstream.url}${request.url}`, {
+        method: request.method,
+        headers,
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        ...(request.method === 'GET' || request.method === 'HEAD' ? {} : { body }),
+      });
+
+      if (!isColdStart(result.status) || Date.now() >= deadline) return { result };
+      lastError = `upstream ${result.status}`;
+    } catch (error) {
+      lastError = String(error);
+      if (Date.now() >= deadline) return { error: lastError };
+    }
+
+    if (!announcedWake) {
+      announcedWake = true;
+      console.log(`Upstream not answering (${lastError}) — waking it, this takes up to a minute…`);
+    }
+
+    // Back off, but stay inside the budget.
+    const wait = Math.min(2000 * attempt, 8000, Math.max(0, deadline - Date.now()));
+    if (wait === 0) return { error: lastError };
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+}
+
+/*
+ * Resolved before the first connection is accepted, rather than in the listen
+ * callback: the probe is a network round trip, and a request that arrived
+ * during it would silently go to the wrong API.
+ */
+upstream = await resolveUpstream();
+
+const server = createServer(async (request, response) => {
   if (request.method === 'OPTIONS') {
     response.writeHead(204, CORS).end();
     return;
   }
 
   // Anything that is not an API call is the preview frame.
-  if (request.method === 'GET' && !request.url.startsWith('/api/') && !request.url.startsWith('/health')) {
+  if (
+    request.method === 'GET' &&
+    !request.url.startsWith('/api/') &&
+    !request.url.startsWith('/health')
+  ) {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     response.end(framePage(APP_ORIGIN));
     return;
   }
 
-  const headers = Object.fromEntries(
-    Object.entries(request.headers).filter(([key]) => !HOP_BY_HOP.has(key)),
-  );
+  const body =
+    request.method === 'GET' || request.method === 'HEAD' ? undefined : await readBody(request);
 
-  try {
-    const upstream = await fetch(`${UPSTREAM}${request.url}`, {
-      method: request.method,
-      headers,
-      ...(request.method === 'GET' || request.method === 'HEAD'
-        ? {}
-        : { body: await readBody(request) }),
-    });
+  const { result, error } = await forward(request, body);
 
-    const body = Buffer.from(await upstream.arrayBuffer());
-    response.writeHead(upstream.status, {
-      ...CORS,
-      'Content-Type': upstream.headers.get('content-type') ?? 'application/json',
-    });
-    response.end(body);
-
-    if (upstream.status >= 400) {
-      console.log(`${upstream.status} ${request.method} ${request.url}`);
+  if (error) {
+    console.error(`503 ${request.method} ${request.url} — ${upstream.url} unreachable: ${error}`);
+    if (upstream.url === LOCAL) {
+      console.error('  Start it with `pnpm dev:api`, or unset JIBLI_PROXY_UPSTREAM to use the deployed API.');
     }
-  } catch (error) {
-    console.error(`502 ${request.method} ${request.url} — ${String(error)}`);
-    response.writeHead(502, { ...CORS, 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({ error: { code: 'PROXY_FAILED', message: String(error) } }));
+    /*
+     * Answer in the API's own error shape, with a code the app knows.
+     *
+     * `api.ts` reads `error.message` as the Arabic text to show, and falls
+     * back to «حدث خطأ غير متوقع» for anything it cannot parse. A raw
+     * `TypeError: fetch failed` under an invented code told the user nothing
+     * and told the developer nothing either.
+     */
+    response.writeHead(503, { ...CORS, 'Content-Type': 'application/json' });
+    response.end(
+      JSON.stringify({
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'الخدمة غير متاحة حالياً، الرجاء المحاولة بعد قليل',
+          details: { upstream: upstream.url, reason: error },
+          request_id: '',
+        },
+      }),
+    );
+    return;
   }
-}).listen(PORT, () => {
-  console.log(`Jibli dev proxy: http://localhost:${PORT} → ${UPSTREAM}`);
+
+  announcedWake = false;
+  const payload = Buffer.from(await result.arrayBuffer());
+  response.writeHead(result.status, {
+    ...CORS,
+    'Content-Type': result.headers.get('content-type') ?? 'application/json',
+  });
+  response.end(payload);
+
+  if (result.status >= 400) {
+    console.log(`${result.status} ${request.method} ${request.url}`);
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`Jibli dev proxy: http://localhost:${PORT} → ${upstream.url}  (${upstream.reason})`);
   console.log(`Phone-sized preview: http://localhost:${PORT}  (frames ${APP_ORIGIN})`);
+  if (upstream.url === DEPLOYED) {
+    console.log(
+      'The deployed API sleeps when idle; the first request may take a minute to wake it.',
+    );
+  }
   console.log('The web preview points here for data; phones talk to the API directly.');
 });

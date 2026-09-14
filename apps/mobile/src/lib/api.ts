@@ -119,6 +119,8 @@ export interface RequestOptions {
   readonly signal?: AbortSignal;
   /** Internal: prevents an infinite refresh loop. */
   readonly _isRetry?: boolean;
+  /** Internal: how many cold-start retries this request has already spent. */
+  readonly _coldStartAttempt?: number;
 }
 
 let refreshInFlight: Promise<boolean> | null = null;
@@ -166,6 +168,22 @@ async function refreshAccessToken(): Promise<boolean> {
   return refreshInFlight;
 }
 
+/**
+ * A gateway saying the server is not there — as opposed to the server saying no.
+ *
+ * The API is on a plan that spins the service down when it is idle and takes
+ * about a minute to wake it. During that minute the edge answers 502 or 503
+ * with an HTML page the app cannot parse, which used to surface as «حدث خطأ
+ * غير متوقع» — the one message that tells a customer nothing. The browser
+ * preview sits behind a proxy that waits the cold start out; a phone talks to
+ * the API directly and has nobody to do that for it.
+ */
+const COLD_START_STATUSES = new Set([502, 503, 504]);
+const COLD_START_RETRIES = 2;
+const COLD_START_BACKOFF_MS = 4000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -202,6 +220,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
+  /*
+   * Wait out a cold start, on reads only.
+   *
+   * A GET may be repeated freely — that is what makes it a GET. A write is not
+   * retried here even though the status says the request never arrived,
+   * because "never arrived" is what the gateway believes and not what the
+   * server knows; a duplicated order is a worse outcome than a retry the
+   * customer performs themselves (plan §109).
+   */
+  const method = options.method ?? 'GET';
+  if (
+    COLD_START_STATUSES.has(response.status) &&
+    method === 'GET' &&
+    (options._coldStartAttempt ?? 0) < COLD_START_RETRIES
+  ) {
+    const attempt = (options._coldStartAttempt ?? 0) + 1;
+    await sleep(COLD_START_BACKOFF_MS * attempt);
+    return apiRequest<T>(path, { ...options, _coldStartAttempt: attempt });
+  }
+
   if (!response.ok) {
     type ErrorPayload = {
       error?: {
@@ -219,7 +257,14 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       /* non-JSON body */
     }
 
-    const code = (payload?.error?.code ?? 'INTERNAL_ERROR') as ErrorCode;
+    /*
+     * An unparseable 5xx is the infrastructure answering, not the API. Saying
+     * «الخدمة غير متاحة حالياً، الرجاء المحاولة بعد قليل» is both true and
+     * actionable; «حدث خطأ غير متوقع» is neither.
+     */
+    const fallback: ErrorCode =
+      response.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR';
+    const code = (payload?.error?.code ?? fallback) as ErrorCode;
     throw new ApiError(
       code,
       payload?.error?.message ?? ERROR_MESSAGES_AR[code] ?? ERROR_MESSAGES_AR.INTERNAL_ERROR,

@@ -237,6 +237,93 @@ describe('token refresh', () => {
   });
 });
 
+describe('a sleeping server', () => {
+  /**
+   * The API runs on a plan that spins down when idle. Waking it takes about a
+   * minute, and during that minute the edge — not the API — answers with an
+   * HTML 502 the client cannot parse.
+   */
+  const gatewayHtml = (status: number) =>
+    new Response('<html><body>Bad Gateway</body></html>', {
+      status,
+      headers: { 'Content-Type': 'text/html' },
+    });
+
+  beforeEach(() => {
+    // The retry sleeps between attempts; no test should wait for it in real time.
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Run a request to completion, letting every backoff elapse instantly. */
+  async function settle<T>(pending: Promise<T>): Promise<T> {
+    const done = pending.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    await vi.runAllTimersAsync();
+    const outcome = await done;
+    if ('error' in outcome) throw outcome.error;
+    return outcome.value;
+  }
+
+  it('waits out a cold start on a read and returns the eventual answer', async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        return calls === 1 ? gatewayHtml(502) : jsonResponse({ data: { ok: true }, meta: {} });
+      }),
+    );
+
+    await expect(settle(apiRequest('/api/v1/storefront', { authenticated: false }))).resolves.toEqual(
+      { ok: true },
+    );
+    expect(calls).toBe(2);
+  });
+
+  it('does not repeat a write, whatever the gateway claims', async () => {
+    const fetchMock = vi.fn(async () => gatewayHtml(503));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await rejection(
+      settle(apiRequest('/api/v1/orders', { method: 'POST', body: { id: 1 } })),
+    );
+
+    // Once. A gateway saying the request never arrived is what the gateway
+    // believes, not what the server knows, and a duplicate order is worse.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(error.status).toBe(503);
+  });
+
+  it('says the service is unavailable rather than «unexpected error»', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => gatewayHtml(502)),
+    );
+
+    const error = await rejection(settle(apiRequest('/api/v1/thing', { method: 'POST', body: {} })));
+
+    expect(error.code).toBe('SERVICE_UNAVAILABLE');
+    expect(error.messageAr).toBe('الخدمة غير متاحة حالياً، الرجاء المحاولة بعد قليل');
+  });
+
+  it('gives up after a bounded number of attempts', async () => {
+    const fetchMock = vi.fn(async () => gatewayHtml(504));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await rejection(settle(apiRequest('/api/v1/storefront', { authenticated: false })));
+
+    // The original plus two retries, then the error — never an open loop.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(error.code).toBe('SERVICE_UNAVAILABLE');
+  });
+});
+
 describe('idempotencyKey()', () => {
   it('is unique per call, so a retry is the caller reusing one deliberately', () => {
     const keys = new Set(Array.from({ length: 200 }, () => idempotencyKey('order')));

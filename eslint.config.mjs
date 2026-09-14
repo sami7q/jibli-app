@@ -65,6 +65,10 @@ export default tseslint.config(
         // Web-standard globals Node has had since 10/18 respectively.
         URL: 'readonly',
         fetch: 'readonly',
+        // Node 17.3+ / 15. The proxy uses both to wait out a cold start.
+        AbortSignal: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
   },

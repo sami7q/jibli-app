@@ -95,6 +95,24 @@ services:
 
       - key: OTP_PROVIDER
         value: console
+      # The demo account, and nothing else, can sign in here.
+      #
+      # `console` generates a real code and hands it to a provider that only
+      # logs that an SMS went out — never the code, by design. So the deployed
+      # app could open every screen and finish nothing: no number could receive
+      # a code, including the one the pilot was meant to be shown from.
+      #
+      # `OTP_PROVIDER=mock` would fix it by making 0000 work for *any* number,
+      # on a URL anybody can reach. This is the same mechanism for one number:
+      # it gets OTP_MOCK_CODE and the code back in the response, every other
+      # number keeps a random code it cannot read, and the env schema refuses
+      # the setting outright when APP_ENV is production.
+      #
+      # Remove it the day a real SMS gateway is connected.
+      - key: OTP_TEST_PHONES
+        value: '+9647712345678'
+      - key: OTP_MOCK_CODE
+        value: '1234'
       - key: PUSH_PROVIDER
         value: console
 

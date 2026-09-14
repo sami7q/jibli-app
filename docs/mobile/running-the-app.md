@@ -279,7 +279,7 @@ Three integrations get asked about, so they are written down plainly.
 | | State |
 |---|---|
 | **OTP / SMS** | The gateway is **implemented** — `HttpSmsGatewayProvider`, with one retry on a 5xx or a timeout, never on a rejection, and the body never logged. It is **not connected**: set `OTP_PROVIDER=sms_gateway`, `SMS_GATEWAY_URL` and `SMS_GATEWAY_API_KEY` and sign-in works. Field names differ by aggregator and are configuration (`SMS_GATEWAY_TO_FIELD` and friends); `SMS_GATEWAY_AUTH_SCHEME` chooses bearer, header or body. On staging, set `OTP_PHONE_ALLOWLIST` so a live gateway cannot text a real customer. |
-| **Signing in without SMS** | `OTP_PROVIDER=mock` makes the code a fixed one — `OTP_MOCK_CODE`, default `0000` — so **any number signs in**. It replaces the generated code rather than bypassing verification, so the challenge is still stored, hashed, expired, attempt-counted and rate-limited exactly as in production; only the randomness is gone. The env schema refuses `mock` in production, so it cannot escape. |
+| **Signing in without SMS** | `OTP_PROVIDER=mock` makes the code a fixed one — `OTP_MOCK_CODE`, default `0000` — so **any number signs in**. It replaces the generated code rather than bypassing verification, so the challenge is still stored, hashed, expired, attempt-counted and rate-limited exactly as in production; only the randomness is gone. Right on a laptop, too wide for a URL anyone can reach — so `OTP_TEST_PHONES` is the same mechanism narrowed to a comma-separated list: those numbers get the fixed code and get it back in the response, every other number keeps a random one it cannot read. Listed numbers also skip the gateway, so connecting a real one later cannot start billing for them. The schema refuses both `mock` and a non-empty `OTP_TEST_PHONES` in production, so neither can escape. |
 | **Google sign-in** | **Server: done.** `POST /auth/google` verifies the ID token against Google's published keys, checking issuer, audience and expiry, and matches on Google's subject id rather than the email — an email can change hands, a subject cannot. A Google account is signed in but **cannot order**: `assertPhoneVerified` refuses the quote and the order until a phone is linked through `POST /auth/phone/link`, which runs the same OTP with the same limits. **App: ready but off.** Fill in `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` and set `GOOGLE_CLIENT_IDS` on the server; without them the button is hidden, because a Google button that fails is worse than none. **Shipping it on iOS obliges Sign in with Apple beside it** (guideline 4.8) — that work is not done. |
 | **Maps** | There is **no in-app map**, deliberately. What exists: the customer can attach their current coordinates to a saved address (`expo-location`, foreground only, asked once), and any point can be opened in whatever maps app the phone already has — `geo:` on Android, Apple Maps on iOS, a Google Maps URL as the fallback. None of that needs an API key or a billing account. A rendered map would need a map SDK, a key, and a geocoder, and in a city where addresses are landmarks it would still be «قرب صيدلية النور» that gets the driver there. ADR-0005 stands: no live driver tracking. |
 | **Driver sign-up** | **Now exists.** `POST /api/v1/driver/apply` creates a driver in `PENDING_ACTIVATION`; `GET /api/v1/driver/application` reports its state. In the app it is a row on the account screen — visible to guests too, because somebody who wants to deliver arrives as a browsing customer. Applying is not joining: an operator activates the account, and `assertDriver` refuses everything until they do. |
@@ -288,9 +288,21 @@ Three integrations get asked about, so they are written down plainly.
 
 ## 11. Running the API locally, and a test account
 
-The deployed API cannot sign anyone in: it has no SMS gateway, and the code is
-neither returned nor logged outside `APP_ENV=local`. To test ordering before
-launch, run the API yourself.
+The deployed API has no SMS gateway, so a random code goes to a console
+provider and is never seen — which for a while meant nobody could sign into the
+deployed app at all. `OTP_TEST_PHONES` on the Render service now opens exactly
+one number, the demo account below, with `OTP_MOCK_CODE=1234`. **Signing in
+against the deployed API needs nothing running locally**: start the proxy and
+the web preview, enter `771 234 5678`, code `1234`.
+
+Its first request may take up to a minute. Render's free plan spins the service
+down after fifteen minutes idle, and the proxy now waits out that cold start
+instead of failing — it prints `waking it, this takes up to a minute…` and
+retries until the service answers.
+
+Run the API yourself when you need anything the deployed one will not do: sign
+in as a *second* number, raise the OTP limits, read server logs, or work
+against your own database.
 
 ### No Docker needed
 
@@ -339,10 +351,15 @@ service invalidates the outstanding challenge, so that code is still live.
 Then point the app at it:
 
 ```powershell
-$env:JIBLI_PROXY_UPSTREAM = "http://localhost:4000"
 pnpm --filter @jibli/mobile proxy     # terminal 2
 pnpm --filter @jibli/mobile web       # terminal 3  → http://localhost:4010
 ```
+
+The proxy finds the local API on its own — it probes `localhost:4000/health/live`
+at startup and falls back to the deployed one — and prints which it chose, so a
+preview talking to the wrong API says so in its first line rather than in a
+confusing ten minutes. `JIBLI_PROXY_UPSTREAM` still overrides it; start the API
+after the proxy and you have to restart the proxy, since the probe runs once.
 
 For a phone over Expo Go, set `EXPO_PUBLIC_API_URL` to `http://<your LAN
 ip>:4000` instead — never `localhost`, which on a phone is the phone.
@@ -365,8 +382,10 @@ and ready to order from — profile completed, default address saved:
 التطوير» button that requests the code for that number and submits it in the
 same gesture, landing straight on the home screen. It is drawn only when
 `__DEV__` is true *and* the server actually answers with a code — which it does
-solely for `APP_ENV=local` or the mock provider — so there is no build in which
-a customer can see it and no flag to remember to turn off.
+solely for `APP_ENV=local`, the mock provider, or a number in `OTP_TEST_PHONES`
+— so there is no build in which a customer can see it and no flag to remember
+to turn off. It works against the deployed API too, because the number it uses
+is the listed one.
 
 It goes through the real OTP path rather than around it: the challenge is
 stored, hashed, expired, attempt-counted and rate-limited exactly as in

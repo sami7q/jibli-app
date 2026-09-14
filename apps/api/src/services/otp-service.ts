@@ -2,7 +2,12 @@ import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { AppError, ERROR_CODES } from '@jibli/contracts';
 import { hashShortCode, safeCompare } from '@jibli/auth';
 import { generateNumericCode, otpChallenges, users, uuidv7 } from '@jibli/db';
-import { NOTIFICATION_TEMPLATES, AllowlistSmsProvider } from '@jibli/notifications';
+import {
+  NOTIFICATION_TEMPLATES,
+  AllowlistSmsProvider,
+  ConsoleSmsProvider,
+  type SmsProvider,
+} from '@jibli/notifications';
 import { parseCsv } from '@jibli/config';
 import { maskPhoneForLog } from '@jibli/logger';
 import type { AppContext } from '../lib/context.js';
@@ -120,11 +125,19 @@ export async function requestOtp(
    *
    * And it cannot reach production: the env schema refuses to validate any
    * provider but `sms_gateway` when APP_ENV is production.
+   *
+   * `OTP_TEST_PHONES` is the same thing for one number at a time. A deployment
+   * with no SMS gateway cannot sign anybody in — the code is generated,
+   * delivered to a console provider and never seen — which made the deployed
+   * app a browsing demo that could not place an order. Opening every number
+   * on a public URL to fix that is too much; opening the demo account is
+   * enough, and it is refused in production too.
    */
-  const code =
-    env.OTP_PROVIDER === 'mock'
-      ? env.OTP_MOCK_CODE.slice(0, env.OTP_LENGTH).padEnd(env.OTP_LENGTH, '0')
-      : generateNumericCode(env.OTP_LENGTH);
+  const isTestPhone = parseCsv(env.OTP_TEST_PHONES).includes(phone);
+  const fixedCode = env.OTP_PROVIDER === 'mock' || isTestPhone;
+  const code = fixedCode
+    ? env.OTP_MOCK_CODE.slice(0, env.OTP_LENGTH).padEnd(env.OTP_LENGTH, '0')
+    : generateNumericCode(env.OTP_LENGTH);
   const challengeId = uuidv7();
   const expiresAt = new Date(Date.now() + env.OTP_TTL_SECONDS * 1000);
 
@@ -140,13 +153,23 @@ export async function requestOtp(
     requestUserAgent: input.userAgent,
   });
 
-  // 4. Deliver. The staging allowlist wraps the provider so a non-production
-  //    deployment cannot text an arbitrary real number (plan §7).
+  /*
+   * 4. Deliver. The staging allowlist wraps the provider so a non-production
+   *    deployment cannot text an arbitrary real number (plan §7).
+   *
+   *    A test number never reaches the real gateway. Its code is a constant
+   *    the tester already has, so the SMS carries nothing — and the numbers
+   *    are invented, so a live aggregator would reject them and fail the
+   *    request with OTP_DELIVERY_FAILED, breaking the one sign-in the list
+   *    exists to allow. It still goes through a provider rather than around
+   *    one, so the path is the same path.
+   */
   const allowlist = parseCsv(env.OTP_PHONE_ALLOWLIST);
-  const provider =
-    allowlist.length > 0
-      ? new AllowlistSmsProvider(ctx.sms, allowlist, ctx.logger)
-      : ctx.sms;
+  const base: SmsProvider = isTestPhone ? new ConsoleSmsProvider(ctx.logger) : ctx.sms;
+  const provider: SmsProvider =
+    allowlist.length > 0 && !isTestPhone
+      ? new AllowlistSmsProvider(base, allowlist, ctx.logger)
+      : base;
 
   const template = NOTIFICATION_TEMPLATES.otpCode(code);
   const delivery = await provider.send({ toE164: phone, body: template.bodyAr });
@@ -170,11 +193,12 @@ export async function requestOtp(
     resendAfterSeconds: env.OTP_RESEND_COOLDOWN_SECONDS,
     expiresInSeconds: env.OTP_TTL_SECONDS,
     /*
-     * Returned when a developer is meant to see it: local development, or the
-     * mock provider — where the code is fixed and public anyway, so hiding it
-     * protects nothing and only makes testing slower.
+     * Returned when a developer is meant to see it: local development, the
+     * mock provider, or a listed test number — in all three the code is fixed
+     * and already written down, so hiding it protects nothing and only makes
+     * testing slower. A real generated code is never returned.
      */
-    ...(env.APP_ENV === 'local' || env.OTP_PROVIDER === 'mock' ? { devCode: code } : {}),
+    ...(env.APP_ENV === 'local' || fixedCode ? { devCode: code } : {}),
   };
 }
 

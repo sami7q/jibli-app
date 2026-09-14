@@ -87,6 +87,22 @@ const otpSchema = z.object({
    */
   GOOGLE_CLIENT_IDS: z.string().optional(),
   OTP_MOCK_CODE: z.string().regex(/^\d{4,8}$/).default('0000'),
+  /**
+   * Numbers that receive `OTP_MOCK_CODE` instead of a random one.
+   *
+   * `OTP_PROVIDER=mock` opens *every* number, which is right on a laptop and
+   * wrong for a deployment anyone can reach — a public URL where 0000 signs in
+   * as any Iraqi number is an open door. This is the same mechanism narrowed to
+   * a list: a demo account can sign in, nobody else's number can.
+   *
+   * Comma-separated E.164. Everything else about the challenge is unchanged —
+   * stored, hashed, expired, attempt-counted and rate-limited exactly as in
+   * production — and the code is returned in the response for these numbers
+   * only, because it is already a constant that the tester was told.
+   *
+   * Refused in production by the schema below.
+   */
+  OTP_TEST_PHONES: z.string().optional(),
   SMS_GATEWAY_URL: z.string().url().optional(),
   SMS_GATEWAY_API_KEY: z.string().optional(),
   SMS_GATEWAY_SENDER_ID: z.string().optional(),
@@ -205,6 +221,13 @@ export const apiEnvSchema = baseSchema
           code: z.ZodIssueCode.custom,
           path: ['PUSH_PROVIDER'],
           message: 'production requires a real push provider',
+        });
+      }
+      if (env.OTP_TEST_PHONES && env.OTP_TEST_PHONES.trim() !== '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['OTP_TEST_PHONES'],
+          message: 'production must not carry fixed-code test numbers',
         });
       }
       if (!env.DATABASE_SSL) {
