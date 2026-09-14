@@ -46,6 +46,51 @@ async function writeSeenAt(iso: string): Promise<void> {
   }
 }
 
+/**
+ * Orders whose tracking screen this device has already opened by itself.
+ *
+ * Lives beside the notification marker because it is the same kind of fact: a
+ * small, local record of what this screen has already shown somebody, worth
+ * nothing to the server and not worth a migration to sync.
+ *
+ * A list rather than one id, capped, because a customer can have two orders
+ * running and being taken to the older one twice is the bug this prevents.
+ */
+const JUMPED_KEY = 'jibli.orders.openedOnLaunch';
+const JUMPED_LIMIT = 20;
+
+async function readJumped(): Promise<string[]> {
+  try {
+    const raw = isWeb
+      ? (globalThis.localStorage?.getItem(JUMPED_KEY) ?? null)
+      : await SecureStore.getItemAsync(JUMPED_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    // Unreadable storage means "never shown", which errs towards showing it —
+    // an extra jump is a smaller wrong than an order the customer never sees.
+    return [];
+  }
+}
+
+export async function hasSeenOrderScreen(orderId: string): Promise<boolean> {
+  return (await readJumped()).includes(orderId);
+}
+
+export async function rememberOrderScreenSeen(orderId: string): Promise<void> {
+  try {
+    const next = [orderId, ...(await readJumped()).filter((id) => id !== orderId)].slice(
+      0,
+      JUMPED_LIMIT,
+    );
+    const raw = JSON.stringify(next);
+    if (isWeb) globalThis.localStorage?.setItem(JUMPED_KEY, raw);
+    else await SecureStore.setItemAsync(JUMPED_KEY, raw);
+  } catch {
+    /* Losing it costs one extra jump, not data. */
+  }
+}
+
 /** Listeners so a badge elsewhere in the app updates the moment this changes. */
 const listeners = new Set<(seenAt: string | null) => void>();
 let cached: string | null = null;

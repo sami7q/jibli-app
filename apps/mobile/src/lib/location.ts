@@ -1,5 +1,9 @@
 import { Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
+import * as SecureStore from 'expo-secure-store';
+
+/** `expo-secure-store` is `export default {}` on web; the flag is not a secret. */
+const isWeb = Platform.OS === 'web';
 
 /**
  * Where the customer is, and how a driver gets there.
@@ -83,6 +87,54 @@ export async function captureCurrentLocation(): Promise<LocationOutcome> {
     // A location read can fail for a dozen reasons the customer cannot act on.
     // They all mean the same thing here: type the address instead.
     return { status: 'unavailable' };
+  }
+}
+
+/**
+ * Ask for the permission once, early, and never again.
+ *
+ * A delivery app that only asks at the address form asks at the worst moment:
+ * the customer is mid-checkout, hungry, and a system dialog lands on top of
+ * the one screen where hesitating costs an order. Asking on the way in — after
+ * the session resolves, on the home screen, not over a sign-in — means the
+ * answer is already known by the time it matters, and the map opens on the
+ * right street instead of on Tahrir Square.
+ *
+ * Once is the important half. iOS shows the prompt exactly once and every
+ * later request resolves silently to the earlier answer, so re-asking trains
+ * nobody and annoys everybody; the flag makes Android behave the same way.
+ * A customer who said no can still say yes from the address form, which asks
+ * deliberately rather than automatically.
+ */
+const ASKED_KEY = 'jibli.location.asked';
+
+export async function ensureLocationPermissionAsked(): Promise<void> {
+  try {
+    if (isWeb ? globalThis.localStorage?.getItem(ASKED_KEY) : await SecureStore.getItemAsync(ASKED_KEY)) {
+      return;
+    }
+  } catch {
+    // Unreadable storage: fall through and ask. The platform dialog is itself
+    // idempotent, so the worst case is a prompt that never appears.
+  }
+
+  try {
+    const existing = await Location.getForegroundPermissionsAsync();
+    // Only when the platform is still willing to show a dialog. Calling
+    // `request` after a denial is a no-op on iOS and a second prompt on some
+    // Android builds — neither is worth it.
+    if (existing.status === 'undetermined' && existing.canAskAgain) {
+      await Location.requestForegroundPermissionsAsync();
+    }
+  } catch {
+    /* No location services on this device or platform. */
+  }
+
+  try {
+    if (isWeb) globalThis.localStorage?.setItem(ASKED_KEY, '1');
+    else await SecureStore.setItemAsync(ASKED_KEY, '1');
+  } catch {
+    /* The flag is a convenience; the platform is the real record. */
   }
 }
 

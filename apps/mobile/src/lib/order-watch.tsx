@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
 import { playChime } from './chime';
+import { hasSeenOrderScreen, rememberOrderScreenSeen } from './notification-inbox';
 import { useSession } from './session';
 import { useCart } from './cart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -278,6 +279,16 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
 
   // ── Opening the order on launch ───────────────────────────────────────────
 
+  /*
+   * Which order this device has already been shown the tracking screen for.
+   *
+   * It was a ref — once per mount — which on a phone means once per launch and
+   * in a browser means once per refresh. Reloading the page while reading a
+   * menu yanked the screen away to an order the customer already knew about,
+   * every single time. Once per *order* is what the rule was always trying to
+   * say: open the app after placing something and it takes you to it; open it
+   * again an hour later and it leaves you where you went.
+   */
   const jumped = useRef(false);
 
   /*
@@ -304,8 +315,15 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
      */
     if (segments[0] !== '(tabs)') return;
 
+    // Claimed before the await: two polls landing together would otherwise
+    // both pass the test before either had recorded anything.
     jumped.current = true;
-    router.push(`/order/${active.id}`);
+
+    void (async () => {
+      if (await hasSeenOrderScreen(active.id)) return;
+      await rememberOrderScreenSeen(active.id);
+      router.push(`/order/${active.id}`);
+    })();
   }, [active, navigationReady, segments, router]);
 
   // ── The rating window, a quarter of an hour after delivery ────────────────

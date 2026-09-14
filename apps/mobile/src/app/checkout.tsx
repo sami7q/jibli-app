@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { notify } from '@/lib/dialog';
 import { color, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Sheet, SummaryRow } from '@/ui/catalog';
+import { MapPicker } from '@/ui/map-picker';
 
 /**
  * Checkout: where the order is going, what it costs, and placing it.
@@ -441,6 +442,18 @@ function AddressSheet({
     notify('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
   };
 
+  /*
+   * The map moved, so the pin moved.
+   *
+   * A point chosen by hand has no accuracy figure and should not borrow one
+   * from a GPS fix that is no longer what is being saved — `null` says «this
+   * is where somebody pointed», which is the honest thing for the driver's
+   * screen to receive.
+   */
+  const pickOnMap = useCallback((next: { latitude: number; longitude: number }) => {
+    setCoordinates({ latitude: next.latitude, longitude: next.longitude, accuracy: null });
+  }, []);
+
   const create = useMutation({
     mutationFn: () =>
       api.createAddress({
@@ -500,11 +513,27 @@ function AddressSheet({
       )}
 
       {/*
-        * The point, offered before the fields.
+        * The map, before the fields.
         *
-        * It is the one thing that removes ambiguity from a landmark address,
-        * and offering it first means a customer who taps it has less typing to
-        * feel guilty about skipping.
+        * «قرب صيدلية النور» is only unambiguous to somebody who already knows
+        * the street. A point is what turns it into an address a courier can
+        * reach without phoning, and this is where it gets set: drag the map,
+        * the pin stays in the middle, and what is under it is saved with the
+        * order and handed to the driver as a navigation link.
+        */}
+      <MapPicker
+        latitude={coordinates?.latitude ?? null}
+        longitude={coordinates?.longitude ?? null}
+        onPick={pickOnMap}
+      />
+
+      {/*
+        * And the shortcut past it, for somebody standing at the address.
+        *
+        * It moves the map rather than replacing it, so the GPS fix is a
+        * starting point to correct rather than an answer to accept — a phone
+        * indoors is routinely fifty metres out, and fifty metres is the next
+        * building along.
         */}
       <Pressable
         onPress={() => void locate()}
@@ -541,8 +570,10 @@ function AddressSheet({
             </Text>
             <Text variant="caption" tone="muted">
               {coordinates
-                ? `دقة تقريبية ${Math.round(coordinates.accuracy ?? 0)} متر — اضغط للتحديث`
-                : 'اختياري، يساعد المندوب في الوصول بدقة'}
+                ? coordinates.accuracy
+                  ? `دقة تقريبية ${Math.round(coordinates.accuracy)} متر — صحّح على الخريطة إن لزم`
+                  : 'محدَّد على الخريطة — اضغط لاستخدام موقعك الحالي'
+                : 'يضع العلامة على موقعك الحالي'}
             </Text>
           </View>
         </Row>

@@ -20,6 +20,7 @@ import {
   type RestaurantCard as RestaurantSummary,
 } from '@/lib/api';
 import { useArea } from '@/lib/area';
+import { ensureLocationPermissionAsked } from '@/lib/location';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
@@ -83,6 +84,19 @@ export default function HomeScreen() {
     const timer = setTimeout(() => setDebounced(term), 300);
     return () => clearTimeout(timer);
   }, [term]);
+
+  /*
+   * The location prompt, here and nowhere else.
+   *
+   * On the home screen rather than at the root, because the root also holds
+   * the sign-in and the splash, and a permission dialog over a welcome screen
+   * is the one every customer denies. By the time this renders they have
+   * chosen an area and are looking at restaurants that deliver to it, which is
+   * the sentence the dialog is asking them to agree with. It asks once, ever.
+   */
+  useEffect(() => {
+    void ensureLocationPermissionAsked();
+  }, []);
 
   const dishes = useQuery({
     queryKey: ['dish-search', area?.cityId, debounced],
