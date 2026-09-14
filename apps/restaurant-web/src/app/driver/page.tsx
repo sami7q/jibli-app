@@ -366,27 +366,33 @@ function DeliveryCard({
 function NavigationButtons({ links }: { links?: NavigationLinks }) {
   if (!links) return null;
 
-  if (!links.has_coordinates) {
-    return (
-      <p className="driver__task-meta">
-        لم يحدّد الزبون موقعه على الخريطة — اعتمد على العنوان أعلاه واتصل به عند اللزوم.
-      </p>
-    );
-  }
-
-  const primary = links.geo ?? links.apple ?? links.google;
-  if (!primary) return null;
-
   return (
     <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-      <a className="btn btn--primary" href={primary} target="_blank" rel="noreferrer">
-        <Icon name="location" className="nav__icon" aria-hidden />
-        فتح الموقع في الخرائط
-      </a>
-      {links.google && links.google !== primary ? (
-        <a className="btn btn--ghost" href={links.google} target="_blank" rel="noreferrer">
-          خرائط جوجل
+      {links.googleMaps ? (
+        <a className="btn btn--primary" href={links.googleMaps} target="_blank" rel="noreferrer">
+          <Icon name="location" className="nav__icon" aria-hidden />
+          {links.hasCoordinates ? 'فتح الموقع في الخرائط' : 'بحث عن العنوان في الخرائط'}
         </a>
+      ) : null}
+
+      {/*
+        * Waze only when there is a pin.
+        *
+        * It navigates to coordinates and has nothing to do with a landmark
+        * address, so the server returns null for it without one — and a
+        * button that is there half the time is better than a button that
+        * opens an app with nowhere to go.
+        */}
+      {links.waze ? (
+        <a className="btn btn--ghost" href={links.waze} target="_blank" rel="noreferrer">
+          Waze
+        </a>
+      ) : null}
+
+      {!links.hasCoordinates ? (
+        <p className="driver__task-meta" style={{ width: '100%' }}>
+          لم يحدّد الزبون موقعه على الخريطة — البحث بالعنوان تقريبي، واتصل به عند اللزوم.
+        </p>
       ) : null}
     </div>
   );

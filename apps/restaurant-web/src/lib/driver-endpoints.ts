@@ -34,12 +34,21 @@ export interface DriverDelivery {
   restaurant_location: Record<string, unknown> | null;
 }
 
-/** Links out to whatever maps app the phone already has (plan §50). */
+/**
+ * Links out to whatever maps app the phone already has (plan §50).
+ *
+ * camelCase, unusually for a response body: this is a `@jibli/domain` object
+ * the route hands through untouched rather than a payload assembled in
+ * snake_case beside it. Declared here rather than imported from that package —
+ * `@jibli/domain` reaches for the database, and a browser bundle has no
+ * business pulling it in for four field names.
+ */
 export interface NavigationLinks {
-  geo: string | null;
-  apple: string | null;
-  google: string | null;
-  has_coordinates: boolean;
+  googleMaps: string | null;
+  waze: string | null;
+  /** Text to copy when neither app opens — a landmark address, usually. */
+  copyableAddress: string | null;
+  hasCoordinates: boolean;
 }
 
 export interface DriverDeliveryDetail {
