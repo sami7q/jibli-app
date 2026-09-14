@@ -43,6 +43,7 @@ import { AreaPicker } from '@/ui/area-picker';
  * in the header, which is the comp's location row doing real work.
  */
 export default function HomeScreen() {
+  const { width: windowWidth } = useWindowDimensions();
   const isGuest = useIsGuest();
   const router = useRouter();
   const { area, isResolving } = useArea();
@@ -133,7 +134,9 @@ export default function HomeScreen() {
         * edges reads as a mistake.
         */}
       {searching ? null : storefront.isLoading ? (
-        <Skeleton height={200} style={{ marginTop: space[4] }} />
+        // The same 2:1 the real banner uses, so the layout does not jump by a
+        // few pixels the moment the carousel replaces it.
+        <Skeleton height={windowWidth / 2} style={{ marginTop: space[4] }} />
       ) : (
         <BannerCarousel
           banners={storefront.data?.banners ?? []}

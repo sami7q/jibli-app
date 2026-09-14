@@ -74,16 +74,16 @@ function readBody(request) {
  * name runs out of room first.
  */
 const DEVICES = [
-  { name: 'iPhone SE', width: 375, height: 667 },
-  { name: 'iPhone 14', width: 390, height: 844 },
-  { name: 'Pixel 7', width: 412, height: 915 },
-  { name: 'iPhone 14 Pro Max', width: 430, height: 932 },
+  { name: 'iPhone SE', width: 375, height: 667, safeTop: 20, safeBottom: 0, notch: false },
+  { name: 'iPhone 14', width: 390, height: 844, safeTop: 47, safeBottom: 34, notch: true },
+  { name: 'Pixel 7', width: 412, height: 915, safeTop: 24, safeBottom: 24, notch: false },
+  { name: 'iPhone 14 Pro Max', width: 430, height: 932, safeTop: 59, safeBottom: 34, notch: true },
 ];
 
 function framePage(appOrigin) {
   const options = DEVICES.map(
     (d, i) =>
-      `<option value="${d.width}x${d.height}"${i === 1 ? ' selected' : ''}>${d.name} — ${d.width}×${d.height}</option>`,
+      `<option value="${d.width}x${d.height}x${d.safeTop}x${d.safeBottom}x${d.notch ? 1 : 0}"${i === 1 ? ' selected' : ''}>${d.name} — ${d.width}×${d.height}</option>`,
   ).join('');
 
   return `<!doctype html>
@@ -121,13 +121,30 @@ function framePage(appOrigin) {
     overflow: hidden;
     transition: width .18s ease, height .18s ease;
   }
-  /* The notch, only so the top inset is visible rather than imagined. */
-  .phone::before {
-    content: ""; position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
-    width: 34%; height: 22px; background: #23262c; border-radius: 0 0 14px 14px; z-index: 2;
-    pointer-events: none;
+  /*
+    The safe areas, reserved rather than drawn over.
+
+    A browser reports env(safe-area-inset-*) as zero inside an iframe, so the
+    app laid itself out as if the screen began at the very top — and the notch
+    this page drew on top of it covered the header. Giving the strips their own
+    height puts the app's first pixel exactly where a device's safe area ends,
+    which is what the app itself does on hardware.
+  */
+  .phone__safe {
+    background: #f8f9fa; flex-shrink: 0; position: relative;
   }
-  iframe { width: 100%; height: 100%; border: 0; display: block; background: #f8f9fa; }
+  .phone__stack { display: flex; flex-direction: column; height: 100%; }
+  /* The island, in the space the app is already keeping clear of it. */
+  .phone.has-notch .phone__safe--top::after {
+    content: ""; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    width: 30%; height: 24px; background: #16181d; border-radius: 14px;
+  }
+  /* The home indicator, for the same reason. */
+  .phone__safe--bottom::after {
+    content: ""; position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 36%; height: 5px; background: #c9ccd2; border-radius: 3px;
+  }
+  iframe { width: 100%; flex: 1; border: 0; display: block; background: #f8f9fa; }
   .hint { font-size: 12px; color: #9ca3af; max-width: 560px; text-align: center; }
   code { background: #22262d; padding: 1px 5px; border-radius: 4px; }
 </style>
@@ -139,7 +156,13 @@ function framePage(appOrigin) {
     <button id="reload">إعادة التحميل</button>
   </header>
 
-  <div class="phone" id="phone"><iframe id="app" src="${appOrigin}"></iframe></div>
+  <div class="phone" id="phone">
+    <div class="phone__stack">
+      <div class="phone__safe phone__safe--top" id="safeTop"></div>
+      <iframe id="app" src="${appOrigin}"></iframe>
+      <div class="phone__safe phone__safe--bottom" id="safeBottom"></div>
+    </div>
+  </div>
 
   <p class="hint">
     التطبيق نفسه يعمل على <code>${appOrigin}</code>. هذه الصفحة تعرضه بأبعاد الهاتف فقط —
@@ -151,10 +174,23 @@ function framePage(appOrigin) {
   const size = document.getElementById('size');
   const app = document.getElementById('app');
 
+  const safeTop = document.getElementById('safeTop');
+  const safeBottom = document.getElementById('safeBottom');
+
   function apply() {
-    const [w, h] = size.value.split('x').map(Number);
+    const [w, h, top, bottom, notch] = size.value.split('x').map(Number);
     phone.style.width = w + 'px';
     phone.style.height = h + 'px';
+
+    /*
+     * The insets are part of the device's height, not extra on top of it: an
+     * iPhone 14 is 844 points tall including the 47 above the app and the 34
+     * below it. So they are carved out of the frame rather than added to it,
+     * and what is left is what a screen actually gives a layout to work with.
+     */
+    safeTop.style.height = top + 'px';
+    safeBottom.style.height = bottom + 'px';
+    phone.classList.toggle('has-notch', notch === 1);
 
     // Keep it on screen on a laptop, without changing the layout the app sees.
     const room = window.innerHeight - 150;

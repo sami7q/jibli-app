@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { AppState, Platform, Pressable, View } from 'react-native';
-import { useRouter, useSegments } from 'expo-router';
+import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
@@ -269,8 +269,21 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
 
   const jumped = useRef(false);
 
+  /*
+   * Whether the router can be navigated yet.
+   *
+   * `segments` fills in before the root navigator has finished mounting, and
+   * pushing in that window throws «Attempted to navigate before mounting the
+   * Root Layout component» — which is exactly what a provider that navigates
+   * from an effect at the root will hit on a cold start, every time, because
+   * it is the first thing to run. `state.key` is only set once navigation is
+   * actually ready.
+   */
+  const navigationState = useRootNavigationState();
+  const navigationReady = Boolean(navigationState?.key);
+
   useEffect(() => {
-    if (jumped.current || !active) return;
+    if (jumped.current || !active || !navigationReady) return;
 
     /*
      * Only from a tab. Taking the screen away from someone who is filling in
@@ -282,7 +295,7 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
 
     jumped.current = true;
     router.push(`/order/${active.id}`);
-  }, [active, segments, router]);
+  }, [active, navigationReady, segments, router]);
 
   // ── The rating window, a quarter of an hour after delivery ────────────────
 

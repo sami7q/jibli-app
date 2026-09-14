@@ -572,7 +572,21 @@ export function PromoBanner({
   const body = (
     <View
       style={{
-        height: fullBleed ? 200 : 164,
+        /*
+         * A ratio, not a height — for the full-bleed slot at least.
+         *
+         * It was 200px on every phone, so the same artwork was cropped
+         * differently on each one: 1.88:1 on an SE, 2.15:1 on a Pro Max. A
+         * designer exports one image and it lost a different slice of itself
+         * per device, which is the kind of thing that only shows up once
+         * somebody puts two phones side by side. Two-to-one is the ratio these
+         * are drawn at, and now every screen shows the same picture.
+         *
+         * The inset variant keeps its fixed height: it is a card in a column
+         * of cards, and matching its neighbours matters more there than
+         * matching itself across devices.
+         */
+        ...(fullBleed ? { aspectRatio: 2 } : { height: 164 }),
         borderRadius: fullBleed ? 0 : radius['2xl'],
         overflow: 'hidden',
         backgroundColor: color.brand,
