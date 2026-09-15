@@ -16,7 +16,14 @@
 # addon esbuild cannot inline.
 # =============================================================================
 
-ARG NODE_VERSION=20.18.1
+# Node 22 LTS, matching development.
+#
+# It was 20.18.1, which sat below the >=20.19.4 floor the workspace root
+# declares since Expo SDK 54 raised it. `engine-strict` is off, so pnpm would
+# only have warned — but a container building on a Node the repository says is
+# too old is drift waiting to become a failure, and the version that ran
+# `deploy:check` is the one worth shipping.
+ARG NODE_VERSION=22.20.0
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS deps
@@ -36,24 +43,31 @@ COPY package.json ./
 # source of truth and this cannot drift from what developers run locally.
 RUN npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 
-# Every root file pnpm reads before installing. All five, not four:
+# Every root file pnpm reads before installing:
 #
 #   package.json         the workspace root manifest
 #   pnpm-lock.yaml       the resolution to reproduce
 #   pnpm-workspace.yaml  which directories are packages
 #   .npmrc               linker and hoisting settings
-#   .pnpmfile.cjs        install hooks
 #
-# The last one is the trap. pnpm records a checksum of .pnpmfile.cjs *in the
-# lockfile*, so leaving it out makes a frozen install fail with
+# There was a fifth, .pnpmfile.cjs, and it was a trap worth remembering even
+# now that it is gone: pnpm records a checksum of that file *in the lockfile*,
+# so omitting it from the image made a frozen install fail with
 # ERR_PNPM_LOCKFILE_CONFIG_MISMATCH — a message about configuration that gives
-# no hint a file is simply absent. It is required even though what it does
-# (pinning React 18 typings for the mobile app) is irrelevant here: the
-# checksum is compared before anything is evaluated.
+# no hint a file is simply absent.
+#
+# The hook was deleted when SDK 54 brought the app to React 19 and the React
+# 18 typing workaround it existed for became unnecessary. The lockfile no
+# longer carries its checksum, so listing it here only broke the build with
+# "failed to calculate checksum of ref ... not found" — the same failure from
+# the other direction.
+#
+# If a root-level pnpm input is ever added back, it belongs on this line, and
+# the lockfile will insist on it.
 #
 # This layer is cached until a dependency actually changes, so an ordinary
 # source edit does not reinstall the world.
-COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc .pnpmfile.cjs ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/
 COPY apps/worker/package.json apps/worker/
 COPY apps/admin-web/package.json apps/admin-web/
