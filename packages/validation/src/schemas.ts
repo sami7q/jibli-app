@@ -30,9 +30,18 @@ export const iraqiPhoneSchema = z
   });
 
 /**
- * A person's full name. Plan §11: "valid Unicode text with reasonable length and
- * control-character restrictions". Digits and symbols are rejected because a name
- * field is a frequent target for injected junk.
+ * The name a customer is greeted and addressed by.
+ *
+ * Plan §11: "valid Unicode text with reasonable length and control-character
+ * restrictions". Digits and symbols stay rejected — a name field is a frequent
+ * target for injected junk, and nothing legitimate needs them.
+ *
+ * What was dropped is the requirement for two words. It was asking for a
+ * document, not a name: plenty of people go by one, an Iraqi customer may give
+ * a first name and a tribal name that reads as one token, and the app only
+ * ever needs something to put on an order and say مرحباً to. A delivery is
+ * identified by a phone number and a PIN, never by matching a name against
+ * anything — so the rule rejected real people and protected nothing.
  */
 export const fullNameSchema = z
   .string()
@@ -40,13 +49,10 @@ export const fullNameSchema = z
   .pipe(
     z
       .string()
-      .min(3, 'الاسم قصير جداً')
+      .min(2, 'الاسم قصير جداً')
       .max(80, 'الاسم طويل جداً')
       .regex(/^[^\d<>{}[\]\\/|@#$%^*_=+~`]+$/u, 'الاسم يحتوي على رموز غير مسموحة'),
-  )
-  .refine((name) => name.split(' ').filter(Boolean).length >= 2, {
-    message: 'الرجاء إدخال الاسم الكامل',
-  });
+  );
 
 /** Free-form display text such as a restaurant or menu item name. */
 export const displayNameSchema = (min = 2, max = 120) =>
