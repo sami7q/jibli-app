@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { relativeAr } from '@jibli/ui-web';
-import { DRIVER_ACCOUNT_STATUSES, type DriverAccountStatus } from '@jibli/contracts';
+import {
+  DRIVER_ACCOUNT_STATUSES,
+  VEHICLE_TYPES,
+  type DriverAccountStatus,
+  type VehicleType,
+} from '@jibli/contracts';
+import { tryToE164Iraq } from '@jibli/validation';
 import { AdminShell } from '@/components/shell';
 import {
   Badge,
@@ -27,10 +33,15 @@ import { useDebounced } from '@/hooks/use-debounced';
 /**
  * Driver oversight (plan §45, §54, §87).
  *
- * Drivers belong to restaurants; Admin does not create them. What Admin does
- * need is visibility across every restaurant — especially cash custody, because
- * a driver holding a large uncleared balance is an operational risk regardless
- * of which restaurant employs them.
+ * Admin sees every courier, whoever recruited them — especially their cash
+ * custody, because a driver holding a large uncleared balance is an operational
+ * risk regardless of which restaurant employs them.
+ *
+ * It can also add one. That used to be false, and the gap showed at exactly the
+ * wrong moment: the first couriers in a newly opened city are recruited by the
+ * platform, because there is not yet a restaurant to hire them. A restaurant
+ * could add a driver and a customer could apply to become one, and the operator
+ * setting the city up could do neither.
  */
 
 const STATUS_LABELS: Record<DriverAccountStatus, string> = {
@@ -61,6 +72,7 @@ export default function DriversPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<DriverAccountStatus | ''>('');
   const [suspending, setSuspending] = useState<AdminDriver | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const debouncedSearch = useDebounced(search, 350);
   const token = session.status === 'authenticated' ? session.accessToken : '';
@@ -91,9 +103,16 @@ export default function DriversPage() {
   return (
     <AdminShell
       title="المندوبون"
-      subtitle="مندوبو المطاعم وعهدهم النقدية"
+      subtitle="مندوبو المنصة والمطاعم وعهدهم النقدية"
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
+      actions={
+        session.can('driver.create') ? (
+          <button type="button" className="btn btn--primary" onClick={() => setAdding(true)}>
+            إضافة مندوب
+          </button>
+        ) : null
+      }
     >
       {totalCustody > 0 ? (
         <div className="alert-bar alert-bar--warning">
@@ -232,6 +251,17 @@ export default function DriversPage() {
         )}
       </Card>
 
+      {adding ? (
+        <AddDriverDialog
+          token={token}
+          onDone={() => {
+            setAdding(false);
+            void queryClient.invalidateQueries({ queryKey: ['admin-drivers'] });
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : null}
+
       {suspending ? (
         <ConfirmDialog
           title={
@@ -283,5 +313,148 @@ export default function DriversPage() {
         />
       ) : null}
     </AdminShell>
+  );
+}
+
+/**
+ * Add a courier to the platform's roster.
+ *
+ * Four fields, and the phone is the load-bearing one: it is the identity. If
+ * the number already belongs to a Jibli customer, the server attaches a driver
+ * profile to that same person rather than creating a second account — one
+ * identity per phone, everywhere.
+ *
+ * The account is deliberately not usable when this dialog closes. It is created
+ * PENDING_ACTIVATION and the driver activates it themselves by signing in with
+ * an OTP on the handset the deliveries will arrive on. That is said on the form
+ * rather than discovered afterwards, because "I added him and he is not
+ * showing as active" is otherwise the next question.
+ */
+function AddDriverDialog({
+  token,
+  onDone,
+  onCancel,
+}: {
+  token: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [vehicleType, setVehicleType] = useState<VehicleType>('MOTORCYCLE');
+  const [plate, setPlate] = useState('');
+
+  /*
+   * Accepts what an Iraqi operator actually types — 07xx, +9647xx, Arabic-Indic
+   * digits — and normalises to E.164 for the API. Returns null when it is not a
+   * valid Iraqi mobile, which is what gates the button.
+   */
+  const parsed = tryToE164Iraq(phone);
+  const normalized = parsed.ok ? parsed.value : null;
+
+  const create = useMutation({
+    mutationFn: () =>
+      admin.createDriver(token, {
+        full_name: fullName.trim(),
+        // Non-null: the button is disabled until the number parses.
+        phone: normalized ?? '',
+        vehicle_type: vehicleType,
+        ...(plate.trim() ? { plate_number: plate.trim() } : {}),
+      }),
+    onSuccess: onDone,
+  });
+
+  const canSave = fullName.trim().length >= 3 && normalized !== null && !create.isPending;
+
+  return (
+    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="driver-title">
+      <div className="dialog">
+        <h2 id="driver-title">إضافة مندوب</h2>
+
+        <div className="field">
+          <label htmlFor="driver-name">اسم المندوب</label>
+          <input
+            id="driver-name"
+            value={fullName}
+            onChange={(event) => setFullName(event.target.value)}
+            placeholder="أحمد كاظم"
+            maxLength={80}
+          />
+          <span className="field__hint">كما يظهر للعميل عند وصول الطلب.</span>
+        </div>
+
+        <div className="field">
+          <label htmlFor="driver-phone">رقم الهاتف</label>
+          <input
+            id="driver-phone"
+            dir="ltr"
+            inputMode="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="07XX XXX XXXX"
+            aria-invalid={phone !== '' && normalized === null}
+          />
+          <span className="field__hint">
+            هذا الرقم هو هويّته في جيبلي — يسجّل الدخول به في التطبيق ويستلم رمز التحقق عليه.
+          </span>
+          {phone !== '' && normalized === null ? (
+            <span className="field__error">رقم عراقي غير صالح</span>
+          ) : null}
+        </div>
+
+        <div className="field">
+          <label htmlFor="driver-vehicle">وسيلة التوصيل</label>
+          <select
+            id="driver-vehicle"
+            value={vehicleType}
+            onChange={(event) => setVehicleType(event.target.value as VehicleType)}
+          >
+            {VEHICLE_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {VEHICLE_LABELS[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="driver-plate">رقم المركبة (اختياري)</label>
+          <input
+            id="driver-plate"
+            dir="ltr"
+            value={plate}
+            onChange={(event) => setPlate(event.target.value)}
+            placeholder="12345 بغداد"
+            maxLength={20}
+          />
+        </div>
+
+        <p className="auth__note" style={{ margin: 0 }}>
+          يُنشأ الحساب بحالة «بانتظار التفعيل». يفعّله المندوب بنفسه بتسجيل الدخول في تطبيق جيبلي
+          برقمه، ولا يستلم أي طلب قبل ذلك.
+        </p>
+
+        {create.error ? (
+          <p className="alert-bar alert-bar--danger" role="alert">
+            {create.error instanceof ApiError ? create.error.messageAr : 'تعذّر إنشاء المندوب'}
+          </p>
+        ) : null}
+
+        <div className="dialog__actions">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={!canSave}
+            onClick={() => create.mutate()}
+          >
+            {create.isPending ? 'جاري الإنشاء…' : 'إنشاء المندوب'}
+          </button>
+          <button type="button" className="btn btn--outline" onClick={onCancel}>
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

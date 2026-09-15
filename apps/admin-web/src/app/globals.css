@@ -2788,3 +2788,67 @@ html {
   opacity: 0.55;
   margin: 0.25rem auto 0.3rem;
 }
+
+/*
+ * The first cell of the merchant directory.
+ *
+ * Three facts, ranked: the name is the link, the partner code and the owner's
+ * number are the quiet line under it. They shared one line inside the link
+ * before, which put a Latin code in the middle of a right-to-left run — the
+ * `#` rendered on the wrong side of it — and drew the browser's default
+ * underline through the gap between a name and an identifier that are not the
+ * same kind of thing.
+ */
+.merchant-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.merchant-cell__name {
+  font-weight: 700;
+  color: inherit;
+  /* The row is already a link target by convention; the underline arrives on
+     intent rather than sitting under every name in the table. */
+  text-decoration: none;
+}
+
+.merchant-cell__name:hover,
+.merchant-cell__name:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.merchant-cell__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  /* Tabular figures so codes and numbers line up down the column. */
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-cell__dot {
+  color: var(--border-strong);
+}
+
+.merchant-cell__phone {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.merchant-cell__phone:hover,
+.merchant-cell__phone:focus-visible {
+  color: var(--jibli-orange-600);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Stated rather than left blank: "no owner phone" is a thing to fix, and a
+   blank cell reads as a rendering bug. */
+.merchant-cell__missing {
+  color: var(--text-muted);
+  opacity: 0.75;
+}

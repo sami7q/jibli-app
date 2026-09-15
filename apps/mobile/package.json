@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "bundle": "expo export -p ios -p android --output-dir .expo-export",
     "web": "expo start --web",
-    "proxy": "node scripts/dev-proxy.mjs"
+    "proxy": "node scripts/dev-proxy.mjs",
+    "apk": "eas build --platform android --profile preview"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.7",

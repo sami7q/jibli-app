@@ -165,6 +165,39 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
             AND ${users.username} IS NOT NULL
             AND ${users.deletedAt} IS NULL
         )`,
+        /*
+         * Who to call about this partner.
+         *
+         * The directory could say a restaurant was suspended, or had no portal
+         * account, or had taken no order in a week — every one of which ends in
+         * somebody picking up a phone — and the number was three clicks away on
+         * the detail screen. It is one correlated subquery rather than a join
+         * because a restaurant has several members and a join would multiply
+         * the rows by them.
+         *
+         * OWNER specifically, not «any member»: a cashier's phone is not who
+         * you call about a suspension. `ORDER BY created_at` so a restaurant
+         * with two owners answers with the one who was there first, stably,
+         * rather than with whichever row the planner happened to return.
+         */
+        ownerName: sql<string | null>`(
+          SELECT ${users.fullName} FROM ${restaurantMembers}
+          JOIN ${users} ON ${users.id} = ${restaurantMembers.userId}
+          WHERE ${restaurantMembers.restaurantId} = ${restaurants.id}
+            AND ${restaurantMembers.role} = 'OWNER'
+            AND ${users.deletedAt} IS NULL
+          ORDER BY ${restaurantMembers.createdAt}
+          LIMIT 1
+        )`,
+        ownerPhone: sql<string | null>`(
+          SELECT ${users.phoneE164} FROM ${restaurantMembers}
+          JOIN ${users} ON ${users.id} = ${restaurantMembers.userId}
+          WHERE ${restaurantMembers.restaurantId} = ${restaurants.id}
+            AND ${restaurantMembers.role} = 'OWNER'
+            AND ${users.deletedAt} IS NULL
+          ORDER BY ${restaurantMembers.createdAt}
+          LIMIT 1
+        )`,
         // Completed orders in the last 7 days — the number that says whether
         // this restaurant is actually trading.
         orders7d: sql<number>`(
@@ -221,6 +254,8 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           // Surfaced so an operator can see why an ACTIVE restaurant is invisible.
           city_ordering_enabled: row.cityOrderingEnabled,
           has_portal_user: row.hasPortalUser,
+          owner_name: row.ownerName,
+          owner_phone: row.ownerPhone,
           commission_flat_iqd: row.commissionFlatIqd,
           commission_display:
             row.commissionFlatIqd === null ? null : commissionFeeDisplay(row.commissionFlatIqd),

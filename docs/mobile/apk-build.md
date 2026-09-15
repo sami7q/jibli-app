@@ -1,0 +1,65 @@
+# Building an APK you can install on a phone
+
+For trying the app on a real handset, against the live API, without going near
+Google Play or the App Store.
+
+## Why EAS rather than a local build
+
+`expo run:android` compiles on your own machine and needs Android Studio, a
+JDK and the Android SDK installed and on PATH — an afternoon of setup on
+Windows before the first build even starts. EAS builds on Expo's machines and
+hands back a download link. The free tier is enough for this: it queues behind
+paid builds, so a build takes roughly ten to twenty minutes rather than two.
+
+Neither path involves a store. An APK built this way is installed by opening
+the link on the phone and allowing "install from unknown sources" once.
+
+## One-time setup
+
+```bash
+npm install -g eas-cli
+eas login                       # a free Expo account
+cd apps/mobile
+eas build:configure             # writes extra.eas.projectId into app.config.ts
+```
+
+`eas build:configure` is the only step that changes a file, and it only adds
+the project id that ties this checkout to your Expo account. `eas.json` is
+already committed.
+
+## Every build after that
+
+```bash
+pnpm --filter @jibli/mobile apk
+```
+
+That is `eas build --platform android --profile preview`: an **APK**, marked
+`internal` distribution, so EAS gives you a link and a QR code instead of
+preparing a store upload. Open the link on the phone and install.
+
+The `preview` profile pins `EXPO_PUBLIC_API_URL` to the deployed API, so the
+build talks to the same backend the Admin portal does. Nothing else has to be
+configured for it to work over mobile data.
+
+## What "works online" depends on
+
+  - **The API sleeps.** It runs on a free Render instance that spins down after
+    fifteen minutes idle, and the first request then waits about a minute. The
+    app shows its own loading state rather than failing, but a tester who opens
+    the app cold should be told to expect it once.
+  - **Sign-in needs an SMS provider.** `OTP_PROVIDER=console` on the deployed
+    API means no real message is ever sent. The one number in `OTP_TEST_PHONES`
+    signs in with the code in `OTP_MOCK_CODE`; every other number receives a
+    code nobody can read. See `render.yaml` — OTPIQ is tested and needs only an
+    account and five environment variables.
+  - **Map tiles.** `EXPO_PUBLIC_MAP_TILE_URL` is unset, so the address picker
+    falls back to OpenStreetMap's donated tile server. Fine for your own
+    testing; its usage policy does not allow it for an app handed to other
+    people. MapTiler's free tier covers far more than this needs.
+
+## iOS
+
+The same profile builds for iOS (`--platform ios`), but installing it on a
+device without the App Store needs an Apple Developer account and the device
+registered for ad-hoc distribution. Android is the path that works with no
+paid account.

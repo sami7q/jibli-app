@@ -33,6 +33,9 @@ export interface AdminRestaurant {
   accepts_orders: boolean;
   city_ordering_enabled: boolean;
   has_portal_user: boolean;
+  /** The OWNER member's name and number — who you call about this partner. */
+  owner_name?: string | null;
+  owner_phone?: string | null;
   commission_flat_iqd: number | null;
   commission_display: string | null;
   orders_7d: number;
@@ -917,6 +920,30 @@ export const admin = {
 
   drivers: (token: string, filters: Record<string, string | undefined> = {}) =>
     apiRequest<AdminDriver[]>(`/api/v1/admin/drivers${qs(filters)}`, { accessToken: token }),
+
+  /**
+   * Put a courier on the platform's roster.
+   *
+   * The account is created PENDING_ACTIVATION and stays that way until the
+   * driver signs in on their own phone with an OTP — an operator typing a
+   * number cannot put someone on the road who has never held the handset the
+   * deliveries arrive on.
+   */
+  createDriver: (
+    token: string,
+    body: {
+      full_name: string;
+      phone: string;
+      vehicle_type: 'MOTORCYCLE' | 'CAR' | 'BICYCLE' | 'ON_FOOT';
+      plate_number?: string;
+      restaurant_id?: string;
+    },
+  ) =>
+    apiRequest<{ driver_id: string; note_ar: string }>('/api/v1/admin/drivers', {
+      method: 'POST',
+      accessToken: token,
+      body,
+    }),
 
   suspendDriver: (token: string, id: string, suspended: boolean, reason: string) =>
     apiRequest<{ suspended: boolean }>(`/api/v1/admin/drivers/${id}/suspend`, {

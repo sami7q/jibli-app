@@ -9,10 +9,17 @@ import {
   EVENT_TYPES,
   PLATFORM_ROLES,
   USER_STATUSES,
+  VEHICLE_TYPES,
   success,
 } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
-import { maskPhone, reasonSchema, uuidSchema } from '@jibli/validation';
+import {
+  displayNameSchema,
+  iraqiPhoneSchema,
+  maskPhone,
+  reasonSchema,
+  uuidSchema,
+} from '@jibli/validation';
 import { AUDIT_ACTIONS, computeCustody, enqueueOutboxEvent, writeAudit } from '@jibli/domain';
 import {
   cities,
@@ -20,6 +27,7 @@ import {
   driverCashEvents,
   drivers,
   orders,
+  restaurantBranches,
   restaurantDrivers,
   restaurantMembers,
   restaurants,
@@ -388,6 +396,163 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
           cash_custody_iqd: custodyByDriver.get(row.driverId) ?? 0,
           last_seen_at: row.lastHeartbeatAt?.toISOString() ?? null,
         })),
+        { request_id: request.requestId },
+      ),
+    );
+  });
+
+  /**
+   * Create a driver from Admin (plan §45, §87).
+   *
+   * The restaurant portal could already hire one and the customer app could
+   * already apply to be one, and between those two there was no way for the
+   * platform's own operator to put a courier on the road. That is the wrong
+   * gap to have: a pilot city's first couriers are recruited by the platform,
+   * not by a restaurant that has not opened yet, and «add a driver» is the one
+   * thing an operator setting up a launch reaches for and did not find.
+   *
+   * One identity per phone, like every other path here. A number that already
+   * belongs to a customer becomes that customer's driver profile rather than a
+   * second account — the same person, with one more thing they can do.
+   *
+   * `restaurant_id` is optional and normally absent. A driver created here
+   * belongs to the platform and can be assigned to any partner's order; naming
+   * one attaches them to that partner's own roster as well, which is what a
+   * restaurant that brought its own courier expects to see in its portal.
+   */
+  app.post('/api/v1/admin/drivers', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
+    assertAdminPermission(principal, 'driver.create');
+
+    const body = z
+      .object({
+        full_name: displayNameSchema(3, 80),
+        phone: iraqiPhoneSchema,
+        vehicle_type: z.enum(VEHICLE_TYPES).default('MOTORCYCLE'),
+        plate_number: z.string().trim().max(20).optional(),
+        /** Attach to one partner's roster as well. Absent means platform-wide. */
+        restaurant_id: uuidSchema.optional(),
+        can_collect_cash: z.boolean().default(true),
+      })
+      .parse(request.body);
+
+    const result = await ctx.db.transaction(async (tx) => {
+      const [existingUser] = await tx
+        .select({ id: users.id, status: users.status, fullName: users.fullName })
+        .from(users)
+        .where(eq(users.phoneE164, body.phone))
+        .limit(1);
+
+      let userId: string;
+      if (existingUser) {
+        if (existingUser.status !== 'ACTIVE') {
+          throw new AppError(ERROR_CODES.ACCOUNT_SUSPENDED, {
+            details: { reason: 'PHONE_BELONGS_TO_SUSPENDED_ACCOUNT' },
+            messageAr: 'هذا الرقم يعود لحساب موقوف. عالج الحساب أولاً.',
+          });
+        }
+        userId = existingUser.id;
+        // Never overwrite a name its owner chose; fill one in only if absent.
+        if (!existingUser.fullName) {
+          await tx
+            .update(users)
+            .set({ fullName: body.full_name, updatedAt: new Date() })
+            .where(eq(users.id, userId));
+        }
+      } else {
+        userId = uuidv7();
+        await tx.insert(users).values({
+          id: userId,
+          phoneE164: body.phone,
+          fullName: body.full_name,
+          status: 'ACTIVE',
+        });
+      }
+
+      const [existingDriver] = await tx
+        .select({ id: drivers.id })
+        .from(drivers)
+        .where(eq(drivers.userId, userId))
+        .limit(1);
+
+      if (existingDriver) {
+        throw new AppError(ERROR_CODES.CONFLICT, {
+          details: { reason: 'ALREADY_A_DRIVER', driver_id: existingDriver.id },
+          messageAr: 'هذا الرقم مسجّل كمندوب بالفعل.',
+        });
+      }
+
+      const driverId = uuidv7();
+      await tx.insert(drivers).values({
+        id: driverId,
+        userId,
+        /*
+         * Not usable until the driver signs in on their own phone with an OTP.
+         * An operator typing a number must not be able to put a courier on the
+         * road who has never held the handset that receives the deliveries.
+         */
+        status: 'PENDING_ACTIVATION',
+        availability: 'OFFLINE',
+        defaultVehicleType: body.vehicle_type,
+        plateNumber: body.plate_number ?? null,
+      });
+
+      if (body.restaurant_id) {
+        const [branch] = await tx
+          .select({ id: restaurantBranches.id })
+          .from(restaurantBranches)
+          .where(
+            and(
+              eq(restaurantBranches.restaurantId, body.restaurant_id),
+              isNull(restaurantBranches.deletedAt),
+            ),
+          )
+          .limit(1);
+
+        await tx.insert(restaurantDrivers).values({
+          id: uuidv7(),
+          restaurantId: body.restaurant_id,
+          branchId: branch?.id ?? null,
+          driverId,
+          canCollectCash: body.can_collect_cash,
+          isActive: true,
+          createdBy: principal.userId,
+        });
+      }
+
+      await writeAudit(tx, {
+        actorUserId: principal.userId,
+        action: AUDIT_ACTIONS.DRIVER_CREATE,
+        entityType: 'driver',
+        entityId: driverId,
+        after: {
+          phone: maskPhone(body.phone),
+          vehicleType: body.vehicle_type,
+          restaurantId: body.restaurant_id ?? null,
+        },
+        ip: clientIp(request),
+        userAgent: userAgent(request),
+        requestId: request.requestId,
+      });
+
+      await enqueueOutboxEvent(tx, {
+        eventType: EVENT_TYPES.DRIVER_INVITED,
+        aggregateType: 'driver',
+        aggregateId: driverId,
+        requestId: request.requestId,
+        payload: { driverId, userId, restaurantId: body.restaurant_id ?? null },
+      });
+
+      return { driverId };
+    });
+
+    return reply.status(201).send(
+      success(
+        {
+          driver_id: result.driverId,
+          note_ar:
+            'أُنشئ حساب المندوب. يفعّله بنفسه بتسجيل الدخول في تطبيق جيبلي برقم هاتفه ورمز التحقق.',
+        },
         { request_id: request.requestId },
       ),
     );

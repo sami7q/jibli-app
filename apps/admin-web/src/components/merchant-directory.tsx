@@ -11,6 +11,7 @@ import {
   OPERATIONAL_STATUSES,
   type OperationalStatus,
 } from '@jibli/contracts';
+import { formatIraqiPhoneNational } from '@jibli/validation';
 import { AdminShell } from '@/components/shell';
 import { AreaCoverageCard } from '@/components/area-coverage';
 import { IssuePortalAccess } from '@/components/portal-credentials';
@@ -295,23 +296,59 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
               {
                 key: 'name',
                 header: copy.nameHeader,
+                /*
+                 * Name, then the two things you need about it.
+                 *
+                 * All three used to sit on one line inside the link: an Arabic
+                 * name, then a Latin partner code, both underlined, in a
+                 * right-to-left cell. The bidirectional run put the `#` on the
+                 * wrong side of the code, the underline ran through the gap
+                 * between two things that are not the same thing, and the code
+                 * — which nobody clicks — was styled as part of the link.
+                 *
+                 * Now the name is the link and the rest is a quiet second
+                 * line. The owner's number joins it there rather than taking a
+                 * tenth column, because it is read in the same glance as the
+                 * name and never sorted or compared down the page: almost
+                 * every reason to look at this row ends with calling that
+                 * number, and it used to be three clicks away.
+                 */
                 render: (row) => (
-                  <Link
-                    href={`/restaurants/${row.id}`}
-                    style={{ fontWeight: 700, color: 'inherit' }}
-                  >
-                    {row.display_name}
-                    <span
-                      className="ltr-inline"
-                      style={{
-                        color: 'var(--text-muted)',
-                        fontSize: 'var(--text-xs)',
-                        marginInlineStart: 6,
-                      }}
-                    >
-                      #{row.partner_code}
+                  <div className="merchant-cell">
+                    <Link href={`/restaurants/${row.id}`} className="merchant-cell__name">
+                      {row.display_name}
+                    </Link>
+                    <span className="merchant-cell__meta">
+                      <span className="ltr-inline">{row.partner_code}</span>
+                      {row.owner_phone ? (
+                        <>
+                          <span className="merchant-cell__dot" aria-hidden>
+                            ·
+                          </span>
+                          {/*
+                            A real `tel:` link. On the tablet this portal is
+                            actually used from, that is the difference between
+                            calling a partner and reading their number aloud to
+                            a second device.
+                          */}
+                          <a
+                            href={`tel:${row.owner_phone}`}
+                            className="merchant-cell__phone ltr-inline"
+                            title={row.owner_name ?? undefined}
+                          >
+                            {formatIraqiPhoneNational(row.owner_phone)}
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <span className="merchant-cell__dot" aria-hidden>
+                            ·
+                          </span>
+                          <span className="merchant-cell__missing">لا رقم للمالك</span>
+                        </>
+                      )}
                     </span>
-                  </Link>
+                  </div>
                 ),
               },
               ...(only

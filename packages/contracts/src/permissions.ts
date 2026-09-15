@@ -136,6 +136,13 @@ export const ADMIN_PERMISSIONS = [
   'order.read.global',
   'order.override',
   'driver.read.global',
+  /*
+   * Recruiting a courier is the platform's own job in a city it has just
+   * opened: there is no restaurant yet to hire one. The restaurant portal could
+   * hire a driver and the customer app could apply to be one, and Admin — the
+   * surface an operator actually opens to set a launch up — could do neither.
+   */
+  'driver.create',
   'driver.suspend',
   'customer.read',
   'customer.block',
@@ -171,6 +178,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<PlatformRole, readonly AdminPermissi
     'order.read.global',
     'order.override',
     'driver.read.global',
+    'driver.create',
     'driver.suspend',
     'customer.read',
     'config.read',

@@ -21,6 +21,7 @@
     "db:generate": "pnpm --filter @jibli/db generate",
     "db:migrate": "pnpm --filter @jibli/db migrate",
     "db:status": "pnpm --filter @jibli/db migrate:status",
+    "db:remove-demo": "pnpm --filter @jibli/db remove-demo",
     "db:verify": "pnpm --filter @jibli/db verify",
     "db:seed": "pnpm --filter @jibli/db seed",
     "db:reset": "pnpm --filter @jibli/db reset",
