@@ -1,5 +1,7 @@
+import { count, isNull } from 'drizzle-orm';
 import { createDatabase } from '../client.js';
 import { shouldUseSsl } from '../ssl.js';
+import { userPlatformRoles } from '../schema/index.js';
 import { seedGeography, activateCity } from './geography.js';
 import { seedPlatformConfig } from './platform-config.js';
 import { DEMO_OWNER_CREDENTIALS, seedDemoMarketplace } from './demo-marketplace.js';
@@ -94,6 +96,29 @@ async function main(): Promise<void> {
       for (const owner of DEMO_OWNER_CREDENTIALS) {
         console.log(`    ${owner.username} / ${owner.password}   → ${owner.restaurant}`);
       }
+      /*
+       * The one thing seeding cannot do, said out loud.
+       *
+       * Platform roles are granted from inside the Admin Portal, and there is
+       * nobody to sign into it until somebody breaks that circle from a
+       * terminal. Nothing announced that, so a fresh database looked finished
+       * and then refused every sign-in with «اسم المستخدم أو كلمة المرور غير
+       * صحيحة» — the right thing to tell a stranger, and a terrible thing to
+       * debug against, because it is also exactly what an empty table says.
+       */
+      const [staff] = await db
+        .select({ total: count() })
+        .from(userPlatformRoles)
+        .where(isNull(userPlatformRoles.revokedAt));
+
+      if ((staff?.total ?? 0) === 0) {
+        console.log('\n  ⚠ No platform staff account exists, so nobody can sign into');
+        console.log('    the Admin Portal. Create the first Super Admin:');
+        console.log('');
+        console.log('      pnpm --filter @jibli/db bootstrap-admin -- \\');
+        console.log('        --username <username> --name "<full name>"');
+      }
+
       console.log('\n✓ Seed complete.');
     }
   } catch (error) {
