@@ -71,11 +71,26 @@ changing it**; it is baked into the app, not looked up per request.
 
 This is the one part that is not self-service, and the reason is deliberate.
 
-`OTP_PROVIDER=console` in `render.yaml`: the deployed API has no SMS gateway.
-It also runs with `APP_ENV=staging`, and the OTP is returned to the client
-**only** when `APP_ENV=local` (`otp-service.ts`) and logged **only** when the
-same is true (`ConsoleSmsProvider`). So against the deployed API nobody can
-complete a sign-in — by design, because the alternative is an OTP in a log file.
+`OTP_PROVIDER=console` in `render.yaml`: the deployed API has no SMS gateway,
+so no real number can receive a code.
+
+**One number can sign in, and it is the one to test with.** `OTP_TEST_PHONES`
+names it and `OTP_MOCK_CODE` fixes its code, so it needs no SMS at all:
+
+| | |
+|---|---|
+| Phone | `07712345678` (`+9647712345678`) |
+| Code | `1234` |
+
+Verified against the deployed API on 2026-09-15: `POST /auth/otp/request` for
+that number answers `{"sent":true,...,"dev_code":"1234"}`. Every other number
+still gets a random code delivered to a provider that only logs that a message
+went out — never the code — so this opens exactly one account rather than the
+URL.
+
+That is enough to place a real order end to end on a phone. Replace it with a
+real gateway before a real customer: see the OTPIQ block in `render.yaml`,
+which is tested and needs an account and five environment variables.
 
 Three ways forward, in order of how much you need:
 

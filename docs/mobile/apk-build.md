@@ -14,7 +14,34 @@ paid builds, so a build takes roughly ten to twenty minutes rather than two.
 Neither path involves a store. An APK built this way is installed by opening
 the link on the phone and allowing "install from unknown sources" once.
 
+## Before anything: you may not need this at all
+
+If the goal is «أريد أجرب التطبيق على هاتفي وهو شغّال أونلاين», **Expo Go is
+faster and needs no account and no build**. From the repository root:
+
+```powershell
+pnpm dev:mobile
+```
+
+Scan the QR code with Expo Go (Android) or the Camera app (iOS) and the app
+opens on the phone, pointed at the deployed API. Every dependency this app uses
+is in the standard Expo SDK 54 set, so nothing here needs a custom binary.
+See `running-the-app.md`.
+
+Build an APK instead when you want a file to hand to somebody else, an icon on
+the home screen, or the app running with no laptop on the network.
+
 ## One-time setup
+
+### 0. Create the Expo account first
+
+`eas login` signs in to an account that must already exist — it does not create
+one, and a username from GitHub or anywhere else will not work. The error is
+just `Your username, email, or password was incorrect`, which reads like a typo
+rather than like an account that was never created.
+
+Sign up at **https://expo.dev/signup** (free), confirm the email, then use
+those credentials below.
 
 **One command per line.** This project is developed on Windows PowerShell 5.1,
 which has no `&&` — a chained command line fails to parse and *nothing in it
