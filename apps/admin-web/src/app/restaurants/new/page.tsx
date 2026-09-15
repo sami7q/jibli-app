@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { LogoUpload } from '@jibli/ui-web';
-import { CUISINES } from '@jibli/contracts';
+import {
+  MERCHANT_TYPES,
+  MERCHANT_TYPE_LABELS,
+  type MerchantType,
+  CUISINES,
+} from '@jibli/contracts';
 import { normalizeDigits, tryToE164Iraq } from '@jibli/validation';
 import { AdminShell } from '@/components/shell';
 import { Card, MfaChallenge } from '@/components/ui';
@@ -37,6 +42,15 @@ export default function NewRestaurantPage() {
   const [accessError, setAccessError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
+    /*
+     * What is being created, chosen first because it changes the words on the
+     * rest of the form.
+     *
+     * Defaulted to a restaurant: that is the overwhelming majority of what
+     * gets created, and a required choice on the common case is a choice that
+     * gets made carelessly.
+     */
+    merchant_type: 'RESTAURANT' as MerchantType,
     display_name: '',
     owner_name: '',
     owner_phone: '',
@@ -88,6 +102,7 @@ export default function NewRestaurantPage() {
   const create = useMutation({
     mutationFn: () =>
       admin.createRestaurant(token, {
+        merchant_type: form.merchant_type,
         display_name: form.display_name,
         owner_name: form.owner_name,
         owner_phone: form.owner_phone,
@@ -160,8 +175,8 @@ export default function NewRestaurantPage() {
           <Card title="بيانات دخول المطعم" icon="roles">
             <div className="handover">
               <p className="handover__warning" role="alert">
-                انسخ كلمة المرور الآن — لن تظهر مرة أخرى. لا تُخزَّن إلا كتجزئة، ولا يمكن
-                استرجاعها. وإن ضاعت، أعِد تعيينها من صفحة المطعم.
+                انسخ كلمة المرور الآن — لن تظهر مرة أخرى. لا تُخزَّن إلا كتجزئة، ولا يمكن استرجاعها.
+                وإن ضاعت، أعِد تعيينها من صفحة المطعم.
               </p>
 
               <dl className="handover__grid">
@@ -179,8 +194,8 @@ export default function NewRestaurantPage() {
               </dl>
 
               <p className="handover__note">
-                سيُطلب من المالك تغييرها عند أول دخول. سلّمها عبر قناة يثق بها الطرفان، ولا
-                ترسلها في رسالة تبقى محفوظة.
+                سيُطلب من المالك تغييرها عند أول دخول. سلّمها عبر قناة يثق بها الطرفان، ولا ترسلها
+                في رسالة تبقى محفوظة.
               </p>
             </div>
           </Card>
@@ -214,7 +229,9 @@ export default function NewRestaurantPage() {
    */
   const typedUsername = form.portal_username.trim();
   const usernameProblem =
-    form.create_access && typedUsername.length > 0 && !/^[a-z0-9][a-z0-9._-]{2,31}$/.test(typedUsername)
+    form.create_access &&
+    typedUsername.length > 0 &&
+    !/^[a-z0-9][a-z0-9._-]{2,31}$/.test(typedUsername)
       ? 'أحرف إنجليزية صغيرة وأرقام و . _ - فقط، ويبدأ بحرف أو رقم، من ٣ إلى ٣٢ حرفاً'
       : null;
 
@@ -254,13 +271,55 @@ export default function NewRestaurantPage() {
                 }}
               />
 
+              {/*
+                Before the name, because it decides what the name is for.
+                Two radio-style buttons rather than a select: there are exactly
+                two, both fit on a line, and a closed dropdown hides the fact
+                that a choice exists at all.
+              */}
               <div className="field">
-                <label htmlFor="display_name">اسم المطعم</label>
+                <label htmlFor="merchant_type">نوع الشريك</label>
+                <div
+                  id="merchant_type"
+                  role="radiogroup"
+                  aria-label="نوع الشريك"
+                  style={{ display: 'flex', flexDirection: 'row-reverse', gap: 'var(--space-2)' }}
+                >
+                  {MERCHANT_TYPES.map((value) => {
+                    const active = form.merchant_type === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => set('merchant_type', value)}
+                        className={`btn btn--sm ${active ? 'btn--primary' : 'btn--ghost'}`}
+                        style={{ flex: 1 }}
+                      >
+                        {MERCHANT_TYPE_LABELS[value].nameAr}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="field__hint">
+                  {form.merchant_type === 'MARKET'
+                    ? 'يظهر في تبويب «جيبلي ماركت» داخل التطبيق.'
+                    : 'يظهر في تبويب «جيبلي أكل» داخل التطبيق.'}
+                </span>
+              </div>
+
+              <div className="field">
+                <label htmlFor="display_name">
+                  {form.merchant_type === 'MARKET' ? 'اسم الماركت' : 'اسم المطعم'}
+                </label>
                 <input
                   id="display_name"
                   value={form.display_name}
                   onChange={(event) => set('display_name', event.target.value)}
-                  placeholder="مطعم البيت العراقي"
+                  placeholder={
+                    form.merchant_type === 'MARKET' ? 'ماركت الرشيد' : 'مطعم البيت العراقي'
+                  }
                 />
                 <span className="field__hint">الاسم الذي يظهر للعملاء في التطبيق.</span>
               </div>
@@ -370,19 +429,15 @@ export default function NewRestaurantPage() {
                     id="portal_username"
                     className="ltr-input"
                     value={form.portal_username}
-                    onChange={(event) =>
-                      set('portal_username', event.target.value.toLowerCase())
-                    }
+                    onChange={(event) => set('portal_username', event.target.value.toLowerCase())}
                     placeholder="mandi-hadramout"
                     autoComplete="off"
                   />
                   <span className="field__hint">
-                    أحرف إنجليزية صغيرة وأرقام و<span className="ltr-inline"> . _ - </span>فقط،
-                    من ٣ إلى ٣٢ حرفاً. اتركه فارغاً ليُولَّد تلقائياً من رمز الشريك.
+                    أحرف إنجليزية صغيرة وأرقام و<span className="ltr-inline"> . _ - </span>فقط، من ٣
+                    إلى ٣٢ حرفاً. اتركه فارغاً ليُولَّد تلقائياً من رمز الشريك.
                   </span>
-                  {usernameProblem ? (
-                    <span className="field__error">{usernameProblem}</span>
-                  ) : null}
+                  {usernameProblem ? <span className="field__error">{usernameProblem}</span> : null}
                 </div>
               ) : (
                 <p className="field__hint" style={{ margin: 0 }}>
@@ -440,8 +495,8 @@ export default function NewRestaurantPage() {
                   <div className="alert-bar alert-bar--warning">
                     <Icon name="alert" className="nav__icon" aria-hidden />
                     <span>
-                      انضمام المطاعم معطّل في هذه المدينة. يمكنك المتابعة كتجهيز مسبق، لكن المطعم
-                      لن يستقبل طلبات حتى تُفعَّل الطلبات في المدينة.
+                      انضمام المطاعم معطّل في هذه المدينة. يمكنك المتابعة كتجهيز مسبق، لكن المطعم لن
+                      يستقبل طلبات حتى تُفعَّل الطلبات في المدينة.
                     </span>
                   </div>
 
@@ -496,9 +551,9 @@ export default function NewRestaurantPage() {
                 <div className="inherited__body">
                   <strong>العمولة لكل طلب</strong>
                   <span>
-                    قيمة ثابتة لا تتغيّر بحجم الطلب، وموحّدة على مستوى المنصة. لتغييرها لكل
-                    المطاعم: <Link href="/settings">إعدادات المنصة</Link>. ولاستثناء مطعم واحد،
-                    عدّلها من صفحته بعد الإنشاء.
+                    قيمة ثابتة لا تتغيّر بحجم الطلب، وموحّدة على مستوى المنصة. لتغييرها لكل المطاعم:{' '}
+                    <Link href="/settings">إعدادات المنصة</Link>. ولاستثناء مطعم واحد، عدّلها من
+                    صفحته بعد الإنشاء.
                   </span>
                 </div>
               </div>
@@ -569,7 +624,7 @@ export default function NewRestaurantPage() {
                     ? CUISINES.filter((cuisine) => form.cuisine_tags.includes(cuisine.key))
                         .map((cuisine) => cuisine.labelAr)
                         .join('، ')
-                    : selectedCity?.name_ar ?? 'المدينة'}
+                    : (selectedCity?.name_ar ?? 'المدينة')}
                 </span>
                 <span>
                   {selectedCity?.name_ar ?? 'المدينة'}

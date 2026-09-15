@@ -1,7 +1,15 @@
 import { and, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { AppError, CUISINE_KEYS, ERROR_CODES, EVENT_TYPES, OPERATIONAL_STATUSES, success } from '@jibli/contracts';
+import {
+  AppError,
+  CUISINE_KEYS,
+  ERROR_CODES,
+  EVENT_TYPES,
+  OPERATIONAL_STATUSES,
+  success,
+  MERCHANT_TYPES,
+} from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
 import { commissionFeeDisplay } from '@jibli/money';
 import { displayNameSchema, iraqiPhoneSchema, reasonSchema, uuidSchema } from '@jibli/validation';
@@ -41,12 +49,25 @@ const listQuerySchema = z.object({
   city_id: uuidSchema.optional(),
   /** One cuisine key; a restaurant matches if it carries the tag. */
   cuisine: z.string().max(40).optional(),
+  /**
+   * Restaurants or markets. Absent means both, which is what the directory
+   * showed before markets existed and what an operator looking for a partner
+   * by name still wants.
+   */
+  merchant_type: z.enum(MERCHANT_TYPES).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });
 
 const createSchema = z.object({
   display_name: displayNameSchema(2, 120),
+  /*
+   * What is being created. Defaulted rather than required, because every
+   * caller written before markets existed omits it and means a restaurant —
+   * and because a field that must be filled in to create the common case is a
+   * field that gets filled in wrongly.
+   */
+  merchant_type: z.enum(MERCHANT_TYPES).default('RESTAURANT'),
   owner_phone: iraqiPhoneSchema,
   owner_name: displayNameSchema(3, 80),
   governorate_id: uuidSchema,
@@ -88,6 +109,9 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
 
     const conditions = [isNull(restaurants.deletedAt)];
     if (query.status) conditions.push(eq(restaurants.operationalStatus, query.status));
+    if (query.merchant_type) {
+      conditions.push(eq(restaurants.merchantType, query.merchant_type));
+    }
     if (query.governorate_id) {
       conditions.push(eq(restaurantBranches.governorateId, query.governorate_id));
     }
@@ -110,6 +134,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       .select({
         id: restaurants.id,
         displayName: restaurants.displayName,
+        merchantType: restaurants.merchantType,
         cuisineTags: restaurants.cuisineTags,
         activationRequestedAt: restaurants.activationRequestedAt,
         partnerCode: restaurants.partnerCode,
@@ -181,6 +206,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         rows.map((row) => ({
           id: row.id,
           display_name: row.displayName,
+          merchant_type: row.merchantType,
           cuisine_tags: row.cuisineTags,
           activation_requested_at: row.activationRequestedAt?.toISOString() ?? null,
           partner_code: row.partnerCode,
@@ -264,10 +290,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         )
         .leftJoin(
           restaurants,
-          and(
-            eq(restaurants.id, restaurantBranches.restaurantId),
-            isNull(restaurants.deletedAt),
-          ),
+          and(eq(restaurants.id, restaurantBranches.restaurantId), isNull(restaurants.deletedAt)),
         )
         .groupBy(
           governorates.id,
@@ -339,9 +362,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         byGovernorate.set(row.governorateId, entry);
       }
 
-      return reply.send(
-        success([...byGovernorate.values()], { request_id: request.requestId }),
-      );
+      return reply.send(success([...byGovernorate.values()], { request_id: request.requestId }));
     },
   );
 
@@ -451,174 +472,179 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
    * Creates the provider, restaurant, branch, owner identity and membership,
    * and the initial commission config in one transaction.
    */
-  app.post('/api/v1/admin/restaurants', { preHandler: app.authenticate }, async (request, reply) => {
-    const principal = requirePrincipal(request);
-    assertAdminPermission(principal, 'restaurant.create');
-    const body = createSchema.parse(request.body);
+  app.post(
+    '/api/v1/admin/restaurants',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'restaurant.create');
+      const body = createSchema.parse(request.body);
 
-    const result = await ctx.db.transaction(async (tx) => {
-      // Geography must be real and consistent; the composite FK would catch a
-      // mismatch anyway, but a clear error beats a constraint violation.
-      const [geo] = await tx
-        .select({
-          cityId: cities.id,
-          governorateId: cities.governorateId,
-          onboardingEnabled: effectiveCapabilitySql('restaurant_onboarding'),
-        })
-        .from(cities)
-        .innerJoin(governorates, eq(cities.governorateId, governorates.id))
-        .where(eq(cities.id, body.city_id))
-        .limit(1);
+      const result = await ctx.db.transaction(async (tx) => {
+        // Geography must be real and consistent; the composite FK would catch a
+        // mismatch anyway, but a clear error beats a constraint violation.
+        const [geo] = await tx
+          .select({
+            cityId: cities.id,
+            governorateId: cities.governorateId,
+            onboardingEnabled: effectiveCapabilitySql('restaurant_onboarding'),
+          })
+          .from(cities)
+          .innerJoin(governorates, eq(cities.governorateId, governorates.id))
+          .where(eq(cities.id, body.city_id))
+          .limit(1);
 
-      if (!geo) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'city' } });
-      if (geo.governorateId !== body.governorate_id) {
-        throw new AppError(ERROR_CODES.CITY_GOVERNORATE_MISMATCH, {
-          details: { cityId: body.city_id },
+        if (!geo) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'city' } });
+        if (geo.governorateId !== body.governorate_id) {
+          throw new AppError(ERROR_CODES.CITY_GOVERNORATE_MISMATCH, {
+            details: { cityId: body.city_id },
+          });
+        }
+
+        // "Only restaurant-onboarding-enabled geography may be selected under
+        // normal operations. A Super Admin can configure a future location in a
+        // disabled area only through an audited privileged override" (plan §15.1).
+        if (!geo.onboardingEnabled) {
+          if (!body.override_coverage) {
+            throw new AppError(ERROR_CODES.RESTAURANT_ONBOARDING_NOT_AVAILABLE_IN_CITY, {
+              details: { cityId: body.city_id, canOverride: true },
+            });
+          }
+          assertAdminPermission(principal, 'geography.manage');
+          if (!body.reason) {
+            throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+              details: { field: 'reason', message: 'Coverage override requires a reason' },
+            });
+          }
+        }
+
+        // Reuse an existing identity if the owner already has a Jibli account —
+        // one identity per phone (plan §45).
+        const [existingOwner] = await tx
+          .select({ id: users.id, status: users.status })
+          .from(users)
+          .where(eq(users.phoneE164, body.owner_phone))
+          .limit(1);
+
+        let ownerUserId: string;
+        if (existingOwner) {
+          if (existingOwner.status !== 'ACTIVE') {
+            throw new AppError(ERROR_CODES.ACCOUNT_SUSPENDED, {
+              details: { reason: 'OWNER_ACCOUNT_NOT_ACTIVE' },
+            });
+          }
+          ownerUserId = existingOwner.id;
+        } else {
+          ownerUserId = uuidv7();
+          await tx.insert(users).values({
+            id: ownerUserId,
+            phoneE164: body.owner_phone,
+            fullName: body.owner_name,
+            status: 'ACTIVE',
+          });
+        }
+
+        const providerId = uuidv7();
+        /*
+         * Resolved before the transaction opens, and falling back to the platform
+         * default rather than to a number compiled into this file: an operator who
+         * changes the commission in Settings expects the next restaurant to get it.
+         */
+        const commissionFlatIqd =
+          body.commission_flat_iqd ?? (await getConfig(ctx, 'commission_flat_iqd', 500));
+
+        const restaurantId = uuidv7();
+        const branchId = uuidv7();
+        const now = new Date();
+
+        await tx.insert(providers).values({
+          id: providerId,
+          providerType: 'RESTAURANT',
+          status: 'PENDING',
         });
-      }
 
-      // "Only restaurant-onboarding-enabled geography may be selected under
-      // normal operations. A Super Admin can configure a future location in a
-      // disabled area only through an audited privileged override" (plan §15.1).
-      if (!geo.onboardingEnabled) {
-        if (!body.override_coverage) {
-          throw new AppError(ERROR_CODES.RESTAURANT_ONBOARDING_NOT_AVAILABLE_IN_CITY, {
-            details: { cityId: body.city_id, canOverride: true },
-          });
-        }
-        assertAdminPermission(principal, 'geography.manage');
-        if (!body.reason) {
-          throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
-            details: { field: 'reason', message: 'Coverage override requires a reason' },
-          });
-        }
-      }
-
-      // Reuse an existing identity if the owner already has a Jibli account —
-      // one identity per phone (plan §45).
-      const [existingOwner] = await tx
-        .select({ id: users.id, status: users.status })
-        .from(users)
-        .where(eq(users.phoneE164, body.owner_phone))
-        .limit(1);
-
-      let ownerUserId: string;
-      if (existingOwner) {
-        if (existingOwner.status !== 'ACTIVE') {
-          throw new AppError(ERROR_CODES.ACCOUNT_SUSPENDED, {
-            details: { reason: 'OWNER_ACCOUNT_NOT_ACTIVE' },
-          });
-        }
-        ownerUserId = existingOwner.id;
-      } else {
-        ownerUserId = uuidv7();
-        await tx.insert(users).values({
-          id: ownerUserId,
-          phoneE164: body.owner_phone,
-          fullName: body.owner_name,
-          status: 'ACTIVE',
-        });
-      }
-
-      const providerId = uuidv7();
-      /*
-       * Resolved before the transaction opens, and falling back to the platform
-       * default rather than to a number compiled into this file: an operator who
-       * changes the commission in Settings expects the next restaurant to get it.
-       */
-      const commissionFlatIqd =
-        body.commission_flat_iqd ?? (await getConfig(ctx, 'commission_flat_iqd', 500));
-
-      const restaurantId = uuidv7();
-      const branchId = uuidv7();
-      const now = new Date();
-
-      await tx.insert(providers).values({
-        id: providerId,
-        providerType: 'RESTAURANT',
-        status: 'PENDING',
-      });
-
-      await tx.insert(restaurants).values({
-        id: restaurantId,
-        providerId,
-        displayName: body.display_name,
-        partnerCode: await nextPartnerCode(tx),
-        onboardingStatus: 'APPROVED',
-        // Approved on creation, but not yet trading: the readiness checklist
-        // still has to pass before staff flip it to ACTIVE (plan §122).
-        operationalStatus: 'PENDING',
-        cuisineTags: body.cuisine_tags,
-        minimumOrderIqd: body.minimum_order_iqd,
-        approvedAt: now,
-        approvedBy: principal.userId,
-        ...(body.logo_asset_id ? { logoAssetId: body.logo_asset_id } : {}),
-      });
-
-      await tx.insert(restaurantBranches).values({
-        id: branchId,
-        restaurantId,
-        name: body.display_name,
-        governorateId: body.governorate_id,
-        cityId: body.city_id,
-        addressText: body.address_text,
-        latitude: body.latitude ?? null,
-        longitude: body.longitude ?? null,
-        phone: body.owner_phone,
-        isActive: false,
-        acceptsOrders: false,
-        deliveryFeeIqd: body.delivery_fee_iqd,
-      });
-
-      await tx.insert(restaurantMembers).values({
-        id: uuidv7(),
-        restaurantId,
-        userId: ownerUserId,
-        role: 'OWNER',
-        isActive: true,
-        invitedBy: principal.userId,
-      });
-
-      await tx.insert(restaurantCommissionConfigs).values({
-        id: uuidv7(),
-        restaurantId,
-        commissionFlatIqd,
-        settlementPolicy: body.settlement_policy,
-        effectiveFrom: now,
-        createdBy: principal.userId,
-      });
-
-      await writeAudit(tx, {
-        actorUserId: principal.userId,
-        action: AUDIT_ACTIONS.RESTAURANT_CREATE,
-        entityType: 'restaurant',
-        entityId: restaurantId,
-        after: {
+        await tx.insert(restaurants).values({
+          id: restaurantId,
+          providerId,
           displayName: body.display_name,
+          partnerCode: await nextPartnerCode(tx),
+          onboardingStatus: 'APPROVED',
+          // Approved on creation, but not yet trading: the readiness checklist
+          // still has to pass before staff flip it to ACTIVE (plan §122).
+          operationalStatus: 'PENDING',
+          cuisineTags: body.cuisine_tags,
+          minimumOrderIqd: body.minimum_order_iqd,
+          approvedAt: now,
+          approvedBy: principal.userId,
+          ...(body.logo_asset_id ? { logoAssetId: body.logo_asset_id } : {}),
+        });
+
+        await tx.insert(restaurantBranches).values({
+          id: branchId,
+          restaurantId,
+          name: body.display_name,
+          governorateId: body.governorate_id,
           cityId: body.city_id,
+          addressText: body.address_text,
+          latitude: body.latitude ?? null,
+          longitude: body.longitude ?? null,
+          phone: body.owner_phone,
+          isActive: false,
+          acceptsOrders: false,
+          deliveryFeeIqd: body.delivery_fee_iqd,
+        });
+
+        await tx.insert(restaurantMembers).values({
+          id: uuidv7(),
+          restaurantId,
+          userId: ownerUserId,
+          role: 'OWNER',
+          isActive: true,
+          invitedBy: principal.userId,
+        });
+
+        await tx.insert(restaurantCommissionConfigs).values({
+          id: uuidv7(),
+          restaurantId,
           commissionFlatIqd,
-          coverageOverridden: !geo.onboardingEnabled,
-        },
-        reason: body.reason ?? null,
-        ip: clientIp(request),
-        userAgent: userAgent(request),
-        requestId: request.requestId,
+          settlementPolicy: body.settlement_policy,
+          effectiveFrom: now,
+          createdBy: principal.userId,
+        });
+
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: AUDIT_ACTIONS.RESTAURANT_CREATE,
+          entityType: 'restaurant',
+          entityId: restaurantId,
+          after: {
+            displayName: body.display_name,
+            merchantType: body.merchant_type,
+            cityId: body.city_id,
+            commissionFlatIqd,
+            coverageOverridden: !geo.onboardingEnabled,
+          },
+          reason: body.reason ?? null,
+          ip: clientIp(request),
+          userAgent: userAgent(request),
+          requestId: request.requestId,
+        });
+
+        return { restaurantId, branchId, ownerUserId };
       });
 
-      return { restaurantId, branchId, ownerUserId };
-    });
-
-    return reply.status(201).send(
-      success(
-        {
-          restaurant_id: result.restaurantId,
-          branch_id: result.branchId,
-          owner_user_id: result.ownerUserId,
-        },
-        { request_id: request.requestId },
-      ),
-    );
-  });
+      return reply.status(201).send(
+        success(
+          {
+            restaurant_id: result.restaurantId,
+            branch_id: result.branchId,
+            owner_user_id: result.ownerUserId,
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
 
   /**
    * Change the commission (plan §24).
@@ -700,7 +726,8 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           {
             updated: true,
             // Stated back so the UI can reassure the operator (plan §24).
-            note_ar: 'الطلبات السابقة تحتفظ بقيمة العمولة التي سُجّلت عليها ولا تتأثر بهذا التغيير.',
+            note_ar:
+              'الطلبات السابقة تحتفظ بقيمة العمولة التي سُجّلت عليها ولا تتأثر بهذا التغيير.',
           },
           { request_id: request.requestId },
         ),
@@ -730,7 +757,8 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           .for('update')
           .limit(1);
 
-        if (!current) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'restaurant' } });
+        if (!current)
+          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'restaurant' } });
 
         await tx
           .update(restaurants)
@@ -800,7 +828,8 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           .for('update')
           .limit(1);
 
-        if (!current) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'restaurant' } });
+        if (!current)
+          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'restaurant' } });
 
         // The DB check constraint enforces this too; failing here gives a usable
         // Arabic message instead of a constraint violation.

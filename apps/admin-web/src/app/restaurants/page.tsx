@@ -3,7 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CUISINES, OPERATIONAL_STATUSES, type OperationalStatus } from '@jibli/contracts';
+import {
+  MERCHANT_TYPES,
+  MERCHANT_TYPE_LABELS,
+  type MerchantType,
+  CUISINES,
+  OPERATIONAL_STATUSES,
+  type OperationalStatus,
+} from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import { AreaCoverageCard } from '@/components/area-coverage';
 import { IssuePortalAccess } from '@/components/portal-credentials';
@@ -46,6 +53,12 @@ export default function RestaurantsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<OperationalStatus | ''>('');
+  /*
+   * Which kind of partner. Empty is both, which is the directory as it was
+   * before markets existed — and what an operator searching by name wants,
+   * because they rarely remember which of the two a partner is.
+   */
+  const [merchantType, setMerchantType] = useState<MerchantType | ''>('');
   const [governorateId, setGovernorateId] = useState('');
   const [cityId, setCityId] = useState('');
   const [cuisine, setCuisine] = useState('');
@@ -58,11 +71,20 @@ export default function RestaurantsPage() {
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const restaurants = useQuery({
-    queryKey: ['admin-restaurants', debouncedSearch, status, governorateId, cityId, cuisine],
+    queryKey: [
+      'admin-restaurants',
+      debouncedSearch,
+      status,
+      merchantType,
+      governorateId,
+      cityId,
+      cuisine,
+    ],
     queryFn: () =>
       admin.restaurants(token, {
         q: debouncedSearch || undefined,
         status: status || undefined,
+        merchant_type: merchantType || undefined,
         governorate_id: governorateId || undefined,
         city_id: cityId || undefined,
         cuisine: cuisine || undefined,
@@ -159,6 +181,21 @@ export default function RestaurantsPage() {
               label: `${entry.emoji} ${entry.labelAr}`,
             }))}
           />
+          {/*
+            First among the filters, because it narrows the directory more than
+            any other: an operator is usually working on one side of the
+            business at a time.
+          */}
+          <Select
+            value={merchantType}
+            onChange={setMerchantType}
+            label="النوع"
+            allLabel="مطاعم وماركتات"
+            options={MERCHANT_TYPES.map((value) => ({
+              value,
+              label: MERCHANT_TYPE_LABELS[value].nameAr,
+            }))}
+          />
           <Select
             value={status}
             onChange={setStatus}
@@ -188,21 +225,49 @@ export default function RestaurantsPage() {
             caption="قائمة المطاعم وحالتها"
             rows={restaurants.data ?? []}
             keyOf={(row) => row.id}
-            emptyMessage="لا توجد مطاعم مطابقة"
+            emptyMessage={
+              merchantType === 'MARKET' ? 'لا توجد ماركتات مطابقة' : 'لا توجد نتائج مطابقة'
+            }
             columns={[
               {
                 key: 'name',
                 header: 'المطعم',
                 render: (row) => (
-                  <Link href={`/restaurants/${row.id}`} style={{ fontWeight: 700, color: 'inherit' }}>
+                  <Link
+                    href={`/restaurants/${row.id}`}
+                    style={{ fontWeight: 700, color: 'inherit' }}
+                  >
                     {row.display_name}
                     <span
                       className="ltr-inline"
-                      style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', marginInlineStart: 6 }}
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: 'var(--text-xs)',
+                        marginInlineStart: 6,
+                      }}
                     >
                       #{row.partner_code}
                     </span>
                   </Link>
+                ),
+              },
+              {
+                key: 'kind',
+                header: 'النوع',
+                /*
+                 * Beside the name rather than at the end of the row.
+                 *
+                 * An operator scanning the directory is asking "which of these
+                 * is a market" as they read the names, and a badge four
+                 * columns away is answered by scrolling instead of looking.
+                 */
+                render: (row) => (
+                  <Badge tone={row.merchant_type === 'MARKET' ? 'success' : 'neutral'}>
+                    {
+                      MERCHANT_TYPE_LABELS[(row.merchant_type ?? 'RESTAURANT') as MerchantType]
+                        .nameAr
+                    }
+                  </Badge>
                 ),
               },
               {

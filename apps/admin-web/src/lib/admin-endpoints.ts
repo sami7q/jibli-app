@@ -11,6 +11,14 @@ import { apiRequest } from './api';
 export interface AdminRestaurant {
   id: string;
   display_name: string;
+  /**
+   * RESTAURANT or MARKET.
+   *
+   * Optional so the page still renders against an API deployed before the
+   * column existed; the directory falls back to RESTAURANT rather than showing
+   * an empty badge on every row.
+   */
+  merchant_type?: 'RESTAURANT' | 'MARKET';
   /** Keys from CUISINES. Free text on rows created before the vocabulary existed. */
   cuisine_tags: string[];
   partner_code: string;
@@ -243,7 +251,13 @@ export interface AdminRestaurantDetail {
   } | null;
   city_ordering_enabled: boolean;
   commission_history: CommissionConfigView[];
-  staff: { user_id: string; name: string | null; phone: string; role: string; is_active: boolean }[];
+  staff: {
+    user_id: string;
+    name: string | null;
+    phone: string;
+    role: string;
+    is_active: boolean;
+  }[];
 }
 
 export interface AdminOrder {
@@ -594,10 +608,9 @@ export const admin = {
 
   // ── Restaurant portal credentials (plan §69, §1854) ─────────────────────
   portalUsers: (token: string, restaurantId: string) =>
-    apiRequest<PortalUser[]>(
-      `/api/v1/admin/restaurants/${restaurantId}/portal-users`,
-      { accessToken: token },
-    ),
+    apiRequest<PortalUser[]>(`/api/v1/admin/restaurants/${restaurantId}/portal-users`, {
+      accessToken: token,
+    }),
 
   suggestUsername: (token: string, restaurantId: string) =>
     apiRequest<{ username: string }>(
@@ -695,14 +708,10 @@ export const admin = {
   customers: (token: string, filters: Record<string, string | undefined> = {}) =>
     apiRequest<AdminCustomer[]>(`/api/v1/admin/users${qs(filters)}`, { accessToken: token }),
 
-  commissionOverview: (
-    token: string,
-    filters: Record<string, string | undefined> = {},
-  ) =>
-    apiRequest<CommissionOverview>(
-      `/api/v1/admin/finance/commission-overview${qs(filters)}`,
-      { accessToken: token },
-    ),
+  commissionOverview: (token: string, filters: Record<string, string | undefined> = {}) =>
+    apiRequest<CommissionOverview>(`/api/v1/admin/finance/commission-overview${qs(filters)}`, {
+      accessToken: token,
+    }),
 
   // ── Categories and banners ────────────────────────────────────────────────
 
@@ -787,10 +796,12 @@ export const admin = {
     token: string,
     body: { restaurant_id: string; method: string; reference?: string; note?: string },
   ) =>
-    apiRequest<{ settlement_id: string; order_count: number; collected_iqd: number; note_ar: string }>(
-      '/api/v1/admin/finance/collect',
-      { method: 'POST', accessToken: token, body },
-    ),
+    apiRequest<{
+      settlement_id: string;
+      order_count: number;
+      collected_iqd: number;
+      note_ar: string;
+    }>('/api/v1/admin/finance/collect', { method: 'POST', accessToken: token, body }),
 
   collections: (token: string, filters: Record<string, string | undefined> = {}) =>
     apiRequest<CollectionArchive>(`/api/v1/admin/finance/collections${qs(filters)}`, {
@@ -918,10 +929,11 @@ export const admin = {
     ),
 
   createAdjustment: (token: string, id: string, body: { amount_iqd: number; reason: string }) =>
-    apiRequest<{ created: boolean }>(
-      `/api/v1/admin/finance/settlements/${id}/adjustments`,
-      { method: 'POST', accessToken: token, body },
-    ),
+    apiRequest<{ created: boolean }>(`/api/v1/admin/finance/settlements/${id}/adjustments`, {
+      method: 'POST',
+      accessToken: token,
+      body,
+    }),
 
   voidSettlement: (token: string, id: string, reason: string) =>
     apiRequest<{ voided: boolean; note_ar: string }>(
@@ -935,7 +947,8 @@ export const admin = {
     }),
 
   // ── Settings ────────────────────────────────────────────────────────────
-  config: (token: string) => apiRequest<ConfigEntry[]>('/api/v1/admin/config', { accessToken: token }),
+  config: (token: string) =>
+    apiRequest<ConfigEntry[]>('/api/v1/admin/config', { accessToken: token }),
 
   updateConfig: (token: string, key: string, value: unknown, reason?: string) =>
     apiRequest<{ updated: boolean }>('/api/v1/admin/config', {
@@ -944,7 +957,8 @@ export const admin = {
       body: { key, value, reason },
     }),
 
-  staff: (token: string) => apiRequest<StaffMember[]>('/api/v1/admin/staff', { accessToken: token }),
+  staff: (token: string) =>
+    apiRequest<StaffMember[]>('/api/v1/admin/staff', { accessToken: token }),
 
   roleMatrix: (token: string) =>
     apiRequest<RoleMatrix>('/api/v1/admin/roles', { accessToken: token }),
