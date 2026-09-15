@@ -125,6 +125,17 @@ export default function HomeScreen() {
 
   const categories = storefront.data?.categories ?? [];
 
+  /*
+   * What to call the things on this tab, in the two forms Arabic needs.
+   *
+   * Derived once rather than written into each message. The split arrived
+   * before these did, and a customer on the market tab in a city with no
+   * markets was told «لا مطاعم في بغداد بعد» — a sentence about the wrong half
+   * of the app, in the one place where the app has nothing else to say.
+   */
+  const noun = vertical === 'MARKET' ? 'ماركتات' : 'مطاعم';
+  const nounDefinite = vertical === 'MARKET' ? 'الماركتات' : 'المطاعم';
+
   return (
     <Screen scroll edges={['top']} padded={false}>
       <Header
@@ -292,7 +303,7 @@ export default function HomeScreen() {
         ) : !area ? (
           <EmptyState
             title="اختر منطقتك"
-            body="نعرض لك المطاعم التي توصّل إلى منطقتك فقط."
+            body={`نعرض لك ${nounDefinite} التي توصّل إلى منطقتك فقط.`}
             action={{ label: 'اختيار المنطقة', onPress: () => setPickingArea(true) }}
           />
         ) : restaurants.isError ? (
@@ -300,7 +311,7 @@ export default function HomeScreen() {
             message={
               restaurants.error instanceof ApiError
                 ? restaurants.error.messageAr
-                : 'تعذّر تحميل المطاعم'
+                : `تعذّر تحميل ${nounDefinite}`
             }
             onRetry={() => void restaurants.refetch()}
           />
@@ -315,15 +326,15 @@ export default function HomeScreen() {
               search.trim()
                 ? 'لا نتائج للبحث'
                 : category
-                  ? 'لا مطاعم في هذا التصنيف'
-                  : `لا مطاعم في ${area.cityNameAr} بعد`
+                  ? `لا ${noun} في هذا التصنيف`
+                  : `لا ${noun} في ${area.cityNameAr} بعد`
             }
             body={
               search.trim()
                 ? 'جرّب اسماً آخر أو امسح البحث.'
                 : category
                   ? 'جرّب تصنيفاً آخر.'
-                  : 'نعمل على إضافة مطاعم قريباً. جرّب منطقة أخرى.'
+                  : `نعمل على إضافة ${noun} قريباً. جرّب منطقة أخرى.`
             }
             action={
               search.trim()

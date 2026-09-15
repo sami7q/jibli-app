@@ -27,6 +27,26 @@ import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
  * hours the restaurant set in its own portal, so a closed kitchen cannot be
  * ordered from no matter what this screen renders.
  */
+/**
+ * Whether a dish can carry options — sizes, extras, removals.
+ *
+ * Off, and deliberately, until the whole path exists rather than half of it.
+ * The catalog reports `requires_choice` and this screen could collect a
+ * selection, but nothing downstream carries it: the cart has no field for it,
+ * `POST /orders` has no parameter for it, and the API re-prices every line
+ * from the menu. A choice was flattened into the order's free-text note and
+ * its price added on the client only — so a customer could pick a 2,000 dinar
+ * extra, watch the total rise, and be charged the base price for a dish the
+ * kitchen would read about in a comment.
+ *
+ * Turning it off removes that, and it costs the customer nothing today: every
+ * dish is orderable with one tap, which is what this stage of the product
+ * needs. The code stays because the work to finish it is downstream, not here
+ * — a column on the order line, a parameter on the endpoint, and pricing that
+ * the server owns. Then this becomes `true`.
+ */
+const MODIFIERS_ENABLED = false;
+
 export default function RestaurantScreen() {
   const { id, item: itemToOpen } = useLocalSearchParams<{ id: string; item?: string }>();
   const router = useRouter();
@@ -798,26 +818,6 @@ function MenuItemRow({
  * or three dishes out of forty, and loading every modifier group for every
  * item would be most of the payload for none of the use.
  */
-/**
- * Whether a dish can carry options — sizes, extras, removals.
- *
- * Off, and deliberately, until the whole path exists rather than half of it.
- * The catalog reports `requires_choice` and this screen could collect a
- * selection, but nothing downstream carries it: the cart has no field for it,
- * `POST /orders` has no parameter for it, and the API re-prices every line
- * from the menu. A choice was flattened into the order's free-text note and
- * its price added on the client only — so a customer could pick a 2,000 dinar
- * extra, watch the total rise, and be charged the base price for a dish the
- * kitchen would read about in a comment.
- *
- * Turning it off removes that, and it costs the customer nothing today: every
- * dish is orderable with one tap, which is what this stage of the product
- * needs. The code stays because the work to finish it is downstream, not here
- * — a column on the order line, a parameter on the endpoint, and pricing that
- * the server owns. Then this becomes `true`.
- */
-const MODIFIERS_ENABLED = false;
-
 function ItemSheet({
   item,
   restaurant,
