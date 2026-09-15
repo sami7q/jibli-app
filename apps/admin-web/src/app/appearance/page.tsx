@@ -624,7 +624,14 @@ function BannerDialog({
         <LogoUpload
           value={preview}
           label="صورة البنر"
-          hint="الأفضل صورة عريضة (مثلاً ١٢٠٠×٦٠٠). PNG أو JPG أو WebP حتى ٥ ميغابايت."
+          detail="banner"
+          /*
+           * 16:9, which is the shape the app actually draws, and 1920 wide,
+           * which is what a full-bleed banner needs on a 3× phone. The hint
+           * used to say ١٢٠٠×٦٠٠ — the wrong ratio, so it was cropped, and
+           * below the size it was painted at, so it was stretched as well.
+           */
+          hint="الأفضل ١٩٢٠×١٠٨٠ بنسبة ١٦:٩ لأعلى دقة. PNG أو JPG أو WebP حتى ٥ ميغابايت."
           upload={(dataUrl) =>
             adminApi.uploadImage(token, { data: dataUrl, purpose: 'RESTAURANT_COVER' })
           }

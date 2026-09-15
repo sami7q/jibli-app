@@ -634,7 +634,8 @@ function ItemDialog({
         <LogoUpload
           value={imagePreview}
           label="صورة الصنف (اختياري)"
-          hint="PNG أو JPG أو WebP، حتى ٥ ميغابايت. تُصغَّر تلقائياً قبل الرفع."
+          detail="photo"
+          hint="الأفضل ١٢٨٠ بكسل أو أكثر — تُفتح بعرض الشاشة داخل التطبيق. PNG أو JPG أو WebP حتى ٥ ميغابايت."
           upload={(dataUrl) => portal.uploadImage(auth, { data: dataUrl, purpose: 'MENU_ITEM' })}
           onChange={(assetId, previewUrl) => {
             setImageAssetId(assetId);

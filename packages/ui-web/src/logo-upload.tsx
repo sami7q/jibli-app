@@ -26,13 +26,38 @@ const ACCEPT = 'image/png,image/jpeg,image/webp';
 const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 
 /**
- * What gets uploaded. A logo is displayed at 88px in this control and at about
- * 120px in the app, so anything past 512 on the long edge is bytes nobody sees.
- * Downscaling here means a 4 MB photo arrives as a few tens of kilobytes, the
- * page loads faster for every customer afterwards, and the size limit is
- * something a client has to go out of its way to hit.
+ * How large the image is allowed to stay, by what it is for.
+ *
+ * There was one number here — 512 on the long edge — applied to everything this
+ * control uploads, and it was written for a logo: "a logo is displayed at 88px
+ * in this control and about 120px in the app, so anything past 512 is bytes
+ * nobody sees." True of a logo. Not true of the rest.
+ *
+ * The home banner is the case that made it visible. It is drawn full-bleed at
+ * 16:9 across the entire screen, which on a current phone is about 1290 device
+ * pixels — so a 512-wide file was being stretched two and a half times, and the
+ * one image the customer sees before anything else was the softest thing on the
+ * page. The live banner is 512×286 today for exactly this reason.
+ *
+ * So the ceiling follows the size the image is actually painted at:
+ *
+ *   `icon`   a logo or a category tile — never drawn above ~70pt, so 512 is
+ *            already twice what a 3× screen asks for.
+ *   `photo`  a dish or a restaurant cover: a card-width photograph, and the
+ *            dish sheet opens it at 16:9 across the full width.
+ *   `banner` the home carousel. Edge to edge on the widest phone at 3×, with
+ *            headroom for a tablet, because this one is the shop window.
+ *
+ * Quality rises with it for the same reason: WebP artefacts that are invisible
+ * on a 70pt tile are not invisible on a full-width photograph.
  */
-const MAX_EDGE_PX = 512;
+export type UploadDetail = 'icon' | 'photo' | 'banner';
+
+const DETAIL: Readonly<Record<UploadDetail, { maxEdgePx: number; quality: number }>> = {
+  icon: { maxEdgePx: 512, quality: 0.9 },
+  photo: { maxEdgePx: 1280, quality: 0.92 },
+  banner: { maxEdgePx: 1920, quality: 0.94 },
+};
 
 /**
  * Shrink to fit, re-encode, and keep whichever is smaller.
@@ -41,7 +66,8 @@ const MAX_EDGE_PX = 512;
  * logo, so JPEG is not an option. If the re-encode somehow comes out larger
  * than the original (already-optimised small PNGs can), the original wins.
  */
-async function downscale(file: File): Promise<string> {
+async function downscale(file: File, detail: UploadDetail): Promise<string> {
+  const { maxEdgePx, quality } = DETAIL[detail];
   const originalDataUrl = await readAsDataUrl(file);
 
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -52,18 +78,33 @@ async function downscale(file: File): Promise<string> {
   });
 
   const longest = Math.max(image.width, image.height);
-  if (longest <= MAX_EDGE_PX && file.size <= 256 * 1024) return originalDataUrl;
 
-  const scale = Math.min(1, MAX_EDGE_PX / longest);
+  /*
+   * Already small enough and already light: send the file untouched.
+   *
+   * Re-encoding it could only lose something. This is the path a properly
+   * exported 1920×1080 banner of 200 KB now takes — it arrives exactly as the
+   * designer saved it.
+   */
+  if (longest <= maxEdgePx && file.size <= 256 * 1024) return originalDataUrl;
+
+  const scale = Math.min(1, maxEdgePx / longest);
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(image.width * scale));
   canvas.height = Math.max(1, Math.round(image.height * scale));
 
   const context = canvas.getContext('2d');
   if (!context) return originalDataUrl;
+  /*
+   * The browser's default resampling is the fast one, which on a large
+   * downscale aliases the fine detail — the text baked into a promotional
+   * banner is exactly what it ruins. It costs a few milliseconds, once.
+   */
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-  const webp = canvas.toDataURL('image/webp', 0.9);
+  const webp = canvas.toDataURL('image/webp', quality);
   const encoded = webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png');
 
   return encoded.length < originalDataUrl.length ? encoded : originalDataUrl;
@@ -88,6 +129,12 @@ export interface LogoUploadProps {
   readonly label?: string;
   readonly hint?: string;
   readonly disabled?: boolean;
+  /**
+   * How large the image is drawn where it ends up, which decides how much of
+   * it is worth keeping. Defaults to `icon` — the smallest — so a call site
+   * that has not thought about it cannot accidentally ship megabytes.
+   */
+  readonly detail?: UploadDetail;
 }
 
 export function LogoUpload({
@@ -97,6 +144,7 @@ export function LogoUpload({
   label = 'شعار المطعم',
   hint = 'PNG أو JPG أو WebP، حتى ٥ ميغابايت. تُصغَّر تلقائياً قبل الرفع.',
   disabled = false,
+  detail = 'icon',
 }: LogoUploadProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -124,7 +172,7 @@ export function LogoUpload({
 
     setBusy(true);
     try {
-      const dataUrl = await downscale(file);
+      const dataUrl = await downscale(file, detail);
 
       // Shown immediately; the server call decides whether it stays.
       setPreview(dataUrl);
