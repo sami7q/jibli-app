@@ -8,20 +8,20 @@ Ten HTML comps describe a complete customer journey. They now live in [`comps/`]
 
 ## 1. The inventory
 
-| Comp | Screen | Route | Status |
-|---|---|---|---|
-| `01-welcome.html` | شاشة البداية — brand, food doodles | `(auth)/welcome` | **built** |
-| `02-phone.html` | تسجيل الدخول — phone entry | `(auth)/phone` | restyled |
-| `03-otp.html` | التحقق — OTP with keypad | `(auth)/otp` | existing |
-| `04-profile.html` | إكمال البيانات — name, governorate, city | `(auth)/profile` | existing |
-| `05-home.html` | الرئيسية — search, promo, categories, restaurants | `(tabs)/index` | **rebuilt** |
-| `06-restaurant.html` | تفاصيل المطعم — cover, menu, modifiers | `restaurant/[id]` | **built** |
-| `07-cart.html` | السلة | `cart` | **built** |
-| `08-order-detail.html` | تفاصيل الطلب — status timeline | `order/[id]` | **built** |
-| `09-order-tracking.html` | تتبع الطلب — live, with driver card | `order/[id]` (same screen) | **built** |
-| `10-account.html` | الملف الشخصي | `(tabs)/account` | **rebuilt** |
-| — | المفضلة (the fourth tab both comps draw) | `(tabs)/favorites` | **built** |
-| — | تأكيد الطلب (implied by the cart's CTA) | `checkout` | **built** |
+| Comp                     | Screen                                            | Route                      | Status      |
+| ------------------------ | ------------------------------------------------- | -------------------------- | ----------- |
+| `01-welcome.html`        | شاشة البداية — brand, food doodles                | `(auth)/welcome`           | **built**   |
+| `02-phone.html`          | تسجيل الدخول — phone entry                        | `(auth)/phone`             | restyled    |
+| `03-otp.html`            | التحقق — OTP with keypad                          | `(auth)/otp`               | existing    |
+| `04-profile.html`        | إكمال البيانات — name, governorate, city          | `(auth)/profile`           | existing    |
+| `05-home.html`           | الرئيسية — search, promo, categories, restaurants | `(tabs)/index`             | **rebuilt** |
+| `06-restaurant.html`     | تفاصيل المطعم — cover, menu, modifiers            | `restaurant/[id]`          | **built**   |
+| `07-cart.html`           | السلة                                             | `cart`                     | **built**   |
+| `08-order-detail.html`   | تفاصيل الطلب — status timeline                    | `order/[id]`               | **built**   |
+| `09-order-tracking.html` | تتبع الطلب — live, with driver card               | `order/[id]` (same screen) | **built**   |
+| `10-account.html`        | الملف الشخصي                                      | `(tabs)/account`           | **rebuilt** |
+| —                        | المفضلة (the fourth tab both comps draw)          | `(tabs)/favorites`         | **built**   |
+| —                        | تأكيد الطلب (implied by the cart's CTA)           | `checkout`                 | **built**   |
 
 There is no fourth file in the original numbering. Nothing references it; the journey is complete without it.
 
@@ -39,14 +39,14 @@ There is no fourth file in the original numbering. Nothing references it; the jo
 
 Each file was designed on its own, so each picked its own brand colour. Left alone, this ships an app whose splash, home and profile are three different oranges.
 
-| Comp | Orange |
-|---|---|
+| Comp                | Orange    |
+| ------------------- | --------- |
 | home, cart, profile | `#FF5400` |
 | phone, order detail | `#FF5722` |
-| order tracking | `#FF5500` |
-| welcome | `#FF5E00` |
-| restaurant | `#FF4700` |
-| account | `#FF4713` |
+| order tracking      | `#FF5500` |
+| welcome             | `#FF5E00` |
+| restaurant          | `#FF4700` |
+| account             | `#FF4713` |
 
 **Decision: `#FF5400`.** It is the value on the home screen — the screen every session starts at and the one the brand is judged on — it is shared by three comps including the cart, and it sits at the median of the cluster, so no comp is more than a few degrees of hue from it.
 
@@ -96,18 +96,18 @@ Two dependencies were added for this: `react-native-svg` (the wordmark is transc
 
 This is the part that had to be wired, not just drawn.
 
-| What the customer sees | Where it comes from | Endpoint |
-|---|---|---|
-| Promo banner, its art, its order, how long it holds | Admin → شكل التطبيق | `GET /storefront` |
-| Category strip: names, images, order | Admin → التصنيفات | `GET /storefront` |
-| Which restaurants appear at all | Admin → المطاعم + geography | `GET /restaurants` |
-| Restaurant open/closed, accepting orders | Restaurant portal → working hours | `GET /restaurants/:id` |
-| Menu, prices, availability, options | Restaurant portal → المنيو | `GET /restaurants/:id`, `GET /catalog/items/:id/modifiers` |
-| Delivery fee, minimum order | Admin → restaurant detail | `GET /restaurants` |
-| The authoritative total | server-side pricing | `POST /checkout/quote` |
-| The 500 IQD commission | Admin → الإعدادات | invisible to the customer, applied server-side |
-| Order status as it moves | Restaurant portal → order board | `GET /orders/:id` |
-| Rating window opening 15 minutes after delivery | Admin → الإعدادات | `GET /orders/:id/review-eligibility` |
+| What the customer sees                              | Where it comes from               | Endpoint                                                   |
+| --------------------------------------------------- | --------------------------------- | ---------------------------------------------------------- |
+| Promo banner, its art, its order, how long it holds | Admin → شكل التطبيق               | `GET /storefront`                                          |
+| Category strip: names, images, order                | Admin → التصنيفات                 | `GET /storefront`                                          |
+| Which restaurants appear at all                     | Admin → المطاعم + geography       | `GET /restaurants`                                         |
+| Restaurant open/closed, accepting orders            | Restaurant portal → working hours | `GET /restaurants/:id`                                     |
+| Menu, prices, availability, options                 | Restaurant portal → المنيو        | `GET /restaurants/:id`, `GET /catalog/items/:id/modifiers` |
+| Delivery fee, minimum order                         | Admin → restaurant detail         | `GET /restaurants`                                         |
+| The authoritative total                             | server-side pricing               | `POST /checkout/quote`                                     |
+| The 500 IQD commission                              | Admin → الإعدادات                 | invisible to the customer, applied server-side             |
+| Order status as it moves                            | Restaurant portal → order board   | `GET /orders/:id`                                          |
+| Rating window opening 15 minutes after delivery     | Admin → الإعدادات                 | `GET /orders/:id/review-eligibility`                       |
 
 **Nothing on the home screen is a constant in the app.** A Ramadan banner, a promoted category, a reordered strip — all of it moves without a release, which matters because a release takes a week to reach every phone through two review queues.
 
@@ -143,17 +143,17 @@ A guest still sees all four tabs. المفضلة and طلباتي ask for an acc
 
 - **Privacy policy reachable in-app**: a row on the account screen and a tappable link on the sign-in screen, where consent is actually given. URLs come from `extra` in `app.config.ts`, so changing them is not a release.
 - **App Privacy answers** must declare what is collected: phone, name, delivery address, order history. No tracking across apps, so no ATT prompt — but it must be declared as "not tracking" rather than left blank.
-- **`NSCameraUsageDescription` has been removed.** It claimed delivery-proof photography, which the *customer* app never does — that is Driver Mode's job and it does not ship in this binary. A purpose string for an unused capability is itself a rejection, and it would have put a data type in the privacy label that Jibli does not collect.
+- **`NSCameraUsageDescription` has been removed.** It claimed delivery-proof photography, which the _customer_ app never does — that is Driver Mode's job and it does not ship in this binary. A purpose string for an unused capability is itself a rejection, and it would have put a data type in the privacy label that Jibli does not collect.
 
 ### 6.4 Support and contact — 1.5
 
 A support URL on the listing, and a way to reach a human in-app: the «المساعدة والدعم» row dials the support number from config.
 
-### 6.5 Sign in with Apple — 4.8 · *not applicable, and kept that way*
+### 6.5 Sign in with Apple — 4.8 · _not applicable, and kept that way_
 
 `02-phone.html` draws «أو تابع باستخدام» with Google and Apple buttons. **They were not built.** There is no social identity provider behind them, and adding one would pull 4.8 into scope: a third-party login obliges the app to offer Sign in with Apple beside it. Phone OTP is the only way in, which keeps 4.8 out of scope entirely. If social login is ever wanted, 4.8 comes with it.
 
-### 6.6 Payments — 3.1.1 · *not applicable, worth stating*
+### 6.6 Payments — 3.1.1 · _not applicable, worth stating_
 
 In-app purchase is required for digital goods. Food is physical, so cash on delivery is fine and IAP must **not** be used. Written down because it is a common misreading that causes people to build the wrong thing.
 
@@ -187,7 +187,7 @@ In-app purchase is required for digital goods. Food is physical, so cash on deli
 ## 8. What is still worth knowing
 
 - **The cart's rules are tested, the screens are not.** `reduceCart` is a pure reducer with nine tests covering the three rules that decide whether an order can be placed at all — one restaurant at a time, an empty cart is no cart, quantity zero removes. The screens have no tests; the next most valuable one is the checkout's idempotency key surviving a retry.
-- **It bundles, and that took three fixes a typecheck could never have found.** `@babel/runtime` was not a dependency; `tsconfig`'s `react` path mapping — which exists so TypeScript resolves React 18 — was being applied by Metro to *runtime* resolution, so `import 'react'` resolved to a types package with no JavaScript; and the workspace packages' `./x.js` specifiers needed the same treatment Webpack gets in `config/next-portal.mjs`. `pnpm deploy:check` now bundles the app so this cannot regress. Details in [`../mobile/running-the-app.md`](../mobile/running-the-app.md) §5.
+- **It bundles, and that took three fixes a typecheck could never have found.** `@babel/runtime` was not a dependency; `tsconfig`'s `react` path mapping — which exists so TypeScript resolves the app's own React types — was being applied by Metro to _runtime_ resolution, so `import 'react'` resolved to a types package with no JavaScript; and the workspace packages' `./x.js` specifiers needed the same treatment Webpack gets in `config/next-portal.mjs`. `pnpm deploy:check` now bundles the app so this cannot regress. Details in [`../mobile/running-the-app.md`](../mobile/running-the-app.md) §5.
 - **Nothing here has run on a device.** Typecheck, lint, 386 tests and a Metro bundle for both platforms are all clean, but `expo run:ios` has never been executed against this code. The first device run is where RTL layout, font weights on Android, and the sheet's keyboard behaviour will actually be judged.
 - **The wiring is verified; the data is not populated.** All 24 endpoints the app calls resolve, the deployed API is healthy, and the 22 categories on the home screen come from Admin. But the only ordering-enabled area has no restaurants, so the list is empty until someone enables بغداد for ordering. [`../mobile/integration.md`](../mobile/integration.md) has the full map of which dashboard switch drives which pixel.
 - **The OTP and profile screens are the two the comps still lead.** They work and they use the tokens, but they predate the kit — `04-profile.html` in particular describes a richer profile step than what is built.
