@@ -45,6 +45,17 @@ interface Verdict {
   readonly action: 'DELETE' | 'ARCHIVE';
 }
 
+/** "localhost:5432/jibli" or "ep-xxx.eu-central-1.aws.neon.tech/jibli" — no credentials. */
+function describeTarget(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    return `${url.host}${url.pathname}${local ? '  (local)' : '  ← REMOTE'}`;
+  } catch {
+    return 'unparseable DATABASE_URL';
+  }
+}
+
 async function main(): Promise<void> {
   loadDotEnv();
 
@@ -55,6 +66,18 @@ async function main(): Promise<void> {
   }
 
   const confirmed = process.argv.includes('--confirm');
+
+  /*
+   * Name the target before doing anything to it.
+   *
+   * This script reads DATABASE_URL, and on a developer's machine that variable
+   * points at whichever database they last needed — a container on localhost,
+   * or the live one. Those two deserve very different levels of care and look
+   * identical from the command line. Host and database name only: enough to
+   * tell them apart, and never the credentials.
+   */
+  console.log(`Target: ${describeTarget(connectionString)}
+`);
 
   const { db, sql: client } = createDatabase({
     connectionString,

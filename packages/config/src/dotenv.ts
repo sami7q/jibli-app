@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * Reading a `.env` file into the environment, for development only.
@@ -28,6 +28,39 @@ export interface LoadDotEnvResult {
 }
 
 /**
+ * The nearest `.env`, looking up from the working directory.
+ *
+ * It used to resolve `.env` against the working directory and stop there,
+ * which is correct for a single-package project and wrong for this one. Every
+ * script here is run through pnpm — `pnpm db:migrate`, `pnpm dev:api` — and
+ * pnpm runs a package's script with that package's own directory as the
+ * working directory. So a command launched from the repository root, with the
+ * repository's `.env` sitting right there, looked for `packages/db/.env`,
+ * found nothing, and reported "DATABASE_URL must be set" — a message that
+ * sends you to check the file rather than to notice that nothing read it.
+ *
+ * Walking up finds the one file that exists. It stops at the workspace root
+ * rather than continuing to the filesystem root, so a stray `.env` in a home
+ * directory can never be picked up by a project that has none.
+ */
+function findUpwards(filename: string): string | null {
+  let directory = process.cwd();
+
+  for (;;) {
+    const candidate = join(directory, filename);
+    if (existsSync(candidate)) return candidate;
+
+    // The workspace root is the boundary: above it is somebody's home
+    // directory, and whatever is there belongs to them, not to this project.
+    if (existsSync(join(directory, 'pnpm-workspace.yaml'))) return null;
+
+    const parent = dirname(directory);
+    if (parent === directory) return null;
+    directory = parent;
+  }
+}
+
+/**
  * Fill absent variables from a `.env` file. Never overwrites.
  *
  * The precedence matters both ways round: a real environment always wins, so a
@@ -37,7 +70,10 @@ export interface LoadDotEnvResult {
  */
 export function loadDotEnv(
   options: {
-    /** Defaults to `.env` in the current working directory. */
+    /**
+     * An explicit file. Absent means the nearest `.env` at or above the
+     * working directory, stopping at the workspace root — see findUpwards.
+     */
     readonly path?: string;
     /**
      * Refuse to read anything in production.
@@ -57,8 +93,8 @@ export function loadDotEnv(
     return { path: null, loaded: 0 };
   }
 
-  const path = resolve(options.path ?? '.env');
-  if (!existsSync(path)) return { path: null, loaded: 0 };
+  const path = options.path ? resolve(options.path) : findUpwards('.env');
+  if (path === null || !existsSync(path)) return { path: null, loaded: 0 };
 
   let contents: string;
   try {

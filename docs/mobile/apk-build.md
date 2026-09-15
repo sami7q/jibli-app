@@ -16,20 +16,28 @@ the link on the phone and allowing "install from unknown sources" once.
 
 ## One-time setup
 
-```bash
+**One command per line.** This project is developed on Windows PowerShell 5.1,
+which has no `&&` — a chained command line fails to parse and *nothing in it
+runs*, including the first command. The symptom is confusing, because the next
+thing you try then fails with "'eas' is not recognized": not a broken install, an
+install that never happened.
+
+```powershell
 npm install -g eas-cli
-eas login                       # a free Expo account
-cd apps/mobile
-eas build:configure             # writes extra.eas.projectId into app.config.ts
+eas login
+cd apps\mobile
+eas build:configure
 ```
 
-`eas build:configure` is the only step that changes a file, and it only adds
-the project id that ties this checkout to your Expo account. `eas.json` is
-already committed.
+`eas login` wants a free Expo account. `eas build:configure` is the only step
+that changes a file, and it only adds the project id tying this checkout to that
+account. `eas.json` is already committed.
 
 ## Every build after that
 
-```bash
+From anywhere in the repository:
+
+```powershell
 pnpm --filter @jibli/mobile apk
 ```
 
