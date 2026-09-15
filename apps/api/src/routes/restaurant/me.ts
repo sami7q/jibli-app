@@ -46,12 +46,11 @@ export function registerRestaurantMeRoute(app: FastifyInstance, ctx: AppContext)
                 id: restaurants.id,
                 displayName: restaurants.displayName,
                 partnerCode: restaurants.partnerCode,
+                merchantType: restaurants.merchantType,
                 operationalStatus: restaurants.operationalStatus,
               })
               .from(restaurants)
-              .where(
-                and(inArray(restaurants.id, membershipIds), isNull(restaurants.deletedAt)),
-              );
+              .where(and(inArray(restaurants.id, membershipIds), isNull(restaurants.deletedAt)));
 
       return reply.send(
         success({
@@ -65,6 +64,15 @@ export function registerRestaurantMeRoute(app: FastifyInstance, ctx: AppContext)
               id: row.id,
               display_name: row.displayName,
               partner_code: row.partnerCode,
+              /*
+               * What kind of shop this is, so the portal can say «المنتجات» to
+               * a grocer and «القائمة» to a cook.
+               *
+               * It arrives here rather than being looked up per page because
+               * the shell already holds this object, and a second request for
+               * one enum would be a round trip on every navigation.
+               */
+              merchant_type: row.merchantType,
               operational_status: row.operationalStatus,
               roles,
               permissions: [...restaurantPermissionsFor(roles)],

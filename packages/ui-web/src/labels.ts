@@ -22,11 +22,7 @@ import type {
  * they name, so the mobile app can read the same Arabic. Re-exported here so
  * the twenty screens already importing them from this module keep working.
  */
-export {
-  DELIVERY_STATUS_LABELS,
-  ORDER_STATUS_LABELS,
-  ORDER_STATUS_TONE,
-} from '@jibli/contracts';
+export { DELIVERY_STATUS_LABELS, ORDER_STATUS_LABELS, ORDER_STATUS_TONE } from '@jibli/contracts';
 
 export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   DRAFT: 'مسودة',
@@ -94,10 +90,23 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 };
 
 /** Restaurant Portal navigation (plan §131). */
+/**
+ * The portal's sidebar.
+ *
+ * One entry's label is not a constant: a grocer's catalog is «المنتجات» and a
+ * cook's is «القائمة», and the same sidebar serves both. `catalogLabel` marks
+ * the entry whose label comes from the merchant's type instead — see
+ * `MERCHANT_TYPE_LABELS` in @jibli/contracts and the `words` on the portal
+ * session.
+ *
+ * Marked rather than removed, so the array stays the single description of the
+ * sidebar and nothing has to remember to splice an entry back in at the right
+ * position.
+ */
 export const RESTAURANT_NAV = [
   { href: '/', labelAr: 'الرئيسية', icon: 'home' },
   { href: '/orders', labelAr: 'الطلبات', icon: 'orders' },
-  { href: '/menu', labelAr: 'المنيو', icon: 'menu' },
+  { href: '/menu', labelAr: 'المنيو', icon: 'menu', catalogLabel: true },
   { href: '/inventory', labelAr: 'المخزون', icon: 'inventory' },
   { href: '/profits', labelAr: 'الأرباح', icon: 'profits' },
   { href: '/commissions', labelAr: 'العمولات', icon: 'commissions' },
@@ -303,9 +312,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
  * Which family an audit action belongs to, for colouring it in a feed.
  * Derived from the prefix so a new action is classified without a code change.
  */
-export function auditActionTone(
-  action: string,
-): 'positive' | 'negative' | 'money' | 'neutral' {
+export function auditActionTone(action: string): 'positive' | 'negative' | 'money' | 'neutral' {
   if (/\.(approve|reactivate|create|grant|invite)$/.test(action)) return 'positive';
   if (/\.(reject|suspend|void|block|deactivate|revoke|override|unmask)$/.test(action)) {
     return 'negative';

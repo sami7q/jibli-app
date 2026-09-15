@@ -21,12 +21,27 @@ import { portal, type MenuCategory, type MenuItem } from '@/lib/portal-endpoints
 export default function MenuPage() {
   return (
     <PortalPage permission="menu.read" permissionLabelAr="قراءة المنيو">
-      {({ auth, can }) => <MenuScreen auth={auth} canWrite={can('menu.write')} />}
+      {({ auth, can, words }) => (
+        <MenuScreen auth={auth} canWrite={can('menu.write')} words={words} />
+      )}
     </PortalPage>
   );
 }
 
-function MenuScreen({ auth, canWrite }: { auth: PortalAuth; canWrite: boolean }) {
+function MenuScreen({
+  auth,
+  canWrite,
+  words,
+}: {
+  auth: PortalAuth;
+  canWrite: boolean;
+  /*
+   * What this shop calls its catalog and one line in it — «القائمة / الصنف»
+   * for a kitchen, «المنتجات / المنتج» for a grocery. From the merchant's own
+   * type, not from this screen.
+   */
+  words: { readonly catalogAr: string; readonly itemAr: string };
+}) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<{ item: MenuItem; categoryId: string } | null>(null);
   const [addingItem, setAddingItem] = useState<string | null>(null);
@@ -75,9 +90,9 @@ function MenuScreen({ auth, canWrite }: { auth: PortalAuth; canWrite: boolean })
   return (
     <>
       <Card
-        title="المنيو"
+        title={words.catalogAr}
         icon="menu"
-        subtitle={`${allItems.length} صنف في ${categories.length} تصنيف`}
+        subtitle={`${allItems.length} ${words.itemAr} في ${categories.length} تصنيف`}
         actions={
           canWrite ? (
             <button
@@ -160,6 +175,7 @@ function MenuScreen({ auth, canWrite }: { auth: PortalAuth; canWrite: boolean })
           onDelete={setDeleting}
           onAddItem={() => setAddingItem(category.id)}
           isBusy={toggleAvailability.isPending}
+          itemWord={words.itemAr}
         />
       ))}
 
@@ -204,7 +220,7 @@ function MenuScreen({ auth, canWrite }: { auth: PortalAuth; canWrite: boolean })
       {deleting ? (
         <ConfirmDialog
           title={`حذف ${deleting.name_ar}`}
-          confirmLabel="حذف الصنف"
+          confirmLabel={`حذف ${words.itemAr}`}
           isSubmitting={deleteItem.isPending}
           error={deleteItem.error instanceof ApiError ? deleteItem.error.messageAr : null}
           body={
@@ -230,6 +246,7 @@ function CategoryCard({
   onDelete,
   onAddItem,
   isBusy,
+  itemWord,
 }: {
   category: MenuCategory;
   canSeeCost: boolean;
@@ -239,6 +256,8 @@ function CategoryCard({
   onDelete: (item: MenuItem) => void;
   onAddItem: () => void;
   isBusy: boolean;
+  /** Named by the merchant's type, like every other catalog word here. */
+  itemWord: string;
 }) {
   return (
     <Card
@@ -247,7 +266,7 @@ function CategoryCard({
       actions={
         canWrite ? (
           <button type="button" className="btn btn--ghost btn--sm" onClick={onAddItem}>
-            إضافة صنف
+            {`إضافة ${itemWord}`}
           </button>
         ) : null
       }
@@ -289,13 +308,13 @@ function CategoryCard({
                       }}
                     >
                       {/*
-                        * The photo, or the absence of one, at a glance.
-                        *
-                        * A dashed empty square rather than nothing: a menu
-                        * where three dishes have pictures and nine do not
-                        * looks worse in the app than one where none do, and
-                        * this is the only place that gap is visible.
-                        */}
+                       * The photo, or the absence of one, at a glance.
+                       *
+                       * A dashed empty square rather than nothing: a menu
+                       * where three dishes have pictures and nine do not
+                       * looks worse in the app than one where none do, and
+                       * this is the only place that gap is visible.
+                       */}
                       <ItemThumbnail item={item} />
 
                       <div>
@@ -600,14 +619,14 @@ function ItemDialog({
         </div>
 
         {/*
-          * The photo, above the description and below the name.
-          *
-          * The column and the customer app's `image_asset_id` have both existed
-          * since the schema was written, and nothing ever wrote one — so every
-          * dish in the app rendered as a grey block. The same uploader the
-          * logo uses: it downscales in the browser before sending, which is
-          * what keeps a 12-megapixel phone photo from becoming a 5 MB request.
-          */}
+         * The photo, above the description and below the name.
+         *
+         * The column and the customer app's `image_asset_id` have both existed
+         * since the schema was written, and nothing ever wrote one — so every
+         * dish in the app rendered as a grey block. The same uploader the
+         * logo uses: it downscales in the browser before sending, which is
+         * what keeps a 12-megapixel phone photo from becoming a 5 MB request.
+         */}
         <LogoUpload
           value={imagePreview}
           label="صورة الصنف (اختياري)"

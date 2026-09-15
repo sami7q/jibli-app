@@ -1,7 +1,11 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { RestaurantPermission } from '@jibli/contracts';
+import {
+  type MERCHANT_TYPE_LABELS,
+  type MerchantType,
+  type RestaurantPermission,
+} from '@jibli/contracts';
 import { Shell } from './shell';
 import { ForbiddenState, Skeleton } from './ui';
 import { SignedOut } from './signed-out';
@@ -26,6 +30,15 @@ export interface PortalContext {
   readonly can: (permission: RestaurantPermission) => boolean;
   readonly restaurantName: string;
   readonly userName: string;
+  /**
+   * The words that change with the kind of shop: what its catalog is called,
+   * and what one line in it is called.
+   *
+   * On the context so a page names things the way the sidebar beside it does,
+   * rather than each screen deciding for itself.
+   */
+  readonly words: (typeof MERCHANT_TYPE_LABELS)[MerchantType];
+  readonly merchantType: MerchantType;
 }
 
 export function PortalPage({
@@ -59,6 +72,7 @@ export function PortalPage({
       restaurantName={session.restaurantName}
       partnerCode={session.partnerCode}
       userName={session.userName}
+      catalogLabel={session.words.catalogAr}
     >
       {denied ? (
         <ForbiddenState requiredAr={permissionLabelAr ?? permission} />
@@ -68,6 +82,16 @@ export function PortalPage({
           can: session.can,
           restaurantName: session.restaurantName,
           userName: session.userName,
+          /*
+           * What this merchant calls its catalog and one line in it.
+           *
+           * Passed with the rest rather than fetched per page, so every screen
+           * that names a catalog names it the same way — a sidebar saying
+           * «المنتجات» beside a heading saying «المنيو» is worse than either
+           * one alone.
+           */
+          words: session.words,
+          merchantType: session.merchantType,
         })
       )}
     </Shell>

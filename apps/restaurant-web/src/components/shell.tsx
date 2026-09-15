@@ -27,6 +27,13 @@ export interface ShellProps {
   onSwitchRestaurant?: (restaurantId: string) => void;
   /** Count for the topbar bell — new orders needing a decision. */
   notificationCount?: number;
+  /**
+   * What this merchant calls its catalog — «القائمة» or «المنتجات».
+   *
+   * Optional and defaulted, so a caller that has not been updated renders the
+   * restaurant wording rather than a blank sidebar entry.
+   */
+  catalogLabel?: string;
 }
 
 export function Shell({
@@ -38,6 +45,7 @@ export function Shell({
   activeRestaurantId,
   onSwitchRestaurant,
   notificationCount = 0,
+  catalogLabel = 'المنيو',
 }: ShellProps) {
   return (
     <div className="shell">
@@ -48,7 +56,13 @@ export function Shell({
 
         <nav className="nav" aria-label="القائمة الرئيسية">
           {RESTAURANT_NAV.map((item) => (
-            <NavLink key={item.href} href={item.href} icon={item.icon} label={item.labelAr} />
+            <NavLink
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              // One entry is named by the merchant rather than by the sidebar.
+              label={'catalogLabel' in item && item.catalogLabel ? catalogLabel : item.labelAr}
+            />
           ))}
         </nav>
 
@@ -249,9 +263,7 @@ function RestaurantBadge({
           رقم الشريك: <span className="ltr-inline">#{partnerCode}</span>
         </span>
       </div>
-      {canSwitch ? (
-        <Icon name="chevron" className="nav__icon" aria-hidden />
-      ) : null}
+      {canSwitch ? <Icon name="chevron" className="nav__icon" aria-hidden /> : null}
     </>
   );
 

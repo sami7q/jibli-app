@@ -1,7 +1,20 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { RestaurantPermission, RestaurantRole } from '@jibli/contracts';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  MERCHANT_TYPE_LABELS,
+  type MerchantType,
+  type RestaurantPermission,
+  type RestaurantRole,
+} from '@jibli/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '@/lib/api';
 
@@ -18,6 +31,8 @@ export interface PortalRestaurant {
   readonly id: string;
   readonly display_name: string;
   readonly partner_code: string;
+  /** RESTAURANT or MARKET — decides the words this portal uses for a catalog. */
+  readonly merchant_type: MerchantType;
   readonly operational_status: string;
   readonly roles: RestaurantRole[];
   readonly permissions: RestaurantPermission[];
@@ -46,6 +61,17 @@ export type SessionState =
       restaurantId: string;
       restaurantName: string;
       partnerCode: string;
+      /** Which kind of shop this is. */
+      merchantType: MerchantType;
+      /**
+       * The words that change with it — what a catalog is called here, and
+       * what one line in it is called.
+       *
+       * On the session rather than looked up at each use, so a screen cannot
+       * accidentally use the restaurant wording while its neighbour uses the
+       * market one.
+       */
+      words: (typeof MERCHANT_TYPE_LABELS)[MerchantType];
       roles: RestaurantRole[];
       permissions: RestaurantPermission[];
       /** Every restaurant this session may switch to. Usually one. */
@@ -157,8 +183,7 @@ function useSessionState(active: boolean): SessionState {
         });
 
         // Schedule the next rotation before this token expires.
-        const delayMs =
-          Math.max(refreshed.expires_in_seconds - REFRESH_MARGIN_SECONDS, 30) * 1000;
+        const delayMs = Math.max(refreshed.expires_in_seconds - REFRESH_MARGIN_SECONDS, 30) * 1000;
         refreshTimer = setTimeout(() => void load(), delayMs);
       } catch (error) {
         if (cancelled) return;
@@ -216,6 +241,20 @@ function useSessionState(active: boolean): SessionState {
       restaurantId: active.id,
       restaurantName: active.display_name,
       partnerCode: active.partner_code,
+      /*
+       * Carried on the session rather than read per page.
+       *
+       * Every screen that names the catalog needs it — the menu, inventory,
+       * commissions, the sidebar — and a page-level fetch for one enum would
+       * be a round trip on every navigation for a value that cannot change
+       * while somebody is signed in.
+       *
+       * Defaulted rather than required: an API deployed before this field
+       * existed sends nothing, and a portal that renders «undefined» where the
+       * word «القائمة» belongs is worse than one that assumes a restaurant.
+       */
+      merchantType: active.merchant_type ?? 'RESTAURANT',
+      words: MERCHANT_TYPE_LABELS[active.merchant_type ?? 'RESTAURANT'],
       roles: active.roles,
       permissions: active.permissions,
       restaurants: loaded.restaurants,

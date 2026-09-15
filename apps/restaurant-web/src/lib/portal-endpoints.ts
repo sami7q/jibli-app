@@ -203,6 +203,7 @@ export interface PortalSettings {
     display_name: string;
     description_ar: string | null;
     partner_code: string;
+    merchant_type: 'RESTAURANT' | 'MARKET';
     operational_status: string;
     cuisine_tags: string[];
     minimum_order_iqd: number;
@@ -392,10 +393,7 @@ export const portal = {
   // ── Support ─────────────────────────────────────────────────────────────
 
   supportThreads: (auth: Auth) =>
-    apiRequest<SupportThreadSummary[]>(
-      '/api/v1/restaurant-portal/support/threads',
-      scoped(auth),
-    ),
+    apiRequest<SupportThreadSummary[]>('/api/v1/restaurant-portal/support/threads', scoped(auth)),
 
   supportThread: (auth: Auth, threadId: string) =>
     apiRequest<SupportThreadDetail>(
@@ -422,18 +420,12 @@ export const portal = {
   // ── Reviews ─────────────────────────────────────────────────────────────
 
   reviews: (auth: Auth, filters: Record<string, string | number | undefined> = {}) =>
-    apiRequest<PortalReviews>(
-      `/api/v1/restaurant-portal/reviews${qs(filters)}`,
-      scoped(auth),
-    ),
+    apiRequest<PortalReviews>(`/api/v1/restaurant-portal/reviews${qs(filters)}`, scoped(auth)),
 
   // ── Dashboard ───────────────────────────────────────────────────────────
   /** Everything the home screen shows, in one round trip (plan §131). */
   dashboard: (auth: Auth) =>
-    apiRequest<DashboardOverview>(
-      '/api/v1/restaurant-portal/dashboard/overview',
-      scoped(auth),
-    ),
+    apiRequest<DashboardOverview>('/api/v1/restaurant-portal/dashboard/overview', scoped(auth)),
 
   // ── Orders history & running commission ─────────────────────────────────
   /**
@@ -455,14 +447,10 @@ export const portal = {
   },
 
   openCommissions: (auth: Auth) =>
-    apiRequest<OpenCommissions>(
-      '/api/v1/restaurant-portal/finance/commissions/open',
-      scoped(auth),
-    ),
+    apiRequest<OpenCommissions>('/api/v1/restaurant-portal/finance/commissions/open', scoped(auth)),
 
   // ── Menu ────────────────────────────────────────────────────────────────
-  menu: (auth: Auth) =>
-    apiRequest<MenuResponse>('/api/v1/restaurant-portal/menu', scoped(auth)),
+  menu: (auth: Auth) => apiRequest<MenuResponse>('/api/v1/restaurant-portal/menu', scoped(auth)),
 
   createCategory: (auth: Auth, body: unknown) =>
     apiRequest<{ id: string }>('/api/v1/restaurant-portal/menu/categories', {
@@ -548,7 +536,6 @@ export const portal = {
       `/api/v1/restaurant-portal/inventory/${id}/movements`,
       scoped(auth),
     ),
-
 
   // ── Finance ─────────────────────────────────────────────────────────────
   profit: (auth: Auth, days = 30) =>
@@ -660,8 +647,7 @@ export const portal = {
       body,
     }),
 
-  staff: (auth: Auth) =>
-    apiRequest<StaffMember[]>('/api/v1/restaurant-portal/staff', scoped(auth)),
+  staff: (auth: Auth) => apiRequest<StaffMember[]>('/api/v1/restaurant-portal/staff', scoped(auth)),
 
   createStaff: (auth: Auth, body: unknown) =>
     apiRequest<{ id: string; note_ar: string }>('/api/v1/restaurant-portal/staff', {
