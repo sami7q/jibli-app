@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { MerchantType } from '@jibli/contracts';
 import { api, assetUrl } from '@/lib/api';
 import { useVertical } from '@/lib/vertical';
-import { color, palette, space, text } from '@/theme';
+import { color, palette, radius, shadow, space, text } from '@/theme';
 import { Screen, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import { JibliWordmark } from '@/ui/brand';
@@ -77,7 +77,7 @@ const HALVES: readonly {
 export default function ChooseScreen() {
   const router = useRouter();
   const { choose } = useVertical();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
 
   /*
    * Both storefronts, for their banners.
@@ -124,31 +124,67 @@ export default function ChooseScreen() {
   };
 
   /*
-   * The panels take what is left after the header, split evenly.
+   * The art sets the panel's height. The panel does not set the art's.
    *
-   * Measured rather than given a fixed height: on a short phone a hard 300pt
-   * would push the second panel off the screen, and the one thing this layout
-   * cannot do is hide half of a two-way choice.
+   * Splitting the screen evenly and centring a 16:9 banner in each half left
+   * 70pt of flat colour above and below it — a third of every panel saying
+   * nothing, which reads as a banner that failed to load rather than one that
+   * is the wrong shape for the space. Covering the panel instead would crop
+   * 37% off the banner's width, and these are composed left to right with the
+   * products on one side and the headline on the other, so that 37% is where
+   * half the design lives.
+   *
+   * So the panel is the banner plus an even frame. Nothing is cropped and
+   * nothing is padding: every phone shows the identical picture, and the
+   * section's colour is a border around it rather than a gap behind it.
+   *
+   * The second term only bites on a short screen, where two 16:9 banners at
+   * full width would push the header off the top. There the pair shrinks
+   * together and stays centred, which is the one thing this layout may never
+   * do without: show both halves of a two-way choice.
    */
-  const panelHeight = Math.max((height - 190) / 2, 160);
+  /*
+   * The wordmark scales with the phone rather than being one number.
+   *
+   * At 176 it is right on a 430pt screen and 55% of the width of a 320pt one,
+   * where the header has 200pt to fit a mark, a question and a line under it
+   * — and a status bar inset on top of that. Tying it to the width keeps the
+   * proportion instead of the measurement.
+   */
+  const markWidth = Math.min(176, width * 0.42);
+
+  const inset = space[4];
+  const artWidth = Math.min(width - inset * 2, (((height - 200) / 2 - inset * 2) * 16) / 9);
+  const artHeight = (artWidth * 9) / 16;
 
   return (
     <Screen edges={['top', 'bottom']} padded={false}>
       <View style={{ flex: 1, backgroundColor: color.surfaceCard }}>
-        <Enter delay={0}>
+        {/*
+          The header takes whatever the two panels leave, and fills it rather
+          than floating in it.
+          
+          A 16:9 banner on a portrait phone is 224pt tall, so two of them
+          occupy a little over half the screen and no amount of layout will
+          make them occupy more without cropping them. That leaves roughly
+          300pt above, which is too much for a caption and exactly right for a
+          title: the wordmark at brand size with the question under it reads as
+          the top of a page, where the same block at caption size read as a
+          label stranded in white.
+        */}
+        <Enter delay={0} style={{ flex: 1, justifyContent: 'center' }}>
           <View
             style={{
               alignItems: 'center',
-              paddingTop: space[6],
-              paddingBottom: space[4],
-              gap: space[1],
+              paddingHorizontal: space[5],
+              gap: space[2],
             }}
           >
-            <JibliWordmark width={128} tint={color.brand} pinTint={palette.white} />
-            <Text variant="h3" style={{ marginTop: space[2] }}>
+            <JibliWordmark width={markWidth} tint={color.brand} pinTint={palette.white} />
+            <Text variant="h1" style={{ marginTop: space[4] }}>
               شنو تريد اليوم؟
             </Text>
-            <Text variant="small" tone="muted">
+            <Text variant="body" tone="muted" style={{ textAlign: 'center' }}>
               اختر القسم، وتقدر ترجع تبدّله بأي وقت
             </Text>
           </View>
@@ -158,13 +194,13 @@ export default function ChooseScreen() {
           const art = artwork(half.type);
 
           return (
-            <Enter key={half.type} delay={90 + index * 90} style={{ flex: 1 }}>
+            <Enter key={half.type} delay={90 + index * 90}>
               <Pressable
                 onPress={() => enter(half.type)}
                 accessibilityRole="button"
                 accessibilityLabel={`${half.label} — ${half.caption}`}
                 style={({ pressed }) => [
-                  { flex: 1, minHeight: panelHeight },
+                  { height: artHeight + inset * 2 },
                   pressed ? { opacity: 0.94 } : null,
                 ]}
               >
@@ -174,22 +210,34 @@ export default function ChooseScreen() {
                   // happens to be two colours.
                   start={{ x: 1, y: 0 }}
                   end={{ x: 0, y: 1 }}
-                  /*
-                   * The artwork is wider than the panel is tall, so it lands as
-                   * a band across the middle with the section's colour above
-                   * and below it. Filling the panel instead would crop about a
-                   * third off the sides, and these are designed 16:9 pieces
-                   * composed left to right — that third is where half the
-                   * design lives.
-                   */
-                  style={{ flex: 1, justifyContent: 'center', overflow: 'hidden' }}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
                 >
                   {art.url ? (
-                    <Image
-                      source={{ uri: art.url }}
-                      style={{ width: '100%', aspectRatio: 16 / 9 }}
-                      resizeMode="cover"
-                    />
+                    /*
+                      The shadow is on the wrapper and the corner is on both.
+                      iOS draws no shadow for a view that clips its children,
+                      so the two cannot share one element: the outer view casts
+                      and the image rounds.
+                    */
+                    <View
+                      style={{
+                        width: artWidth,
+                        height: artHeight,
+                        borderRadius: radius['2xl'],
+                        ...shadow.md,
+                      }}
+                    >
+                      <Image
+                        source={{ uri: art.url }}
+                        style={{ width: '100%', height: '100%', borderRadius: radius['2xl'] }}
+                        resizeMode="cover"
+                      />
+                    </View>
                   ) : art.known ? (
                     /*
                      * Words, for a section with no banner scheduled.
@@ -199,7 +247,15 @@ export default function ChooseScreen() {
                      * it is — the same trade the home screen's banner makes in
                      * the other direction.
                      */
-                    <View style={{ gap: space[2], paddingHorizontal: space[5] }}>
+                    <View
+                      style={{
+                        width: artWidth,
+                        height: artHeight,
+                        justifyContent: 'center',
+                        gap: space[2],
+                        paddingHorizontal: space[5],
+                      }}
+                    >
                       <View
                         style={{
                           flexDirection: 'row-reverse',
