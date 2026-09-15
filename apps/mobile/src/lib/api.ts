@@ -625,9 +625,18 @@ export const api = {
    * 5.1.1(ii)), and declaring it saves a keychain read on the request the home
    * screen makes most often.
    */
-  restaurants: (cityId: string, search?: string) =>
+  /**
+   * Merchants in a city, optionally of one kind.
+   *
+   * `merchantType` is left off by callers that want both — which the server
+   * treats as no filter at all, so nothing written before markets existed had
+   * to change.
+   */
+  restaurants: (cityId: string, search?: string, merchantType?: 'RESTAURANT' | 'MARKET') =>
     apiRequest<RestaurantCard[]>(
-      `/api/v1/restaurants?city_id=${cityId}${search ? `&q=${encodeURIComponent(search)}` : ''}`,
+      `/api/v1/restaurants?city_id=${cityId}` +
+        (search ? `&q=${encodeURIComponent(search)}` : '') +
+        (merchantType ? `&merchant_type=${merchantType}` : ''),
       { authenticated: false },
     ),
 

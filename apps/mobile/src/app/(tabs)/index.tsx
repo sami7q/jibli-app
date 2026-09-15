@@ -21,6 +21,8 @@ import { notify } from '@/lib/dialog';
 import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
+import type { MerchantType } from '@jibli/contracts';
+import { VerticalSwitch } from '@/ui/vertical-switch';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
 
@@ -47,6 +49,16 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const [pickingArea, setPickingArea] = useState(false);
 
+  /*
+   * Which half of Jibli the customer is in.
+   *
+   * Food, always, on open. Not the last choice remembered: most sessions are a
+   * meal, and a customer who bought milk on Tuesday should not find the app
+   * showing them a grocery on Friday evening when they are hungry. The switch
+   * is one tap and always visible, which is the cheaper way to be wrong.
+   */
+  const [vertical, setVertical] = useState<MerchantType>('RESTAURANT');
+
   const storefront = useQuery({
     queryKey: ['storefront'],
     queryFn: () => api.storefront(),
@@ -55,8 +67,10 @@ export default function HomeScreen() {
   });
 
   const restaurants = useQuery({
-    queryKey: ['restaurants', area?.cityId],
-    queryFn: () => api.restaurants(area?.cityId as string),
+    // The type is in the key, so switching halves does not show the other
+    // one's merchants for a frame while the new request is in flight.
+    queryKey: ['restaurants', area?.cityId, vertical],
+    queryFn: () => api.restaurants(area?.cityId as string, undefined, vertical),
     enabled: Boolean(area?.cityId),
   });
 
@@ -133,13 +147,41 @@ export default function HomeScreen() {
        * Sixty milliseconds apart. Any slower and a returning customer, who
        * opens this ten times a day, starts waiting for it.
        */}
-      <Enter delay={0} style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
+      {/*
+       * The split, above the search rather than below it.
+       *
+       * The search means something different on each side — dishes in one,
+       * products in the other — so choosing the half first is the order the
+       * screen has to be read in, and putting the switch under the field
+       * would invite typing before choosing.
+       *
+       * Hidden while searching: a dish search already spans the city, and a
+       * switch that does nothing to the results in front of you is worse than
+       * no switch.
+       */}
+      {searching ? null : (
+        <Enter delay={0} style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
+          <VerticalSwitch
+            value={vertical}
+            onChange={(next) => {
+              setVertical(next);
+              // Categories belong to the half that defined them — «برجر» has
+              // no meaning in a grocery — so the filter clears with the switch.
+              setCategory(null);
+            }}
+          />
+        </Enter>
+      )}
+
+      <Enter delay={40} style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="ابحث عن مطعم أو وجبة…"
+          placeholder={vertical === 'MARKET' ? 'ابحث عن منتج أو ماركت…' : 'ابحث عن مطعم أو وجبة…'}
           returnKeyType="search"
-          accessibilityLabel="البحث عن مطعم أو وجبة"
+          accessibilityLabel={
+            vertical === 'MARKET' ? 'البحث عن منتج أو ماركت' : 'البحث عن مطعم أو وجبة'
+          }
         />
       </Enter>
 
@@ -185,14 +227,20 @@ export default function HomeScreen() {
                 ? `نتائج البحث عن «${term}»`
                 : category
                   ? (categories.find((entry) => entry.key === category)?.name_ar ?? 'مطاعم التصنيف')
-                  : 'المطاعم القريبة منك'}
+                  : vertical === 'MARKET'
+                    ? 'الماركتات القريبة منك'
+                    : 'المطاعم القريبة منك'}
             </Text>
             <Text variant="caption" tone="muted">
               {searching
                 ? 'الوجبات المتاحة الآن أولاً'
                 : area
-                  ? `أفضل المطاعم في ${area.cityNameAr}`
-                  : 'اختر منطقتك لعرض المطاعم'}
+                  ? vertical === 'MARKET'
+                    ? `ماركتات توصّل إلى ${area.cityNameAr}`
+                    : `أفضل المطاعم في ${area.cityNameAr}`
+                  : vertical === 'MARKET'
+                    ? 'اختر منطقتك لعرض الماركتات'
+                    : 'اختر منطقتك لعرض المطاعم'}
             </Text>
           </View>
 
