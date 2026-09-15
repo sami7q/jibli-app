@@ -196,6 +196,38 @@ asked.
 
 ### Portals
 
+#### The install command carries `--force`, and it has to
+
+Both `vercel.json` files install with:
+
+```
+cd ../.. && pnpm install --frozen-lockfile --ignore-scripts --force
+```
+
+`--force` rebuilds `node_modules` instead of reconciling what Vercel restored
+from the previous deployment's build cache. Without it, every Admin and
+Restaurant deploy failed for thirteen hours with:
+
+```
+./src/app/appearance/page.tsx
+Type error: The inferred type of 'AppearancePage' cannot be named without a
+reference to '.pnpm/@types+react@19.1.17/node_modules/@types/react'.
+```
+
+Nothing was wrong with that file. The restored cache held a `node_modules` in
+which the portal resolved `@types/react@19.1.17` — the copy the React Native
+tree pins — while the workspace packages it imports resolved `19.3.0`, and a
+type crossing two copies of the same `@types` package cannot be named. A clean
+install of the same lockfile produces one copy and compiles. `appearance` is
+simply the first route directory alphabetically; the error would have moved to
+`applications` if that one file were annotated.
+
+What made it expensive was the silence. Vercel kept serving the last good
+build, so the portal looked alive and merely out of date, and the deployment
+list is the only place that said otherwise. **After any push that matters,
+check that the deployment actually succeeded** — `vercel ls <project>` — rather
+than reloading the site and trusting what loads.
+
 ```bash
 NEXT_PUBLIC_API_URL=https://api.yourdomain.com pnpm --filter admin-web build
 NEXT_PUBLIC_API_URL=https://api.yourdomain.com pnpm --filter restaurant-web build
