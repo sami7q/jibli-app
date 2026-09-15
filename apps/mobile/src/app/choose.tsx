@@ -75,6 +75,18 @@ const HALVES: readonly {
   },
 ];
 
+/**
+ * How much of the top belongs to the mark and the question.
+ *
+ * A number rather than a flex share. The panels below want every point they
+ * can get, and a header that grows with the screen would hand a tall phone's
+ * extra height to the emptiest part of the page.
+ */
+const HEADER_HEIGHT = 188;
+
+/** After the last letter has landed: five at 70ms apart, plus the rise. */
+const LETTERS_SETTLE = 4 * 70 + 160;
+
 export default function ChooseScreen() {
   const router = useRouter();
   const { choose } = useVertical();
@@ -159,90 +171,69 @@ export default function ChooseScreen() {
   };
 
   /*
-   * The panel is the banner. Nothing above it, nothing below it, nothing
-   * around it.
-   *
-   * This went through both wrong answers first. Splitting the screen evenly
-   * and centring the banner in each half left 70pt of flat colour above and
-   * below it — a third of every panel saying nothing, which reads as a banner
-   * that failed to load. Framing it in 16pt of the section's colour was
-   * better and still 64pt of the screen spent on a border.
-   *
-   * Covering the panel is the other direction and it is not available: a 16:9
-   * picture stretched to fill a phone-shaped panel loses 37% of its width, and
-   * these are composed left to right — products on one side, headline on the
-   * other — so that 37% is where half the design lives.
-   *
-   * What is left is the honest maximum: full width, its own ratio, edge to
-   * edge, the two of them stacked against each other. 242pt on a 430pt phone.
-   * The header takes what remains, because what remains is real and the only
-   * way to shrink it is to cut the artwork.
-   *
-   * The second term only bites on a screen too short for two of those, where
-   * the pair shrinks together rather than pushing one of them off the bottom —
-   * a two-way choice may never hide one of its halves.
-   */
-  /*
    * The wordmark scales with the phone rather than being one number.
    *
-   * At 176 it is right on a 430pt screen and 55% of the width of a 320pt one,
-   * where the header has 200pt to fit a mark, a question and a line under it
-   * — and a status bar inset on top of that. Tying it to the width keeps the
-   * proportion instead of the measurement.
+   * At 176 it is right on a 430pt screen and 55% of the width of a 320pt one.
+   * Tying it to the width keeps the proportion instead of the measurement.
    */
-  const markWidth = Math.min(176, width * 0.42);
+  const markWidth = Math.min(176, width * 0.44);
 
   /*
-   * One height for both, and never taller than the shorter picture.
+   * How tall the picture wants to be, and how tall its half of the screen is.
    *
-   * Equal because a two-way choice with one half visibly larger is not an
-   * even choice. Bounded by the shorter of the two because going past a
-   * picture's natural height means cropping it, and this way neither is
-   * cropped until the screen itself runs out of room.
+   * These are two different numbers and the screen needs both. A 16:9 banner
+   * is 242pt on a 430pt phone and two of those leave 250pt over — real space
+   * that has to belong to something, because the alternatives are cropping a
+   * third off the artwork's width or leaving a hole.
    *
-   * The cap is what stops a very tall banner from pushing the other half
-   * below the fold. Past it both are cropped top and bottom rather than at
-   * the sides — a banner is composed left to right, so its edges carry the
-   * headline and its margins carry nothing.
+   * So the half is whatever is left, split evenly, and the picture sits at the
+   * top of it in its own ratio with the section's colour carrying on beneath.
+   * The page ends in colour rather than in white, the two halves stay the same
+   * size as each other, and the artwork is never cut. Give the same design a
+   * squarer export and the picture grows into the space until there is none.
+   *
+   * `artHeight` is bounded by the shorter of the two pictures for the same
+   * reason the halves are equal: past a picture's natural height it is being
+   * cropped, and neither half should be cropped for the other's sake.
    */
   const naturalHeight = (type: MerchantType) => width / (ratios[type] ?? 16 / 9);
-  const artHeight = Math.min(
-    (height - 200) / 2,
-    naturalHeight('RESTAURANT'),
-    naturalHeight('MARKET'),
-  );
+  const halfHeight = Math.max((height - HEADER_HEIGHT) / 2, 120);
+  const artHeight = Math.min(halfHeight, naturalHeight('RESTAURANT'), naturalHeight('MARKET'));
+
+  /** What the picture leaves: the band of section colour under it. */
+  const stripHeight = Math.max(halfHeight - artHeight, 1);
 
   return (
     <Screen edges={['top', 'bottom']} padded={false}>
       <View style={{ flex: 1, backgroundColor: color.surfaceCard }}>
         {/*
-          The header takes what the panels leave and sits at the bottom of it,
-          against the first banner.
+          The header is a fixed height at the top, not a flexible block that
+          swallows the slack.
 
-          Centred, the slack split in two and put half of it between the
-          question and the answers — a gap in the middle of the screen reads as
-          something missing, while the same emptiness above the wordmark reads
-          as the top of a page. Same pixels, and only one of the two looks
-          deliberate.
+          Letting it flex put the mark a quarter of the way down the screen and
+          the pictures below the middle, which is the wrong half of the page for
+          both. Measured instead, everything sits where the eye starts and the
+          leftover goes where leftover belongs: into the panels, as more of the
+          section's own colour.
+
+          The line under the question is gone. «اختر القسم» is what the
+          question already asked, and the promise that it can be changed later
+          is answered by the control on the next screen that changes it.
         */}
-        <Enter delay={0} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <View
-            style={{
-              alignItems: 'center',
-              paddingHorizontal: space[5],
-              paddingBottom: space[6],
-              gap: space[2],
-            }}
-          >
-            <JibliWordmark width={markWidth} tint={color.brand} pinTint={palette.white} />
-            <Text variant="h1" style={{ marginTop: space[4] }}>
-              شنو تريد اليوم؟
-            </Text>
-            <Text variant="body" tone="muted" style={{ textAlign: 'center' }}>
-              اختر القسم، وتقدر ترجع تبدّله بأي وقت
-            </Text>
-          </View>
-        </Enter>
+        <View
+          style={{
+            height: HEADER_HEIGHT,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: space[5],
+            gap: space[3],
+          }}
+        >
+          <JibliWordmark animate width={markWidth} tint={color.brand} pinTint={palette.white} />
+          <Enter delay={LETTERS_SETTLE}>
+            <Text variant="h1">شنو تريد اليوم؟</Text>
+          </Enter>
+        </View>
 
         {HALVES.map((half, index) => {
           const art = artwork(half.type);
@@ -253,7 +244,10 @@ export default function ChooseScreen() {
                 onPress={() => enter(half.type)}
                 accessibilityRole="button"
                 accessibilityLabel={`${half.label} — ${half.caption}`}
-                style={({ pressed }) => [{ height: artHeight }, pressed ? { opacity: 0.94 } : null]}
+                style={({ pressed }) => [
+                  { height: halfHeight },
+                  pressed ? { opacity: 0.94 } : null,
+                ]}
               >
                 <LinearGradient
                   colors={[...half.gradient]}
@@ -261,13 +255,31 @@ export default function ChooseScreen() {
                   // happens to be two colours.
                   start={{ x: 1, y: 0 }}
                   end={{ x: 0, y: 1 }}
-                  style={{
-                    flex: 1,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
+                  style={{ flex: 1, alignItems: 'center', overflow: 'hidden' }}
                 >
+                  {/*
+                    The band under the picture, and what is in it.
+
+                    Whatever the artwork does not use is the section's own
+                    colour, and on a tall phone that is a hundred points of it.
+                    Flat, it reads as the page having run out; with the
+                    section's glyph across it at the size of a watermark it
+                    reads as the section, which is what the half is. Cropped by
+                    the panel on two sides on purpose — a mark that fits inside
+                    the band is an icon, and an icon in an empty band is a
+                    placeholder.
+                  */}
+                  <MaterialCommunityIcons
+                    name={half.icon}
+                    size={stripHeight * 1.9}
+                    color="rgba(255,255,255,0.14)"
+                    style={{
+                      position: 'absolute',
+                      bottom: -stripHeight * 0.55,
+                      insetInlineStart: -stripHeight * 0.35,
+                    }}
+                  />
+
                   {art.url ? (
                     <Image
                       source={{ uri: art.url }}

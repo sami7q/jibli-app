@@ -67,6 +67,20 @@ export function Enter({
       return;
     }
 
+    /*
+     * Back to the start before running, and this is the whole reason anything
+     * moves.
+     *
+     * The initial state is «reduced until proven otherwise», so the first pass
+     * through this effect always sets `progress` to 1. When the async check
+     * comes back saying motion is allowed, the effect re-runs — and animating
+     * to 1 from 1 is a no-op. Every entrance in the app was silently arriving
+     * finished: the component ran, the timing ran, and nothing ever moved.
+     *
+     * Resetting first is what makes the animation have somewhere to come from.
+     */
+    progress.setValue(0);
+
     const animation = Animated.timing(progress, {
       toValue: 1,
       duration,

@@ -389,49 +389,73 @@ function Header({
       {/*
        * Which half you are in, and the way out of it.
        *
-       * A back arrow alone would be ambiguous — back to what? — so it carries
-       * the name of the section it leaves. It is the first row because it is
-       * the outermost thing about this screen: the area below it is a setting
-       * within the half, not above it.
+       * This was a 16px chevron on a tinted chip, and it failed at both jobs.
+       * A chevron pointing away from a section name is read as «there is more
+       * of this», not «leave this» — the one gesture it has to suggest is a
+       * swap, so it says so, in a word and in an icon that shows two
+       * directions rather than one. And at caption size on a 24pt chip it was
+       * a label that happened to be tappable; it is now a control with a real
+       * target, a border, and a filled tile carrying the section's own glyph.
+       *
+       * It is the first row because it is the outermost thing about this
+       * screen: the delivery area below it is a setting within the half, not
+       * above it.
        */}
       <Pressable
         onPress={onBack}
         accessibilityRole="button"
-        accessibilityLabel={`الرجوع لاختيار القسم. القسم الحالي ${
+        accessibilityLabel={`تبديل القسم. القسم الحالي ${
           vertical === 'MARKET' ? 'جيبلي ماركت' : 'جيبلي أكل'
         }`}
+        accessibilityHint="يفتح شاشة اختيار القسم"
         style={({ pressed }) => [
           {
             flexDirection: 'row-reverse',
             alignItems: 'center',
-            gap: space[2],
             alignSelf: 'flex-start',
-            paddingVertical: space[1],
-            paddingHorizontal: space[2],
-            marginBottom: space[2],
+            gap: space[2],
+            height: 38,
+            paddingInlineStart: space[1],
+            paddingInlineEnd: space[3],
+            marginBottom: space[3],
             borderRadius: radius.full,
-            backgroundColor: vertical === 'MARKET' ? palette.success[50] : color.brandSoft,
+            borderWidth: 1,
+            borderColor: accent[200],
+            backgroundColor: pressed ? accent[100] : color.brandSoft,
           },
-          pressed ? { opacity: 0.7 } : null,
         ]}
       >
-        <MaterialCommunityIcons
-          name={vertical === 'MARKET' ? 'basket-outline' : 'silverware-fork-knife'}
-          size={16}
-          color={vertical === 'MARKET' ? palette.success[700] : color.textBrand}
-        />
-        <Text
-          variant="captionBold"
-          style={{ color: vertical === 'MARKET' ? palette.success[700] : color.textBrand }}
+        {/* The section, as a filled tile — the one element with real contrast. */}
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: radius.full,
+            backgroundColor: color.brand,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
+          <MaterialCommunityIcons
+            name={vertical === 'MARKET' ? 'basket-outline' : 'silverware-fork-knife'}
+            size={17}
+            color={palette.white}
+          />
+        </View>
+
+        <Text variant="smallBold" style={{ color: color.textBrand }}>
           {vertical === 'MARKET' ? 'جيبلي ماركت' : 'جيبلي أكل'}
         </Text>
-        {/* Points the way the language runs, which under forced RTL is left. */}
-        <MaterialCommunityIcons
-          name="chevron-left"
-          size={16}
-          color={vertical === 'MARKET' ? palette.success[700] : color.textBrand}
-        />
+
+        {/* Hairline, so the name and the action read as two things. */}
+        <View style={{ width: 1, height: 16, backgroundColor: accent[200] }} />
+
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: space[1] }}>
+          <MaterialCommunityIcons name="swap-horizontal" size={16} color={color.textBrand} />
+          <Text variant="caption" style={{ color: color.textBrand }}>
+            تبديل
+          </Text>
+        </View>
       </Pressable>
 
       <Row justify="space-between" gap={space[3]}>
