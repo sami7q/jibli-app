@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..700,0..1,0&display=swap" rel="stylesheet">
+<script src="./image-slot.js"></script>
+<style>
+html,body{margin:0;padding:0}
+body{background:#eeebe6}
+a{color:#e2620a;text-decoration:none}
+a:hover{color:#b34c06}
+[data-scroll]::-webkit-scrollbar{display:none}
+[data-hs]::-webkit-scrollbar{display:none}
+@keyframes jh-sheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes jh-fade{from{opacity:0}to{opacity:1}}
+@keyframes jh-pulse{0%{box-shadow:0 0 0 0 rgba(30,158,106,.55)}70%{box-shadow:0 0 0 7px rgba(30,158,106,0)}100%{box-shadow:0 0 0 0 rgba(30,158,106,0)}}
+@keyframes jh-bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+@keyframes jh-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</helmet>
+<div dir="rtl" ref="{{ setRoot }}" style="min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:24px;padding:36px 20px 56px;background:#eeebe6;font-family:Tajawal,system-ui,sans-serif;color:#1d1a17">
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;max-width:470px">
+    <div style="font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;color:#c2521a">JIBLI · HOME</div>
+    <h1 style="margin:0;font:800 26px/1.3 Tajawal,system-ui,sans-serif;white-space:nowrap">الواجهة الرئيسية</h1>
+    <p style="margin:0;font:400 14px/1.6 Tajawal,system-ui,sans-serif;color:#6d6660;text-wrap:pretty">إعادة تصميم كاملة بنمط RTL: رأس برتقالي بتدرّج الهوية، بحث عائم، تصنيفات، بطاقات مطاعم، وشريط طلب حيّ. كل شيء قابل للنقر.</p>
+  </div>
+
+  <div style="position:relative;width:414px;height:868px;flex:none;box-sizing:border-box;padding:12px;border-radius:58px;background:linear-gradient(160deg,#3a3d44,#15171b 35%,#101216 70%,#2c2f35);box-shadow:0 34px 70px -24px rgba(24,14,4,.5),0 4px 14px rgba(0,0,0,.16)">
+    <div style="position:relative;width:390px;height:844px;overflow:hidden;border-radius:46px;background:#f7f4f1">
+
+      <div data-scroll style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none">
+
+        <div data-header style="position:sticky;top:0;z-index:5;background:linear-gradient(165deg,#ff8a14 0%,#fd6702 48%,#f05002 100%);border-radius:0 0 30px 30px;box-shadow:0 10px 26px -14px rgba(202,73,2,.7)">
+          <div style="display:flex;align-items:center;justify-content:space-between;height:52px;padding:0 24px 0 26px;color:#fff">
+            <span style="font:700 15px Tajawal,system-ui,sans-serif;letter-spacing:.2px">10:45</span>
+            <span style="display:flex;align-items:center;gap:5px">
+              <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;font-variation-settings:'FILL' 1">signal_cellular_alt</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;font-variation-settings:'FILL' 1">wifi</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:17px;line-height:1;font-variation-settings:'FILL' 1">battery_full</span>
+            </span>
+          </div>
+
+          <div style="padding:2px 18px 0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:38px;height:38px;flex:none;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;color:#fff">
+                  <span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;font-variation-settings:'FILL' 1">location_on</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font:500 11px Tajawal,system-ui,sans-serif;color:rgba(255,255,255,.82)">التوصيل إلى</span>
+                  <span style="display:flex;align-items:center;gap:3px;font:700 15px Tajawal,system-ui,sans-serif;color:#fff">بغداد · الكرادة
+                    <span style="font-family:'Material Symbols Rounded';font-size:17px;line-height:1">expand_more</span>
+                  </span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button data-cart style="position:relative;width:40px;height:40px;flex:none;border:none;border-radius:14px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgba(255,255,255,.3)">
+                  <span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;font-variation-settings:'FILL' 1">shopping_bag</span>
+                  <span data-cart-count style="position:absolute;top:-4px;left:-4px;min-width:19px;height:19px;padding:0 4px;box-sizing:border-box;border-radius:10px;background:#fff;color:#e2620a;font:800 11px/19px Tajawal,system-ui,sans-serif;text-align:center">2</span>
+                </button>
+                <button style="position:relative;width:40px;height:40px;flex:none;border:none;border-radius:14px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgba(255,255,255,.3)">
+                  <span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;font-variation-settings:'FILL' 1">notifications</span>
+                  <span style="position:absolute;top:8px;left:9px;width:7px;height:7px;border-radius:50%;background:#ffd400;box-shadow:0 0 0 2px #fb6402"></span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <div data-home-only="block" style="padding:14px 18px 0;margin-bottom:-26px">
+            <div style="display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;border-radius:18px;background:#fff;box-shadow:0 12px 26px -14px rgba(60,30,4,.45)">
+              <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;color:#a49c94">search</span>
+              <input data-search type="text" placeholder="ابحث عن مطعم أو وجبة..." style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:500 14px Tajawal,system-ui,sans-serif;color:#1d1a17;text-align:right">
+              <span style="width:1px;height:22px;background:rgba(29,26,23,.1)"></span>
+              <button style="width:32px;height:32px;border:none;border-radius:11px;background:rgba(253,103,2,.1);color:#e2620a;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1;font-variation-settings:'FILL' 1">tune</span>
+              </button>
+            </div>
+          </div>
+          <div data-home-only="block" style="height:12px"></div>
+        </div>
+
+        <div data-tab-panel="home" style="padding:34px 0 200px">
+
+          <div style="margin:0 18px;position:relative;aspect-ratio:16/9;border-radius:26px;overflow:hidden;box-shadow:0 16px 34px -20px rgba(60,30,4,.5)">
+            <image-slot id="jh-hero" shape="rect" placeholder="صورة العرض الرئيسي"></image-slot>
+            <div style="position:absolute;inset:0;background:linear-gradient(0deg,rgba(24,10,2,.9) 0%,rgba(24,10,2,.66) 38%,rgba(24,10,2,.1) 72%,rgba(24,10,2,.22) 100%);pointer-events:none"></div>
+            <div style="position:absolute;inset:0;padding:16px 20px 62px;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;pointer-events:none">
+              <span style="align-self:flex-start;padding:5px 11px;border-radius:9px;background:rgba(255,255,255,.2);color:#fff;white-space:nowrap;font:700 10.5px Tajawal,system-ui,sans-serif;backdrop-filter:blur(4px)">عرض اليوم</span>
+              <div data-promo-title style="max-width:250px;font:800 22px/1.32 Tajawal,system-ui,sans-serif;color:#fff">في غضون 20 دقيقة إلى بابك</div>
+              <span data-promo-sub style="font:500 12.5px Tajawal,system-ui,sans-serif;color:rgba(255,255,255,.82)">توصيل سريع لوجباتك المفضلة</span>
+            </div>
+            <button data-promo-cta style="position:absolute;bottom:18px;right:20px;height:36px;padding:0 18px;border:none;border-radius:12px;background:#fff;color:#e2620a;white-space:nowrap;font:800 13px Tajawal,system-ui,sans-serif;cursor:pointer" style-hover="background:#fff4ec">أطلب الآن</button>
+            <div style="position:absolute;bottom:24px;left:20px;display:flex;gap:5px">
+              <span data-dot="0" style="width:16px;height:5px;border-radius:3px;background:#fff"></span>
+              <span data-dot="1" style="width:5px;height:5px;border-radius:3px;background:rgba(255,255,255,.45)"></span>
+              <span data-dot="2" style="width:5px;height:5px;border-radius:3px;background:rgba(255,255,255,.45)"></span>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin:26px 18px 12px">
+            <h2 style="margin:0;white-space:nowrap;font:800 17.5px Tajawal,system-ui,sans-serif">التصنيفات</h2>
+            <span style="display:flex;align-items:center;gap:2px;white-space:nowrap;font:700 12.5px Tajawal,system-ui,sans-serif;color:#e2620a;cursor:pointer">اختر وجبتك
+              <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">chevron_left</span>
+            </span>
+          </div>
+          <div data-hs style="display:flex;gap:14px;padding:2px 18px 4px;overflow-x:auto;scrollbar-width:none">
+            <button data-cat="all" style="flex:none;width:72px;display:flex;flex-direction:column;align-items:center;gap:8px;border:none;background:transparent;padding:0;cursor:pointer">
+              <span data-cat-ico style="width:62px;height:62px;border-radius:22px;background:#fff;box-shadow:0 8px 18px -12px rgba(60,30,4,.5);display:flex;align-items:center;justify-content:center;color:#e2620a"><span style="font-family:'Material Symbols Rounded';font-size:27px;line-height:1;font-variation-settings:'FILL' 1">restaurant_menu</span></span>
+              <span data-cat-label style="white-space:nowrap;font:700 11px Tajawal,system-ui,sans-serif;color:#1d1a17">الكل</span>
+            </button>
+            <button data-cat="grill" style="flex:none;width:72px;display:flex;flex-direction:column;align-items:center;gap:8px;border:none;background:transparent;padding:0;cursor:pointer">
+              <span data-cat-ico style="width:62px;height:62px;border-radius:22px;background:#fff;box-shadow:0 8px 18px -12px rgba(60,30,4,.5);display:flex;align-items:center;justify-content:center;color:#e2620a"><span style="font-family:'Material Symbols Rounded';font-size:27px;line-height:1;font-variation-settings:'FILL' 1">kebab_dining</span></span>
+              <span data-cat-label style="white-space:nowrap;font:500 11px Tajawal,system-ui,sans-serif;color:#6d6660">مشاوي</span>
+            </button>
+            <button data-cat="pizza" style="flex:none;width:72px;display:flex;flex-direction:column;align-items:center;gap:8px;border:none;background:transparent;padding:0;cursor:pointer">
+              <span data-cat-ico style="width:62px;height:62px;border-radius:22px;background:#fff;box-shadow:0 8px 18px -12px rgba(60,30,4,.5);display:flex;align-items:center;justify-content:center;color:#e2620a"><span style="font-family:'Material Symbols Rounded';font-size:27px;line-height:1;font-variation-settings:'FILL' 1">local_pizza</span></span>
+              <span data-cat-label style="white-space:nowrap;font:500 11px Tajawal,system-ui,sans-serif;color:#6d6660">بيتزا</span>
+            </button>
+            <button data-cat="burger" style="flex:none;width:72px;display:flex;flex-direction:column;align-items:center;gap:8px;border:none;background:transparent;padding:0;cursor:pointer">
+              <span data-cat-ico style="width:62px;height:62px;border-radius:22px;background:#fff;box-shadow:0 8px 18px -12px rgba(60,30,4,.5);display:flex;align-items:center;justify-content:center;color:#e2620a"><span style="font-family:'Material Symbols Rounded';font-size:27px;line-height:1;font-variation-settings:'FILL' 1">lunch_dining</span></span>
+              <span data-cat-label style="white-space:nowrap;font:500 11px Tajawal,system-ui,sans-serif;color:#6d6660">وجبات سريعة</span>
+            </button>
+            <button data-cat="sweets" style="flex:none;width:72px;display:flex;flex-direction:column;align-items:center;gap:8px;border:none;background:transparent;padding:0;cursor:pointer">
+              <span data-cat-ico style="width:62px;height:62px;border-radius:22px;background:#fff;box-shadow:0 8px 18px -12px rgba(60,30,4,.5);display:flex;align-items:center;justify-content:center;color:#e2620a"><span style="font-family:'Material Symbols Rounded';font-size:27px;line-height:1;font-variation-settings:'FILL' 1">icecream</span></span>
+              <span data-cat-label style="white-space:nowrap;font:500 11px Tajawal,system-ui,sans-serif;color:#6d6660">حلويات</span>
+            </button>
+            <button data-cat="drinks" style="flex:none;width:72px;display:flex;flex-direction:column;align-items:center;gap:8px;border:none;background:transparent;padding:0;cursor:pointer">
+              <span data-cat-ico style="width:62px;height:62px;border-radius:22px;background:#fff;box-shadow:0 8px 18px -12px rgba(60,30,4,.5);display:flex;align-items:center;justify-content:center;color:#e2620a"><span style="font-family:'Material Symbols Rounded';font-size:27px;line-height:1;font-variation-settings:'FILL' 1">local_cafe</span></span>
+              <span data-cat-label style="white-space:nowrap;font:500 11px Tajawal,system-ui,sans-serif;color:#6d6660">مشروبات</span>
+            </button>
+          </div>
+
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin:24px 18px 12px">
+            <h2 style="margin:0;white-space:nowrap;font:800 16.5px Tajawal,system-ui,sans-serif">الأكثر طلباً قريب منك</h2>
+            <span style="display:flex;align-items:center;gap:2px;white-space:nowrap;font:700 12.5px Tajawal,system-ui,sans-serif;color:#e2620a;cursor:pointer">الكل
+              <span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">chevron_left</span>
+            </span>
+          </div>
+          <div data-hs data-cards style="display:flex;gap:14px;padding:2px 18px 6px;overflow-x:auto;scrollbar-width:none">
+
+            <div data-card data-cat="pizza" data-name="روما بيتزا إيطالي" style="flex:none;width:236px;border-radius:24px;background:#fff;box-shadow:0 12px 26px -18px rgba(60,30,4,.55);overflow:hidden">
+              <div style="position:relative;height:124px">
+                <image-slot id="jh-r1" shape="rect" placeholder="صورة المطعم"></image-slot>
+                <span style="position:absolute;top:10px;right:10px;padding:5px 9px;border-radius:9px;background:#fd6702;color:#fff;white-space:nowrap;font:800 10.5px Tajawal,system-ui,sans-serif">خصم 20%</span>
+                <button data-fav-btn style="position:absolute;top:8px;left:8px;width:32px;height:32px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:#9a938c;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">favorite</span>
+                </button>
+              </div>
+              <div style="padding:11px 13px 13px">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                  <div style="min-width:0">
+                    <div style="font:800 14.5px Tajawal,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">روما بيتزا</div>
+                    <div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">إيطالي · بيتزا</div>
+                  </div>
+                  <button data-add style="width:32px;height:32px;flex:none;border:none;border-radius:11px;background:#fd6702;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#e2620a">
+                    <span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1">add</span>
+                  </button>
+                </div>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:10px;font:600 11.5px Tajawal,system-ui,sans-serif;color:#6d6660">
+                  <span style="display:flex;align-items:center;gap:3px;color:#1d1a17"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1;font-variation-settings:'FILL' 1;color:#f5a524">star</span>4.8</span>
+                  <span style="display:flex;align-items:center;gap:3px"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">schedule</span>25 د</span>
+                  <span style="color:#1e9e6a">توصيل مجاني</span>
+                </div>
+              </div>
+            </div>
+
+            <div data-card data-cat="grill" data-name="كباب أبو حيدر مشاوي عراقي" style="flex:none;width:236px;border-radius:24px;background:#fff;box-shadow:0 12px 26px -18px rgba(60,30,4,.55);overflow:hidden">
+              <div style="position:relative;height:124px">
+                <image-slot id="jh-r2" shape="rect" placeholder="صورة المطعم"></image-slot>
+                <span style="position:absolute;top:10px;right:10px;padding:5px 9px;border-radius:9px;background:rgba(24,10,2,.62);color:#fff;white-space:nowrap;font:800 10.5px Tajawal,system-ui,sans-serif;backdrop-filter:blur(4px)">الأكثر طلباً</span>
+                <button data-fav-btn style="position:absolute;top:8px;left:8px;width:32px;height:32px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:#9a938c;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">favorite</span>
+                </button>
+              </div>
+              <div style="padding:11px 13px 13px">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                  <div style="min-width:0">
+                    <div style="font:800 14.5px Tajawal,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">كباب أبو حيدر</div>
+                    <div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">مشاوي · عراقي</div>
+                  </div>
+                  <button data-add style="width:32px;height:32px;flex:none;border:none;border-radius:11px;background:#fd6702;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#e2620a">
+                    <span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1">add</span>
+                  </button>
+                </div>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:10px;font:600 11.5px Tajawal,system-ui,sans-serif;color:#6d6660">
+                  <span style="display:flex;align-items:center;gap:3px;color:#1d1a17"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1;font-variation-settings:'FILL' 1;color:#f5a524">star</span>4.7</span>
+                  <span style="display:flex;align-items:center;gap:3px"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">schedule</span>30 د</span>
+                  <span>1,000 د.ع</span>
+                </div>
+              </div>
+            </div>
+
+            <div data-card data-cat="burger" data-name="برجر هاوس وجبات سريعة" style="flex:none;width:236px;border-radius:24px;background:#fff;box-shadow:0 12px 26px -18px rgba(60,30,4,.55);overflow:hidden">
+              <div style="position:relative;height:124px">
+                <image-slot id="jh-r3" shape="rect" placeholder="صورة المطعم"></image-slot>
+                <button data-fav-btn style="position:absolute;top:8px;left:8px;width:32px;height:32px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:#9a938c;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">favorite</span>
+                </button>
+              </div>
+              <div style="padding:11px 13px 13px">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                  <div style="min-width:0">
+                    <div style="font:800 14.5px Tajawal,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">برجر هاوس</div>
+                    <div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">برجر · وجبات سريعة</div>
+                  </div>
+                  <button data-add style="width:32px;height:32px;flex:none;border:none;border-radius:11px;background:#fd6702;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#e2620a">
+                    <span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1">add</span>
+                  </button>
+                </div>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:10px;font:600 11.5px Tajawal,system-ui,sans-serif;color:#6d6660">
+                  <span style="display:flex;align-items:center;gap:3px;color:#1d1a17"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1;font-variation-settings:'FILL' 1;color:#f5a524">star</span>4.6</span>
+                  <span style="display:flex;align-items:center;gap:3px"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">schedule</span>20 د</span>
+                  <span>1,500 د.ع</span>
+                </div>
+              </div>
+            </div>
+
+            <div data-card data-cat="sweets" data-name="حلويات السلطان كنافة" style="flex:none;width:236px;border-radius:24px;background:#fff;box-shadow:0 12px 26px -18px rgba(60,30,4,.55);overflow:hidden">
+              <div style="position:relative;height:124px">
+                <image-slot id="jh-r4" shape="rect" placeholder="صورة المطعم"></image-slot>
+                <button data-fav-btn style="position:absolute;top:8px;left:8px;width:32px;height:32px;border:none;border-radius:50%;background:rgba(255,255,255,.92);color:#9a938c;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">favorite</span>
+                </button>
+              </div>
+              <div style="padding:11px 13px 13px">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                  <div style="min-width:0">
+                    <div style="font:800 14.5px Tajawal,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">حلويات السلطان</div>
+                    <div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">كنافة · بقلاوة</div>
+                  </div>
+                  <button data-add style="width:32px;height:32px;flex:none;border:none;border-radius:11px;background:#fd6702;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#e2620a">
+                    <span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1">add</span>
+                  </button>
+                </div>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:10px;font:600 11.5px Tajawal,system-ui,sans-serif;color:#6d6660">
+                  <span style="display:flex;align-items:center;gap:3px;color:#1d1a17"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1;font-variation-settings:'FILL' 1;color:#f5a524">star</span>4.9</span>
+                  <span style="display:flex;align-items:center;gap:3px"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">schedule</span>35 د</span>
+                  <span>2,000 د.ع</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div data-empty style="display:none;margin:18px;padding:26px 18px;border-radius:22px;background:#fff;text-align:center">
+            <span style="font-family:'Material Symbols Rounded';font-size:30px;line-height:1;color:#c9c2ba">search_off</span>
+            <div style="margin-top:8px;font:700 14px Tajawal,system-ui,sans-serif">لا توجد نتائج مطابقة</div>
+            <div style="margin-top:3px;font:500 12px Tajawal,system-ui,sans-serif;color:#8a837c">جرّب تصنيفاً آخر أو كلمة بحث مختلفة</div>
+          </div>
+
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin:26px 18px 12px">
+            <h2 style="margin:0;white-space:nowrap;font:800 17.5px Tajawal,system-ui,sans-serif">مطاعم قريبة منك</h2>
+            <span style="font:600 12px Tajawal,system-ui,sans-serif;color:#8a837c">‹ 2 كم</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin:0 18px">
+            <div style="display:flex;gap:12px;padding:10px;border-radius:22px;background:#fff;box-shadow:0 10px 22px -18px rgba(60,30,4,.5)">
+              <div style="position:relative;width:78px;height:78px;flex:none">
+                <image-slot id="jh-n1" shape="rounded" radius="16" placeholder="صورة"></image-slot>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="font:800 14.5px Tajawal,system-ui,sans-serif">مندي الشام</span>
+                  <span style="padding:2px 7px;border-radius:7px;background:rgba(30,158,106,.12);color:#1e9e6a;font:700 10px Tajawal,system-ui,sans-serif">مفتوح</span>
+                </div>
+                <span style="font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">مندي · أرز · عربي</span>
+                <div style="display:flex;align-items:center;gap:10px;font:600 11.5px Tajawal,system-ui,sans-serif;color:#6d6660">
+                  <span style="display:flex;align-items:center;gap:3px;color:#1d1a17"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1;font-variation-settings:'FILL' 1;color:#f5a524">star</span>4.8</span>
+                  <span>28 د</span>
+                  <span>1,000 د.ع</span>
+                </div>
+              </div>
+              <button style="align-self:center;width:34px;height:34px;flex:none;border:none;border-radius:12px;background:rgba(253,103,2,.1);color:#e2620a;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1">chevron_left</span>
+              </button>
+            </div>
+
+            <div style="display:flex;gap:12px;padding:10px;border-radius:22px;background:#fff;box-shadow:0 10px 22px -18px rgba(60,30,4,.5)">
+              <div style="position:relative;width:78px;height:78px;flex:none">
+                <image-slot id="jh-n2" shape="rounded" radius="16" placeholder="صورة"></image-slot>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="font:800 14.5px Tajawal,system-ui,sans-serif">دجاج الريف</span>
+                  <span style="padding:2px 7px;border-radius:7px;background:rgba(30,158,106,.12);color:#1e9e6a;font:700 10px Tajawal,system-ui,sans-serif">مفتوح</span>
+                </div>
+                <span style="font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">دجاج · بروست · ساندويش</span>
+                <div style="display:flex;align-items:center;gap:10px;font:600 11.5px Tajawal,system-ui,sans-serif;color:#6d6660">
+                  <span style="display:flex;align-items:center;gap:3px;color:#1d1a17"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1;font-variation-settings:'FILL' 1;color:#f5a524">star</span>4.5</span>
+                  <span>22 د</span>
+                  <span style="color:#1e9e6a">توصيل مجاني</span>
+                </div>
+              </div>
+              <button style="align-self:center;width:34px;height:34px;flex:none;border:none;border-radius:12px;background:rgba(253,103,2,.1);color:#e2620a;display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1">chevron_left</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div data-tab-panel="fav" style="display:none;padding:22px 18px 200px">
+          <h2 style="margin:0 0 14px;font:800 19px Tajawal,system-ui,sans-serif">المفضلة</h2>
+          <div data-fav-empty style="padding:44px 20px;border-radius:24px;background:#fff;text-align:center">
+            <span style="font-family:'Material Symbols Rounded';font-size:34px;line-height:1;color:#e0d9d1;font-variation-settings:'FILL' 1">favorite</span>
+            <div style="margin-top:10px;font:800 15px Tajawal,system-ui,sans-serif">لا توجد مطاعم مفضلة</div>
+            <div style="margin-top:4px;font:500 12.5px/1.6 Tajawal,system-ui,sans-serif;color:#8a837c">اضغط على القلب في أي بطاقة مطعم لإضافته هنا</div>
+          </div>
+          <div data-fav-list style="display:none;flex-direction:column;gap:10px"></div>
+        </div>
+
+        <div data-tab-panel="orders" style="display:none;padding:22px 18px 200px">
+          <h2 style="margin:0 0 14px;font:800 19px Tajawal,system-ui,sans-serif">طلباتي</h2>
+          <div style="padding:14px;border-radius:24px;background:linear-gradient(160deg,#ff8a14,#f05002);color:#fff;box-shadow:0 16px 30px -20px rgba(202,73,2,.8)">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font:800 14.5px Tajawal,system-ui,sans-serif">طلب قيد التوصيل</span>
+              <span style="padding:4px 9px;border-radius:8px;background:rgba(255,255,255,.22);font:700 11px Tajawal,system-ui,sans-serif">12 دقيقة</span>
+            </div>
+            <div style="margin-top:6px;font:500 12px Tajawal,system-ui,sans-serif;color:rgba(255,255,255,.85)">روما بيتزا · JB1305851 · 24,000 د.ع</div>
+            <button data-sheet-open style="margin-top:12px;width:100%;height:42px;border:none;border-radius:14px;background:#fff;color:#e2620a;font:800 13.5px Tajawal,system-ui,sans-serif;cursor:pointer">تتبع الطلب</button>
+          </div>
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:20px;background:#fff">
+              <span style="width:42px;height:42px;flex:none;border-radius:14px;background:rgba(253,103,2,.1);color:#e2620a;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;font-variation-settings:'FILL' 1">receipt_long</span></span>
+              <div style="flex:1;min-width:0">
+                <div style="font:700 13.5px Tajawal,system-ui,sans-serif">كباب أبو حيدر</div>
+                <div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">أمس · 18,500 د.ع · تم التوصيل</div>
+              </div>
+              <button style="height:32px;padding:0 12px;border:1px solid rgba(253,103,2,.35);border-radius:11px;background:#fff;color:#e2620a;font:700 12px Tajawal,system-ui,sans-serif;cursor:pointer">إعادة</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:20px;background:#fff">
+              <span style="width:42px;height:42px;flex:none;border-radius:14px;background:rgba(253,103,2,.1);color:#e2620a;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1;font-variation-settings:'FILL' 1">receipt_long</span></span>
+              <div style="flex:1;min-width:0">
+                <div style="font:700 13.5px Tajawal,system-ui,sans-serif">برجر هاوس</div>
+                <div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">السبت · 12,000 د.ع · تم التوصيل</div>
+              </div>
+              <button style="height:32px;padding:0 12px;border:1px solid rgba(253,103,2,.35);border-radius:11px;background:#fff;color:#e2620a;font:700 12px Tajawal,system-ui,sans-serif;cursor:pointer">إعادة</button>
+            </div>
+          </div>
+        </div>
+
+        <div data-tab-panel="account" style="display:none;padding:22px 18px 200px">
+          <h2 style="margin:0 0 14px;font:800 19px Tajawal,system-ui,sans-serif">حسابي</h2>
+          <div style="display:flex;align-items:center;gap:13px;padding:14px;border-radius:24px;background:#fff;box-shadow:0 10px 22px -18px rgba(60,30,4,.5)">
+            <div style="position:relative;width:58px;height:58px;flex:none">
+              <image-slot id="jh-avatar" shape="circle" placeholder="صورة"></image-slot>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font:800 15.5px Tajawal,system-ui,sans-serif">أحمد الجبوري</div>
+              <div style="margin-top:3px;font:500 12px Tajawal,system-ui,sans-serif;color:#8a837c">0770 123 4567</div>
+            </div>
+            <button style="height:34px;padding:0 13px;border:none;border-radius:12px;background:rgba(253,103,2,.1);color:#e2620a;font:700 12.5px Tajawal,system-ui,sans-serif;cursor:pointer">تعديل</button>
+          </div>
+          <div style="margin-top:14px;border-radius:24px;background:#fff;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:12px;padding:15px 14px;border-bottom:1px solid rgba(29,26,23,.06)"><span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;color:#e2620a">location_on</span><span style="flex:1;font:600 13.5px Tajawal,system-ui,sans-serif">عناويني</span><span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1;color:#c9c2ba">chevron_left</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:15px 14px;border-bottom:1px solid rgba(29,26,23,.06)"><span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;color:#e2620a">credit_card</span><span style="flex:1;font:600 13.5px Tajawal,system-ui,sans-serif">طرق الدفع</span><span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1;color:#c9c2ba">chevron_left</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:15px 14px;border-bottom:1px solid rgba(29,26,23,.06)"><span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;color:#e2620a">notifications</span><span style="flex:1;font:600 13.5px Tajawal,system-ui,sans-serif">الإشعارات</span><span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1;color:#c9c2ba">chevron_left</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:15px 14px"><span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;color:#e2620a">support_agent</span><span style="flex:1;font:600 13.5px Tajawal,system-ui,sans-serif">المساعدة والدعم</span><span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1;color:#c9c2ba">chevron_left</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div data-order-card style="position:absolute;bottom:98px;right:14px;left:14px;z-index:6;display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:22px;background:#fff;box-shadow:0 18px 34px -18px rgba(40,20,4,.45);cursor:pointer">
+        <span style="width:42px;height:42px;flex:none;border-radius:15px;background:linear-gradient(160deg,#ff8a14,#f05002);color:#fff;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:23px;line-height:1;font-variation-settings:'FILL' 1">delivery_dining</span></span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="width:7px;height:7px;border-radius:50%;background:#1e9e6a;animation:jh-pulse 2s ease-out infinite"></span>
+            <span style="white-space:nowrap;font:800 13px Tajawal,system-ui,sans-serif">جاهز · الكابتن في الطريق</span>
+          </div>
+          <div style="margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 11px Tajawal,system-ui,sans-serif;color:#8a837c">روما بيتزا · يصل بعد 12 دقيقة</div>
+          <div style="margin-top:7px;height:4px;border-radius:3px;background:rgba(29,26,23,.08);overflow:hidden">
+            <div data-progress style="width:64%;height:100%;border-radius:3px;background:linear-gradient(90deg,#ff8a14,#f05002)"></div>
+          </div>
+        </div>
+        <span style="display:flex;align-items:center;gap:1px;white-space:nowrap;font:800 12.5px Tajawal,system-ui,sans-serif;color:#e2620a">تتبع<span style="font-family:'Material Symbols Rounded';font-size:17px;line-height:1">chevron_left</span></span>
+      </div>
+
+      <div style="position:absolute;bottom:0;right:0;left:0;z-index:7;height:88px;padding:0 8px;box-sizing:border-box;display:flex;align-items:flex-start;gap:2px;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-top:1px solid rgba(29,26,23,.07)">
+        <button data-tab-btn="home" style="flex:1;height:64px;padding-top:9px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer">
+          <span data-nav-ico style="padding:5px 15px;border-radius:12px;background:rgba(253,103,2,.12);color:#e2620a;display:flex"><span style="font-family:'Material Symbols Rounded';font-size:23px;line-height:1;font-variation-settings:'FILL' 1">home</span></span>
+          <span data-nav-label style="font:800 11px Tajawal,system-ui,sans-serif;color:#e2620a">الرئيسية</span>
+        </button>
+        <button data-tab-btn="fav" style="flex:1;height:64px;padding-top:9px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer">
+          <span data-nav-ico style="padding:5px 15px;border-radius:12px;background:transparent;color:#9a938c;display:flex"><span style="font-family:'Material Symbols Rounded';font-size:23px;line-height:1">favorite</span></span>
+          <span data-nav-label style="font:600 11px Tajawal,system-ui,sans-serif;color:#9a938c">المفضلة</span>
+        </button>
+        <button data-tab-btn="orders" style="flex:1;height:64px;padding-top:9px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer">
+          <span data-nav-ico style="padding:5px 15px;border-radius:12px;background:transparent;color:#9a938c;display:flex"><span style="font-family:'Material Symbols Rounded';font-size:23px;line-height:1">receipt_long</span></span>
+          <span data-nav-label style="font:600 11px Tajawal,system-ui,sans-serif;color:#9a938c">طلباتي</span>
+        </button>
+        <button data-tab-btn="account" style="flex:1;height:64px;padding-top:9px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer">
+          <span data-nav-ico style="padding:5px 15px;border-radius:12px;background:transparent;color:#9a938c;display:flex"><span style="font-family:'Material Symbols Rounded';font-size:23px;line-height:1">person</span></span>
+          <span data-nav-label style="font:600 11px Tajawal,system-ui,sans-serif;color:#9a938c">حسابي</span>
+        </button>
+        <span style="position:absolute;bottom:7px;right:50%;transform:translateX(50%);width:118px;height:5px;border-radius:3px;background:rgba(29,26,23,.22)"></span>
+      </div>
+
+      <div data-sheet style="display:none;position:absolute;inset:0;z-index:9">
+        <div data-sheet-close style="position:absolute;inset:0;background:rgba(22,12,4,.5);animation:jh-fade .25s ease"></div>
+        <div style="position:absolute;right:0;left:0;bottom:0;padding:10px 20px 26px;border-radius:30px 30px 0 0;background:#fff;animation:jh-sheet .34s cubic-bezier(.2,.9,.25,1)">
+          <span style="display:block;width:44px;height:4px;margin:0 auto 14px;border-radius:3px;background:rgba(29,26,23,.15)"></span>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="white-space:nowrap;font:800 18px Tajawal,system-ui,sans-serif">يصل بعد 12 دقيقة</div>
+              <div style="margin-top:3px;font:500 12px Tajawal,system-ui,sans-serif;color:#8a837c">روما بيتزا · JB1305851</div>
+            </div>
+            <button data-sheet-close style="width:34px;height:34px;border:none;border-radius:12px;background:rgba(29,26,23,.06);color:#1d1a17;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1">close</span>
+            </button>
+          </div>
+          <div style="margin-top:18px;display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:11px;height:11px;flex:none;border-radius:50%;background:#fd6702"></span>
+              <span style="white-space:nowrap;font:700 13px Tajawal,system-ui,sans-serif">تم استلام الطلب<span style="margin-right:8px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">10:22</span></span>
+            </div>
+            <span style="width:2px;height:16px;margin-right:4.5px;background:#fd6702"></span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:11px;height:11px;flex:none;border-radius:50%;background:#fd6702"></span>
+              <span style="white-space:nowrap;font:700 13px Tajawal,system-ui,sans-serif">قيد التحضير<span style="margin-right:8px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">10:27</span></span>
+            </div>
+            <span style="width:2px;height:16px;margin-right:4.5px;background:#fd6702"></span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:11px;height:11px;flex:none;border-radius:50%;background:#fd6702"></span>
+              <span style="white-space:nowrap;font:700 13px Tajawal,system-ui,sans-serif">الكابتن في الطريق<span style="margin-right:8px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">10:41</span></span>
+            </div>
+            <span style="width:2px;height:16px;margin-right:4.5px;background:rgba(29,26,23,.12)"></span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:11px;height:11px;flex:none;border-radius:50%;background:rgba(29,26,23,.15)"></span>
+              <span style="white-space:nowrap;font:600 13px Tajawal,system-ui,sans-serif;color:#9a938c">تم التوصيل</span>
+            </div>
+          </div>
+          <div style="margin-top:18px;display:flex;align-items:center;gap:12px;padding:12px;border-radius:20px;background:#f7f4f1">
+            <div style="position:relative;width:46px;height:46px;flex:none">
+              <image-slot id="jh-driver" shape="circle" placeholder="صورة"></image-slot>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font:800 14px Tajawal,system-ui,sans-serif">حيدر كريم</div>
+              <div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">دراجة · ABJ 4471</div>
+            </div>
+            <button style="width:40px;height:40px;border:none;border-radius:14px;background:#fd6702;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;font-variation-settings:'FILL' 1">call</span></button>
+          </div>
+          <button data-sheet-close style="margin-top:14px;width:100%;height:50px;border:none;border-radius:17px;background:#1d1a17;color:#fff;font:800 14.5px Tajawal,system-ui,sans-serif;cursor:pointer" style-hover="background:#3a352f">حسناً، شكراً</button>
+        </div>
+      </div>
+
+      <div style="position:absolute;top:11px;right:50%;transform:translateX(50%);z-index:8;width:112px;height:33px;border-radius:18px;background:#0a0b0d"></div>
+    </div>
+  </div>
+
+  <p style="margin:0;font:500 12.5px/1.7 Tajawal,system-ui,sans-serif;color:#8a837c;text-align:center;max-width:430px">التبويبات، التصنيفات، البحث، القلب، السلة وبطاقة التتبع كلها تعمل. اسحب صورك الحقيقية إلى المساحات المخصصة للصور.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:520,&quot;height&quot;:1080},&quot;showOrderCard&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;autoPromo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const ORANGE = '#e2620a';
+const MUTED = '#9a938c';
+
+class Component extends DCLogic {
+  state = {tab:'home', cat:'all', q:''};
+
+  componentDidMount(){
+    this.bind();
+    this.sync();
+    this.promo = 0;
+    if (this.props.autoPromo !== false)
+      this.timer = setInterval(() => this.rotate(), 4200);
+  }
+  componentDidUpdate(){ this.sync(); }
+  componentWillUnmount(){ clearInterval(this.timer); }
+
+  q(sel){ return this.el ? Array.from(this.el.querySelectorAll(sel)) : []; }
+  one(sel){ return this.el ? this.el.querySelector(sel) : null; }
+
+  bind(){
+    if (!this.el || this.bound) return;
+    this.bound = true;
+    this.q('[data-tab-btn]').forEach(b => b.addEventListener('click', () => {
+      this.setState({tab: b.getAttribute('data-tab-btn')});
+      const sc = this.one('[data-scroll]'); if (sc) sc.scrollTop = 0;
+    }));
+    this.q('[data-cat]').forEach(b => b.addEventListener('click', () => this.setState({cat: b.getAttribute('data-cat')})));
+    const input = this.one('[data-search]');
+    if (input) input.addEventListener('input', e => this.setState({q: e.target.value.trim()}));
+    this.q('[data-svc]').forEach(b => b.addEventListener('click', () => {
+      this.q('[data-svc]').forEach(o => {
+        const on = o === b;
+        o.style.background = on ? '#fff' : 'transparent';
+        o.style.color = on ? ORANGE : 'rgba(255,255,255,.9)';
+        o.style.fontWeight = on ? 800 : 700;
+      });
+    }));
+    this.q('[data-fav-btn]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      const on = b.getAttribute('data-on') !== '1';
+      b.setAttribute('data-on', on ? '1' : '0');
+      b.style.color = on ? '#e5342b' : MUTED;
+      const ico = b.querySelector('span');
+      if (ico) ico.style.fontVariationSettings = on ? "'FILL' 1" : "'FILL' 0";
+      b.style.animation = 'none'; void b.offsetWidth;
+      b.style.animation = 'jh-bump .38s ease';
+      this.renderFavs();
+    }));
+    this.q('[data-add]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      const badge = this.one('[data-cart-count]');
+      if (badge){
+        badge.textContent = String((parseInt(badge.textContent, 10) || 0) + 1);
+        badge.style.animation = 'none'; void badge.offsetWidth;
+        badge.style.animation = 'jh-bump .4s ease';
+      }
+    }));
+    const open = () => { const s = this.one('[data-sheet]'); if (s) s.style.display = 'block'; };
+    const card = this.one('[data-order-card]');
+    if (card) card.addEventListener('click', open);
+    this.q('[data-sheet-open]').forEach(b => b.addEventListener('click', open));
+    this.q('[data-sheet-close]').forEach(b => b.addEventListener('click', () => {
+      const s = this.one('[data-sheet]'); if (s) s.style.display = 'none';
+    }));
+    const cta = this.one('[data-promo-cta]');
+    if (cta) cta.addEventListener('click', () => this.rotate());
+  }
+
+  rotate(){
+    const slides = [
+      ['في غضون 20 دقيقة إلى بابك', 'توصيل سريع لوجباتك المفضلة'],
+      ['خصم 30% على أول طلب', 'استخدم الرمز JIBLI30 عند الدفع'],
+      ['توصيل مجاني هذا الأسبوع', 'على كل الطلبات فوق 15,000 د.ع']
+    ];
+    this.promo = ((this.promo || 0) + 1) % slides.length;
+    const t = this.one('[data-promo-title]'), s = this.one('[data-promo-sub]');
+    if (t){ t.textContent = slides[this.promo][0]; t.style.animation = 'none'; void t.offsetWidth; t.style.animation = 'jh-in .45s ease'; }
+    if (s) s.textContent = slides[this.promo][1];
+    this.q('[data-dot]').forEach(d => {
+      const on = Number(d.getAttribute('data-dot')) === this.promo;
+      d.style.width = on ? '16px' : '5px';
+      d.style.background = on ? '#fff' : 'rgba(255,255,255,.45)';
+    });
+  }
+
+  renderFavs(){
+    const list = this.one('[data-fav-list]'), empty = this.one('[data-fav-empty]');
+    if (!list) return;
+    const favs = this.q('[data-fav-btn][data-on="1"]').map(b => {
+      const card = b.closest('[data-card]');
+      return card ? {name: card.querySelector('div[style*="800 14.5px"]').textContent,
+                     tag: card.querySelectorAll('div[style*="11.5px"]')[0].textContent} : null;
+    }).filter(Boolean);
+    list.innerHTML = favs.map(f => '<div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:20px;background:#fff">'
+      + '<span style="width:46px;height:46px;flex:none;border-radius:15px;background:rgba(253,103,2,.1);color:#e2620a;display:flex;align-items:center;justify-content:center"><span style="font-family:\'Material Symbols Rounded\';font-size:22px;line-height:1;font-variation-settings:\'FILL\' 1">storefront</span></span>'
+      + '<div style="flex:1;min-width:0"><div style="font:800 14px Tajawal,system-ui,sans-serif">' + f.name + '</div>'
+      + '<div style="margin-top:2px;font:500 11.5px Tajawal,system-ui,sans-serif;color:#8a837c">' + f.tag + '</div></div>'
+      + '<span style="font-family:\'Material Symbols Rounded\';font-size:20px;line-height:1;color:#e5342b;font-variation-settings:\'FILL\' 1">favorite</span></div>').join('');
+    list.style.display = favs.length ? 'flex' : 'none';
+    if (empty) empty.style.display = favs.length ? 'none' : 'block';
+  }
+
+  sync(){
+    if (!this.el) return;
+    const {tab, cat} = this.state, q = (this.state.q || '').toLowerCase();
+
+    this.q('[data-tab-panel]').forEach(p => {
+      p.style.display = p.getAttribute('data-tab-panel') === tab ? 'block' : 'none';
+    });
+    this.q('[data-tab-btn]').forEach(b => {
+      const on = b.getAttribute('data-tab-btn') === tab;
+      const ico = b.querySelector('[data-nav-ico]'), lab = b.querySelector('[data-nav-label]');
+      if (ico){
+        ico.style.background = on ? 'rgba(253,103,2,.12)' : 'transparent';
+        ico.style.color = on ? ORANGE : MUTED;
+        const g = ico.querySelector('span');
+        if (g) g.style.fontVariationSettings = on ? "'FILL' 1" : "'FILL' 0";
+      }
+      if (lab){ lab.style.color = on ? ORANGE : MUTED; lab.style.fontWeight = on ? 800 : 600; }
+    });
+    this.q('[data-home-only]').forEach(n => { n.style.display = tab === 'home' ? (n.getAttribute('data-home-only') || 'block') : 'none'; });
+    const header = this.one('[data-header]');
+    if (header) header.style.borderRadius = tab === 'home' ? '0 0 30px 30px' : '0 0 24px 24px';
+
+    this.q('[data-cat]').forEach(b => {
+      const on = b.getAttribute('data-cat') === cat;
+      const ico = b.querySelector('[data-cat-ico]'), lab = b.querySelector('[data-cat-label]');
+      if (ico){
+        ico.style.background = on ? 'linear-gradient(160deg,#ff8a14,#f05002)' : '#fff';
+        ico.style.color = on ? '#fff' : ORANGE;
+        ico.style.boxShadow = on ? '0 10px 20px -10px rgba(202,73,2,.85)' : '0 8px 18px -12px rgba(60,30,4,.5)';
+      }
+      if (lab){ lab.style.color = on ? ORANGE : '#6d6660'; lab.style.fontWeight = on ? 800 : 500; }
+    });
+
+    let shown = 0;
+    this.q('[data-card]').forEach(c => {
+      const okCat = cat === 'all' || c.getAttribute('data-cat') === cat;
+      const okQ = !q || (c.getAttribute('data-name') || '').toLowerCase().indexOf(q) >= 0;
+      const vis = okCat && okQ;
+      c.style.display = vis ? 'block' : 'none';
+      if (vis) shown++;
+    });
+    const empty = this.one('[data-empty]');
+    if (empty) empty.style.display = shown ? 'none' : 'block';
+    const cards = this.one('[data-cards]');
+    if (cards) cards.style.display = shown ? 'flex' : 'none';
+
+    const order = this.one('[data-order-card]');
+    if (order) order.style.display = (this.props.showOrderCard === false || tab === 'orders') ? 'none' : 'flex';
+  }
+
+  renderVals(){ return { setRoot: el => { this.el = el; this.bind(); } }; }
+}
+</script>
+</body>
+</html>

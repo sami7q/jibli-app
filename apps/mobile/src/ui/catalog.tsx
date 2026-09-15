@@ -92,7 +92,10 @@ export function SearchBar({
   onFilterPress,
   style,
   ...props
-}: TextInputProps & { onFilterPress?: () => void; style?: StyleProp<ViewStyle> }) {
+  // `Omit` because TextInputProps carries its own `style`, a TextStyle for the
+  // field. The one here dresses the container around it, and an intersection of
+  // the two is a type nothing can satisfy.
+}: Omit<TextInputProps, 'style'> & { onFilterPress?: () => void; style?: StyleProp<ViewStyle> }) {
   return (
     <Row
       gap={space[2]}
@@ -624,7 +627,17 @@ export function PromoBanner({
          * matching itself across devices.
          */
         ...(fullBleed ? { aspectRatio: 16 / 9 } : { height: 164 }),
-        borderRadius: fullBleed ? 0 : radius['2xl'],
+        /*
+         * Inset and rounded, even full-bleed.
+         *
+         * It ran to both edges with square corners, which reads as a strip
+         * pasted across the screen rather than as the one paid placement on
+         * it. Drawing it as a card — deep corners, a real shadow — gives the
+         * artwork a frame and gives the screen a top edge that is not a hard
+         * line. 26 matches the header's own corner, so the two curves rhyme
+         * down the page instead of arguing.
+         */
+        borderRadius: fullBleed ? 26 : radius['2xl'],
         overflow: 'hidden',
         backgroundColor: color.brand,
       }}

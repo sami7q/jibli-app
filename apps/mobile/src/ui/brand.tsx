@@ -27,69 +27,112 @@ import { BRAND, palette } from '@/theme';
  * the letter's position is in its own path data, where it already was.
  */
 /**
- * The strokes of the mark, left to right, without the pin.
+ * The mark, in the eight pieces the entrance moves independently.
  *
- * Every stroke keeps the whole 340×160 viewBox and its own coordinates inside
- * it, which is what lets the animated version stack them and have each land
- * exactly where the single drawing puts it. No offsets to keep in sync: the
- * letter's position is in its own path data, where it already was.
+ * Each piece keeps the whole 340×160 viewBox and its own coordinates inside it,
+ * which is what lets the animated version stack them and have each land exactly
+ * where the single drawing puts it. No offsets to keep in sync: a piece's
+ * position is in its own path data, where it already was.
  *
- * The pin is not among them. It is drawn separately below, because in the
- * animation it is not a letter — it is the last thing to arrive.
+ * The i's are split from their dots and the J from its pin because the
+ * entrance treats them differently — the strokes fly in from the sides, the
+ * dots and the pin fall from above. `order` is the wordmark's reading order,
+ * which is also the order they arrive in.
  */
-const STROKES: readonly ((tint: string) => React.ReactNode)[] = [
-  // J — the hook, without its dot
-  (tint) => (
-    <Path
-      d="M 72 88 L 88 88 L 88 120 C 88 136 76 148 56 148 C 36 148 24 135 24 122 C 24 116.5 28.5 112 34 112 C 39.5 112 43 116 48 120 C 51 122.5 55 124 59 124 C 67 124 72 118 72 110 L 72 88 Z"
-      fill={tint}
-    />
-  ),
-  // i
-  (tint) => (
-    <G>
-      <Circle cx={118} cy={62} r={9} fill={tint} />
-      <Rect x={109} y={80} width={18} height={65} rx={9} fill={tint} />
-    </G>
-  ),
-  // b
-  (tint) => (
-    <G>
-      <Rect x={144} y={30} width={18} height={115} rx={9} fill={tint} />
-      <Path
-        d="M 160 81 C 168 76 178 73 190 73 C 213 73 229 90 229 113 C 229 135 212 150 188 150 C 176 150 166 145 158 138 L 158 81 Z M 162 113 C 162 125 172 133 186 133 C 199 133 210 124 210 112 C 210 99 199 90 186 90 C 172 90 162 99 162 113 Z"
-        fill={tint}
-        fillRule="evenodd"
-      />
-    </G>
-  ),
-  // l
-  (tint) => <Rect x={245} y={30} width={18} height={115} rx={9} fill={tint} />,
-  // i
-  (tint) => (
-    <G>
-      <Circle cx={288} cy={62} r={9} fill={tint} />
-      <Rect x={279} y={80} width={18} height={65} rx={9} fill={tint} />
-    </G>
-  ),
-];
+const PARTS: readonly { key: PartKey; draw: (tint: string, pinTint: string) => React.ReactNode }[] =
+  [
+    // J — the hook, without its dot
+    {
+      key: 'j',
+      draw: (tint) => (
+        <Path
+          d="M 72 88 L 88 88 L 88 120 C 88 136 76 148 56 148 C 36 148 24 135 24 122 C 24 116.5 28.5 112 34 112 C 39.5 112 43 116 48 120 C 51 122.5 55 124 59 124 C 67 124 72 118 72 110 L 72 88 Z"
+          fill={tint}
+        />
+      ),
+    },
+    { key: 'i1', draw: (tint) => <Rect x={109} y={80} width={18} height={65} rx={9} fill={tint} /> },
+    { key: 'i1dot', draw: (tint) => <Circle cx={118} cy={62} r={9} fill={tint} /> },
+    {
+      key: 'b',
+      draw: (tint) => (
+        <G>
+          <Rect x={144} y={30} width={18} height={115} rx={9} fill={tint} />
+          <Path
+            d="M 160 81 C 168 76 178 73 190 73 C 213 73 229 90 229 113 C 229 135 212 150 188 150 C 176 150 166 145 158 138 L 158 81 Z M 162 113 C 162 125 172 133 186 133 C 199 133 210 124 210 112 C 210 99 199 90 186 90 C 172 90 162 99 162 113 Z"
+            fill={tint}
+            fillRule="evenodd"
+          />
+        </G>
+      ),
+    },
+    { key: 'l', draw: (tint) => <Rect x={245} y={30} width={18} height={115} rx={9} fill={tint} /> },
+    { key: 'i2', draw: (tint) => <Rect x={279} y={80} width={18} height={65} rx={9} fill={tint} /> },
+    { key: 'i2dot', draw: (tint) => <Circle cx={288} cy={62} r={9} fill={tint} /> },
+    {
+      // The pin — the J's dot, and the whole idea of the mark. «جيبلي» is
+      // "bring it to me", and what makes the wordmark mean that rather than
+      // merely spell it is that the J is dotted with a map pin. It arrives last.
+      key: 'pin',
+      draw: (tint, pinTint) => (
+        <G>
+          <Path
+            d="M 58 48 C 58 35.85 67.85 26 80 26 C 92.15 26 102 35.85 102 48 C 102 59.5 86 78 80 84 C 74 78 58 59.5 58 48 Z"
+            fill={tint}
+          />
+          <Circle cx={80} cy={47} r={6.5} fill={pinTint} />
+        </G>
+      ),
+    },
+  ];
+
+type PartKey = 'j' | 'i1' | 'i1dot' | 'b' | 'l' | 'i2' | 'i2dot' | 'pin';
 
 /**
- * The pin — the J's dot, and the whole idea of the mark.
+ * Where each piece starts, and when it sets off.
  *
- * «جيبلي» is "bring it to me", and the thing that makes the wordmark mean that
- * rather than just spell it is that the J is dotted with a map pin. In the
- * animation it is therefore not a letter among five: it is the arrival. The
- * strokes assemble, and then the pin drops onto the word and settles.
+ * Transcribed from the motion study rather than invented here, so the app and
+ * the design agree frame for frame. `dx`/`dy` are fractions of the mark's own
+ * width, not pixels — the study was drawn at one size and this renders at
+ * several, and a pixel offset would make the J fly in from off-screen on a
+ * phone and from the middle of the logo on a tablet.
+ *
+ * The shape of it: the five strokes glide in from far out to the left and
+ * right and settle into the word; then both i-dots drop onto their stems; then
+ * the pin falls from higher still and lands on the J. Nothing overlaps by
+ * accident — the dots begin only once the strokes have nearly stopped, so the
+ * eye reads three separate events rather than one blur.
  */
-const PIN = (tint: string, pinTint: string) => (
-  <G>
-    <Path
-      d="M 58 48 C 58 35.85 67.85 26 80 26 C 92.15 26 102 35.85 102 48 C 102 59.5 86 78 80 84 C 74 78 58 59.5 58 48 Z"
-      fill={tint}
-    />
-    <Circle cx={80} cy={47} r={6.5} fill={pinTint} />
-  </G>
+interface Flight {
+  readonly dx: number;
+  readonly dy: number;
+  readonly rotate: number;
+  readonly scale: number;
+  readonly delay: number;
+  readonly duration: number;
+  readonly ease: 'glide' | 'spring';
+}
+
+const FLIGHT: Record<PartKey, Flight> = {
+  j: { dx: -1.372, dy: 0.058, rotate: -7, scale: 0.92, delay: 0, duration: 1050, ease: 'glide' },
+  i1: { dx: -1.04, dy: 0.031, rotate: -5, scale: 0.92, delay: 100, duration: 1020, ease: 'glide' },
+  b: { dx: 1.195, dy: -0.04, rotate: 6, scale: 0.92, delay: 50, duration: 1050, ease: 'glide' },
+  l: { dx: 1.549, dy: -0.022, rotate: 5, scale: 0.92, delay: 150, duration: 1020, ease: 'glide' },
+  i2: { dx: 1.726, dy: -0.013, rotate: 4, scale: 0.92, delay: 200, duration: 1000, ease: 'glide' },
+  i1dot: { dx: 0, dy: -0.73, rotate: 0, scale: 0.8, delay: 620, duration: 700, ease: 'spring' },
+  i2dot: { dx: 0, dy: -0.73, rotate: 0, scale: 0.8, delay: 700, duration: 700, ease: 'spring' },
+  pin: { dx: 0, dy: -1.239, rotate: 0, scale: 0.68, delay: 840, duration: 860, ease: 'spring' },
+};
+
+/** The study's two curves, by name, so the numbers stay legible. */
+const EASING = {
+  glide: Easing.bezier(0.16, 1, 0.3, 1),
+  spring: Easing.bezier(0.34, 1.5, 0.5, 1),
+} as const;
+
+/** When the last piece has landed. Everything after the mark waits for this. */
+const MARK_SETTLED_MS = Math.max(
+  ...Object.values(FLIGHT).map((flight) => flight.delay + flight.duration),
 );
 
 /**
@@ -160,26 +203,64 @@ function useEntrance(config: {
   return progress;
 }
 
-/** One stroke of the mark arriving: up a little, into focus. */
-function Rise({
+/**
+ * One piece of the mark, flying to its place.
+ *
+ * Native-driven, and that is not a detail: this runs while the session
+ * resolves and the storefront fetches, and eight pieces animating on the JS
+ * thread would stutter on exactly the screen that forms the first impression.
+ * `react-native-svg` cannot hand its own props to the native driver, so the
+ * transform lives on an `Animated.View` wrapping a full-canvas `Svg`.
+ */
+function Fly({
   children,
-  delay,
+  flight,
+  width,
   style,
 }: {
   children: React.ReactNode;
-  delay: number;
+  flight: Flight;
+  /** The mark's rendered width — what `dx`/`dy` are fractions of. */
+  width: number;
   style?: React.ComponentProps<typeof Animated.View>['style'];
 }) {
-  const progress = useEntrance({ delay, duration: 300, easing: Easing.out(Easing.cubic) });
+  const progress = useEntrance({
+    delay: flight.delay,
+    duration: flight.duration,
+    easing: EASING[flight.ease],
+  });
 
   return (
     <Animated.View
       style={[
         style,
         {
-          opacity: progress,
+          opacity: progress.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }),
           transform: [
-            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+            {
+              translateX: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [flight.dx * width, 0],
+              }),
+            },
+            {
+              translateY: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [flight.dy * width, 0],
+              }),
+            },
+            {
+              rotate: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [`${flight.rotate}deg`, '0deg'],
+              }),
+            },
+            {
+              scale: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [flight.scale, 1],
+              }),
+            },
           ],
         },
       ]}
@@ -190,37 +271,87 @@ function Rise({
 }
 
 /**
- * The pin, falling onto the word.
+ * The light behind the mark as it closes.
  *
- * It comes from well above the mark and overshoots slightly on landing, which
- * is what makes it read as dropped rather than faded in. `Easing.bounce` is
- * too much — a logo that bounces twice looks like a mistake — so this is a
- * single soft overshoot.
+ * It expands and fades once, timed to finish as the pin lands, so the word
+ * arrives with a breath of light behind it rather than against flat colour.
+ * The one purely decorative element here, and it earns its place by being over
+ * in under a second and never repeating.
  */
-function Drop({
-  children,
-  delay,
-  style,
-}: {
-  children: React.ReactNode;
-  delay: number;
-  style?: React.ComponentProps<typeof Animated.View>['style'];
-}) {
-  const progress = useEntrance({ delay, duration: 460, easing: Easing.out(Easing.back(2.2)) });
+function Glow({ size, delay }: { size: number; delay: number }) {
+  const progress = useEntrance({ delay, duration: 1150, easing: Easing.out(Easing.quad) });
 
   return (
     <Animated.View
-      style={[
-        style,
-        {
-          // Opaque early in the fall, so it is a pin dropping rather than a
-          // shape fading in while it happens to move.
-          opacity: progress.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 1, 1] }),
-          transform: [
-            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [-44, 0] }) },
-          ],
-        },
-      ]}
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: 'rgba(255,255,255,0.14)',
+        opacity: progress.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0.9, 0] }),
+        transform: [
+          { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1.6] }) },
+        ],
+      }}
+    />
+  );
+}
+
+/**
+ * The mark breathing, once it has settled.
+ *
+ * A slow seven-pixel rise and fall, forever. It is what keeps the screen from
+ * looking frozen while the session resolves behind it — the difference between
+ * "waiting" and "stuck" is whether anything on screen is alive.
+ */
+function Float({
+  children,
+  delay,
+  enabled,
+}: {
+  children: React.ReactNode;
+  delay: number;
+  enabled: boolean;
+}) {
+  const drift = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReduceMotion();
+
+  useEffect(() => {
+    if (!enabled || reduceMotion) {
+      drift.setValue(0);
+      return;
+    }
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drift, {
+          toValue: 1,
+          duration: 2300,
+          delay,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(drift, {
+          toValue: 0,
+          duration: 2300,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [drift, delay, enabled, reduceMotion]);
+
+  return (
+    <Animated.View
+      style={{
+        transform: [
+          { translateY: drift.interpolate({ inputRange: [0, 1], outputRange: [0, -7] }) },
+        ],
+      }}
     >
       {children}
     </Animated.View>
@@ -232,6 +363,7 @@ export function JibliWordmark({
   tint = palette.white,
   pinTint = BRAND[500],
   animate = false,
+  idle = true,
 }: {
   width?: number;
   /** The letterforms. White on the brand ground, brand on white. */
@@ -239,7 +371,7 @@ export function JibliWordmark({
   /** The dot inside the pin — it has to match whatever is behind the mark. */
   pinTint?: string;
   /**
-   * Letter by letter, once, on mount.
+   * Assemble on mount, piece by piece.
    *
    * Off by default and deliberately so. The mark appears in a header on most
    * screens, where a logo that assembles itself every time is a thing to sit
@@ -247,70 +379,70 @@ export function JibliWordmark({
    * which nobody arrives at twice in a row.
    */
   animate?: boolean;
+  /** Keep the settled mark breathing. Only meaningful with `animate`. */
+  idle?: boolean;
 }) {
   const height = (width * 160) / 340;
 
   if (!animate) {
     return (
       <Svg width={width} height={height} viewBox="0 0 340 160" accessibilityLabel="Jibli">
-        {STROKES.map((stroke, index) => (
-          <G key={index}>{stroke(tint)}</G>
+        {PARTS.map((part) => (
+          <G key={part.key}>{part.draw(tint, pinTint)}</G>
         ))}
-        {PIN(tint, pinTint)}
       </Svg>
     );
   }
 
   /*
-   * The mark writes itself, and then the pin lands on it.
+   * The word gathers itself, then the pin lands on it.
    *
-   * The strokes arrive in reading order — J, i, b, l, i — each rising a few
-   * pixels into place, 90ms apart. That is the part that reads as writing: a
-   * word appearing the way a word is written, rather than five things fading
-   * in at once. Then the pin drops from above onto the J and settles with a
-   * small bounce, which is the only flourish and the one worth having: the
-   * pin *is* the mark's idea, so the entrance ends on the thing the logo is
-   * about rather than on a generic sweep.
+   * Five strokes glide in from far off to either side and settle into place;
+   * the two i-dots drop onto their stems; the pin falls from higher still and
+   * lands on the J with a single soft overshoot. Then the whole mark breathes.
    *
-   * Stacked drawings rather than animated `<G>` elements. `react-native-svg`
-   * cannot hand its props to the native driver, so animating a group would run
-   * the whole entrance on the JS thread — which on this screen is busy
-   * resolving a session and fetching a storefront, and a logo that stutters
-   * while it assembles is worse than one that simply appears. An
-   * `Animated.View` per stroke is native-driven, and because each stroke keeps
-   * the full viewBox they register exactly.
+   * Timings and offsets are the study's, in `FLIGHT` above, so this and the
+   * design move identically. The one thing not carried across is the motion
+   * blur on the incoming strokes — React Native has no per-element blur
+   * without a native library, and the entrance reads correctly without it.
    */
   return (
-    <View style={{ width, height }} accessible accessibilityRole="image" accessibilityLabel="Jibli">
-      {STROKES.map((stroke, index) => (
-        <Rise key={index} delay={index * STROKE_STEP} style={StyleSheet.absoluteFill}>
-          <Svg width={width} height={height} viewBox="0 0 340 160">
-            {stroke(tint)}
-          </Svg>
-        </Rise>
-      ))}
+    <Float delay={MARK_SETTLED_MS + 500} enabled={idle}>
+      <View
+        style={{ width, height, alignItems: 'center', justifyContent: 'center' }}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel="Jibli"
+      >
+        <Glow size={width * 1.5} delay={MARK_SETTLED_MS - 280} />
 
-      <Drop delay={STROKES.length * STROKE_STEP + 90} style={StyleSheet.absoluteFill}>
-        <Svg width={width} height={height} viewBox="0 0 340 160">
-          {PIN(tint, pinTint)}
-        </Svg>
-      </Drop>
-    </View>
+        {PARTS.map((part) => (
+          <Fly
+            key={part.key}
+            flight={FLIGHT[part.key]}
+            width={width}
+            style={StyleSheet.absoluteFill}
+          >
+            <Svg width={width} height={height} viewBox="0 0 340 160">
+              {part.draw(tint, pinTint)}
+            </Svg>
+          </Fly>
+        ))}
+      </View>
+    </Float>
   );
 }
 
-/** How far apart the strokes land. Long enough to read as a sequence. */
-const STROKE_STEP = 90;
-
 /**
- * How long the whole entrance takes, so a screen can wait for it.
+ * How long the entrance takes, so a screen can wait it out.
  *
  * Exported because the welcome screen brings its tagline and buttons in after
- * the mark has finished — «until it completes, then enter» — and a screen
- * timing that by a number copied from here would drift the first time this
- * changes.
+ * the mark has finished — the word completes, and only then is there something
+ * to press. A screen timing that by a number copied from here would drift the
+ * first time this changes.
  */
-export const WORDMARK_ENTRANCE_MS = STROKES.length * STROKE_STEP + 90 + 460;
+export const WORDMARK_ENTRANCE_MS = MARK_SETTLED_MS;
+
 
 
 /**

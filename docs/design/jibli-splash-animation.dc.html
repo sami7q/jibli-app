@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0}
+body{background:#f4f2ef}
+a{color:#d94f00;text-decoration:none}
+a:hover{color:#a63c00}
+@keyframes jb-fly{from{transform:translate3d(var(--dx,0px),var(--dy,0px),0) rotate(var(--rot,0deg)) scale(var(--sc,1));opacity:var(--o0,0);filter:blur(var(--bl,0px))}to{transform:translate3d(0,0,0) rotate(0deg) scale(1);opacity:1;filter:blur(0px)}}
+@keyframes jb-rise{from{transform:translate3d(0,22px,0);opacity:0}to{transform:translate3d(0,0,0);opacity:1}}
+@keyframes jb-pulse{0%{transform:scale(.55);opacity:0}40%{opacity:.9}100%{transform:scale(1.6);opacity:0}}
+@keyframes jb-float{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-7px,0)}}
+@keyframes jb-bgin{from{opacity:0;transform:scale(1.06)}to{opacity:1;transform:scale(1)}}
+</style>
+</helmet>
+<div dir="rtl" data-el="page" ref="{{ setRoot }}" style="min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:26px;padding:38px 20px 54px;background:#f4f2ef;font-family:Tajawal,system-ui,sans-serif;color:#1d1a17">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;max-width:460px">
+    <div data-el="eyebrow" style="font:500 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;color:#c2521a;text-transform:uppercase">Jibli · splash</div>
+    <h1 style="margin:0;font:700 27px/1.3 Tajawal,system-ui,sans-serif;white-space:nowrap">أنيميشن الدخول</h1>
+    <p style="margin:0;font:400 14.5px/1.6 Tajawal,system-ui,sans-serif;color:#6d6660;text-wrap:pretty">الأحرف تنطلق متفرقة ثم تلتقي في الوسط، ينزل الدبوس أخيراً بنبضة خفيفة، ثم يظهر الشعار الفرعي.</p>
+  </div>
+
+  <div data-el="phone" style="position:relative;width:360px;height:792px;flex:none;padding:12px;box-sizing:border-box;border-radius:56px;background:linear-gradient(160deg,#3a3d44,#15171b 35%,#101216 70%,#2c2f35);box-shadow:0 34px 70px -24px rgba(24,14,4,.55),0 4px 14px rgba(0,0,0,.18)">
+    <div data-el="screen" onClick="{{ replay }}" style="position:relative;width:336px;height:768px;overflow:hidden;border-radius:45px;background:#fd6702;cursor:pointer">
+      <div data-el="stage" style="position:absolute;left:0;top:0;width:730px;height:1669px;transform:scale(.46);transform-origin:top left">
+        <div data-el="bg" style="position:absolute;inset:0;background:linear-gradient(180deg,#f07a01 0%,#fd7c02 10%,#fe7002 20%,#fd6702 30%,#fd6102 40%,#fd5c01 50%,#fe5901 60%,#fc5602 70%,#fd5302 80%,#fc5201 90%,#ff5904 100%)"></div>
+        <img data-el="doodles" src="assets/doodles.png" alt="" style="position:absolute;left:0;top:0;width:730px;height:1669px;pointer-events:none">
+        <div data-el="glow" style="position:absolute;left:115px;top:390px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.5) 0%,rgba(255,255,255,.14) 42%,rgba(255,255,255,0) 68%);opacity:0;pointer-events:none"></div>
+        <div data-el="mark" style="position:absolute;left:0;top:0;width:730px;height:1669px">
+          <img data-lt="j" src="assets/j.png" alt="J" style="position:absolute;left:133px;top:573px;width:131px;height:173px">
+          <img data-lt="i1" src="assets/i1.png" alt="i" style="position:absolute;left:279px;top:615px;width:44px;height:130px">
+          <img data-lt="i1dot" src="assets/i1dot.png" alt="" style="position:absolute;left:280px;top:572px;width:42px;height:41px">
+          <img data-lt="b" src="assets/b.png" alt="b" style="position:absolute;left:336px;top:571px;width:137px;height:175px">
+          <img data-lt="l" src="assets/l.png" alt="l" style="position:absolute;left:483px;top:571px;width:43px;height:174px">
+          <img data-lt="i2" src="assets/i2.png" alt="i" style="position:absolute;left:541px;top:615px;width:44px;height:130px">
+          <img data-lt="i2dot" src="assets/i2dot.png" alt="" style="position:absolute;left:542px;top:571px;width:42px;height:41px">
+          <img data-lt="pin" src="assets/pin.png" alt="" style="position:absolute;left:225px;top:500px;width:78px;height:102px">
+        </div>
+        <img data-el="tag" src="assets/tagline.png" alt="جيبلي اللي تريده" style="position:absolute;left:173px;top:790px;width:378px;height:67px">
+        <img data-el="foot" src="assets/foot1.png" alt="مذاق أقرب لك" style="position:absolute;left:256px;top:1485px;width:214px;height:48px">
+        <div data-el="foot2" style="position:absolute;left:242px;top:1556px;width:241px;height:38px">
+          <img src="assets/foot2.png" alt="Made for Iraq" style="position:absolute;left:0;top:0;width:193px;height:38px">
+          <img src="assets/flag.png" alt="" style="position:absolute;left:202px;top:4px;width:39px;height:19px;border-radius:2px">
+        </div>
+      </div>
+      <div style="position:absolute;top:13px;left:50%;transform:translateX(-50%);width:100px;height:29px;border-radius:16px;background:#0a0b0d"></div>
+    </div>
+  </div>
+
+  <div data-el="controls" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+    <div style="display:flex;gap:8px">
+      <button data-chip="gather" onClick="{{ pickGather }}" style="font:700 14px Tajawal,system-ui,sans-serif;padding:10px 20px;border:1px solid rgba(29,26,23,.14);border-radius:999px;background:#fff;color:#1d1a17;cursor:pointer;transition:all .18s ease">تجمّع</button>
+      <button data-chip="drop" onClick="{{ pickDrop }}" style="font:700 14px Tajawal,system-ui,sans-serif;padding:10px 20px;border:1px solid rgba(29,26,23,.14);border-radius:999px;background:#fff;color:#1d1a17;cursor:pointer;transition:all .18s ease">هبوط</button>
+      <button data-chip="unfold" onClick="{{ pickUnfold }}" style="font:700 14px Tajawal,system-ui,sans-serif;padding:10px 20px;border:1px solid rgba(29,26,23,.14);border-radius:999px;background:#fff;color:#1d1a17;cursor:pointer;transition:all .18s ease">توسّع</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <button onClick="{{ replay }}" style="font:700 13.5px Tajawal,system-ui,sans-serif;padding:9px 18px;border:none;border-radius:999px;background:#1d1a17;color:#fff;cursor:pointer" style-hover="background:#3a352f;transform:translateY(-1px)">إعادة التشغيل</button>
+      <label style="display:flex;align-items:center;gap:7px;font:500 13px Tajawal,system-ui,sans-serif;color:#6d6660;cursor:pointer">
+        <input data-el="loopbox" type="checkbox" onChange="{{ toggleLoop }}" style="width:15px;height:15px;accent-color:#e2620a;cursor:pointer">
+        تكرار
+      </label>
+      <span data-el="hint" style="font:400 12.5px Tajawal,system-ui,sans-serif;color:#9a938c">أو انقر على الشاشة</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:520,&quot;height&quot;:1060},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;gather&quot;,&quot;drop&quot;,&quot;unfold&quot;],&quot;default&quot;:&quot;gather&quot;,&quot;tsType&quot;:&quot;'gather'|'drop'|'unfold'&quot;},&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0.5,&quot;max&quot;:1.6,&quot;step&quot;:0.05,&quot;default&quot;:1,&quot;tsType&quot;:&quot;number&quot;},&quot;loop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;idleFloat&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showChrome&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const PARTS = [
+  {n:'j',     x:133, y:573, w:131, h:173},
+  {n:'i1',    x:279, y:615, w:44,  h:130},
+  {n:'i1dot', x:280, y:572, w:42,  h:41},
+  {n:'b',     x:336, y:571, w:137, h:175},
+  {n:'l',     x:483, y:571, w:43,  h:174},
+  {n:'i2',    x:541, y:615, w:44,  h:130},
+  {n:'i2dot', x:542, y:571, w:42,  h:41},
+  {n:'pin',   x:225, y:500, w:78,  h:102}
+];
+const GLIDE = 'cubic-bezier(.16,1,.3,1)';
+const SPRING = 'cubic-bezier(.34,1.5,.5,1)';
+
+// dx,dy,rot,scale,blur,delay,dur,ease
+const MOTION = {
+  gather: {
+    j:     [-620,  26, -7,  .92, 12, .00, 1.05, GLIDE],
+    i1:    [-470,  14, -5,  .92, 12, .10, 1.02, GLIDE],
+    b:     [ 540, -18,  6,  .92, 12, .05, 1.05, GLIDE],
+    l:     [ 700, -10,  5,  .92, 12, .15, 1.02, GLIDE],
+    i2:    [ 780,  -6,  4,  .92, 12, .20, 1.00, GLIDE],
+    i1dot: [   0,-330,  0,  .80,  4, .62,  .70, SPRING],
+    i2dot: [   0,-330,  0,  .80,  4, .70,  .70, SPRING],
+    pin:   [   0,-560,  0,  .68,  6, .84,  .86, SPRING]
+  },
+  drop: {
+    j:     [ -40,-760,-11,  .94, 10, .00, 1.00, SPRING],
+    i1:    [ -14,-660, -6,  .94, 10, .09,  .96, SPRING],
+    b:     [  18,-820,  9,  .94, 10, .18, 1.00, SPRING],
+    l:     [  12,-700,  6,  .94, 10, .27,  .96, SPRING],
+    i2:    [   8,-640,  4,  .94, 10, .34,  .94, SPRING],
+    i1dot: [   0,-300,  0,  .85,  4, .58,  .66, SPRING],
+    i2dot: [   0,-300,  0,  .85,  4, .64,  .66, SPRING],
+    pin:   [   0,-520,  0,  .70,  6, .78,  .86, SPRING]
+  }
+};
+
+class Component extends DCLogic {
+  state = {motion:null, loop:null};
+  get motion(){ return this.state.motion || this.props.motion || 'gather'; }
+  get loop(){ return this.state.loop === null ? (this.props.loop !== false) : this.state.loop; }
+  get speed(){ const s = Number(this.props.speed); return s > 0 ? s : 1; }
+
+  componentDidMount(){ this.sync(); this.play(); }
+  componentDidUpdate(){ this.sync(); }
+  componentWillUnmount(){ clearTimeout(this.t); }
+
+  q(sel){ return this.el ? Array.from(this.el.querySelectorAll(sel)) : []; }
+  one(sel){ return this.el ? this.el.querySelector(sel) : null; }
+
+  sync(){
+    const m = this.motion;
+    this.q('[data-chip]').forEach(b => {
+      const on = b.getAttribute('data-chip') === m;
+      b.style.background = on ? '#e2620a' : '#fff';
+      b.style.color = on ? '#fff' : '#1d1a17';
+      b.style.borderColor = on ? '#e2620a' : 'rgba(29,26,23,.14)';
+      b.style.boxShadow = on ? '0 6px 16px -8px rgba(226,98,10,.9)' : 'none';
+    });
+    const cb = this.one('[data-el="loopbox"]');
+    if (cb) cb.checked = this.loop;
+    const page = this.one('[data-el="page"]');
+    if (page){
+      const bare = this.props.showChrome === false;
+      page.querySelectorAll('[data-el="controls"]').forEach(n => n.style.display = bare ? 'none' : 'flex');
+      page.firstElementChild.style.display = bare ? 'none' : 'flex';
+    }
+  }
+
+  table(){
+    const m = this.motion;
+    if (MOTION[m]) return MOTION[m];
+    // unfold: every glyph starts stacked at the wordmark's centre, then spreads out
+    const cx = 356, cy = 660, t = {};
+    PARTS.forEach((p, i) => {
+      const dx = cx - (p.x + p.w/2), dy = cy - (p.y + p.h/2);
+      const rank = Math.abs(p.x + p.w/2 - cx) / 260;
+      t[p.n] = [dx*0.92, dy*0.92, 0, .42, 8, 0.06 + rank*0.30, 1.05, GLIDE];
+    });
+    t.pin = [cx - 264, cy - 551, -14, .3, 8, .78, .9, SPRING];
+    return t;
+  }
+
+  play(){
+    if (!this.el) return;
+    clearTimeout(this.t);
+    const sp = this.speed, t = this.table();
+    const anim = (el, name, dur, delay, ease, vars) => {
+      if (!el) return;
+      el.style.animation = 'none';
+      if (vars) for (const k in vars) el.style.setProperty(k, vars[k]);
+      void el.offsetWidth;
+      el.style.animation = name + ' ' + (dur/sp).toFixed(3) + 's ' + ease + ' ' + (delay/sp).toFixed(3) + 's both';
+    };
+    let last = 0;
+    this.q('[data-lt]').forEach(el => {
+      const c = t[el.getAttribute('data-lt')];
+      if (!c) return;
+      const [dx, dy, rot, sc, bl, delay, dur, ease] = c;
+      last = Math.max(last, delay + dur);
+      anim(el, 'jb-fly', dur, delay, ease, {
+        '--dx': dx + 'px', '--dy': dy + 'px', '--rot': rot + 'deg',
+        '--sc': sc, '--bl': bl + 'px', '--o0': 0
+      });
+    });
+    anim(this.one('[data-el="bg"]'), 'jb-bgin', .9, 0, 'ease-out');
+    anim(this.one('[data-el="doodles"]'), 'jb-fly', 1.5, .35, 'ease-out', {'--dx':'0px','--dy':'0px','--rot':'0deg','--sc':1.04,'--bl':'0px','--o0':0});
+    anim(this.one('[data-el="glow"]'), 'jb-pulse', 1.15, last - .28, 'ease-out');
+    anim(this.one('[data-el="tag"]'), 'jb-rise', .8, last + .06, GLIDE);
+    anim(this.one('[data-el="foot"]'), 'jb-rise', .8, last + .2, GLIDE);
+    anim(this.one('[data-el="foot2"]'), 'jb-rise', .8, last + .3, GLIDE);
+
+    const mark = this.one('[data-el="mark"]');
+    if (mark){
+      mark.style.animation = 'none';
+      void mark.offsetWidth;
+      if (this.props.idleFloat !== false)
+        mark.style.animation = 'jb-float 4.6s ease-in-out ' + ((last + .5)/sp).toFixed(2) + 's infinite';
+    }
+    const total = (last + 1.3)/sp;
+    if (this.loop) this.t = setTimeout(() => this.play(), (total + 1.5) * 1000);
+  }
+
+  set(motion){ this.setState({motion}, () => this.play()); }
+
+  renderVals(){
+    return {
+      setRoot: el => { this.el = el; },
+      pickGather: () => this.set('gather'),
+      pickDrop: () => this.set('drop'),
+      pickUnfold: () => this.set('unfold'),
+      replay: () => this.play(),
+      toggleLoop: e => {
+        const loop = e.target.checked;
+        this.setState({loop}, () => { clearTimeout(this.t); if (loop) this.play(); });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

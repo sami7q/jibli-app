@@ -3,6 +3,7 @@ import { FlatList, Image, Pressable, ScrollView, View, useWindowDimensions } fro
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import {
@@ -18,7 +19,7 @@ import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
 import { notify } from '@/lib/dialog';
-import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { BRAND, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
@@ -156,6 +157,8 @@ export default function HomeScreen() {
           setSearch('');
           backToChooser();
         }}
+        search={search}
+        onChangeSearch={setSearch}
       />
 
       {/*
@@ -170,17 +173,6 @@ export default function HomeScreen() {
        * Sixty milliseconds apart. Any slower and a returning customer, who
        * opens this ten times a day, starts waiting for it.
        */}
-      <Enter delay={40} style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
-        <SearchBar
-          value={search}
-          onChangeText={setSearch}
-          placeholder={vertical === 'MARKET' ? 'ابحث عن منتج أو ماركت…' : 'ابحث عن مطعم أو وجبة…'}
-          returnKeyType="search"
-          accessibilityLabel={
-            vertical === 'MARKET' ? 'البحث عن منتج أو ماركت' : 'البحث عن مطعم أو وجبة'
-          }
-        />
-      </Enter>
 
       {/*
        * The banner runs edge to edge.
@@ -358,6 +350,20 @@ export default function HomeScreen() {
  * piece of state that changes what the whole screen shows, so it belongs at
  * the top where it can be seen and changed.
  */
+/**
+ * The header, and the search that hangs off it.
+ *
+ * A gradient block in the brand's own ramp with its bottom corners drawn in,
+ * and the search field overlapping that edge rather than sitting under it.
+ * Both are doing work rather than decorating: the block gives the top of the
+ * screen a horizon, so the scrolling content below reads as *under* something
+ * instead of beginning at the top of a white page; and a field that straddles
+ * the edge ties the two together, which is what keeps the header from looking
+ * like a banner somebody dropped on.
+ *
+ * Everything inside it is the control it always was — the section switch, the
+ * delivery area, the cart, the bell. Only the ground under them changed.
+ */
 function Header({
   areaLabel,
   isResolving,
@@ -366,6 +372,8 @@ function Header({
   onPressSignIn,
   vertical,
   onBack,
+  search,
+  onChangeSearch,
 }: {
   areaLabel: string | null;
   isResolving: boolean;
@@ -374,152 +382,185 @@ function Header({
   onPressSignIn: () => void;
   vertical: MerchantType;
   onBack: () => void;
+  search: string;
+  onChangeSearch: (value: string) => void;
 }) {
+  const market = vertical === 'MARKET';
+
   return (
-    <View
-      style={{
-        paddingHorizontal: space[4],
-        paddingTop: space[2],
-        paddingBottom: space[3],
-        backgroundColor: color.surfaceCard,
-        borderBottomWidth: 1,
-        borderBottomColor: color.borderSubtle,
-      }}
-    >
-      {/*
-       * Which half you are in, and the way out of it.
-       *
-       * This was a 16px chevron on a tinted chip, and it failed at both jobs.
-       * A chevron pointing away from a section name is read as «there is more
-       * of this», not «leave this» — the one gesture it has to suggest is a
-       * swap, so it says so, in a word and in an icon that shows two
-       * directions rather than one. And at caption size on a 24pt chip it was
-       * a label that happened to be tappable; it is now a control with a real
-       * target, a border, and a filled tile carrying the section's own glyph.
-       *
-       * It is the first row because it is the outermost thing about this
-       * screen: the delivery area below it is a setting within the half, not
-       * above it.
-       */}
-      <Pressable
-        onPress={onBack}
-        accessibilityRole="button"
-        accessibilityLabel={`تبديل القسم. القسم الحالي ${
-          vertical === 'MARKET' ? 'جيبلي ماركت' : 'جيبلي أكل'
-        }`}
-        accessibilityHint="يفتح شاشة اختيار القسم"
-        style={({ pressed }) => [
-          {
-            flexDirection: 'row-reverse',
-            alignItems: 'center',
-            alignSelf: 'flex-start',
-            gap: space[2],
-            height: 38,
-            paddingInlineStart: space[1],
-            paddingInlineEnd: space[3],
-            marginBottom: space[3],
-            borderRadius: radius.full,
-            borderWidth: 1,
-            borderColor: accent[200],
-            backgroundColor: pressed ? accent[100] : color.brandSoft,
-          },
-        ]}
+    <View style={{ marginBottom: space[2] }}>
+      <LinearGradient
+        // The section's own ramp: orange for food, green for the market. The
+        // header is the one surface large enough for the two halves to be told
+        // apart across a room, which is the whole point of the split.
+        colors={market ? MARKET_HEADER : FOOD_HEADER}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={{
+          paddingHorizontal: space[4],
+          paddingTop: space[2],
+          paddingBottom: HEADER_OVERLAP + space[4],
+          borderBottomLeftRadius: 30,
+          borderBottomRightRadius: 30,
+        }}
       >
-        {/* The section, as a filled tile — the one element with real contrast. */}
-        <View
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: radius.full,
-            backgroundColor: color.brand,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <MaterialCommunityIcons
-            name={vertical === 'MARKET' ? 'basket-outline' : 'silverware-fork-knife'}
-            size={17}
-            color={palette.white}
-          />
-        </View>
-
-        <Text variant="smallBold" style={{ color: color.textBrand }}>
-          {vertical === 'MARKET' ? 'جيبلي ماركت' : 'جيبلي أكل'}
-        </Text>
-
-        {/* Hairline, so the name and the action read as two things. */}
-        <View style={{ width: 1, height: 16, backgroundColor: accent[200] }} />
-
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: space[1] }}>
-          <MaterialCommunityIcons name="swap-horizontal" size={16} color={color.textBrand} />
-          <Text variant="caption" style={{ color: color.textBrand }}>
-            تبديل
-          </Text>
-        </View>
-      </Pressable>
-
-      <Row justify="space-between" gap={space[3]}>
+        {/*
+         * Which half you are in, and the way out of it. It sits first because
+         * it is the outermost thing about this screen: the delivery area below
+         * is a setting within the half, not above it.
+         */}
         <Pressable
-          onPress={onPressArea}
+          onPress={onBack}
           accessibilityRole="button"
-          accessibilityLabel="تغيير منطقة التوصيل"
-          accessibilityValue={areaLabel ? { text: areaLabel } : undefined}
+          accessibilityLabel={`تبديل القسم. القسم الحالي ${market ? 'جيبلي ماركت' : 'جيبلي أكل'}`}
+          accessibilityHint="يفتح شاشة اختيار القسم"
           style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', gap: space[2], flex: 1 },
-            pressed ? { opacity: 0.7 } : null,
+            {
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              alignSelf: 'flex-start',
+              gap: space[2],
+              height: 34,
+              paddingInlineStart: space[1],
+              paddingInlineEnd: space[3],
+              marginBottom: space[3],
+              borderRadius: radius.full,
+              backgroundColor: 'rgba(255,255,255,0.2)',
+            },
+            pressed ? { backgroundColor: 'rgba(255,255,255,0.32)' } : null,
           ]}
         >
-          <IconTile size={40}>
-            <MaterialCommunityIcons name="map-marker-outline" size={20} color={color.brand} />
-          </IconTile>
-
-          <View style={{ flex: 1 }}>
-            <Text variant="caption" tone="muted">
-              التوصيل إلى
-            </Text>
-            <Row gap={space[1]}>
-              <Text variant="smallBold" numberOfLines={1} style={{ flexShrink: 1 }}>
-                {isResolving ? '…' : (areaLabel ?? 'اختر منطقتك')}
-              </Text>
-              <MaterialCommunityIcons name="chevron-down" size={16} color={color.textMuted} />
-            </Row>
+          <View
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: radius.full,
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialCommunityIcons
+              name={market ? 'basket-outline' : 'silverware-fork-knife'}
+              size={15}
+              color={market ? palette.green[600] : BRAND[500]}
+            />
           </View>
+
+          <Text variant="caption" tone="inverse" style={{ fontWeight: '700' }}>
+            {market ? 'جيبلي ماركت' : 'جيبلي أكل'}
+          </Text>
+
+          <MaterialCommunityIcons name="swap-horizontal" size={15} color={palette.white} />
         </Pressable>
 
-        {/*
-         * A guest sees the way in, not a locked door. This is the only place
-         * the app asks — everything else stays browsable.
-         */}
-        {isGuest ? (
+        <Row justify="space-between" gap={space[3]}>
           <Pressable
-            onPress={onPressSignIn}
+            onPress={onPressArea}
             accessibilityRole="button"
-            accessibilityLabel="تسجيل الدخول"
+            accessibilityLabel="تغيير منطقة التوصيل"
+            accessibilityValue={areaLabel ? { text: areaLabel } : undefined}
             style={({ pressed }) => [
-              {
-                minHeight: TAP_TARGET - 8,
-                paddingHorizontal: space[3],
-                borderRadius: radius.full,
-                backgroundColor: color.brandSoft,
-                borderWidth: 1,
-                borderColor: accent[200],
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              pressed ? { opacity: 0.7 } : null,
+              { flexDirection: 'row', alignItems: 'center', gap: space[2], flex: 1 },
+              pressed ? { opacity: 0.75 } : null,
             ]}
           >
-            <Text variant="caption" tone="brand">
-              تسجيل الدخول
-            </Text>
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 14,
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <MaterialCommunityIcons name="map-marker" size={20} color={palette.white} />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text variant="caption" tone="inverse" style={{ opacity: 0.85 }}>
+                التوصيل إلى
+              </Text>
+              <Row gap={space[1]}>
+                <Text
+                  variant="smallBold"
+                  tone="inverse"
+                  numberOfLines={1}
+                  style={{ flexShrink: 1 }}
+                >
+                  {isResolving ? '…' : (areaLabel ?? 'اختر منطقتك')}
+                </Text>
+                <MaterialCommunityIcons name="chevron-down" size={16} color={palette.white} />
+              </Row>
+            </View>
           </Pressable>
-        ) : (
-          <NotificationBell />
-        )}
-      </Row>
+
+          {isGuest ? (
+            <Pressable
+              onPress={onPressSignIn}
+              accessibilityRole="button"
+              accessibilityLabel="تسجيل الدخول"
+              style={({ pressed }) => [
+                {
+                  height: 34,
+                  paddingHorizontal: space[3],
+                  borderRadius: radius.full,
+                  backgroundColor: palette.white,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed ? { opacity: 0.85 } : null,
+              ]}
+            >
+              <Text
+                variant="caption"
+                style={{ color: market ? palette.green[700] : BRAND[600], fontWeight: '700' }}
+              >
+                تسجيل الدخول
+              </Text>
+            </Pressable>
+          ) : (
+            <NotificationBell />
+          )}
+        </Row>
+      </LinearGradient>
+
+      {/*
+       * The field straddles the header's edge.
+       *
+       * Lifted by exactly the padding the header reserved for it, so the two
+       * cannot drift apart when either changes — and given a real shadow,
+       * because the thing that makes it read as floating is the shadow, not
+       * the position.
+       */}
+      <View style={{ marginTop: -HEADER_OVERLAP, marginHorizontal: space[4] }}>
+        <SearchBar
+          value={search}
+          onChangeText={onChangeSearch}
+          placeholder={market ? 'ابحث عن منتج أو ماركت…' : 'ابحث عن مطعم أو وجبة…'}
+          returnKeyType="search"
+          accessibilityLabel={market ? 'البحث عن منتج أو ماركت' : 'البحث عن مطعم أو وجبة'}
+          style={shadow.lg}
+        />
+      </View>
     </View>
   );
 }
+
+/**
+ * How far the search field is lifted over the header's edge.
+ *
+ * Half its own height, so it straddles the edge rather than sitting on one
+ * side of it. The header reserves `HEADER_OVERLAP + space[4]` at its bottom,
+ * which is what keeps the lifted field clear of the delivery-area row above —
+ * the two numbers are a pair and moving one without the other closes that gap.
+ */
+const HEADER_OVERLAP = 26;
+
+/** The two header ramps, one per half of the app. */
+const FOOD_HEADER = ['#ff8a14', '#fd6702', '#f05002'] as const;
+const MARKET_HEADER = [palette.green[400], palette.green[600], palette.green[800]] as const;
 
 /**
  * The way back to an update nobody was looking at when it arrived.
@@ -645,7 +686,7 @@ function BannerCarousel({
         }}
         keyExtractor={(banner) => banner.id}
         renderItem={({ item }) => (
-          <View style={{ width: slide }}>
+          <View style={{ width: slide, paddingHorizontal: space[4] }}>
             <PromoBanner
               fullBleed
               title={item.title_ar}
@@ -736,8 +777,8 @@ function CategoryStrip({
  * three and a half tiles on the narrowest screen the app supports — enough of a
  * fourth showing to say the strip scrolls.
  */
-const CATEGORY_TILE = 104;
-const CATEGORY_SLOT = 116;
+const CATEGORY_TILE = 68;
+const CATEGORY_SLOT = 78;
 
 /**
  * One category: a photograph, at a size worth photographing for.
@@ -787,22 +828,31 @@ function CategoryTile({
           {
             width: CATEGORY_TILE,
             height: CATEGORY_TILE,
-            borderRadius: radius.xl,
+            /*
+             * A squircle, not a circle and not a rounded square.
+             *
+             * 22 on 68 is the proportion the design uses throughout — the
+             * cart tile, the location tile, the category — and repeating one
+             * corner radius across every small surface is most of what makes
+             * a screen look like one piece of work rather than several.
+             */
+            borderRadius: 22,
             overflow: 'hidden',
             alignItems: 'center',
             justifyContent: 'center',
-            // Only ever seen behind an emoji: a photograph covers it entirely.
-            backgroundColor: hasImage ? color.surfaceSunken : color.brandSoft,
+            backgroundColor: hasImage ? color.surfaceCard : color.surfaceCard,
             /*
              * The ring is drawn inside the tile rather than as an outer glow,
              * so selecting something never nudges its neighbours sideways —
              * a row that shifts under the finger is the reason a second tap
              * lands on the wrong category.
              */
-            borderWidth: active ? 3 : 1,
-            borderColor: active ? color.brand : color.borderSubtle,
+            borderWidth: active ? 2 : 0,
+            borderColor: active ? color.brand : 'transparent',
           },
-          active ? shadow.md : null,
+          // Every tile is lifted, the selected one more so. A shadow on the
+          // selected tile alone makes the rest read as disabled.
+          active ? shadow.md : shadow.sm,
         ]}
       >
         {category.image_asset_id ? (
@@ -812,8 +862,7 @@ function CategoryTile({
             resizeMode="cover"
           />
         ) : (
-          // Scaled with the tile: an emoji sized for a 78px chip is lost in a 104px one.
-          <Text style={{ fontSize: 46, lineHeight: 56 }}>{category.emoji ?? '🍽️'}</Text>
+          <Text style={{ fontSize: 30, lineHeight: 38 }}>{category.emoji ?? '🍽️'}</Text>
         )}
       </View>
 
@@ -824,9 +873,9 @@ function CategoryTile({
        * lines at this width, and reserving them for everybody is what keeps
        * the tiles a row instead of a staircase.
        */}
-      <View style={{ height: 36, justifyContent: 'flex-start' }}>
+      <View style={{ height: 30, justifyContent: 'flex-start' }}>
         <Text
-          variant={active ? 'smallBold' : 'small'}
+          variant={active ? 'captionBold' : 'caption'}
           align="center"
           tone={active ? 'brand' : 'secondary'}
           numberOfLines={2}
