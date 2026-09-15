@@ -12,7 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
+import { color, palette, radius, ROW, shadow, space, TAP_TARGET, text } from '@/theme';
 
 /**
  * The mobile UI kit.
@@ -216,7 +216,7 @@ export function Button({
           minHeight: size === 'lg' ? TAP_TARGET + 8 : TAP_TARGET,
           paddingHorizontal: space[5],
           borderRadius: radius.md,
-          flexDirection: 'row',
+          flexDirection: ROW,
           alignItems: 'center',
           justifyContent: 'center',
           gap: space[2],
@@ -303,7 +303,9 @@ export function Row({
   return (
     <View
       style={[
-        { flexDirection: 'row', alignItems: align, gap },
+        // ROW, not 'row': the app must read right-to-left whether or not the
+        // native RTL flag has taken effect. See the note on ROW in the theme.
+        { flexDirection: ROW, alignItems: align, gap },
         justify ? { justifyContent: justify } : null,
         style,
       ]}
@@ -449,7 +451,22 @@ export function EmptyState({
   action?: { label: string; onPress: () => void };
 }) {
   return (
-    <View style={{ alignItems: 'center', gap: space[2], paddingVertical: space[10] }}>
+    <View
+      style={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: space[2],
+        paddingVertical: space[8],
+        paddingHorizontal: space[4],
+        /*
+         * Tall enough to sit in the middle of the screen rather than at the top
+         * of it. A three-line message pinned under the header with an empty
+         * half-page beneath reads as a page that failed to load; the same
+         * message centred in that space reads as the answer.
+         */
+        minHeight: 340,
+      }}
+    >
       <Text variant="h3" align="center">
         {title}
       </Text>
@@ -459,7 +476,18 @@ export function EmptyState({
         </Text>
       ) : null}
       {action ? (
-        <Button label={action.label} onPress={action.onPress} style={{ marginTop: space[2] }} />
+        /*
+         * `alignSelf` is stated because Button sets its own to `flex-start`,
+         * which wins over the parent's `alignItems: 'center'` — so the one
+         * element this block exists for was landing hard against the left edge
+         * under two centred lines of text.
+         */
+        <Button
+          label={action.label}
+          onPress={action.onPress}
+          size="lg"
+          style={{ marginTop: space[3], alignSelf: 'center', paddingHorizontal: space[8] }}
+        />
       ) : null}
     </View>
   );

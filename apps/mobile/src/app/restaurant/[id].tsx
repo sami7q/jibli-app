@@ -11,7 +11,7 @@ import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { notify } from '@/lib/dialog';
-import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
@@ -217,7 +217,7 @@ export default function RestaurantScreen() {
               padding: space[3],
               borderRadius: radius.md,
               backgroundColor: color.warningSoft,
-              flexDirection: 'row',
+              flexDirection: ROW,
               alignItems: 'center',
               gap: space[2],
             }}
@@ -369,7 +369,8 @@ function Cover({
           top: space[10],
           insetInlineStart: space[4],
           insetInlineEnd: space[4],
-          flexDirection: 'row',
+          // Back sits under the thumb on the right, where the chevron points.
+          flexDirection: ROW,
           justifyContent: 'space-between',
         }}
       >
@@ -641,6 +642,12 @@ function CategoryTabs({
   );
 }
 
+/** The dish thumbnail in the menu list. See the note where it is used. */
+const DISH_THUMB = 112;
+
+/** The placeholder mark inside the sheet's 16:9 frame, when there is no photo. */
+const SHEET_DISH = 132;
+
 function MenuItemRow({
   item,
   disabled,
@@ -747,9 +754,15 @@ function MenuItemRow({
       <View>
         <View
           style={{
-            width: 88,
-            height: 88,
-            borderRadius: radius.md,
+            /*
+             * 88 was too small to tell one dish from another at arm's length,
+             * which is the only distance this list is ever read at. 112 is the
+             * largest square that still leaves room for two lines of name, a
+             * description and a price beside it on a 360dp screen.
+             */
+            width: DISH_THUMB,
+            height: DISH_THUMB,
+            borderRadius: radius.lg,
             overflow: 'hidden',
             backgroundColor: color.brandSoft,
             alignItems: 'center',
@@ -765,7 +778,7 @@ function MenuItemRow({
           ) : (
             // Seeded by the item so a dish keeps its own plate between
             // renders, and a list of them does not read as one repeated mark.
-            <DishPlaceholder size={88} seed={item.id} />
+            <DishPlaceholder size={DISH_THUMB} seed={item.id} />
           )}
         </View>
 
@@ -935,6 +948,44 @@ function ItemSheet({
         </Row>
       }
     >
+      {/*
+       * The dish, at the size the decision is made at.
+       *
+       * This sheet is what opens when somebody taps a dish, and it showed the
+       * name, the description and the price — everything except the thing being
+       * bought. The customer had just tapped a 112px thumbnail to see it
+       * larger and got a smaller view of it: no picture at all.
+       *
+       * 16:9 across the full width, so a plate shot fills it rather than
+       * floating in a letterboxed box. The placeholder keeps the same frame,
+       * seeded by the item, so a dish with no photograph is still a dish rather
+       * than a gap.
+       */}
+      {item ? (
+        <View
+          style={{
+            width: '100%',
+            aspectRatio: 16 / 9,
+            borderRadius: radius.lg,
+            overflow: 'hidden',
+            backgroundColor: color.brandSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {item.image_asset_id ? (
+            <Image
+              source={{ uri: assetUrl(item.image_asset_id) }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <DishPlaceholder size={SHEET_DISH} seed={item.id} />
+          )}
+        </View>
+      ) : null}
+
       {item?.description_ar ? <Text tone="secondary">{item.description_ar}</Text> : null}
 
       {MODIFIERS_ENABLED && groups.isLoading ? <Skeleton height={64} /> : null}

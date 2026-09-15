@@ -216,11 +216,63 @@ export const FONT_FAMILIES = Object.values(FAMILY_FOR_WEIGHT);
  * ratio is applied here. Rounded, because a fractional line height makes text
  * jitter by a pixel between re-renders on Android.
  */
+/**
+ * A row that reads right-to-left, whatever the native flag happens to say.
+ *
+ * `I18nManager.forceRTL(true)` does not take effect until the app restarts,
+ * and in Expo Go it may never stick at all — so `isRTL` is false on the device
+ * this app is tested on and true in a store build that has been opened twice.
+ * Code that writes `flexDirection: 'row'` and trusts the flag therefore renders
+ * one way here and the other way there, which is exactly what happened: the
+ * account screen, the search field and the phone input all laid themselves out
+ * left-to-right on a phone while the screens that hard-coded `row-reverse`
+ * looked correct beside them.
+ *
+ * Hard-coding `row-reverse` is not the fix either — it is the same bug from the
+ * other side, and it breaks the moment the flag flips.
+ *
+ * So the direction is derived rather than assumed. `ROW` always reads
+ * right-to-left and `ROW_LTR` always reads left-to-right, in both modes, and
+ * nothing in the app has to know which mode it is in.
+ *
+ * One consequence worth stating: with visual order pinned this way, positional
+ * styles must be **physical** (`left`/`right`, `marginLeft`) rather than
+ * logical (`start`/`end`, `marginStart`). The logical ones flip with the flag,
+ * so they would reintroduce the same split they are meant to avoid.
+ */
+/**
+ * Whether the platform is already laying out right-to-left on its own.
+ *
+ * Two different mechanisms, and both have to be asked. On a device it is the
+ * native flag. On the web `I18nManager` is a stub whose flag never becomes
+ * true, but `enforceRtl` sets `dir="rtl"` on the document — and CSS flexbox
+ * follows the writing direction, so `flex-direction: row` is already reading
+ * right-to-left there. Consulting only the flag would have given the browser
+ * `row-reverse` inside an RTL document, which renders left-to-right: the web
+ * preview would have come out mirrored the moment the phone came out right.
+ */
+const laidOutRtl = I18nManager.isRTL || Platform.OS === 'web';
+
+export const ROW: ViewStyle['flexDirection'] = laidOutRtl ? 'row' : 'row-reverse';
+
+/** For content that reads left-to-right inside this app: a phone number, a price. */
+export const ROW_LTR: ViewStyle['flexDirection'] = laidOutRtl ? 'row-reverse' : 'row';
+
 function type(size: number, weight: keyof typeof FAMILY_FOR_WEIGHT, ratio: number): TextStyle {
   return {
     fontFamily: FAMILY_FOR_WEIGHT[weight],
     fontSize: size,
     lineHeight: Math.round(size * ratio),
+    /*
+     * Arabic starts at the right, and the default does not.
+     *
+     * React Native's default alignment follows `I18nManager.isRTL`, which on
+     * this device is false — so every unaligned line of Arabic in the app was
+     * starting at the left edge. `'right'` is physical and therefore correct in
+     * both modes; anything that wants otherwise (a button label, a centred
+     * empty state) overrides it, and `Ltr` overrides the direction too.
+     */
+    textAlign: 'right',
   };
 }
 

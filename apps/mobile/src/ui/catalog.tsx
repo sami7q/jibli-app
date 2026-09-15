@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { TAP_TARGET, accent, color, palette, radius, shadow, space, text } from '@/theme';
+import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space, text } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Row, Text } from './index';
 
@@ -145,7 +145,7 @@ export function RatingPill({ rating, count }: { rating: number | null; count?: n
 
   return (
     <View
-      style={[pill(palette.warning[50], palette.warning[500]), { flexDirection: 'row', gap: 3 }]}
+      style={[pill(palette.warning[50], palette.warning[500]), { flexDirection: ROW, gap: 3 }]}
     >
       <MaterialCommunityIcons name="star" size={13} color={palette.warning[500]} />
       <Text variant="caption" style={{ color: palette.warning[700] }}>
@@ -320,7 +320,9 @@ export function ListRow({
       accessibilityLabel={label}
       style={({ pressed }) => [
         {
-          flexDirection: 'row',
+          // The icon leads, and in Arabic leading means the right-hand edge.
+          // Plain 'row' put every row of the account screen back to front.
+          flexDirection: ROW,
           alignItems: 'center',
           gap: space[3],
           minHeight: TAP_TARGET + 8,
@@ -744,7 +746,8 @@ export function CartBar({
             borderRadius: radius.full,
             backgroundColor: color.brand,
             paddingHorizontal: space[4],
-            flexDirection: 'row',
+            // Cart on the right, total on the left — the reading order.
+            flexDirection: ROW,
             alignItems: 'center',
             justifyContent: 'space-between',
           },

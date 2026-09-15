@@ -7,7 +7,7 @@ import type { OrderStatus } from '@jibli/contracts';
 import { api, ApiError, type OrderNotification } from '@/lib/api';
 import { markNotificationsSeen, useUnseenNotifications } from '@/lib/notification-inbox';
 import { announcementFor } from '@/lib/order-watch';
-import { color, radius, space, TAP_TARGET } from '@/theme';
+import { ROW, TAP_TARGET, color, radius, space } from '@/theme';
 import { EmptyState, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
 
 /**
@@ -154,7 +154,7 @@ function NotificationRow({
       accessibilityLabel={`${announcementFor(entry.status)}، طلب رقم ${entry.public_order_number}`}
       style={({ pressed }) => [
         {
-          flexDirection: 'row',
+          flexDirection: ROW,
           alignItems: 'center',
           gap: space[3],
           paddingHorizontal: space[3],

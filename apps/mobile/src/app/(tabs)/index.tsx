@@ -18,7 +18,7 @@ import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
 import { notify } from '@/lib/dialog';
-import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
@@ -465,7 +465,7 @@ function Header({
           accessibilityLabel="تغيير منطقة التوصيل"
           accessibilityValue={areaLabel ? { text: areaLabel } : undefined}
           style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', gap: space[2], flex: 1 },
+            { flexDirection: ROW, alignItems: 'center', gap: space[2], flex: 1 },
             pressed ? { opacity: 0.7 } : null,
           ]}
         >
@@ -727,9 +727,17 @@ function CategoryStrip({
   );
 }
 
-/** Every tile is this wide, so the labels form a row rather than a ragged edge. */
-const CATEGORY_TILE = 78;
-const CATEGORY_SLOT = 88;
+/**
+ * Every tile is this wide, so the labels form a row rather than a ragged edge.
+ *
+ * 78 was too small to read on a phone: at that size a plate of food is a smudge
+ * and the label under it is the only thing carrying the category, which defeats
+ * having a photograph at all. 104 shows what is in the picture and still fits
+ * three and a half tiles on the narrowest screen the app supports — enough of a
+ * fourth showing to say the strip scrolls.
+ */
+const CATEGORY_TILE = 104;
+const CATEGORY_SLOT = 116;
 
 /**
  * One category: a photograph, at a size worth photographing for.
@@ -804,7 +812,8 @@ function CategoryTile({
             resizeMode="cover"
           />
         ) : (
-          <Text style={{ fontSize: 34, lineHeight: 42 }}>{category.emoji ?? '🍽️'}</Text>
+          // Scaled with the tile: an emoji sized for a 78px chip is lost in a 104px one.
+          <Text style={{ fontSize: 46, lineHeight: 56 }}>{category.emoji ?? '🍽️'}</Text>
         )}
       </View>
 
@@ -815,9 +824,9 @@ function CategoryTile({
        * lines at this width, and reserving them for everybody is what keeps
        * the tiles a row instead of a staircase.
        */}
-      <View style={{ height: 32, justifyContent: 'flex-start' }}>
+      <View style={{ height: 36, justifyContent: 'flex-start' }}>
         <Text
-          variant={active ? 'captionBold' : 'caption'}
+          variant={active ? 'smallBold' : 'small'}
           align="center"
           tone={active ? 'brand' : 'secondary'}
           numberOfLines={2}

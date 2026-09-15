@@ -14,7 +14,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { normalizeDigits } from '@jibli/validation';
 import { apiRequest, ApiError, idempotencyKey, NetworkError } from '@/lib/api';
 import { notify } from '@/lib/dialog';
-import { BRAND, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
  * Driver delivery task (plan §49, §50, §52, §132).
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.borderSubtle,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  row: { flexDirection: ROW, alignItems: 'center', gap: space[2] },
   flex: { flex: 1 },
 
   orderNumber: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },

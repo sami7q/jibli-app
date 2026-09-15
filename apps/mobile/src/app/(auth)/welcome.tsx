@@ -70,9 +70,27 @@ export default function WelcomeScreen() {
       <DoodleLayer animate={!reduceMotion} />
 
       <View style={{ flex: 1, paddingHorizontal: space[6], justifyContent: 'space-between' }}>
-        <Enter animate={!reduceMotion} delay={0} style={{ flex: 1, justifyContent: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center' }}>
           <View style={{ alignItems: 'center' }}>
-            <JibliWordmark width={248} />
+            {/*
+             * The mark assembles itself here, and only here.
+             *
+             * This is the first thing anybody sees of Jibli, and it was
+             * arriving as a finished picture inside a block that faded up —
+             * indistinguishable from a static splash. `animate` draws the
+             * letters in from the outside, which is the one moment in the app
+             * where a logo doing something is a welcome rather than a delay.
+             *
+             * It is no longer wrapped in the block's own `Enter`: two
+             * entrances on the same element fight each other, and the letters
+             * were gathering inside something that was still rising.
+             */}
+            <JibliWordmark animate width={248} />
+            <Enter
+              animate={!reduceMotion}
+              delay={420}
+              style={{ alignItems: 'center', alignSelf: 'stretch' }}
+            >
             <Text variant="h1" tone="inverse" align="center" style={{ marginTop: space[4] }}>
               جيِبلي اللي تريده
             </Text>
@@ -84,8 +102,9 @@ export default function WelcomeScreen() {
             >
               مذاق أقرب لك
             </Text>
+            </Enter>
           </View>
-        </Enter>
+        </View>
 
         <Enter animate={!reduceMotion} delay={220} style={{ paddingBottom: space[6] }}>
           {/*

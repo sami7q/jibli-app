@@ -1,7 +1,7 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { BRAND, palette } from '@/theme';
-import { Enter } from '@/ui/enter';
 
 /**
  * The wordmark.
@@ -70,6 +70,115 @@ const LETTERS: readonly ((tint: string, pinTint: string) => React.ReactNode)[] =
   ),
 ];
 
+/**
+ * The letters converge into the mark.
+ *
+ * `Enter` fades and lifts, which is the right entrance for a section of a
+ * screen and the wrong one for a logo: five identical lifts read as five
+ * things arriving, not as one word assembling. This starts each letter pushed
+ * outward from the centre of the word and slightly small, then draws them in.
+ * The eye reads it as the mark gathering itself, which is what it is.
+ *
+ * Native-driven, like `Enter`, and for the same reason: it runs while the
+ * session resolves and the storefront fetches, and an entrance that stutters
+ * on the first screen of the app is worse than none. `react-native-svg` cannot
+ * hand its props to the native driver, so the transform lives on an
+ * `Animated.View` wrapping a full-canvas `Svg` — each letter keeps the whole
+ * viewBox, so they register exactly where the static drawing puts them.
+ *
+ * Reduce motion is honoured and assumed until proven otherwise, so a phone
+ * with the setting on never sees a frame of movement.
+ */
+function Gather({
+  children,
+  index,
+  count,
+  style,
+}: {
+  children: React.ReactNode;
+  index: number;
+  count: number;
+  style?: React.ComponentProps<typeof Animated.View>['style'];
+}) {
+  const progress = useRef(new Animated.Value(0)).current;
+  const [reduceMotion, setReduceMotion] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (alive) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      (enabled) => alive && setReduceMotion(enabled),
+    );
+    return () => {
+      alive = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      progress.setValue(1);
+      return;
+    }
+
+    // Reset first, or the effect's second pass animates from 1 to 1 and
+    // nothing ever moves — the bug `Enter` documents at length.
+    progress.setValue(0);
+
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: 520,
+      // Staggered from the outside in, so the word closes rather than wipes.
+      delay: Math.round(Math.abs(index - (count - 1) / 2) * 60),
+      /*
+       * A gentle overshoot: the letters arrive, pass their mark by a hair and
+       * settle, which is what makes it read as gathering rather than sliding
+       * to a stop. More tension than this and the mark wobbles, which on a
+       * logo looks like a mistake rather than a flourish.
+       */
+      easing: Easing.out(Easing.back(1.2)),
+      useNativeDriver: true,
+    });
+
+    animation.start();
+    return () => animation.stop();
+  }, [reduceMotion, progress, index, count]);
+
+  /*
+   * Outward from the middle of the word, proportional to the distance from it:
+   * the outer letters travel furthest, the middle ones barely move. That
+   * gradient is what makes five separate moves read as one word closing up.
+   */
+  const offset = (index - (count - 1) / 2) * 26;
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: progress,
+          transform: [
+            {
+              translateX: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [offset, 0],
+              }),
+            },
+            {
+              scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 export function JibliWordmark({
   width = 220,
   tint = palette.white,
@@ -119,11 +228,11 @@ export function JibliWordmark({
   return (
     <View style={{ width, height }} accessible accessibilityRole="image" accessibilityLabel="Jibli">
       {LETTERS.map((letter, index) => (
-        <Enter key={index} delay={index * 70} distance={16} style={StyleSheet.absoluteFill}>
+        <Gather key={index} index={index} count={LETTERS.length} style={StyleSheet.absoluteFill}>
           <Svg width={width} height={height} viewBox="0 0 340 160">
             {letter(tint, pinTint)}
           </Svg>
-        </Enter>
+        </Gather>
       ))}
     </View>
   );
