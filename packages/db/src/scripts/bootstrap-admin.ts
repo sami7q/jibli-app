@@ -11,7 +11,6 @@ import { shouldUseSsl } from '../ssl.js';
 import { users, userPlatformRoles } from '../schema/index.js';
 import { uuidv7 } from '../ids.js';
 
-
 /**
  * Create the first Super Admin.
  *
@@ -218,7 +217,9 @@ async function main(): Promise<void> {
     console.log(`  name      ${args.name}`);
     console.log(`  user id   ${result.userId}`);
     console.log(`  action    ${result.created ? 'created' : 'password reset on existing user'}`);
-    console.log(`  role      ${result.roleGranted ? 'SUPER_ADMIN granted' : 'SUPER_ADMIN already held'}`);
+    console.log(
+      `  role      ${result.roleGranted ? 'SUPER_ADMIN granted' : 'SUPER_ADMIN already held'}`,
+    );
 
     if (!args.password) {
       console.log('');
@@ -229,7 +230,18 @@ async function main(): Promise<void> {
 
     console.log('');
     console.log('  Next, in order:');
-    console.log('    1. Sign in — you will be required to change this password');
+    /*
+     * `--keep-password` turns the forced change off, and this line was
+     * announcing it anyway. A script that tells you what is about to happen
+     * and is wrong about it is worse than one that says nothing: the next
+     * person reads it, waits for a prompt that never comes, and stops
+     * believing the rest of the output.
+     */
+    console.log(
+      args.keepPassword
+        ? '    1. Sign in — this password stands until you change it yourself'
+        : '    1. Sign in — you will be required to change this password',
+    );
     console.log('    2. Enrol MFA. Plan §88 blocks every finance action until you do');
     console.log('');
   } finally {
