@@ -159,7 +159,18 @@ function framePage(appOrigin) {
   <div class="phone" id="phone">
     <div class="phone__stack">
       <div class="phone__safe phone__safe--top" id="safeTop"></div>
-      <iframe id="app" src="${appOrigin}"></iframe>
+      <!--
+        The allow attribute is what makes the GPS button work in here.
+
+        This frame is cross-origin: the page is :4010 and the app is :8081. A
+        browser refuses Geolocation to a cross-origin frame unless the parent
+        delegates it through Permissions Policy. Without the attribute,
+        navigator.geolocation still exists and is still callable, and its error
+        callback fires with PERMISSION_DENIED before any prompt appears — so
+        the preview looks like an app whose location feature is broken while
+        the same code works on a phone.
+      -->
+      <iframe id="app" src="${appOrigin}" allow="geolocation"></iframe>
       <div class="phone__safe phone__safe--bottom" id="safeBottom"></div>
     </div>
   </div>

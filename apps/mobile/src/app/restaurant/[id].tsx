@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { DishPlaceholder } from '@/ui/dish-placeholder';
 import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
@@ -649,7 +650,9 @@ function MenuItemRow({
    * directly makes an order the kitchen cannot fill, which the server rejects
    * at the quote — after the customer has already filled a basket.
    */
-  const quickAddable = !unavailable && !item.requires_choice;
+  // With modifiers off there is nothing to choose, so every available dish
+  // takes the one-tap path.
+  const quickAddable = !unavailable && (!MODIFIERS_ENABLED || !item.requires_choice);
 
   /*
    * The card is a View, not a Pressable.
@@ -710,7 +713,7 @@ function MenuItemRow({
           <Text variant="smallBold" tone="brand">
             {formatIqdArabic(iqd(item.price_iqd))}
           </Text>
-          {item.requires_choice && !unavailable ? (
+          {MODIFIERS_ENABLED && item.requires_choice && !unavailable ? (
             <Text variant="caption" tone="muted">
               · اختر الحجم
             </Text>
@@ -743,11 +746,9 @@ function MenuItemRow({
               resizeMode="cover"
             />
           ) : (
-            <MaterialCommunityIcons
-              name="silverware-fork-knife"
-              size={24}
-              color={palette.orange[300]}
-            />
+            // Seeded by the item so a dish keeps its own plate between
+            // renders, and a list of them does not read as one repeated mark.
+            <DishPlaceholder size={88} seed={item.id} />
           )}
         </View>
 
@@ -797,6 +798,26 @@ function MenuItemRow({
  * or three dishes out of forty, and loading every modifier group for every
  * item would be most of the payload for none of the use.
  */
+/**
+ * Whether a dish can carry options — sizes, extras, removals.
+ *
+ * Off, and deliberately, until the whole path exists rather than half of it.
+ * The catalog reports `requires_choice` and this screen could collect a
+ * selection, but nothing downstream carries it: the cart has no field for it,
+ * `POST /orders` has no parameter for it, and the API re-prices every line
+ * from the menu. A choice was flattened into the order's free-text note and
+ * its price added on the client only — so a customer could pick a 2,000 dinar
+ * extra, watch the total rise, and be charged the base price for a dish the
+ * kitchen would read about in a comment.
+ *
+ * Turning it off removes that, and it costs the customer nothing today: every
+ * dish is orderable with one tap, which is what this stage of the product
+ * needs. The code stays because the work to finish it is downstream, not here
+ * — a column on the order line, a parameter on the endpoint, and pricing that
+ * the server owns. Then this becomes `true`.
+ */
+const MODIFIERS_ENABLED = false;
+
 function ItemSheet({
   item,
   restaurant,
@@ -819,7 +840,9 @@ function ItemSheet({
   const groups = useQuery({
     queryKey: ['item-modifiers', item?.id],
     queryFn: () => api.itemModifiers(item?.id as string),
-    enabled: Boolean(item),
+    // Not fetched at all when off: a request whose answer is discarded still
+    // costs the customer a round trip on a phone connection.
+    enabled: MODIFIERS_ENABLED && Boolean(item),
   });
 
   const groupList = groups.data ?? [];
@@ -917,7 +940,7 @@ function ItemSheet({
     >
       {item?.description_ar ? <Text tone="secondary">{item.description_ar}</Text> : null}
 
-      {groups.isLoading ? <Skeleton height={64} /> : null}
+      {MODIFIERS_ENABLED && groups.isLoading ? <Skeleton height={64} /> : null}
 
       {groupList.map((group) => (
         <View key={group.id} style={{ gap: space[2] }}>
