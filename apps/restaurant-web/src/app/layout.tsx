@@ -33,7 +33,7 @@ const cairo = Cairo({
  */
 
 export const metadata: Metadata = {
-  title: 'جيبلي — بوابة المطاعم',
+  title: 'جيبلي — بوابة الشركاء',
   description: 'إدارة الطلبات والمنيو والمخزون والتسويات',
   // A portal must never be indexed.
   robots: { index: false, follow: false },

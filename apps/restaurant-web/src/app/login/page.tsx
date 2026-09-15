@@ -52,7 +52,7 @@ const BACKOFF_AFTER_ATTEMPTS = 3;
 const BACKOFF_SECONDS = 15;
 
 /** What the browser shows beside the saved password in its own list. */
-const NOTE_DISPLAY_NAME = 'بوابة مطاعم جيبلي';
+const NOTE_DISPLAY_NAME = 'بوابة شركاء جيبلي';
 
 function LoginForm() {
   const router = useRouter();
@@ -179,9 +179,7 @@ function LoginForm() {
        * placeholder instead of the form on the one screen every session
        * starts at.
        */
-      const destination = safeReturnPath(
-        new URLSearchParams(window.location.search).get('next'),
-      );
+      const destination = safeReturnPath(new URLSearchParams(window.location.search).get('next'));
 
       /*
        * A password someone else issued is a password someone else knows, so
@@ -207,7 +205,6 @@ function LoginForm() {
         password: credentials.password,
         displayName: NOTE_DISPLAY_NAME,
       });
-
 
       // Replace, not push: the login page must not sit in the back stack of an
       // authenticated session.
@@ -266,10 +263,10 @@ function LoginForm() {
   return (
     <LoginFrame>
       <form onSubmit={submit} noValidate>
-        <h1>بوابة مطاعم جيبلي</h1>
+        <h1>بوابة شركاء جيبلي</h1>
         <p className="auth__subtitle">
           {stage === 'CREDENTIALS'
-            ? 'سجّل الدخول بحساب المطعم'
+            ? 'سجّل الدخول بحساب الشريك'
             : 'أدخل رمز التحقق من تطبيق المصادقة'}
         </p>
 
@@ -328,7 +325,11 @@ function LoginForm() {
               </div>
 
               {capsLock ? (
-                <span className="field__hint" role="status" style={{ color: 'var(--jibli-warning-700)' }}>
+                <span
+                  className="field__hint"
+                  role="status"
+                  style={{ color: 'var(--jibli-warning-700)' }}
+                >
                   تنبيه: مفتاح Caps Lock مُفعّل
                 </span>
               ) : null}
@@ -436,7 +437,7 @@ function LoginForm() {
         ) : null}
 
         <p className="auth__note">
-          إن لم يكن لديك حساب، اطلب من مالك المطعم إضافتك من صفحة الموظفين.
+          إن لم يكن لديك حساب، اطلب من مالك الحساب إضافتك من صفحة الموظفين.
         </p>
 
         {/*
@@ -447,7 +448,7 @@ function LoginForm() {
           a different journey, not a second sentence about the same one.
         */}
         <div className="auth__apply">
-          <span>مطعم جديد ولا تملك حساباً؟</span>
+          <span>مطعم أو ماركت جديد ولا تملك حساباً؟</span>
           <Link className="btn btn--outline" href="/apply">
             تقديم طلب انضمام
           </Link>

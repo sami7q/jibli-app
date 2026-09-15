@@ -101,9 +101,29 @@ export const portalNextConfig = {
      */
     const httpConnect = process.env.API_ORIGIN ? '' : ` ${apiOrigin}`;
 
+    /*
+     * `'unsafe-eval'`, in development only.
+     *
+     * `next dev` ships React Refresh, and its runtime evaluates a string —
+     * which this policy forbids. The result was not a warning in the console
+     * and a working page: the client bundle threw on load, React never
+     * hydrated, and both portals served server-rendered HTML with no
+     * interactivity at all. Every field accepted text and no button ever
+     * enabled, because nothing was listening.
+     *
+     * It survived because it cannot happen in production. `next build` emits
+     * no Refresh runtime, so `pnpm build` passed, the deployed portals were
+     * fine, and only local development was broken — which is the shape of bug
+     * that lasts longest, since the thing that would catch it is the thing
+     * that is broken.
+     *
+     * Gated on NODE_ENV so the production policy is byte-for-byte what it was.
+     */
+    const devEval = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
+
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${devEval}`,
       // React sets inline `style` attributes. No external stylesheet: the font
       // is self-hosted by next/font, so no third-party origin is allowed here.
       "style-src 'self' 'unsafe-inline'",

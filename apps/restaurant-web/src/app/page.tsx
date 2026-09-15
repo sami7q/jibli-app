@@ -2,13 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import {
-  BarChart,
-  money,
-  moneyCompact,
-  percentDelta,
-  RankedBar,
-} from '@jibli/ui-web';
+import { BarChart, money, moneyCompact, percentDelta, RankedBar } from '@jibli/ui-web';
 import { Shell } from '@/components/shell';
 import { LiveBoard } from '@/components/live-board';
 import { Icon, type IconName } from '@/components/icon';
@@ -39,18 +33,10 @@ export default function DashboardPage() {
 
   const auth = { accessToken: session.accessToken, restaurantId: session.restaurantId };
 
-  return (
-    <DashboardShell
-      auth={auth}
-      session={session}
-    />
-  );
+  return <DashboardShell auth={auth} session={session} />;
 }
 
-type AuthenticatedSession = Extract<
-  ReturnType<typeof useSession>,
-  { status: 'authenticated' }
->;
+type AuthenticatedSession = Extract<ReturnType<typeof useSession>, { status: 'authenticated' }>;
 
 function DashboardShell({
   auth,
@@ -78,6 +64,8 @@ function DashboardShell({
       activeRestaurantId={session.restaurantId}
       onSwitchRestaurant={session.switchRestaurant}
       notificationCount={data?.new_orders ?? 0}
+      catalogLabel={session.words.catalogAr}
+      itemLabel={session.words.itemAr}
     >
       {/*
         Above the board on purpose: a restaurant that is not live yet has an
@@ -91,7 +79,11 @@ function DashboardShell({
       {/* The board comes before every chart, by design and by plan §131. */}
       <LiveBoard auth={auth} />
 
-      <AnalyticsRow data={data} isLoading={overview.isLoading} canSeeFinance={session.can('finance.read')} />
+      <AnalyticsRow
+        data={data}
+        isLoading={overview.isLoading}
+        canSeeFinance={session.can('finance.read')}
+      />
     </Shell>
   );
 }
@@ -156,7 +148,10 @@ function StatTile({
   if (loading) return <div className="skeleton" style={{ height: 96 }} aria-hidden />;
 
   return (
-    <div className="stat" style={highlight ? { borderColor: 'var(--jibli-orange-300)' } : undefined}>
+    <div
+      className="stat"
+      style={highlight ? { borderColor: 'var(--jibli-orange-300)' } : undefined}
+    >
       <div className="stat__body">
         <span className="stat__label">{label}</span>
         <span className="stat__value numeric">{value}</span>
@@ -357,7 +352,10 @@ function LowStockCard({ data }: { data: DashboardOverview }) {
               */}
               <Icon name="alert" className="nav__icon" aria-hidden />
               <span style={{ flex: 1 }}>{item.name_ar}</span>
-              <span className="numeric" style={{ color: 'var(--jibli-danger-700)', fontWeight: 700 }}>
+              <span
+                className="numeric"
+                style={{ color: 'var(--jibli-danger-700)', fontWeight: 700 }}
+              >
                 {item.available} {item.unit}
               </span>
             </li>

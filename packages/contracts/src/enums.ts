@@ -78,10 +78,27 @@ export type MerchantType = (typeof MERCHANT_TYPES)[number];
  */
 export const MERCHANT_TYPE_LABELS: Record<
   MerchantType,
-  { readonly nameAr: string; readonly catalogAr: string; readonly itemAr: string }
+  {
+    readonly nameAr: string;
+    readonly catalogAr: string;
+    /** Indefinite — «إضافة صنف», «٢٤ صنفاً». */
+    readonly itemAr: string;
+    /** Definite — «حذف الصنف», «اسم الصنف». */
+    readonly itemDefiniteAr: string;
+  }
 > = {
-  RESTAURANT: { nameAr: 'مطعم', catalogAr: 'القائمة', itemAr: 'الصنف' },
-  MARKET: { nameAr: 'ماركت', catalogAr: 'المنتجات', itemAr: 'المنتج' },
+  RESTAURANT: {
+    nameAr: 'مطعم',
+    catalogAr: 'المنيو',
+    itemAr: 'صنف',
+    itemDefiniteAr: 'الصنف',
+  },
+  MARKET: {
+    nameAr: 'ماركت',
+    catalogAr: 'المنتجات',
+    itemAr: 'منتج',
+    itemDefiniteAr: 'المنتج',
+  },
 };
 
 export const ONBOARDING_STATUSES = [

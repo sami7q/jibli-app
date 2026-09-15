@@ -40,7 +40,11 @@ function MenuScreen({
    * for a kitchen, «المنتجات / المنتج» for a grocery. From the merchant's own
    * type, not from this screen.
    */
-  words: { readonly catalogAr: string; readonly itemAr: string };
+  words: {
+    readonly catalogAr: string;
+    readonly itemAr: string;
+    readonly itemDefiniteAr: string;
+  };
 }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<{ item: MenuItem; categoryId: string } | null>(null);
@@ -220,7 +224,7 @@ function MenuScreen({
       {deleting ? (
         <ConfirmDialog
           title={`حذف ${deleting.name_ar}`}
-          confirmLabel={`حذف ${words.itemAr}`}
+          confirmLabel={`حذف ${words.itemDefiniteAr}`}
           isSubmitting={deleteItem.isPending}
           error={deleteItem.error instanceof ApiError ? deleteItem.error.messageAr : null}
           body={

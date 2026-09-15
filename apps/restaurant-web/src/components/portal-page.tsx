@@ -73,6 +73,7 @@ export function PortalPage({
       partnerCode={session.partnerCode}
       userName={session.userName}
       catalogLabel={session.words.catalogAr}
+      itemLabel={session.words.itemAr}
     >
       {denied ? (
         <ForbiddenState requiredAr={permissionLabelAr ?? permission} />

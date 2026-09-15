@@ -34,6 +34,8 @@ export interface ShellProps {
    * restaurant wording rather than a blank sidebar entry.
    */
   catalogLabel?: string;
+  /** And what one line in it is called — «صنف» or «منتج». */
+  itemLabel?: string;
 }
 
 export function Shell({
@@ -46,6 +48,7 @@ export function Shell({
   onSwitchRestaurant,
   notificationCount = 0,
   catalogLabel = 'المنيو',
+  itemLabel = 'صنف',
 }: ShellProps) {
   return (
     <div className="shell">
@@ -85,6 +88,8 @@ export function Shell({
           activeRestaurantId={activeRestaurantId}
           onSwitchRestaurant={onSwitchRestaurant}
           notificationCount={notificationCount}
+          catalogLabel={catalogLabel}
+          itemLabel={itemLabel}
         />
         {children}
       </main>
@@ -118,8 +123,13 @@ function Topbar({
   activeRestaurantId,
   onSwitchRestaurant,
   notificationCount,
+  catalogLabel,
+  itemLabel,
 }: Omit<ShellProps, 'children' | 'restaurants'> & {
   restaurants: readonly PortalRestaurant[];
+  /** Named by the merchant, so the search says what it actually searches. */
+  catalogLabel: string;
+  itemLabel: string;
 }) {
   return (
     <header className="topbar">
@@ -135,18 +145,18 @@ function Topbar({
       <div className="topbar__search">
         <Icon name="search" className="nav__icon" aria-hidden />
         <label htmlFor="portal-search" className="sr-only">
-          البحث عن طلب، عميل أو صنف في المنيو
+          {`البحث عن طلب، عميل أو ${itemLabel} في ${catalogLabel}`}
         </label>
         <input
           id="portal-search"
           type="search"
-          placeholder="البحث عن طلب، عميل أو صنف في المنيو..."
+          placeholder={`البحث عن طلب، عميل أو ${itemLabel} في ${catalogLabel}...`}
         />
       </div>
 
       <NotificationBell count={notificationCount ?? 0} />
 
-      <SessionMenu userName={userName} userRoleAr="فريق المطعم" />
+      <SessionMenu userName={userName} userRoleAr="فريق الشريك" />
 
       <RestaurantBadge
         restaurantName={restaurantName}
