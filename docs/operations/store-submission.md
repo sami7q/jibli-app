@@ -13,7 +13,7 @@ Each of these is a documented rejection reason that has already been closed.
 | **App Store 5.1.1(ii)** — no account required for content that does not need one | `(auth)/welcome.tsx` offers browsing as a guest; the number is asked for at checkout  |
 | **App Store 5.1.1(v)** — account deletion inside the app                         | `(tabs)/account.tsx` → `DeleteAccountSheet`, `DELETE /api/v1/profile`                 |
 | **App Store 4.8** — a privacy-respecting login beside any third-party one        | No third-party login ships. See "Google sign-in" below before changing that           |
-| **Play target API level** — API 36 since 31 August 2026                          | Expo SDK 54. This is the reason the project is on 54                                  |
+| **Play target API level** — API 36 since 31 August 2026                          | Expo SDK 57, which targets 36 and above                                               |
 | **Export compliance**                                                            | `ITSAppUsesNonExemptEncryption: false` in `app.config.ts`                             |
 | **Permission purpose strings**                                                   | `NSLocationWhenInUseUsageDescription`, in Arabic, naming the one screen that uses it  |
 | **Least privilege**                                                              | Android asks for three permissions. No camera, and never `ACCESS_BACKGROUND_LOCATION` |

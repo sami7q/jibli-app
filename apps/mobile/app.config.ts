@@ -79,11 +79,6 @@ const config: ExpoConfig = {
     privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://jibli.iq/privacy',
     termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://jibli.iq/terms',
   },
-  splash: {
-    image: './assets/splash.png',
-    resizeMode: 'contain',
-    backgroundColor: '#FF5400',
-  },
   assetBundlePatterns: ['**/*'],
   web: { favicon: './assets/favicon.png' },
   ios: {
@@ -130,8 +125,11 @@ const config: ExpoConfig = {
      *
      * Play refuses a new submission below API 36 as of 31 August 2026 — and it
      * refuses it at upload, not at review, so the floor is not something an
-     * appeal can reach. Expo SDK 54 targets 36, which is the reason this
-     * project is on 54 at all.
+     * appeal can reach. Expo SDK 57 clears it comfortably.
+     *
+     * The project moved 54 → 57 because Expo Go on iOS ships only the newest
+     * SDK: an iPhone could not open the project at all, and unlike Android
+     * there is no way to install an older Expo Go beside it.
      *
      * Deliberately not restated as `targetSdkVersion` here: that key belongs
      * to `expo-build-properties`, and installing a config plugin to repeat a
@@ -157,7 +155,7 @@ const config: ExpoConfig = {
     'expo-secure-store',
     'expo-localization',
     /*
-     * Required from SDK 54: fonts are embedded at build time by the plugin
+     * Required since SDK 54: fonts are embedded at build time by the plugin
      * rather than loaded from the bundle at runtime. Without it the Cairo
      * faces are missing on a release build and every screen falls back to the
      * system Arabic face — which is exactly the reflow `useFonts` exists to
@@ -165,10 +163,27 @@ const config: ExpoConfig = {
      */
     'expo-font',
     /*
+     * Required from SDK 57: the in-app browser is a config plugin now rather
+     * than a runtime-only module. `expo install --fix` refuses to edit a
+     * dynamic config like this one and prints the block to add, which is easy
+     * to scroll past — without it the OAuth and terms links open nothing on a
+     * release build.
+     */
+    'expo-web-browser',
+    /*
      * The splash is held by the app until fonts and the session have resolved
      * (see src/app/_layout.tsx), so the plugin must not hide it on its own.
+     *
+     * The plugin is now the only place it is configured. SDK 57 removed the
+     * top-level `splash` key from ExpoConfig — it had been the older of two
+     * ways to say the same thing, and this project set both. `resizeMode`
+     * moved here with it; without it the artwork is cropped to fill instead of
+     * fitted, which on a tall phone cuts the wordmark in half.
      */
-    ['expo-splash-screen', { backgroundColor: '#FF5400', image: './assets/splash.png' }],
+    [
+      'expo-splash-screen',
+      { backgroundColor: '#FF5400', image: './assets/splash.png', resizeMode: 'contain' },
+    ],
   ],
   experiments: {
     typedRoutes: true,

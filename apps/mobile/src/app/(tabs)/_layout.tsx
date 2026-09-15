@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { View, type ColorValue } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { color, radius, space, TAB_BAR_HEIGHT, text } from '@/theme';
 
@@ -73,7 +73,16 @@ function TabIcon({
   focused,
   name,
 }: {
-  color: string;
+  /*
+   * `ColorValue`, not `string`, since SDK 57.
+   *
+   * React Native widened every colour prop to admit its own opaque handles —
+   * a platform colour or a processed one — and expo-router passes the tab
+   * bar's tint straight through. Both consumers below take `ColorValue`
+   * already, so this is only the declaration catching up with what was always
+   * being handed to it.
+   */
+  color: ColorValue;
   focused: boolean;
   name: 'home' | 'heart' | 'clipboard-list' | 'account';
 }) {

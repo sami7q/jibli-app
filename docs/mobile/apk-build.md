@@ -25,7 +25,7 @@ pnpm dev:mobile
 
 Scan the QR code with Expo Go (Android) or the Camera app (iOS) and the app
 opens on the phone, pointed at the deployed API. Every dependency this app uses
-is in the standard Expo SDK 54 set, so nothing here needs a custom binary.
+is in the standard Expo SDK 57 set, so nothing here needs a custom binary.
 See `running-the-app.md`.
 
 Build an APK instead when you want a file to hand to somebody else, an icon on
