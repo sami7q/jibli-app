@@ -11,6 +11,7 @@
     "bundle": "expo export -p ios -p android --output-dir .expo-export",
     "web": "expo start --web",
     "proxy": "node scripts/dev-proxy.mjs",
+    "check": "node scripts/preflight.mjs",
     "apk": "eas build --platform android --profile preview"
   },
   "dependencies": {

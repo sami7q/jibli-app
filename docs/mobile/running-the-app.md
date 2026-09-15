@@ -18,10 +18,34 @@ Then a way to see the app. Pick one:
 
 | | What it runs | Needs | Good for |
 |---|---|---|---|
-| **Expo Go** | JavaScript only, inside Expo's own app | a phone + the Expo Go app from the store | seeing screens today |
-| **Development build** | a real Jibli binary on your device | Xcode (iOS) or Android Studio | anything native — push, the real icon, store testing |
+| **Expo Go** | JavaScript only, inside Expo's own app | a phone, Expo Go from the store, **and a free Expo account signed in on both the phone and the CLI** | seeing screens today |
+| **Development build** | a real Jibli binary on your device | Xcode (iOS) or Android Studio; no account | anything native — push, the real icon, store testing |
 
 Expo Go is the fast path and is enough for everything the app currently does.
+
+> **The account is not optional any more.** Since SDK 57, Expo requires you to
+> be signed in on *both* the Expo CLI and the Expo Go app, to the same account,
+> before it will open a development server. Without it the phone answers «You
+> need to be signed in to Expo Go and Expo CLI to open your project» — an error
+> that appears on the phone for a cause that lives on the computer. It applies
+> to Expo Go on iOS today; Expo says Android follows.
+>
+> ```powershell
+> npx expo login
+> ```
+>
+> then in Expo Go: home → avatar, top right → sign in to the same account.
+> Create it free at https://expo.dev/signup. Development builds are exempt.
+
+### Check before you scan
+
+```powershell
+pnpm mobile:check
+```
+
+Verifies the SDK, CLI sign-in, which network address the QR will carry (it
+ignores WSL and Hyper-V adapters, which a phone cannot route to) and whether the
+API is awake — each of which otherwise fails in a way that points elsewhere.
 
 ---
 

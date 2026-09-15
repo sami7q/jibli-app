@@ -14,19 +14,32 @@ paid builds, so a build takes roughly ten to twenty minutes rather than two.
 Neither path involves a store. An APK built this way is installed by opening
 the link on the phone and allowing "install from unknown sources" once.
 
-## Before anything: you may not need this at all
+## Before anything: Expo Go is still the faster path
 
-If the goal is «أريد أجرب التطبيق على هاتفي وهو شغّال أونلاين», **Expo Go is
-faster and needs no account and no build**. From the repository root:
+If the goal is «أريد أجرب التطبيق على هاتفي وهو شغّال أونلاين», Expo Go gets
+there in minutes rather than in a build queue. Every dependency this app uses
+is in the standard Expo SDK 57 set, so nothing here needs a custom binary.
 
+**It does need an Expo account, though — since SDK 57.** Expo changed the rule:
+a project served in development mode now requires you to be signed in on *both*
+the CLI and the Expo Go app, to the same account. Scanning without that gives
+«You need to be signed in to Expo Go and Expo CLI to open your project», on the
+phone, for a cause that is on the computer. It currently applies to Expo Go on
+iOS and Expo says Android will follow.
+
+So the free account is unavoidable for either path. Create it once (§0 below),
+then:
+
+```powershell
+pnpm mobile:check
+```
 ```powershell
 pnpm dev:mobile
 ```
 
-Scan the QR code with Expo Go (Android) or the Camera app (iOS) and the app
-opens on the phone, pointed at the deployed API. Every dependency this app uses
-is in the standard Expo SDK 57 set, so nothing here needs a custom binary.
-See `running-the-app.md`.
+`mobile:check` verifies the things that fail silently — CLI sign-in, which
+network address the QR will carry, whether the API is awake — before you pick
+up the phone. See `running-the-app.md`.
 
 Build an APK instead when you want a file to hand to somebody else, an icon on
 the home screen, or the app running with no laptop on the network.
