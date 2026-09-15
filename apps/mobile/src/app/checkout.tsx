@@ -651,6 +651,7 @@ function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void })
       <Row gap={space[2]}>
         <Button
           label="اختيار الخيارات"
+          style={{ alignSelf: 'center' }}
           onPress={() =>
             router.push(`/restaurant/${cart.restaurantId}?item=${line.menuItemId}`)
           }
@@ -658,6 +659,7 @@ function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void })
         <Button
           label="حذف الصنف"
           variant="secondary"
+          style={{ alignSelf: 'center' }}
           onPress={() => {
             remove(line.key);
             onRetry();

@@ -11,9 +11,9 @@ import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { notify } from '@/lib/dialog';
-import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
-import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
+import { Button, ErrorState, HScroll, Row, Screen, Skeleton, Text } from '@/ui';
 import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
 
 /**
@@ -217,7 +217,7 @@ export default function RestaurantScreen() {
               padding: space[3],
               borderRadius: radius.md,
               backgroundColor: color.warningSoft,
-              flexDirection: 'row',
+              flexDirection: ROW,
               alignItems: 'center',
               gap: space[2],
             }}
@@ -367,9 +367,10 @@ function Cover({
         style={{
           position: 'absolute',
           top: space[10],
-          insetInlineStart: space[4],
-          insetInlineEnd: space[4],
-          flexDirection: 'row',
+          // Equal insets, so physical sides are unambiguous in either mode.
+          left: space[4],
+          right: space[4],
+          flexDirection: ROW,
           justifyContent: 'space-between',
         }}
       >
@@ -603,9 +604,7 @@ function CategoryTabs({
   onSelect: (id: string) => void;
 }) {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
+    <HScroll
       contentContainerStyle={{
         paddingHorizontal: space[4],
         paddingTop: space[4],
@@ -637,7 +636,7 @@ function CategoryTabs({
           </Pressable>
         );
       })}
-    </ScrollView>
+    </HScroll>
   );
 }
 
@@ -688,7 +687,7 @@ function MenuItemRow({
   return (
     <View
       style={{
-        flexDirection: 'row',
+        flexDirection: ROW,
         gap: space[3],
         padding: space[3],
         backgroundColor: color.surfaceCard,
@@ -798,7 +797,7 @@ function MenuItemRow({
               {
                 position: 'absolute',
                 bottom: -space[2],
-                insetInlineStart: -space[2],
+                right: -space[2],
                 width: 34,
                 height: 34,
                 borderRadius: radius.full,
@@ -942,7 +941,7 @@ function ItemSheet({
             label={`إضافة — ${formatIqdArabic(iqd(unitPriceIqd * quantity))}`}
             onPress={submit}
             disabled={missing.length > 0}
-            style={{ flex: 1 }}
+            style={{ flex: 1, alignSelf: 'center' }}
           />
         </Row>
       }

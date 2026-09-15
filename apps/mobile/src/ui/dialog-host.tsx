@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
-import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
+import { ROW, color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
 import { Text } from '@/ui';
 import { subscribeToDialogs, type DialogRequest } from '@/lib/dialog';
 
@@ -101,7 +101,7 @@ export function DialogHost() {
            */}
           <View
             style={{
-              flexDirection: 'row-reverse',
+              flexDirection: ROW,
               gap: space[3],
               marginTop: space[2],
             }}

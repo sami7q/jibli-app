@@ -60,7 +60,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
         <Text tone="muted" align="center">
           نعتذر — أُغلقت الشاشة بسبب خلل. بياناتك وطلباتك لم تتأثر.
         </Text>
-        <Button label="إعادة المحاولة" onPress={this.reset} />
+        <Button label="إعادة المحاولة" onPress={this.reset} style={{ alignSelf: 'center' }} />
       </View>
     );
   }

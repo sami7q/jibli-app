@@ -88,7 +88,8 @@ export default function DriverLoginScreen() {
           style={{
             position: 'absolute',
             top: space[10],
-            insetInlineStart: space[4],
+            // The start corner: the right, where the chevron points.
+            right: space[4],
             width: TAP_TARGET,
             height: TAP_TARGET,
             alignItems: 'center',

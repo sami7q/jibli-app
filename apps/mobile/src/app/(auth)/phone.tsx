@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
-import { BRAND, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
 import { useSession } from '@/lib/session';
@@ -382,7 +382,9 @@ const styles = StyleSheet.create({
   back: {
     position: 'absolute',
     top: space[10],
-    insetInlineStart: space[4],
+    // The start corner, which in Arabic is the right one — and where a
+    // right-pointing chevron belongs.
+    right: space[4],
     width: TAP_TARGET,
     height: TAP_TARGET,
     alignItems: 'center',
@@ -394,7 +396,7 @@ const styles = StyleSheet.create({
   subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
 
   inputRow: {
-    flexDirection: 'row',
+    flexDirection: ROW,
     alignItems: 'center',
     gap: space[2],
     borderWidth: 1,
@@ -405,12 +407,15 @@ const styles = StyleSheet.create({
     minHeight: TAP_TARGET + 8,
   },
   prefix: {
-    flexDirection: 'row',
+    flexDirection: ROW,
     alignItems: 'center',
     gap: space[1],
-    paddingEnd: space[3],
-    borderEndWidth: 1,
-    borderEndColor: color.borderSubtle,
+    // The prefix block leads on the right, so the rule that separates it from
+    // the number sits on its left. Physical, like every other position in the
+    // app: the logical pair follows the native flag.
+    paddingLeft: space[3],
+    borderLeftWidth: 1,
+    borderLeftColor: color.borderSubtle,
   },
   prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
   input: {

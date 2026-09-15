@@ -8,7 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
 import { useIsGuest, useSession } from '@/lib/session';
 import { confirmAsync, notify } from '@/lib/dialog';
-import { accent, color, radius, shadow, space } from '@/theme';
+import { ALIGN_START, ROW, accent, color, radius, shadow, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
 import { ListRow, RTL_TEXT, Sheet } from '@/ui/catalog';
@@ -52,17 +52,12 @@ export default function AccountScreen() {
     <Screen scroll edges={['top']} padded={false}>
       <View style={{ padding: space[4], gap: space[4] }}>
         {/*
-         * This screen reads right-to-left, and the rest of the app does not.
-         *
-         * That is a deliberate, local decision rather than an oversight. The
-         * account screen is a column of Arabic labels with nothing else in it —
-         * no prices, no Latin names, no photographs to anchor the eye — and a
-         * column of Arabic that begins at the left edge is the one place the
-         * misalignment is impossible to read past. Turning the whole app over
-         * is a separate decision about the whole product.
-         *
          * `RTL_TEXT` is physical alignment, so it holds whichever way the
-         * native layout flag happens to be set.
+         * native layout flag happens to be set. It used to be this screen's
+         * private exception — for one release the account page was the only
+         * right-to-left screen in the app — and it stays now for the narrower
+         * reason it was always good for: it states the edge rather than
+         * leaving it to the bidi algorithm.
          */}
         <Text variant="h2" style={RTL_TEXT}>
           حسابي
@@ -77,7 +72,7 @@ export default function AccountScreen() {
               borderWidth: 1,
               borderColor: accent[200],
               gap: space[2],
-              alignItems: 'flex-end',
+              alignItems: ALIGN_START,
             }}
           >
             <Text variant="bodyBold" tone="brand" style={RTL_TEXT}>
@@ -100,7 +95,7 @@ export default function AccountScreen() {
            */
           <View
             style={{
-              flexDirection: 'row-reverse',
+              flexDirection: ROW,
               alignItems: 'center',
               gap: space[4],
               padding: space[4],
@@ -142,20 +137,17 @@ export default function AccountScreen() {
 
       <Group title="حسابي">
         <ListRow
-          rtl
           label="منطقة التوصيل"
           sublabel={area?.cityNameAr ?? 'اختر منطقتك'}
           icon={<MaterialCommunityIcons name="map-marker-outline" size={20} color={color.brand} />}
           onPress={() => setPickingArea(true)}
         />
         <ListRow
-          rtl
           label="المفضلة"
           icon={<MaterialCommunityIcons name="heart-outline" size={20} color={color.brand} />}
           onPress={() => router.push('/(tabs)/favorites')}
         />
         <ListRow
-          rtl
           label="طلباتي"
           icon={
             <MaterialCommunityIcons name="clipboard-list-outline" size={20} color={color.brand} />
@@ -174,7 +166,6 @@ export default function AccountScreen() {
        */}
       <Group title="العمل مع جيبلي">
         <ListRow
-          rtl
           label="الانضمام كمندوب توصيل"
           sublabel="وصّل الطلبات واكسب معنا"
           icon={<MaterialCommunityIcons name="motorbike" size={20} color={color.brand} />}
@@ -197,7 +188,6 @@ export default function AccountScreen() {
          * a courier borrowing a customer's phone is the ordinary case.
          */}
         <ListRow
-          rtl
           label={isDriver ? 'وضع المندوب' : 'دخول المندوبين'}
           sublabel={
             isDriver ? 'طلبات التوصيل المعيّنة لك' : 'لديك اسم مستخدم من المطعم؟ ادخل من هنا'
@@ -209,14 +199,12 @@ export default function AccountScreen() {
 
       <Group title="المساعدة">
         <ListRow
-          rtl
           label="المساعدة والدعم"
           sublabel="تواصل معنا مباشرة"
           icon={<MaterialCommunityIcons name="headset" size={20} color={color.brand} />}
           onPress={() => open(`tel:${extra?.supportPhone ?? ''}`)}
         />
         <ListRow
-          rtl
           label="سياسة الخصوصية"
           icon={
             <MaterialCommunityIcons name="shield-check-outline" size={20} color={color.brand} />
@@ -224,7 +212,6 @@ export default function AccountScreen() {
           onPress={() => open(extra?.privacyPolicyUrl ?? 'https://jibli.iq/privacy')}
         />
         <ListRow
-          rtl
           label="الشروط والأحكام"
           icon={
             <MaterialCommunityIcons name="file-document-outline" size={20} color={color.brand} />
@@ -236,7 +223,6 @@ export default function AccountScreen() {
       {!isGuest ? (
         <Group title="الحساب">
           <ListRow
-          rtl
             label="تسجيل الخروج"
             icon={<MaterialCommunityIcons name="logout" size={20} color={color.textSecondary} />}
             onPress={() =>
@@ -251,7 +237,6 @@ export default function AccountScreen() {
             }
           />
           <ListRow
-          rtl
             label="حذف حسابي"
             sublabel="حذف نهائي لبياناتك الشخصية"
             destructive
@@ -353,14 +338,19 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
       title="حذف الحساب"
       footer={
         <Row gap={space[2]}>
-          <Button label="تراجع" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <Button
+            label="تراجع"
+            variant="ghost"
+            onPress={onClose}
+            style={{ flex: 1, alignSelf: 'center' }}
+          />
           <Button
             label="حذف نهائي"
             variant="danger"
             loading={remove.isPending}
             disabled={remove.isPending}
             onPress={() => remove.mutate()}
-            style={{ flex: 1 }}
+            style={{ flex: 1, alignSelf: 'center' }}
           />
         </Row>
       }

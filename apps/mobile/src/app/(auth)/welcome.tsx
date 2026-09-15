@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSession } from '@/lib/session';
-import { BRAND, TAP_TARGET, palette, radius, space } from '@/theme';
+import { BRAND, ROW, TAP_TARGET, palette, radius, space } from '@/theme';
 import { Screen, Text } from '@/ui';
 import { IraqFlag, JibliWordmark, WORDMARK_ENTRANCE_MS } from '@/ui/brand';
 
@@ -24,21 +24,28 @@ import { IraqFlag, JibliWordmark, WORDMARK_ENTRANCE_MS } from '@/ui/brand';
  * call about it.
  */
 
-/** The food outlines drifting behind the mark, from the comp's doodle layer. */
+/**
+ * The food outlines drifting behind the mark, from the comp's doodle layer.
+ *
+ * Placed by physical side rather than by `start`/`end`. This is a composition,
+ * not a reading order — the taco is where it is because of what is next to it,
+ * and a logical side would silently mirror the whole scatter on the day the
+ * native RTL flag finally takes.
+ */
 const DOODLES = [
-  { icon: 'taco', size: 150, top: '-2%', start: '-12%', rotate: '-12deg', drift: -8 },
+  { icon: 'taco', size: 150, top: '-2%', left: '-12%', rotate: '-12deg', drift: -8 },
   {
     icon: 'food-drumstick-outline',
     size: 120,
     top: '40%',
-    start: '-8%',
+    left: '-8%',
     rotate: '38deg',
     drift: 7,
   },
-  { icon: 'hamburger', size: 160, top: '62%', start: '-6%', rotate: '-6deg', drift: -9 },
-  { icon: 'french-fries', size: 170, top: '44%', end: '-10%', rotate: '12deg', drift: 8 },
-  { icon: 'pizza', size: 145, top: '70%', end: '28%', rotate: '-12deg', drift: -7 },
-  { icon: 'popcorn', size: 130, top: '84%', end: '-6%', rotate: '-8deg', drift: 6 },
+  { icon: 'hamburger', size: 160, top: '62%', left: '-6%', rotate: '-6deg', drift: -9 },
+  { icon: 'french-fries', size: 170, top: '44%', right: '-10%', rotate: '12deg', drift: 8 },
+  { icon: 'pizza', size: 145, top: '70%', right: '28%', rotate: '-12deg', drift: -7 },
+  { icon: 'popcorn', size: 130, top: '84%', right: '-6%', rotate: '-8deg', drift: 6 },
 ] as const;
 
 export default function WelcomeScreen() {
@@ -168,7 +175,7 @@ export default function WelcomeScreen() {
 
           <View
             style={{
-              flexDirection: 'row',
+              flexDirection: ROW,
               alignItems: 'center',
               justifyContent: 'center',
               gap: space[2],
@@ -287,8 +294,8 @@ function Doodle({ doodle, animate }: { doodle: (typeof DOODLES)[number]; animate
       style={{
         position: 'absolute',
         top: doodle.top,
-        ...('start' in doodle ? { insetInlineStart: doodle.start } : {}),
-        ...('end' in doodle ? { insetInlineEnd: doodle.end } : {}),
+        ...('left' in doodle ? { left: doodle.left } : {}),
+        ...('right' in doodle ? { right: doodle.right } : {}),
         transform: [
           { rotate: doodle.rotate },
           {

@@ -8,13 +8,12 @@ import {
   type ReactNode,
 } from 'react';
 import { AppState, Platform, Pressable, View } from 'react-native';
-import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
 import { playChime } from './chime';
-import { hasSeenOrderScreen, rememberOrderScreenSeen } from './notification-inbox';
 import { useSession } from './session';
 import { useCart } from './cart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,14 +27,15 @@ import { RateOrderSheet } from '@/ui/rate-order';
  * Until this existed, an order was only visible on the screen that showed it.
  * Someone who placed an order and went back to browsing had no idea the
  * restaurant had accepted it, and someone who closed the app and came back had
- * to remember to go looking. Three things follow from that, and they are all
- * the same fact seen from different screens:
+ * to remember to go looking. Two things follow from that, and they are the
+ * same fact seen from different screens:
  *
  *   - a bar, on every screen, saying where the order is
  *   - an announcement when that changes, rather than a number that silently
  *     differs from the one read a minute ago
- *   - the order itself, opened on launch, because a customer who opens this
- *     app while waiting for food opened it to check on the food
+ *
+ * What does *not* follow is opening the order for them. That was here once and
+ * is deliberately gone; the note where it used to live says why.
  *
  * Polled rather than pushed. The API has a realtime gateway and the app has no
  * client for it; push covers a closed app and needs a provider that is not
@@ -161,7 +161,6 @@ async function notifyOnDevice(body: string): Promise<void> {
 
 export function OrderWatchProvider({ children }: { children: ReactNode }) {
   const { state } = useSession();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const segments = useSegments() as readonly string[];
 
@@ -277,54 +276,26 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [signedIn, queryClient]);
 
-  // ── Opening the order on launch ───────────────────────────────────────────
-
   /*
-   * Which order this device has already been shown the tracking screen for.
+   * ── Opening the app, with an order already running ────────────────────────
    *
-   * It was a ref — once per mount — which on a phone means once per launch and
-   * in a browser means once per refresh. Reloading the page while reading a
-   * menu yanked the screen away to an order the customer already knew about,
-   * every single time. Once per *order* is what the rule was always trying to
-   * say: open the app after placing something and it takes you to it; open it
-   * again an hour later and it leaves you where you went.
-   */
-  const jumped = useRef(false);
-
-  /*
-   * Whether the router can be navigated yet.
+   * Nothing happens. That is the behaviour, and it is worth stating because
+   * the opposite used to be: launching the app with a live order pushed the
+   * tracking screen over the home screen, once per order.
    *
-   * `segments` fills in before the root navigator has finished mounting, and
-   * pushing in that window throws «Attempted to navigate before mounting the
-   * Root Layout component» — which is exactly what a provider that navigates
-   * from an effect at the root will hit on a cold start, every time, because
-   * it is the first thing to run. `state.key` is only set once navigation is
-   * actually ready.
+   * The reasoning was that somebody who opens a delivery app while waiting for
+   * food opened it to check on the food. Sometimes — but they also open it to
+   * order something else, to look at a different restaurant, or to hand the
+   * phone to whoever is paying, and in every one of those cases the app has
+   * decided where they were going on their behalf and they have to press back
+   * to get out of it. A screen the customer did not ask for is a worse cost
+   * than a tap they did not have to make.
+   *
+   * So the answer to «where is my order» is the card below instead. It is on
+   * every screen, it says the status in words, it updates itself, and it opens
+   * the same screen when it is tapped — which is the same information offered
+   * rather than imposed.
    */
-  const navigationState = useRootNavigationState();
-  const navigationReady = Boolean(navigationState?.key);
-
-  useEffect(() => {
-    if (jumped.current || !active || !navigationReady) return;
-
-    /*
-     * Only from a tab. Taking the screen away from someone who is filling in
-     * an address, reading a menu or signing in would be a worse interruption
-     * than the one it saves — and checkout already lands on this same screen
-     * by itself.
-     */
-    if (segments[0] !== '(tabs)') return;
-
-    // Claimed before the await: two polls landing together would otherwise
-    // both pass the test before either had recorded anything.
-    jumped.current = true;
-
-    void (async () => {
-      if (await hasSeenOrderScreen(active.id)) return;
-      await rememberOrderScreenSeen(active.id);
-      router.push(`/order/${active.id}`);
-    })();
-  }, [active, navigationReady, segments, router]);
 
   // ── The rating window, a quarter of an hour after delivery ────────────────
 

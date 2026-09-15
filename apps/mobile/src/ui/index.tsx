@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -7,12 +7,25 @@ import {
   TextInput,
   View,
   type StyleProp,
+  type ScrollViewProps,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
+import {
+  ALIGN_START,
+  color,
+  LAID_OUT_RTL,
+  palette,
+  radius,
+  ROW,
+  shadow,
+  space,
+  TAP_TARGET,
+  TEXT_START,
+  text,
+} from '@/theme';
 
 /**
  * The mobile UI kit.
@@ -27,9 +40,14 @@ import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme
  *
  * Two rules the whole kit follows:
  *
- *   **No hard-coded left or right.** RTL is forced (plan §2), so anything
- *   directional uses `start`/`end` and React Native mirrors it. A `marginLeft`
- *   in here is a bug that only shows up in Arabic.
+ *   **Direction is decided here, not by the device.** `I18nManager.forceRTL`
+ *   does not take until the app restarts and never takes at all in Expo Go, so
+ *   a kit that writes `flexDirection: 'row'` and trusts the flag renders one
+ *   way in development and the other way in a store build. Everything
+ *   directional reads a pinned token instead — `ROW`, `ALIGN_START`,
+ *   `TEXT_START` — which means the same thing in both modes. The corollary is
+ *   that positional styles must be *physical* (`left`/`right`): the logical
+ *   ones follow the flag, so they would reopen the split these tokens close.
  *
  *   **Nothing smaller than the tap target.** Every pressable declares
  *   `minHeight: TAP_TARGET` (plan §134). A 32px icon button is a button most
@@ -51,11 +69,7 @@ export function Text({
   children: ReactNode;
   variant?: TextVariant;
   tone?: 'primary' | 'secondary' | 'muted' | 'brand' | 'inverse' | 'danger' | 'success';
-  /**
-   * `start` follows the writing direction; there is no logical `end` in React
-   * Native, and offering one that resolves to a physical side would be wrong
-   * in exactly the language this app is written in.
-   */
+  /** `start` is the right edge — see `TEXT_START`. */
   align?: 'start' | 'center';
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
@@ -75,9 +89,7 @@ export function Text({
       style={[
         text[variant],
         { color: tones[tone] },
-        // 'auto' follows the text's own direction — under forced RTL that is
-        // the right edge, which is what "start" means here.
-        align ? { textAlign: align === 'start' ? ('auto' as const) : ('center' as const) } : null,
+        align ? { textAlign: align === 'start' ? TEXT_START : ('center' as const) } : null,
         style,
       ]}
       {...(numberOfLines === undefined ? {} : { numberOfLines })}
@@ -216,11 +228,22 @@ export function Button({
           minHeight: size === 'lg' ? TAP_TARGET + 8 : TAP_TARGET,
           paddingHorizontal: space[5],
           borderRadius: radius.md,
-          flexDirection: 'row',
+          // The icon sits before the label, which in Arabic is its right.
+          flexDirection: ROW,
           alignItems: 'center',
           justifyContent: 'center',
           gap: space[2],
-          alignSelf: block ? 'stretch' : 'flex-start',
+          /*
+           * Not `flex-start`: an inline button under a right-aligned heading
+           * belongs on the right, and `flex-start` is the left until the
+           * native flag says otherwise.
+           *
+           * This is the column case, which is nearly every one. A button
+           * placed inside a `Row` is on a vertical cross axis instead, where
+           * this would read as "bottom" — those few pass `alignSelf: 'center'`
+           * of their own and say so at the call site.
+           */
+          alignSelf: block ? 'stretch' : ALIGN_START,
         },
         surfaces[variant],
         variant === 'primary' || variant === 'danger' ? shadow.sm : null,
@@ -287,6 +310,20 @@ export function Divider({ spacing = space[3] }: { spacing?: number }) {
   );
 }
 
+/**
+ * A row, reading right to left.
+ *
+ * The single most load-bearing component in the app: nearly every header, card
+ * and summary line in twenty screens is one of these, and for most of them
+ * this is the only thing that decides which way round they come out. It wrote
+ * `flexDirection: 'row'` and therefore followed the native flag — which is how
+ * an Arabic app ended up with its back arrows on the left and its restaurant
+ * names on the wrong side of the price.
+ *
+ * A row whose *content* reads the other way — a phone prefix beside a number,
+ * a verification code — is not one of these: it reaches for `ROW_LTR` and says
+ * so at the point where the exception is being made.
+ */
 export function Row({
   children,
   gap = space[2],
@@ -303,13 +340,60 @@ export function Row({
   return (
     <View
       style={[
-        { flexDirection: 'row', alignItems: align, gap },
+        { flexDirection: ROW, alignItems: align, gap },
         justify ? { justifyContent: justify } : null,
         style,
       ]}
     >
       {children}
     </View>
+  );
+}
+
+/**
+ * A strip that scrolls sideways and begins on the right.
+ *
+ * Two things have to be true for that, and only one of them is a style. The
+ * items are laid out with `ROW`, so the first category sits at the right-hand
+ * end of the content; but a horizontal `ScrollView` still opens at offset zero,
+ * which is the *left* end — so the strip would open showing the last item and
+ * the customer would have to swipe backwards to find the first one.
+ *
+ * Nudged to the far end once, on the first layout, and only where the platform
+ * has not already done it: a device laying out right-to-left natively — and a
+ * browser under `dir="rtl"` — starts a horizontal scroller at the right on its
+ * own, and a second nudge there would be a no-op at best.
+ *
+ * `flexGrow` is for the short case. Four categories do not fill the screen, and
+ * without it the content box shrinks to its items and lands against the left
+ * edge — a row of chips floating away from the side the page reads from.
+ */
+export function HScroll({
+  children,
+  contentContainerStyle,
+  onContentSizeChange,
+  ...props
+}: Omit<ScrollViewProps, 'horizontal'> & { children: ReactNode }) {
+  const view = useRef<ScrollView>(null);
+  const settled = useRef(false);
+
+  return (
+    <ScrollView
+      ref={view}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      {...props}
+      contentContainerStyle={[{ flexDirection: ROW, flexGrow: 1 }, contentContainerStyle]}
+      onContentSizeChange={(width, height) => {
+        if (!LAID_OUT_RTL && !settled.current && width > 0) {
+          settled.current = true;
+          view.current?.scrollToEnd({ animated: false });
+        }
+        onContentSizeChange?.(width, height);
+      }}
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -338,6 +422,8 @@ export function Badge({
         paddingHorizontal: space[2],
         paddingVertical: space[1],
         borderRadius: radius.full,
+        // The top of whatever row it is in — `alignSelf` here is the cross
+        // axis, which for a row is vertical and does not mirror.
         alignSelf: 'flex-start',
       }}
     >
@@ -400,8 +486,12 @@ export function Input({
           backgroundColor: color.surfaceCard,
           color: color.textPrimary,
           // A phone number typed into an RTL field comes out reversed unless
-          // the field itself is LTR.
-          ...(ltr ? { textAlign: 'left' as const, writingDirection: 'ltr' as const } : {}),
+          // the field itself is LTR. Everything else starts where Arabic
+          // starts, stated rather than left to the bidi algorithm — an empty
+          // field has no first strong character for it to read.
+          ...(ltr
+            ? { textAlign: 'left' as const, writingDirection: 'ltr' as const }
+            : { textAlign: TEXT_START }),
         },
         style,
       ]}

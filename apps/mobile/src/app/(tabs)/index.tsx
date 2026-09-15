@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { FlatList, Image, Pressable, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -19,9 +19,20 @@ import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
 import { notify } from '@/lib/dialog';
-import { BRAND, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import {
+  ALIGN_START,
+  BRAND,
+  ROW,
+  TAP_TARGET,
+  accent,
+  color,
+  palette,
+  radius,
+  shadow,
+  space,
+} from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
-import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
+import { EmptyState, ErrorState, HScroll, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import type { MerchantType } from '@jibli/contracts';
 import { useVertical } from '@/lib/vertical';
@@ -416,13 +427,17 @@ function Header({
           accessibilityHint="يفتح شاشة اختيار القسم"
           style={({ pressed }) => [
             {
-              flexDirection: 'row-reverse',
+              flexDirection: ROW,
               alignItems: 'center',
-              alignSelf: 'flex-start',
+              // The header's start corner — the right one, above the delivery
+              // area it sits over.
+              alignSelf: ALIGN_START,
               gap: space[2],
               height: 34,
-              paddingInlineStart: space[1],
-              paddingInlineEnd: space[3],
+              // Physical, because the visual order above is pinned: the round
+              // glyph leads on the right and wants the tighter inset.
+              paddingRight: space[1],
+              paddingLeft: space[3],
               marginBottom: space[3],
               borderRadius: radius.full,
               backgroundColor: 'rgba(255,255,255,0.2)',
@@ -461,7 +476,7 @@ function Header({
             accessibilityLabel="تغيير منطقة التوصيل"
             accessibilityValue={areaLabel ? { text: areaLabel } : undefined}
             style={({ pressed }) => [
-              { flexDirection: 'row', alignItems: 'center', gap: space[2], flex: 1 },
+              { flexDirection: ROW, alignItems: 'center', gap: space[2], flex: 1 },
               pressed ? { opacity: 0.75 } : null,
             ]}
           >
@@ -745,9 +760,7 @@ function CategoryStrip({
         </Text>
       </Row>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <HScroll
         contentContainerStyle={{
           paddingHorizontal: space[4],
           gap: space[3],
@@ -763,7 +776,7 @@ function CategoryStrip({
             onPress={() => onSelect(selected === entry.key ? null : entry.key)}
           />
         ))}
-      </ScrollView>
+      </HScroll>
     </View>
   );
 }
@@ -905,7 +918,7 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
   return (
     <View
       style={{
-        flexDirection: 'row',
+        flexDirection: ROW,
         gap: space[3],
         padding: space[3],
         backgroundColor: color.surfaceCard,
@@ -1023,7 +1036,7 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
               {
                 position: 'absolute',
                 bottom: -space[2],
-                insetInlineStart: -space[2],
+                right: -space[2],
                 width: 32,
                 height: 32,
                 borderRadius: radius.full,

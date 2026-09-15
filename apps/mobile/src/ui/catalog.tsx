@@ -14,7 +14,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space, text } from '@/theme';
+import {
+  ALIGN_START,
+  ROW,
+  TAP_TARGET,
+  TEXT_START,
+  accent,
+  color,
+  palette,
+  radius,
+  shadow,
+  space,
+  text,
+} from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Row, Text } from './index';
 
@@ -27,8 +39,10 @@ import { Row, Text } from './index';
  * `docs/design/mobile-design-system.md` §2, and these read the reconciled
  * token rather than any single comp's value.
  *
- * Same two rules as the primitives: nothing hard-codes left or right, and
- * nothing pressable is smaller than the tap target.
+ * Same two rules as the primitives: direction comes from a pinned token
+ * rather than from the device's flag — and where a position has to name a
+ * side, it names a physical one — and nothing pressable is smaller than the
+ * tap target.
  */
 
 // ── IconTile ────────────────────────────────────────────────────────────────
@@ -81,8 +95,10 @@ export function IconTile({
 /**
  * Arabic that starts where Arabic starts.
  *
- * `textAlign` is physical, so this is right in either layout direction — which
- * is what a row that opts into RTL inside an otherwise LTR app needs.
+ * `textAlign` is physical, so it holds whichever way the native flag happens
+ * to be set — and it says the right edge outright rather than leaving it to
+ * the bidi algorithm, which reads the first strong character and therefore
+ * sends a line opening with a price or an order number to the left.
  */
 export const RTL_TEXT = { textAlign: 'right', writingDirection: 'rtl' } as const;
 
@@ -115,7 +131,15 @@ export function SearchBar({
       <MaterialCommunityIcons name="magnify" size={20} color={color.textMuted} />
       <TextInput
         placeholderTextColor={palette.ink[400]}
-        style={[text.small, { flex: 1, color: color.textPrimary, paddingVertical: space[2] }]}
+        style={[
+          text.small,
+          {
+            flex: 1,
+            color: color.textPrimary,
+            paddingVertical: space[2],
+            textAlign: TEXT_START,
+          },
+        ]}
         {...props}
       />
       {onFilterPress ? (
@@ -155,9 +179,7 @@ export function RatingPill({ rating, count }: { rating: number | null; count?: n
   }
 
   return (
-    <View
-      style={[pill(palette.warning[50], palette.warning[500]), { flexDirection: 'row', gap: 3 }]}
-    >
+    <View style={[pill(palette.warning[50], palette.warning[500]), { flexDirection: ROW, gap: 3 }]}>
       <MaterialCommunityIcons name="star" size={13} color={palette.warning[500]} />
       <Text variant="caption" style={{ color: palette.warning[700] }}>
         {rating.toFixed(1)}
@@ -175,6 +197,8 @@ function pill(background: string, border: string): ViewStyle {
     paddingHorizontal: space[2],
     paddingVertical: 2,
     borderRadius: radius.md,
+    // Vertical, not horizontal: every pill sits inside a row, and a row's
+    // cross axis does not mirror.
     alignSelf: 'flex-start',
     alignItems: 'center',
   };
@@ -308,7 +332,15 @@ export function SummaryRow({
 
 // ── ListRow ─────────────────────────────────────────────────────────────────
 
-/** The account screen's row: tile, label, chevron. */
+/**
+ * The account screen's row: tile, label, chevron.
+ *
+ * It used to take an `rtl` flag, because for one release the account screen
+ * was the only right-to-left screen in the app and turning the rest over was a
+ * decision nobody had made yet. That decision has been made — the whole app
+ * reads right-to-left now — so the flag is gone rather than left behind as a
+ * prop every call site would have to remember to pass.
+ */
 export function ListRow({
   label,
   sublabel,
@@ -316,7 +348,6 @@ export function ListRow({
   badge,
   onPress,
   destructive = false,
-  rtl = false,
 }: {
   label: string;
   sublabel?: string;
@@ -324,17 +355,6 @@ export function ListRow({
   badge?: string;
   onPress: () => void;
   destructive?: boolean;
-  /**
-   * Lay the row out right-to-left: icon on the right, label beside it reading
-   * inward, chevron on the far left.
-   *
-   * Opt-in rather than the default, and deliberately so. The rest of the app
-   * lays out left-to-right today; turning that over wholesale is a decision
-   * about the whole product, not about this component, and doing it from here
-   * would change nineteen screens nobody asked about. The account screen asks
-   * for it because it is a column of Arabic labels and nothing else.
-   */
-  rtl?: boolean;
 }) {
   return (
     <Pressable
@@ -343,7 +363,7 @@ export function ListRow({
       accessibilityLabel={label}
       style={({ pressed }) => [
         {
-          flexDirection: rtl ? ROW : 'row',
+          flexDirection: ROW,
           alignItems: 'center',
           gap: space[3],
           minHeight: TAP_TARGET + 8,
@@ -360,15 +380,11 @@ export function ListRow({
       ) : null}
 
       <View style={{ flex: 1 }}>
-        <Text
-          variant="bodyBold"
-          tone={destructive ? 'danger' : 'primary'}
-          style={rtl ? RTL_TEXT : null}
-        >
+        <Text variant="bodyBold" tone={destructive ? 'danger' : 'primary'} style={RTL_TEXT}>
           {label}
         </Text>
         {sublabel ? (
-          <Text variant="caption" tone="muted" style={rtl ? RTL_TEXT : null}>
+          <Text variant="caption" tone="muted" style={RTL_TEXT}>
             {sublabel}
           </Text>
         ) : null}
@@ -535,7 +551,7 @@ export function SegmentedProgress({ total, current }: { total: number; current: 
     <View
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 1, max: total, now: current }}
-      style={{ flexDirection: 'row', gap: space[1] }}
+      style={{ flexDirection: ROW, gap: space[1] }}
     >
       {Array.from({ length: total }, (_, index) => (
         <View
@@ -680,7 +696,7 @@ export function PromoBanner({
             {badge ? (
               <View
                 style={{
-                  alignSelf: 'flex-start',
+                  alignSelf: ALIGN_START,
                   backgroundColor: 'rgba(255,255,255,0.22)',
                   borderRadius: radius.full,
                   paddingHorizontal: space[2],
@@ -706,7 +722,7 @@ export function PromoBanner({
             {ctaLabel ? (
               <View
                 style={{
-                  alignSelf: 'flex-start',
+                  alignSelf: ALIGN_START,
                   marginTop: space[2],
                   backgroundColor: color.surfaceCard,
                   borderRadius: radius.full,
@@ -781,7 +797,7 @@ export function CartBar({
             borderRadius: radius.full,
             backgroundColor: color.brand,
             paddingHorizontal: space[4],
-            flexDirection: 'row',
+            flexDirection: ROW,
             alignItems: 'center',
             justifyContent: 'space-between',
           },
@@ -850,8 +866,8 @@ export function Sheet({
         <View
           style={{
             backgroundColor: color.surfaceCard,
-            borderTopStartRadius: radius['3xl'],
-            borderTopEndRadius: radius['3xl'],
+            borderTopLeftRadius: radius['3xl'],
+            borderTopRightRadius: radius['3xl'],
             paddingBottom: insets.bottom + space[4],
             maxHeight: '88%',
           }}
@@ -994,8 +1010,8 @@ export function RestaurantCard({
             colors={['rgba(17,24,39,0)', 'rgba(17,24,39,0.55)']}
             style={{
               position: 'absolute',
-              insetInlineStart: 0,
-              insetInlineEnd: 0,
+              left: 0,
+              right: 0,
               bottom: 0,
               height: 88,
             }}
@@ -1007,9 +1023,11 @@ export function RestaurantCard({
             style={{
               position: 'absolute',
               top: space[3],
-              // The start edge, which is the right one under RTL — where the
-              // comp draws both badges.
-              insetInlineStart: space[3],
+              // The start edge — physically the right, where the comp draws
+              // both badges. Physical rather than `insetInlineStart`, which
+              // follows the native flag and so lands on the left in a build
+              // where `forceRTL` has not taken.
+              right: space[3],
               backgroundColor: color.brand,
               paddingHorizontal: space[2],
               paddingVertical: 4,
@@ -1026,7 +1044,7 @@ export function RestaurantCard({
           style={{
             position: 'absolute',
             bottom: space[3],
-            insetInlineStart: space[3],
+            right: space[3],
             backgroundColor: 'rgba(17,24,39,0.85)',
             paddingHorizontal: space[2],
             paddingVertical: 4,
@@ -1044,8 +1062,8 @@ export function RestaurantCard({
               position: 'absolute',
               top: 0,
               bottom: 0,
-              insetInlineStart: 0,
-              insetInlineEnd: 0,
+              left: 0,
+              right: 0,
               backgroundColor: 'rgba(255,255,255,0.72)',
               alignItems: 'center',
               justifyContent: 'center',

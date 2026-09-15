@@ -14,7 +14,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { normalizeDigits } from '@jibli/validation';
 import { apiRequest, ApiError, idempotencyKey, NetworkError } from '@/lib/api';
 import { notify } from '@/lib/dialog';
-import { BRAND, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
  * Driver delivery task (plan §49, §50, §52, §132).
@@ -152,7 +152,7 @@ export default function DeliveryScreen({
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <View style={styles.row}>
+        <View style={[styles.row, styles.rowBetween]}>
           <Text style={styles.orderNumber}>#{task.public_order_number}</Text>
           <View style={styles.cashBadge}>
             <Text style={styles.cashText}>
@@ -310,12 +310,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.borderSubtle,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  row: { flexDirection: ROW, alignItems: 'center', gap: space[2] },
+  /*
+   * The order number at one end of the row and the cash badge at the other.
+   *
+   * `justifyContent`, not the `marginStart: 'auto'` the badge used to carry:
+   * an auto margin names a physical side, and which physical side is the far
+   * one depends on whether the row is drawn `row` or `row-reverse`. Splitting
+   * the row is the same result and has no side in it.
+   */
+  rowBetween: { justifyContent: 'space-between' },
   flex: { flex: 1 },
 
   orderNumber: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
   cashBadge: {
-    marginStart: 'auto',
     backgroundColor: color.successSoft,
     paddingHorizontal: space[3],
     paddingVertical: space[1],

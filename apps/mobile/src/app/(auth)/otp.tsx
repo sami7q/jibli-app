@@ -14,7 +14,18 @@ import { formatIraqiPhoneDisplay, normalizeDigits } from '@jibli/validation';
 import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { BRAND, ROW_LTR, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
+import {
+  BRAND,
+  ROW,
+  ROW_LTR,
+  TAP_TARGET,
+  color,
+  palette,
+  radius,
+  shadow,
+  space,
+  text,
+} from '@/theme';
 
 const OTP_LENGTH = 4;
 
@@ -392,7 +403,7 @@ const styles = StyleSheet.create({
   },
 
   phonePill: {
-    flexDirection: 'row-reverse',
+    flexDirection: ROW,
     alignItems: 'center',
     gap: space[3],
     backgroundColor: BRAND[50],

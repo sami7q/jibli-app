@@ -7,7 +7,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, assetUrl } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
-import { TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
+import { ALIGN_END, ROW, TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, EmptyState, Row, Screen, Text } from '@/ui';
 import { Stepper, SummaryRow } from '@/ui/catalog';
@@ -89,7 +89,7 @@ export default function CartScreen() {
               key={line.key}
               style={[
                 {
-                  flexDirection: 'row',
+                  flexDirection: ROW,
                   gap: space[3],
                   padding: space[3],
                   backgroundColor: color.surfaceCard,
@@ -309,7 +309,8 @@ function TopBar({
             width: TAP_TARGET,
             height: TAP_TARGET,
             justifyContent: 'center',
-            alignItems: 'flex-end',
+            // The outer edge of the header, which is the left one here.
+            alignItems: ALIGN_END,
           }}
         >
           <Text variant="caption" tone="danger">

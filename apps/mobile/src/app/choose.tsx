@@ -7,7 +7,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { MerchantType } from '@jibli/contracts';
 import { api, assetUrl } from '@/lib/api';
 import { useVertical } from '@/lib/vertical';
-import { color, palette, space, text } from '@/theme';
+import { ROW, color, palette, space, text } from '@/theme';
 import { Screen, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import { JibliWordmark } from '@/ui/brand';
@@ -301,7 +301,7 @@ export default function ChooseScreen() {
                       >
                         <View
                           style={{
-                            flexDirection: 'row-reverse',
+                            flexDirection: ROW,
                             alignItems: 'center',
                             gap: space[3],
                           }}

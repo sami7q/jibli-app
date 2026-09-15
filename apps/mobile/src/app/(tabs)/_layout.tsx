@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, type ColorValue } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { color, radius, space, TAB_BAR_HEIGHT, text } from '@/theme';
+import { color, LAID_OUT_RTL, radius, space, TAB_BAR_HEIGHT, text } from '@/theme';
 
 /**
  * The shell.
@@ -19,9 +19,46 @@ import { color, radius, space, TAB_BAR_HEIGHT, text } from '@/theme';
  * which is the honest shape — hiding them would tell a browsing customer the
  * app does less than it does.
  */
+
+/** The bar, in reading order: الرئيسية first, حسابي last. */
+const TABS = [
+  { name: 'index', title: 'الرئيسية', icon: 'home' },
+  { name: 'favorites', title: 'المفضلة', icon: 'heart' },
+  { name: 'orders', title: 'طلباتي', icon: 'clipboard-list' },
+  { name: 'account', title: 'حسابي', icon: 'account' },
+] as const;
+
+/**
+ * Which tab the app opens on, and which one «back» returns to.
+ *
+ * Both have to be said out loud once the declaration order stops being the
+ * reading order below. React Navigation takes the *first* declared route as
+ * the initial one and, by default, sends the Android back button there too —
+ * so a bar declared حسابي-first would open the app on the account screen and
+ * bounce every back press into it.
+ */
+const HOME = 'index';
+
 export default function TabsLayout() {
+  /*
+   * The bar draws its items in declaration order, left to right, and that row
+   * is the one thing in the app `ROW` cannot reach: it lives inside
+   * `BottomTabBar`, under a style no navigator option exposes.
+   *
+   * So the order is reversed here instead, and only where it has to be. When
+   * the platform is already laying out right-to-left — a store build where
+   * `forceRTL` has taken, or the browser under `dir="rtl"` — that row mirrors
+   * itself and reading order is already visual order. When it is not, the app
+   * is drawn right-to-left by `ROW` while the tab bar alone still runs the
+   * other way, which is exactly the split this removes: الرئيسية on the far
+   * right, حسابي on the far left, in both modes.
+   */
+  const ordered = LAID_OUT_RTL ? TABS : [...TABS].reverse();
+
   return (
     <Tabs
+      initialRouteName={HOME}
+      backBehavior="initialRoute"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: color.brand,
@@ -35,34 +72,16 @@ export default function TabsLayout() {
         tabBarLabelStyle: text.caption,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'الرئيسية',
-          tabBarIcon: (props) => <TabIcon {...props} name="home" />,
-        }}
-      />
-      <Tabs.Screen
-        name="favorites"
-        options={{
-          title: 'المفضلة',
-          tabBarIcon: (props) => <TabIcon {...props} name="heart" />,
-        }}
-      />
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'طلباتي',
-          tabBarIcon: (props) => <TabIcon {...props} name="clipboard-list" />,
-        }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: 'حسابي',
-          tabBarIcon: (props) => <TabIcon {...props} name="account" />,
-        }}
-      />
+      {ordered.map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: tab.title,
+            tabBarIcon: (props) => <TabIcon {...props} name={tab.icon} />,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }

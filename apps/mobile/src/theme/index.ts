@@ -253,10 +253,48 @@ export const FONT_FAMILIES = Object.values(FAMILY_FOR_WEIGHT);
  */
 const laidOutRtl = I18nManager.isRTL || Platform.OS === 'web';
 
+/**
+ * Whether the platform mirrors the layout for us.
+ *
+ * Exported because a handful of things cannot be expressed as a style token and
+ * have to branch on it directly: the order the tab bar's own row draws its
+ * items in, and where a horizontal list starts scrolling from. Everything else
+ * should reach for `ROW`, `ALIGN_START` or `TEXT_START` instead — a screen that
+ * asks this question itself is a screen that will get it wrong.
+ */
+export const LAID_OUT_RTL = laidOutRtl;
+
 export const ROW: ViewStyle['flexDirection'] = laidOutRtl ? 'row' : 'row-reverse';
 
 /** For content that reads left-to-right inside this app: a phone number, a price. */
 export const ROW_LTR: ViewStyle['flexDirection'] = laidOutRtl ? 'row-reverse' : 'row';
+
+/**
+ * The cross-axis ends of a column, pinned the same way `ROW` pins a row.
+ *
+ * `flex-start` in a column follows the layout direction exactly as
+ * `flexDirection: 'row'` does, so a badge or a button that says `alignSelf:
+ * 'flex-start'` lands against the left edge on a device where the native flag
+ * never took — under a heading that is already sitting on the right. These two
+ * always mean the right and the left edge respectively, in both modes.
+ *
+ * **Only inside a column.** The cross axis of a *row* is vertical and does not
+ * mirror, so `alignSelf: ALIGN_START` on a child of a `Row` does not say "the
+ * right edge" — it says "the bottom". A pill or a button in a row wants
+ * `flex-start` or `center`, spelled physically, and means the ordinary thing.
+ */
+export const ALIGN_START: ViewStyle['alignItems'] = laidOutRtl ? 'flex-start' : 'flex-end';
+export const ALIGN_END: ViewStyle['alignItems'] = laidOutRtl ? 'flex-end' : 'flex-start';
+
+/**
+ * Where a line of Arabic begins.
+ *
+ * Physical on purpose. `textAlign: 'auto'` resolves from the first strong
+ * character in the string, which is right for a sentence of Arabic and wrong
+ * for every line that opens with a price, an order number or a Latin brand —
+ * those slide to the left edge in the middle of a right-aligned column.
+ */
+export const TEXT_START: TextStyle['textAlign'] = 'right';
 
 function type(size: number, weight: keyof typeof FAMILY_FOR_WEIGHT, ratio: number): TextStyle {
   return {
