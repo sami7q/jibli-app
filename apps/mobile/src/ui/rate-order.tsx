@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { api, ApiError } from '@/lib/api';
 import { notify } from '@/lib/dialog';
 import { color, palette, radius, space, TAP_TARGET, text } from '@/theme';

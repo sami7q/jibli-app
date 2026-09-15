@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError } from '@/lib/api';

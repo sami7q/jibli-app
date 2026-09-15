@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { OrderStatus } from '@jibli/contracts';
 import { api, ApiError, type OrderNotification } from '@/lib/api';
 import { markNotificationsSeen, useUnseenNotifications } from '@/lib/notification-inbox';

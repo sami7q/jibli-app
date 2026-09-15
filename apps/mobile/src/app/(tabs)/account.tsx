@@ -3,7 +3,7 @@ import { Linking, View } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
 import { useIsGuest, useSession } from '@/lib/session';

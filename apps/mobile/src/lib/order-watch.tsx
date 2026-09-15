@@ -10,7 +10,7 @@ import {
 import { AppState, Platform, Pressable, View } from 'react-native';
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
 import { playChime } from './chime';

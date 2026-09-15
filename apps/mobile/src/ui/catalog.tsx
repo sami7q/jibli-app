@@ -11,7 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
