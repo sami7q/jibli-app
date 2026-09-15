@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  FlatList,
-  Image,
-  Pressable,
-  ScrollView,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -27,6 +20,7 @@ import { useUnseenCount } from '@/lib/notification-inbox';
 import { notify } from '@/lib/dialog';
 import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
+import { Enter } from '@/ui/enter';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
 
@@ -127,7 +121,19 @@ export default function HomeScreen() {
         onPressSignIn={() => router.push('/(auth)/phone')}
       />
 
-      <View style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
+      {/*
+       * The screen arrives in order, top to bottom.
+       *
+       * Not decoration: home resolves an area, a storefront and a restaurant
+       * list, and the pieces land whenever their request does — so the screen
+       * used to assemble itself in whatever sequence the network chose. A
+       * short stagger imposes the reading order instead, and covers the same
+       * moment the skeletons were covering.
+       *
+       * Sixty milliseconds apart. Any slower and a returning customer, who
+       * opens this ten times a day, starts waiting for it.
+       */}
+      <Enter delay={0} style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
         <SearchBar
           value={search}
           onChangeText={setSearch}
@@ -135,28 +141,30 @@ export default function HomeScreen() {
           returnKeyType="search"
           accessibilityLabel="البحث عن مطعم أو وجبة"
         />
-      </View>
+      </Enter>
 
       {/*
-        * The banner runs edge to edge.
-        *
-        * It was inset by the page gutter like everything else, which made an
-        * advertisement look like a card — the one thing on the screen that is
-        * paid for, framed smaller than the restaurant cards under it. Full
-        * bleed is what every delivery app does with this slot, and it is why
-        * the corner radius drops here too: a rounded rectangle touching both
-        * edges reads as a mistake.
-        */}
+       * The banner runs edge to edge.
+       *
+       * It was inset by the page gutter like everything else, which made an
+       * advertisement look like a card — the one thing on the screen that is
+       * paid for, framed smaller than the restaurant cards under it. Full
+       * bleed is what every delivery app does with this slot, and it is why
+       * the corner radius drops here too: a rounded rectangle touching both
+       * edges reads as a mistake.
+       */}
       {searching ? null : storefront.isLoading ? (
-        // The same 16:9 the real banner uses, so the layout does not jump the
+        // The same 3:2 the real banner uses, so the layout does not jump the
         // moment the carousel replaces it.
-        <Skeleton height={(windowWidth * 9) / 16} style={{ marginTop: space[4] }} />
+        <Skeleton height={(windowWidth * 2) / 3} style={{ marginTop: space[4] }} />
       ) : (
-        <BannerCarousel
-          banners={storefront.data?.banners ?? []}
-          seconds={storefront.data?.banner_rotation_seconds ?? 5}
-          onOpenCategory={setCategory}
-        />
+        <Enter delay={60}>
+          <BannerCarousel
+            banners={storefront.data?.banners ?? []}
+            seconds={storefront.data?.banner_rotation_seconds ?? 5}
+            onOpenCategory={setCategory}
+          />
+        </Enter>
       )}
 
       {searching ? null : storefront.isLoading ? (
@@ -164,7 +172,9 @@ export default function HomeScreen() {
           <Skeleton height={92} />
         </View>
       ) : (
-        <CategoryStrip categories={categories} selected={category} onSelect={setCategory} />
+        <Enter delay={120}>
+          <CategoryStrip categories={categories} selected={category} onSelect={setCategory} />
+        </Enter>
       )}
 
       <View style={{ paddingHorizontal: space[4], paddingTop: space[5] }}>
@@ -174,8 +184,7 @@ export default function HomeScreen() {
               {searching
                 ? `نتائج البحث عن «${term}»`
                 : category
-                  ? (categories.find((entry) => entry.key === category)?.name_ar ??
-                    'مطاعم التصنيف')
+                  ? (categories.find((entry) => entry.key === category)?.name_ar ?? 'مطاعم التصنيف')
                   : 'المطاعم القريبة منك'}
             </Text>
             <Text variant="caption" tone="muted">
@@ -223,7 +232,11 @@ export default function HomeScreen() {
             />
           ) : (
             (dishes.data ?? []).map((dish) => (
-              <DishRow key={dish.id} dish={dish} onOpen={() => router.push(`/restaurant/${dish.restaurant.id}`)} />
+              <DishRow
+                key={dish.id}
+                dish={dish}
+                onOpen={() => router.push(`/restaurant/${dish.restaurant.id}`)}
+              />
             ))
           )
         ) : isResolving ? (
@@ -880,7 +893,9 @@ function RestaurantSummaryCard({
       coverUrl={restaurant.cover_asset_id ? assetUrl(restaurant.cover_asset_id) : null}
       rating={restaurant.rating}
       ratingCount={restaurant.rating_count}
-      deliveryFee={free ? 'التوصيل مجاني' : `التوصيل ${formatIqdArabic(iqd(restaurant.delivery_fee_iqd))}`}
+      deliveryFee={
+        free ? 'التوصيل مجاني' : `التوصيل ${formatIqdArabic(iqd(restaurant.delivery_fee_iqd))}`
+      }
       etaMinutes={restaurant.estimated_preparation_minutes}
       offer={free ? 'توصيل مجاني' : null}
       closed={closed}

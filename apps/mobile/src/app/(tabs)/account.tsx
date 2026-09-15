@@ -8,10 +8,10 @@ import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
 import { useIsGuest, useSession } from '@/lib/session';
 import { confirmAsync, notify } from '@/lib/dialog';
-import { color, palette, radius, space } from '@/theme';
+import { color, palette, radius, shadow, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
-import { IconTile, ListRow, Sheet } from '@/ui/catalog';
+import { ListRow, Sheet } from '@/ui/catalog';
 
 /**
  * Account (`9.html`).
@@ -40,8 +40,7 @@ export default function AccountScreen() {
 
   const me = state.status === 'ready' || state.status === 'needs-profile' ? state.me : null;
   const extra = Constants.expoConfig?.extra as
-    | { supportPhone?: string; privacyPolicyUrl?: string; termsUrl?: string }
-    | undefined;
+    { supportPhone?: string; privacyPolicyUrl?: string; termsUrl?: string } | undefined;
 
   const open = (url: string) => {
     void Linking.openURL(url).catch(() =>
@@ -74,26 +73,54 @@ export default function AccountScreen() {
             <Button label="تسجيل الدخول" onPress={() => router.push('/(auth)/phone')} />
           </View>
         ) : (
-          <Row gap={space[3]}>
-            <IconTile size={64}>
-              <Text variant="h1" tone="brand">
+          /*
+           * Who you are, on the brand.
+           *
+           * It was an initial tile beside two grey lines, indistinguishable
+           * from the settings rows beneath it — the person's own name was the
+           * least prominent thing on their own account screen. A filled card
+           * gives the top of the page something to be, and the rows below it
+           * something to sit under.
+           */
+          <View
+            style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: space[4],
+              padding: space[4],
+              borderRadius: radius.xl,
+              backgroundColor: color.brand,
+              ...shadow.md,
+            }}
+          >
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: radius.full,
+                backgroundColor: 'rgba(255,255,255,0.22)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text variant="h1" tone="inverse">
                 {(me?.full_name ?? 'ج').slice(0, 1)}
               </Text>
-            </IconTile>
-            <View style={{ flex: 1 }}>
-              <Text variant="h3" numberOfLines={1}>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="h3" tone="inverse" numberOfLines={1}>
                 {me?.full_name ?? 'مستخدم جيبلي'}
               </Text>
-              <Text variant="caption" tone="muted">
+              <Text variant="caption" tone="inverse" style={{ opacity: 0.9 }}>
                 {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'لم تُحدَّد المنطقة'}
               </Text>
               {state.status === 'offline-ready' ? (
-                <Text variant="caption" tone="muted">
+                <Text variant="caption" tone="inverse" style={{ opacity: 0.9 }}>
                   أنت غير متصل — بعض البيانات قد تكون قديمة.
                 </Text>
               ) : null}
             </View>
-          </Row>
+          </View>
         )}
       </View>
 
@@ -111,19 +138,21 @@ export default function AccountScreen() {
         />
         <ListRow
           label="طلباتي"
-          icon={<MaterialCommunityIcons name="clipboard-list-outline" size={20} color={color.brand} />}
+          icon={
+            <MaterialCommunityIcons name="clipboard-list-outline" size={20} color={color.brand} />
+          }
           onPress={() => router.push('/(tabs)/orders')}
         />
       </Group>
 
       {/*
-        * The other door into the platform.
-        *
-        * A driver account could only be created from inside a restaurant's
-        * portal, so anyone who wanted to deliver had to already know an owner.
-        * It sits on the customer's account screen because that is the only
-        * screen a prospective driver has — they arrive as a customer.
-        */}
+       * The other door into the platform.
+       *
+       * A driver account could only be created from inside a restaurant's
+       * portal, so anyone who wanted to deliver had to already know an owner.
+       * It sits on the customer's account screen because that is the only
+       * screen a prospective driver has — they arrive as a customer.
+       */}
       <Group title="العمل مع جيبلي">
         <ListRow
           label="الانضمام كمندوب توصيل"
@@ -139,23 +168,21 @@ export default function AccountScreen() {
         />
 
         {/*
-          * The way in for somebody who already delivers.
-          *
-          * A driver whose restaurant created their account and handed them a
-          * username has nothing to apply for — and «الانضمام كمندوب» is the
-          * wrong row for them. It shows the delivery screen when this account
-          * already carries the mode, and the sign-in when it does not, because
-          * a courier borrowing a customer's phone is the ordinary case.
-          */}
+         * The way in for somebody who already delivers.
+         *
+         * A driver whose restaurant created their account and handed them a
+         * username has nothing to apply for — and «الانضمام كمندوب» is the
+         * wrong row for them. It shows the delivery screen when this account
+         * already carries the mode, and the sign-in when it does not, because
+         * a courier borrowing a customer's phone is the ordinary case.
+         */}
         <ListRow
           label={isDriver ? 'وضع المندوب' : 'دخول المندوبين'}
           sublabel={
             isDriver ? 'طلبات التوصيل المعيّنة لك' : 'لديك اسم مستخدم من المطعم؟ ادخل من هنا'
           }
           icon={<MaterialCommunityIcons name="moped" size={20} color={color.brand} />}
-          onPress={() =>
-            router.push(isDriver ? '/(driver)/delivery' : '/(auth)/driver-login')
-          }
+          onPress={() => router.push(isDriver ? '/(driver)/delivery' : '/(auth)/driver-login')}
         />
       </Group>
 
@@ -232,19 +259,33 @@ export default function AccountScreen() {
   );
 }
 
+/**
+ * A titled group of rows.
+ *
+ * The heading was the same muted caption as the sublabels inside the rows, so
+ * it read as another row rather than the thing naming them. Small caps weight
+ * and a little air above separate the two jobs.
+ *
+ * The box outline is gone with it. A hairline border *and* a white fill on a
+ * tinted page is two ways of saying the same thing, and on a screen of four
+ * stacked groups it turned into a ladder of lines.
+ */
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={{ paddingHorizontal: space[4], paddingBottom: space[2] }}>
-      <Text variant="caption" tone="muted" style={{ paddingBottom: space[1] }}>
+    <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
+      <Text
+        variant="captionBold"
+        tone="secondary"
+        style={{ paddingBottom: space[2], paddingHorizontal: space[1] }}
+      >
         {title}
       </Text>
       <View
         style={{
           backgroundColor: color.surfaceCard,
-          borderRadius: radius.lg,
-          borderWidth: 1,
-          borderColor: color.borderSubtle,
-          paddingVertical: space[1],
+          borderRadius: radius.xl,
+          overflow: 'hidden',
+          ...shadow.sm,
         }}
       >
         {children}

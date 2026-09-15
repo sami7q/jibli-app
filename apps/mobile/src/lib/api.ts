@@ -262,8 +262,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
      * «الخدمة غير متاحة حالياً، الرجاء المحاولة بعد قليل» is both true and
      * actionable; «حدث خطأ غير متوقع» is neither.
      */
-    const fallback: ErrorCode =
-      response.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR';
+    const fallback: ErrorCode = response.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR';
     const code = (payload?.error?.code ?? fallback) as ErrorCode;
     throw new ApiError(
       code,
@@ -643,7 +642,14 @@ export const api = {
 
   myOrders: () =>
     apiRequest<
-      { id: string; public_order_number: string; status: string; customer_total_iqd: number; placed_at: string; restaurant_name: string | null }[]
+      {
+        id: string;
+        public_order_number: string;
+        status: string;
+        customer_total_iqd: number;
+        placed_at: string;
+        restaurant_name: string | null;
+      }[]
     >('/api/v1/orders'),
 
   /**
@@ -752,10 +758,19 @@ export const api = {
     ),
 
   /** Orders whose rating window is open (plan §31). */
+  /*
+   * The shape the server actually sends.
+   *
+   * This declared `delivered_at` and `opens_at` — neither of which exists on
+   * the response — and omitted `completed_at`, which does. Nothing caught it
+   * because the only caller read the id and the name, so the invented fields
+   * were never touched; the first screen to want a date would have received
+   * undefined and formatted it into an Invalid Date.
+   */
   pendingReviews: () =>
-    apiRequest<
-      { order_id: string; restaurant_name: string; delivered_at: string; opens_at: string }[]
-    >('/api/v1/reviews/pending'),
+    apiRequest<{ order_id: string; restaurant_name: string; completed_at: string }[]>(
+      '/api/v1/reviews/pending',
+    ),
 
   /**
    * The notification feed — every status an order of theirs has reached.
@@ -763,8 +778,7 @@ export const api = {
    * Server-derived from the order status history, so it is the same truth the
    * order screen shows and it survives a reinstall. Read state is local.
    */
-  notifications: () =>
-    apiRequest<OrderNotification[]>('/api/v1/notifications'),
+  notifications: () => apiRequest<OrderNotification[]>('/api/v1/notifications'),
 
   submitReview: (orderId: string, rating: number, comment?: string) =>
     apiRequest<{ submitted: boolean }>(`/api/v1/orders/${orderId}/review`, {

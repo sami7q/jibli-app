@@ -52,11 +52,7 @@ export function IconTile({
   tone?: 'brand' | 'neutral';
   style?: StyleProp<ViewStyle>;
 }) {
-  const surface = active
-    ? color.brand
-    : tone === 'brand'
-      ? color.brandSoft
-      : color.surfaceSunken;
+  const surface = active ? color.brand : tone === 'brand' ? color.brandSoft : color.surfaceSunken;
 
   return (
     <View
@@ -206,11 +202,21 @@ export function Stepper({
         overflow: 'hidden',
       }}
     >
-      <StepperButton icon="minus" accessibilityLabel="إنقاص" disabled={value <= min} onPress={() => step(-1)} />
+      <StepperButton
+        icon="minus"
+        accessibilityLabel="إنقاص"
+        disabled={value <= min}
+        onPress={() => step(-1)}
+      />
       <View style={{ minWidth: 36, alignItems: 'center' }}>
         <Text variant="bodyBold">{value}</Text>
       </View>
-      <StepperButton icon="plus" accessibilityLabel="زيادة" disabled={value >= max} onPress={() => step(1)} />
+      <StepperButton
+        icon="plus"
+        accessibilityLabel="زيادة"
+        disabled={value >= max}
+        onPress={() => step(1)}
+      />
     </Row>
   );
 }
@@ -281,10 +287,7 @@ export function SummaryRow({
       <Text variant={emphasis ? 'bodyBold' : 'small'} tone={emphasis ? 'primary' : 'muted'}>
         {label}
       </Text>
-      <Text
-        variant={emphasis ? 'h3' : 'smallBold'}
-        tone={emphasis ? 'brand' : (tone ?? 'primary')}
-      >
+      <Text variant={emphasis ? 'h3' : 'smallBold'} tone={emphasis ? 'brand' : (tone ?? 'primary')}>
         {value}
       </Text>
     </Row>
@@ -359,9 +362,9 @@ export function ListRow({
       ) : null}
 
       {/*
-        * `chevron-left` is correct under RTL: the row opens a screen that
-        * slides in from the start edge, which is the left here.
-        */}
+       * `chevron-left` is correct under RTL: the row opens a screen that
+       * slides in from the start edge, which is the left here.
+       */}
       <MaterialCommunityIcons name="chevron-left" size={22} color={color.textMuted} />
     </Pressable>
   );
@@ -418,7 +421,10 @@ export function StatusTimeline({ steps }: { steps: TimelineStep[] }) {
             </View>
 
             <View style={{ flex: 1, paddingBottom: last ? 0 : space[4] }}>
-              <Text variant={step.state === 'current' ? 'bodyBold' : 'body'} tone={on ? 'primary' : 'muted'}>
+              <Text
+                variant={step.state === 'current' ? 'bodyBold' : 'body'}
+                tone={on ? 'primary' : 'muted'}
+              >
                 {step.label}
               </Text>
               {step.at ? (
@@ -589,7 +595,17 @@ export function PromoBanner({
          * of cards, and matching its neighbours matters more there than
          * matching itself across devices.
          */
-        ...(fullBleed ? { aspectRatio: 16 / 9 } : { height: 164 }),
+        /*
+         * 3:2 full bleed, not 16:9.
+         *
+         * 16:9 is a video ratio, and on a 430pt phone it left the slot 242pt
+         * tall — shorter than the two restaurant cards below it, so the one
+         * paid placement on the screen was also the least present. 3:2 adds
+         * about fifty points: enough for artwork to hold a dish and a sentence
+         * without pushing the categories below the fold, which is the line
+         * this cannot cross.
+         */
+        ...(fullBleed ? { aspectRatio: 3 / 2 } : { height: 164 }),
         borderRadius: fullBleed ? 0 : radius['2xl'],
         overflow: 'hidden',
         backgroundColor: color.brand,
@@ -909,7 +925,11 @@ export function RestaurantCard({
     >
       <View style={{ height: 176, backgroundColor: color.surfaceSunken }}>
         {coverUrl ? (
-          <Image source={{ uri: coverUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          <Image
+            source={{ uri: coverUrl }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
         ) : (
           /*
            * A restaurant with no photograph yet.

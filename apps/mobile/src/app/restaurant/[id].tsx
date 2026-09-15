@@ -3,6 +3,7 @@ import { Image, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
@@ -141,9 +142,7 @@ export default function RestaurantScreen() {
       <Screen edges={['top']}>
         <ErrorState
           message={
-            restaurant.error instanceof ApiError
-              ? restaurant.error.messageAr
-              : 'تعذّر تحميل المطعم'
+            restaurant.error instanceof ApiError ? restaurant.error.messageAr : 'تعذّر تحميل المطعم'
           }
           onRetry={() => void restaurant.refetch()}
         />
@@ -181,13 +180,13 @@ export default function RestaurantScreen() {
         />
 
         {/*
-          * Why nothing responds.
-          *
-          * A closed restaurant's dishes are faded and inert, which is correct
-          * — but the «مغلق الآن» badge is in the card at the top, and by the
-          * time someone has scrolled into the menu it is off screen. Tapping a
-          * dish and getting nothing is the experience this line prevents.
-          */}
+         * Why nothing responds.
+         *
+         * A closed restaurant's dishes are faded and inert, which is correct
+         * — but the «مغلق الآن» badge is in the card at the top, and by the
+         * time someone has scrolled into the menu it is off screen. Tapping a
+         * dish and getting nothing is the experience this line prevents.
+         */}
         {!detail.orderable ? (
           <View
             style={{
@@ -266,18 +265,10 @@ export default function RestaurantScreen() {
        * have.
        */}
       {itemCount > 0 && cartIsThisRestaurant ? (
-        <CartBar
-          count={itemCount}
-          totalIqd={subtotalIqd}
-          onPress={() => router.push('/cart')}
-        />
+        <CartBar count={itemCount} totalIqd={subtotalIqd} onPress={() => router.push('/cart')} />
       ) : null}
 
-      <ItemSheet
-        item={openItem}
-        restaurant={detail}
-        onClose={() => setOpenItem(null)}
-      />
+      <ItemSheet item={openItem} restaurant={detail} onClose={() => setOpenItem(null)} />
     </Screen>
   );
 }
@@ -292,7 +283,7 @@ function Cover({
   restaurantId: string;
 }) {
   return (
-    <View style={{ height: 224, backgroundColor: color.surfaceSunken }}>
+    <View style={{ height: 268, backgroundColor: color.surfaceSunken }}>
       {coverUrl ? (
         <Image
           source={{ uri: coverUrl }}
@@ -321,6 +312,38 @@ function Cover({
           />
         </View>
       )}
+
+      {/*
+       * A scrim under the controls, not a darker button.
+       *
+       * The back and favourite buttons sit on whatever photograph the
+       * restaurant uploaded, and some of them are bright food shot on a white
+       * plate. Making the buttons darker until they survive that is how a
+       * control ends up looking heavy on every *other* photo; a short
+       * top-down fade darkens only what is behind them and leaves the middle
+       * of the image alone.
+       *
+       * `pointerEvents="none"` because a gradient laid over the cover would
+       * otherwise swallow the taps meant for the buttons under it.
+       */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120 }}
+        pointerEvents="none"
+      />
+
+      {/*
+       * And a fade into the page at the bottom.
+       *
+       * The cover used to end on a hard horizontal line with the info card
+       * butted against it, which reads as two screenshots stacked. The fade
+       * hands the photograph over to the page instead.
+       */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.25)']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 96 }}
+        pointerEvents="none"
+      />
 
       <View
         style={{
@@ -729,12 +752,12 @@ function MenuItemRow({
         </View>
 
         {/*
-          * The plus, over the corner of the picture.
-          *
-          * Its own Pressable rather than a control inside the row's: tapping
-          * the row opens the dish, tapping the plus adds it, and nesting them
-          * would make one swallow the other.
-          */}
+         * The plus, over the corner of the picture.
+         *
+         * Its own Pressable rather than a control inside the row's: tapping
+         * the row opens the dish, tapping the plus adds it, and nesting them
+         * would make one swallow the other.
+         */}
         {quickAddable ? (
           <Pressable
             onPress={onQuickAdd}
@@ -892,9 +915,7 @@ function ItemSheet({
         </Row>
       }
     >
-      {item?.description_ar ? (
-        <Text tone="secondary">{item.description_ar}</Text>
-      ) : null}
+      {item?.description_ar ? <Text tone="secondary">{item.description_ar}</Text> : null}
 
       {groups.isLoading ? <Skeleton height={64} /> : null}
 
@@ -949,4 +970,3 @@ function ItemSheet({
     </Sheet>
   );
 }
-

@@ -1,11 +1,5 @@
 import { and, avg, count, desc, eq, gt, isNull, lte } from 'drizzle-orm';
-import {
-  orderReviews,
-  orders,
-  restaurants,
-  uuidv7,
-  type DbExecutor,
-} from '@jibli/db';
+import { orderReviews, orders, restaurants, uuidv7, type DbExecutor } from '@jibli/db';
 import { AppError, ERROR_CODES } from '@jibli/contracts';
 import type { AppContext } from '../lib/context.js';
 import { getConfig } from './config-service.js';
@@ -34,8 +28,19 @@ import { getConfig } from './config-service.js';
 /** How long after delivery a customer may rate. Configurable; 15 minutes. */
 const DEFAULT_REVIEW_DELAY_MINUTES = 15;
 
-/** And how long the window stays open. A month-old meal is not being recalled. */
-const REVIEW_WINDOW_DAYS = 30;
+/**
+ * And how long the window stays open, counted from delivery.
+ *
+ * Five days. A month was long enough that the prompt outlived the memory it
+ * asks about — a rating given three weeks later is recalling a receipt, not a
+ * meal, and the list of things still awaiting judgement only grew. Short
+ * enough to be answerable, long enough to survive a busy week.
+ *
+ * Measured from `completedAt` rather than when the order was placed, which is
+ * the same boundary either way to within an hour and the more defensible one:
+ * the window is for the meal that arrived, so it starts when it arrived.
+ */
+const REVIEW_WINDOW_DAYS = 5;
 
 export interface ReviewEligibility {
   readonly can_review: boolean;
@@ -150,9 +155,7 @@ export async function recomputeRating(
       total: count(orderReviews.id),
     })
     .from(orderReviews)
-    .where(
-      and(eq(orderReviews.restaurantId, restaurantId), eq(orderReviews.isHidden, false)),
-    );
+    .where(and(eq(orderReviews.restaurantId, restaurantId), eq(orderReviews.isHidden, false)));
 
   const total = Number(stats?.total ?? 0);
   // Rounded to one decimal: the extra digits are noise, and a stored 4.33333
