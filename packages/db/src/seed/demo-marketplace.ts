@@ -166,78 +166,370 @@ function always(): Record<number, readonly [string, string]> {
  * ordering, delivery, commission and portal behind it are the restaurants'
  * unchanged — which is the point of the whole discriminator.
  */
-const DEMO_MARKET: DemoRestaurant = {
-  partnerCode: 'DEMO-2001',
-  merchantType: 'MARKET',
-  name: 'ماركت الرشيد',
-  description: 'بقالة ومواد غذائية، توصيل سريع لكل ما ينقص البيت.',
-  cuisines: ['grocery'],
-  minimumOrderIqd: 5000,
-  deliveryFeeIqd: 1500,
-  // A market picks from a shelf; it does not cook. Ten minutes is packing.
-  prepMinutes: 10,
-  rating: 4.5,
-  ratingCount: 186,
-  address: 'شارع فلسطين، حي البنوك',
-  district: 'البنوك',
-  phone: '+9647701110007',
-  ownerUsername: 'demo.market',
-  ownerName: 'أبو أحمد الرشيد',
-  hours: always(),
-  menu: [
-    {
-      name: 'ألبان وأجبان',
-      description: 'مبرّدة، تصل باردة',
-      items: [
-        { name: 'حليب طازج ١ لتر', description: 'مبستر، كامل الدسم', priceIqd: 2000 },
-        { name: 'لبن رائب ٥٠٠ غم', priceIqd: 1500 },
-        { name: 'جبن أبيض ٤٠٠ غم', priceIqd: 4500 },
-        { name: 'زبدة ٢٠٠ غم', priceIqd: 3500 },
-        { name: 'بيض طازج ٣٠ حبة', description: 'محلي', priceIqd: 7000 },
-      ],
+const DEMO_MARKETS: readonly DemoRestaurant[] = [
+  {
+    partnerCode: 'DEMO-2001',
+    merchantType: 'MARKET',
+    name: 'ماركت الرشيد',
+    description: 'بقالة ومواد غذائية، توصيل سريع لكل ما ينقص البيت.',
+    cuisines: ['grocery'],
+    minimumOrderIqd: 5000,
+    deliveryFeeIqd: 1500,
+    // A market picks from a shelf; it does not cook. Ten minutes is packing.
+    prepMinutes: 10,
+    rating: 4.5,
+    ratingCount: 186,
+    address: 'شارع فلسطين، حي البنوك',
+    district: 'البنوك',
+    phone: '+9647701110007',
+    ownerUsername: 'demo.market',
+    ownerName: 'أبو أحمد الرشيد',
+    hours: always(),
+    menu: [
+      {
+        name: 'ألبان وأجبان',
+        description: 'مبرّدة، تصل باردة',
+        items: [
+          { name: 'حليب طازج ١ لتر', description: 'مبستر، كامل الدسم', priceIqd: 2000 },
+          { name: 'لبن رائب ٥٠٠ غم', priceIqd: 1500 },
+          { name: 'جبن أبيض ٤٠٠ غم', priceIqd: 4500 },
+          { name: 'زبدة ٢٠٠ غم', priceIqd: 3500 },
+          { name: 'بيض طازج ٣٠ حبة', description: 'محلي', priceIqd: 7000 },
+        ],
+      },
+      {
+        name: 'مواد غذائية أساسية',
+        items: [
+          { name: 'رز بسمتي ٥ كغم', priceIqd: 12_000 },
+          { name: 'سكر ٢ كغم', priceIqd: 2500 },
+          { name: 'زيت دوار الشمس ١.٨ لتر', priceIqd: 6500 },
+          { name: 'طحين ٥ كغم', priceIqd: 5000 },
+          { name: 'معجون طماطم ٨٠٠ غم', priceIqd: 3000 },
+          { name: 'شاي أسود ٤٠٠ غم', description: 'سيلاني', priceIqd: 5500 },
+        ],
+      },
+      {
+        name: 'خضار وفواكه',
+        description: 'من سوق الجملة كل صباح',
+        items: [
+          { name: 'طماطم ١ كغم', priceIqd: 1500 },
+          { name: 'خيار ١ كغم', priceIqd: 1250 },
+          { name: 'بصل ١ كغم', priceIqd: 1000 },
+          { name: 'بطاطا ٢ كغم', priceIqd: 2500 },
+          { name: 'تفاح أحمر ١ كغم', priceIqd: 4000 },
+          { name: 'موز ١ كغم', priceIqd: 3500, unavailable: true },
+        ],
+      },
+      {
+        name: 'مشروبات',
+        items: [
+          { name: 'ماء ١.٥ لتر — ٦ قناني', priceIqd: 3000 },
+          { name: 'بيبسي ٣٣٠ مل — ٦ علب', priceIqd: 4500 },
+          { name: 'عصير برتقال ١ لتر', priceIqd: 3000 },
+        ],
+      },
+      {
+        name: 'منظفات ومستلزمات',
+        items: [
+          { name: 'مسحوق غسيل ٣ كغم', priceIqd: 8000 },
+          { name: 'صابون أطباق ٧٥٠ مل', priceIqd: 2500 },
+          { name: 'مناديل ورقية — ٥ علب', priceIqd: 4000 },
+          { name: 'أكياس قمامة — ٥٠ كيس', priceIqd: 2000 },
+        ],
+      },
+    ],
+  },
+
+  /*
+   * A corner shop: small basket, short list, and open around the clock.
+   *
+   * The counterpart to a full market in every number that matters — a 3,000
+   * dinar minimum against 5,000, five minutes of picking against ten — because
+   * a storefront that shows six merchants with identical fees and identical
+   * times is a storefront nobody has to read.
+   */
+  {
+    partnerCode: 'DEMO-2002',
+    merchantType: 'MARKET',
+    name: 'بقالة الحي',
+    description: 'أساسيات البيت، على بعد دقائق. مفتوح على مدار الساعة.',
+    cuisines: ['grocery'],
+    minimumOrderIqd: 3000,
+    deliveryFeeIqd: 1000,
+    prepMinutes: 5,
+    rating: 4.3,
+    ratingCount: 94,
+    address: 'شارع ٦٢، حي الجامعة',
+    district: 'الجامعة',
+    phone: '+9647701110008',
+    ownerUsername: 'demo.baqala',
+    ownerName: 'أبو زيد',
+    hours: always(),
+    menu: [
+      {
+        name: 'الأساسيات',
+        items: [
+          { name: 'خبز صمون — ١٠ أقراص', priceIqd: 1000 },
+          { name: 'حليب ١ لتر', priceIqd: 2000 },
+          { name: 'بيض ١٢ حبة', priceIqd: 3000 },
+          { name: 'سكر ١ كغم', priceIqd: 1250 },
+          { name: 'شاي ٢٠٠ غم', priceIqd: 3000 },
+        ],
+      },
+      {
+        name: 'وجبات سريعة',
+        items: [
+          { name: 'معكرونة ٥٠٠ غم', priceIqd: 1500 },
+          { name: 'تونة معلبة ١٨٥ غم', priceIqd: 2500 },
+          { name: 'فاصولياء معلبة', priceIqd: 2000 },
+        ],
+      },
+      {
+        name: 'مشروبات وحلويات',
+        items: [
+          { name: 'ماء ٠.٥ لتر — ١٢ قنينة', priceIqd: 3500 },
+          { name: 'مشروب غازي ١ لتر', priceIqd: 1750 },
+          { name: 'بسكويت — ٦ قطع', priceIqd: 2000 },
+          { name: 'شوكولاتة', priceIqd: 1000 },
+        ],
+      },
+    ],
+  },
+
+  /*
+   * A produce specialist, with a shorter day.
+   *
+   * Closes at six, which is what a vegetable seller does, and the point of
+   * seeding it: the closed state has to be exercised on the market side too,
+   * not only among the restaurants.
+   */
+  {
+    partnerCode: 'DEMO-2003',
+    merchantType: 'MARKET',
+    name: 'خضار وفواكه الطازج',
+    description: 'من سوق الجملة كل فجر. خضار وفواكه فقط.',
+    cuisines: ['grocery'],
+    minimumOrderIqd: 4000,
+    deliveryFeeIqd: 1500,
+    prepMinutes: 15,
+    rating: 4.8,
+    ratingCount: 241,
+    address: 'سوق الشورجة، باب الشيخ',
+    district: 'باب الشيخ',
+    phone: '+9647701110009',
+    ownerUsername: 'demo.khudar',
+    ownerName: 'حاج كريم',
+    hours: daily('06:00', '18:00'),
+    menu: [
+      {
+        name: 'خضار',
+        items: [
+          { name: 'طماطم ١ كغم', priceIqd: 1500 },
+          { name: 'خيار ١ كغم', priceIqd: 1250 },
+          { name: 'باذنجان ١ كغم', priceIqd: 1500 },
+          { name: 'فلفل أخضر ٥٠٠ غم', priceIqd: 1250 },
+          { name: 'بصل ٢ كغم', priceIqd: 2000 },
+          { name: 'بطاطا ٢ كغم', priceIqd: 2500 },
+        ],
+      },
+      {
+        name: 'فواكه',
+        items: [
+          { name: 'تفاح ١ كغم', priceIqd: 4000 },
+          { name: 'برتقال ٢ كغم', priceIqd: 5000 },
+          { name: 'موز ١ كغم', priceIqd: 3500 },
+          { name: 'عنب ١ كغم', priceIqd: 5000, unavailable: true },
+          { name: 'رمان ١ كغم', priceIqd: 4500 },
+        ],
+      },
+      {
+        name: 'أعشاب',
+        items: [
+          { name: 'بقدونس — حزمة', priceIqd: 500 },
+          { name: 'نعناع — حزمة', priceIqd: 500 },
+          { name: 'جرجير — حزمة', priceIqd: 750 },
+        ],
+      },
+    ],
+  },
+
+  /*
+   * The big one: bulk sizes, a high minimum, and free delivery above it.
+   *
+   * A fee of zero is worth having in the data — the card renders «مجاناً»
+   * instead of a number, and that branch is otherwise only reachable by
+   * editing a restaurant by hand.
+   */
+  {
+    partnerCode: 'DEMO-2004',
+    merchantType: 'MARKET',
+    name: 'هايبر ماركت العائلة',
+    description: 'تسوّق الشهر بأسعار الجملة. توصيل مجاني.',
+    cuisines: ['grocery'],
+    minimumOrderIqd: 25_000,
+    deliveryFeeIqd: 0,
+    prepMinutes: 25,
+    rating: 4.6,
+    ratingCount: 512,
+    address: 'طريق المطار، حي الجهاد',
+    district: 'الجهاد',
+    phone: '+9647701110010',
+    ownerUsername: 'demo.hyper',
+    ownerName: 'شركة العائلة للتجارة',
+    hours: daily('08:00', '23:00'),
+    menu: [
+      {
+        name: 'حصص شهرية',
+        description: 'كميات الجملة للعائلة',
+        items: [
+          { name: 'رز بسمتي ١٠ كغم', priceIqd: 22_000 },
+          { name: 'زيت طبخ ٤ لتر', priceIqd: 13_000 },
+          { name: 'سكر ١٠ كغم', priceIqd: 11_000 },
+          { name: 'طحين ١٠ كغم', priceIqd: 9500 },
+          { name: 'عدس ٥ كغم', priceIqd: 12_000 },
+        ],
+      },
+      {
+        name: 'معلبات',
+        items: [
+          { name: 'معجون طماطم — ١٢ علبة', priceIqd: 15_000 },
+          { name: 'تونة — ٦ علب', priceIqd: 13_500 },
+          { name: 'ذرة حلوة — ٦ علب', priceIqd: 9000 },
+        ],
+      },
+      {
+        name: 'منظفات',
+        items: [
+          { name: 'مسحوق غسيل ٩ كغم', priceIqd: 21_000 },
+          { name: 'منعّم ملابس ٤ لتر', priceIqd: 8500 },
+          { name: 'مبيّض ٤ لتر', priceIqd: 4000 },
+          { name: 'مناديل — ١٢ علبة', priceIqd: 9000 },
+        ],
+      },
+      {
+        name: 'مستلزمات أطفال',
+        items: [
+          { name: 'حفاضات — عبوة كبيرة', priceIqd: 18_000 },
+          { name: 'مناديل مبللة — ٦ عبوات', priceIqd: 7000 },
+          { name: 'حليب أطفال ٤٠٠ غم', priceIqd: 14_000 },
+        ],
+      },
+    ],
+  },
+
+  /*
+   * A butcher, deliberately not rated.
+   *
+   * `rating: null` is the case that put an unrated partner above a 4.9 before
+   * the storefront learned to sort NULLS LAST, and nothing on the market side
+   * exercised it until now.
+   */
+  {
+    partnerCode: 'DEMO-2005',
+    merchantType: 'MARKET',
+    name: 'ملحمة البركة',
+    description: 'لحوم طازجة يومياً، ذبح اليوم. تقطيع حسب الطلب.',
+    cuisines: ['grocery', 'meat'],
+    minimumOrderIqd: 15_000,
+    deliveryFeeIqd: 2000,
+    prepMinutes: 20,
+    rating: null,
+    ratingCount: 0,
+    address: 'شارع الكفاح، باب المعظم',
+    district: 'باب المعظم',
+    phone: '+9647701110011',
+    ownerUsername: 'demo.malhama',
+    ownerName: 'أبو حسن القصاب',
+    hours: daily('07:00', '21:00'),
+    menu: [
+      {
+        name: 'لحوم حمراء',
+        items: [
+          { name: 'لحم غنم ١ كغم', description: 'ذبح اليوم', priceIqd: 22_000 },
+          { name: 'لحم عجل ١ كغم', priceIqd: 18_000 },
+          { name: 'كباب مفروم ١ كغم', priceIqd: 16_000 },
+          { name: 'ضلوع غنم ١ كغم', priceIqd: 20_000 },
+        ],
+      },
+      {
+        name: 'دواجن',
+        items: [
+          { name: 'دجاج كامل — حبة', priceIqd: 7000 },
+          { name: 'صدور دجاج ١ كغم', priceIqd: 9000 },
+          { name: 'أفخاذ دجاج ١ كغم', priceIqd: 7500 },
+        ],
+      },
+      {
+        name: 'أسماك',
+        items: [
+          { name: 'كارب نهري ١ كغم', priceIqd: 12_000 },
+          { name: 'زبيدي ١ كغم', priceIqd: 25_000, unavailable: true },
+        ],
+      },
+    ],
+  },
+
+  /*
+   * A pastry and dairy shop, closed on Fridays.
+   *
+   * The only merchant in the dataset with a day off, which is what makes the
+   * weekly-hours evaluation testable at all: every other one either opens
+   * daily or opens around the clock.
+   */
+  {
+    partnerCode: 'DEMO-2006',
+    merchantType: 'MARKET',
+    name: 'ألبان ومعجنات الصباح',
+    description: 'أجبان بلدية ومعجنات تُخبز كل صباح. مغلق الجمعة.',
+    cuisines: ['grocery', 'sweets'],
+    minimumOrderIqd: 6000,
+    deliveryFeeIqd: 1500,
+    prepMinutes: 12,
+    rating: 4.9,
+    ratingCount: 168,
+    address: 'شارع الأطباء، المنصور',
+    district: 'المنصور',
+    phone: '+9647701110012',
+    ownerUsername: 'demo.alban',
+    ownerName: 'أم محمد',
+    hours: {
+      0: ['06:00', '20:00'],
+      1: ['06:00', '20:00'],
+      2: ['06:00', '20:00'],
+      3: ['06:00', '20:00'],
+      4: ['06:00', '20:00'],
+      5: null,
+      6: ['06:00', '20:00'],
     },
-    {
-      name: 'مواد غذائية أساسية',
-      items: [
-        { name: 'رز بسمتي ٥ كغم', priceIqd: 12_000 },
-        { name: 'سكر ٢ كغم', priceIqd: 2500 },
-        { name: 'زيت دوار الشمس ١.٨ لتر', priceIqd: 6500 },
-        { name: 'طحين ٥ كغم', priceIqd: 5000 },
-        { name: 'معجون طماطم ٨٠٠ غم', priceIqd: 3000 },
-        { name: 'شاي أسود ٤٠٠ غم', description: 'سيلاني', priceIqd: 5500 },
-      ],
-    },
-    {
-      name: 'خضار وفواكه',
-      description: 'من سوق الجملة كل صباح',
-      items: [
-        { name: 'طماطم ١ كغم', priceIqd: 1500 },
-        { name: 'خيار ١ كغم', priceIqd: 1250 },
-        { name: 'بصل ١ كغم', priceIqd: 1000 },
-        { name: 'بطاطا ٢ كغم', priceIqd: 2500 },
-        { name: 'تفاح أحمر ١ كغم', priceIqd: 4000 },
-        { name: 'موز ١ كغم', priceIqd: 3500, unavailable: true },
-      ],
-    },
-    {
-      name: 'مشروبات',
-      items: [
-        { name: 'ماء ١.٥ لتر — ٦ قناني', priceIqd: 3000 },
-        { name: 'بيبسي ٣٣٠ مل — ٦ علب', priceIqd: 4500 },
-        { name: 'عصير برتقال ١ لتر', priceIqd: 3000 },
-      ],
-    },
-    {
-      name: 'منظفات ومستلزمات',
-      items: [
-        { name: 'مسحوق غسيل ٣ كغم', priceIqd: 8000 },
-        { name: 'صابون أطباق ٧٥٠ مل', priceIqd: 2500 },
-        { name: 'مناديل ورقية — ٥ علب', priceIqd: 4000 },
-        { name: 'أكياس قمامة — ٥٠ كيس', priceIqd: 2000 },
-      ],
-    },
-  ],
-};
+    menu: [
+      {
+        name: 'أجبان وألبان',
+        items: [
+          { name: 'جبن بلدي ٥٠٠ غم', priceIqd: 6000 },
+          { name: 'لبن رائب ١ كغم', priceIqd: 2500 },
+          { name: 'قيمر طازج ٢٥٠ غم', description: 'صباحاً فقط', priceIqd: 5000 },
+          { name: 'زبدة بلدية ٢٥٠ غم', priceIqd: 4500 },
+        ],
+      },
+      {
+        name: 'معجنات',
+        items: [
+          { name: 'صمون بالجبن — ٦ حبات', priceIqd: 4000 },
+          { name: 'فطيرة سبانخ — ٤ حبات', priceIqd: 3500 },
+          { name: 'كعك بالسمسم — ١٢ حبة', priceIqd: 3000 },
+        ],
+      },
+      {
+        name: 'عسل ومربى',
+        items: [
+          { name: 'عسل طبيعي ٥٠٠ غم', priceIqd: 15_000 },
+          { name: 'مربى تين ٤٠٠ غم', priceIqd: 4000 },
+          { name: 'دبس تمر ٧٠٠ غم', priceIqd: 5000 },
+        ],
+      },
+    ],
+  },
+];
 
 const DEMO_RESTAURANTS: readonly DemoRestaurant[] = [
   {
@@ -714,7 +1006,7 @@ export async function seedDemoMarketplace(db: Database, cityCode: string): Promi
 
   // The market runs through the same loop as the restaurants, because it is
   // the same shape — that is the whole argument for the discriminator.
-  for (const demo of [...DEMO_RESTAURANTS, DEMO_MARKET]) {
+  for (const demo of [...DEMO_RESTAURANTS, ...DEMO_MARKETS]) {
     await db.transaction(async (tx) => {
       const [existing] = await tx
         .select({ id: restaurants.id, providerId: restaurants.providerId })
