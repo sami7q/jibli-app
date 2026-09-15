@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Image, Pressable, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -6,7 +7,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { MerchantType } from '@jibli/contracts';
 import { api, assetUrl } from '@/lib/api';
 import { useVertical } from '@/lib/vertical';
-import { color, palette, radius, shadow, space, text } from '@/theme';
+import { color, palette, space, text } from '@/theme';
 import { Screen, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import { JibliWordmark } from '@/ui/brand';
@@ -118,30 +119,68 @@ export default function ChooseScreen() {
     };
   };
 
+  /*
+   * How tall each banner actually is, asked of the file rather than assumed.
+   *
+   * The first version hard-coded 16:9 because that is what the home screen
+   * asks for, and it made this screen permanently 52% banner and 48% empty:
+   * two landscape pictures cannot fill a portrait phone, and a layout built
+   * around a constant cannot notice when a better-shaped file arrives.
+   *
+   * Measured, the panel grows to whatever it is given. Drop a squarer export
+   * in for this slot and the two halves fill the screen; leave the 16:9 one
+   * and nothing changes. `Image.getSize` reads the header of an image the
+   * screen is about to display anyway, so it costs a cache hit.
+   */
+  const [ratios, setRatios] = useState<Partial<Record<MerchantType, number>>>({});
+
+  const foodArt = artwork('RESTAURANT').url;
+  const marketArt = artwork('MARKET').url;
+
+  useEffect(() => {
+    for (const [type, url] of [
+      ['RESTAURANT', foodArt],
+      ['MARKET', marketArt],
+    ] as const) {
+      if (!url) continue;
+      Image.getSize(
+        url,
+        (w, h) => h > 0 && setRatios((current) => ({ ...current, [type]: w / h })),
+        // A banner whose header will not parse still gets a panel; it just
+        // gets the one 16:9 would have given it.
+        () => undefined,
+      );
+    }
+  }, [foodArt, marketArt]);
+
   const enter = (type: MerchantType) => {
     choose(type);
     router.replace('/(tabs)');
   };
 
   /*
-   * The art sets the panel's height. The panel does not set the art's.
+   * The panel is the banner. Nothing above it, nothing below it, nothing
+   * around it.
    *
-   * Splitting the screen evenly and centring a 16:9 banner in each half left
-   * 70pt of flat colour above and below it — a third of every panel saying
-   * nothing, which reads as a banner that failed to load rather than one that
-   * is the wrong shape for the space. Covering the panel instead would crop
-   * 37% off the banner's width, and these are composed left to right with the
-   * products on one side and the headline on the other, so that 37% is where
-   * half the design lives.
+   * This went through both wrong answers first. Splitting the screen evenly
+   * and centring the banner in each half left 70pt of flat colour above and
+   * below it — a third of every panel saying nothing, which reads as a banner
+   * that failed to load. Framing it in 16pt of the section's colour was
+   * better and still 64pt of the screen spent on a border.
    *
-   * So the panel is the banner plus an even frame. Nothing is cropped and
-   * nothing is padding: every phone shows the identical picture, and the
-   * section's colour is a border around it rather than a gap behind it.
+   * Covering the panel is the other direction and it is not available: a 16:9
+   * picture stretched to fill a phone-shaped panel loses 37% of its width, and
+   * these are composed left to right — products on one side, headline on the
+   * other — so that 37% is where half the design lives.
    *
-   * The second term only bites on a short screen, where two 16:9 banners at
-   * full width would push the header off the top. There the pair shrinks
-   * together and stays centred, which is the one thing this layout may never
-   * do without: show both halves of a two-way choice.
+   * What is left is the honest maximum: full width, its own ratio, edge to
+   * edge, the two of them stacked against each other. 242pt on a 430pt phone.
+   * The header takes what remains, because what remains is real and the only
+   * way to shrink it is to cut the artwork.
+   *
+   * The second term only bites on a screen too short for two of those, where
+   * the pair shrinks together rather than pushing one of them off the bottom —
+   * a two-way choice may never hide one of its halves.
    */
   /*
    * The wordmark scales with the phone rather than being one number.
@@ -153,30 +192,45 @@ export default function ChooseScreen() {
    */
   const markWidth = Math.min(176, width * 0.42);
 
-  const inset = space[4];
-  const artWidth = Math.min(width - inset * 2, (((height - 200) / 2 - inset * 2) * 16) / 9);
-  const artHeight = (artWidth * 9) / 16;
+  /*
+   * One height for both, and never taller than the shorter picture.
+   *
+   * Equal because a two-way choice with one half visibly larger is not an
+   * even choice. Bounded by the shorter of the two because going past a
+   * picture's natural height means cropping it, and this way neither is
+   * cropped until the screen itself runs out of room.
+   *
+   * The cap is what stops a very tall banner from pushing the other half
+   * below the fold. Past it both are cropped top and bottom rather than at
+   * the sides — a banner is composed left to right, so its edges carry the
+   * headline and its margins carry nothing.
+   */
+  const naturalHeight = (type: MerchantType) => width / (ratios[type] ?? 16 / 9);
+  const artHeight = Math.min(
+    (height - 200) / 2,
+    naturalHeight('RESTAURANT'),
+    naturalHeight('MARKET'),
+  );
 
   return (
     <Screen edges={['top', 'bottom']} padded={false}>
       <View style={{ flex: 1, backgroundColor: color.surfaceCard }}>
         {/*
-          The header takes whatever the two panels leave, and fills it rather
-          than floating in it.
-          
-          A 16:9 banner on a portrait phone is 224pt tall, so two of them
-          occupy a little over half the screen and no amount of layout will
-          make them occupy more without cropping them. That leaves roughly
-          300pt above, which is too much for a caption and exactly right for a
-          title: the wordmark at brand size with the question under it reads as
-          the top of a page, where the same block at caption size read as a
-          label stranded in white.
+          The header takes what the panels leave and sits at the bottom of it,
+          against the first banner.
+
+          Centred, the slack split in two and put half of it between the
+          question and the answers — a gap in the middle of the screen reads as
+          something missing, while the same emptiness above the wordmark reads
+          as the top of a page. Same pixels, and only one of the two looks
+          deliberate.
         */}
-        <Enter delay={0} style={{ flex: 1, justifyContent: 'center' }}>
+        <Enter delay={0} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <View
             style={{
               alignItems: 'center',
               paddingHorizontal: space[5],
+              paddingBottom: space[6],
               gap: space[2],
             }}
           >
@@ -199,10 +253,7 @@ export default function ChooseScreen() {
                 onPress={() => enter(half.type)}
                 accessibilityRole="button"
                 accessibilityLabel={`${half.label} — ${half.caption}`}
-                style={({ pressed }) => [
-                  { height: artHeight + inset * 2 },
-                  pressed ? { opacity: 0.94 } : null,
-                ]}
+                style={({ pressed }) => [{ height: artHeight }, pressed ? { opacity: 0.94 } : null]}
               >
                 <LinearGradient
                   colors={[...half.gradient]}
@@ -218,26 +269,11 @@ export default function ChooseScreen() {
                   }}
                 >
                   {art.url ? (
-                    /*
-                      The shadow is on the wrapper and the corner is on both.
-                      iOS draws no shadow for a view that clips its children,
-                      so the two cannot share one element: the outer view casts
-                      and the image rounds.
-                    */
-                    <View
-                      style={{
-                        width: artWidth,
-                        height: artHeight,
-                        borderRadius: radius['2xl'],
-                        ...shadow.md,
-                      }}
-                    >
-                      <Image
-                        source={{ uri: art.url }}
-                        style={{ width: '100%', height: '100%', borderRadius: radius['2xl'] }}
-                        resizeMode="cover"
-                      />
-                    </View>
+                    <Image
+                      source={{ uri: art.url }}
+                      style={{ width: '100%', height: artHeight }}
+                      resizeMode="cover"
+                    />
                   ) : art.known ? (
                     /*
                      * Words, for a section with no banner scheduled.
@@ -249,7 +285,7 @@ export default function ChooseScreen() {
                      */
                     <View
                       style={{
-                        width: artWidth,
+                        width: '100%',
                         height: artHeight,
                         justifyContent: 'center',
                         gap: space[2],

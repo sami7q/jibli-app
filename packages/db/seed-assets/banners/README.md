@@ -23,12 +23,33 @@ generated placeholder, so you can replace them one at a time.
 
 ## The size
 
-**16:9**, and the app crops nothing — the slot is exactly that ratio, so what
-you export is what appears.
+**16:9**, exported at **1920 × 1080**. That covers the largest phone at 3×
+without upscaling; 1280 × 720 is enough if the file size matters more than the
+sharpness.
 
-- **1920 × 1080** is the size to export at. It covers the largest phone at 3×
-  without upscaling.
-- 1280 × 720 is enough if the file matters more than the sharpness.
+Keep it **under about 600KB**. The seed prints a warning past that, because
+the home screen loads this before anything else and a full-quality export is
+several megabytes over an Iraqi phone network. A 1920 × 1080 JPEG at quality
+80 lands around 300KB and looks the same.
+
+### Two slots, one file
+
+The same image is shown in two places, and they are not the same shape:
+
+|                     |                        |                                  |
+| ------------------- | ---------------------- | -------------------------------- |
+| **Home carousel**   | exactly 16:9           | what the ratio above is for      |
+| **Section chooser** | as tall as the file is | half the screen, less the header |
+
+Neither crops horizontally, so nothing you put in the frame is ever cut off
+the sides. The chooser sizes its panel from the file itself: a 16:9 banner
+fills about half the screen there and a squarer one fills more.
+
+If you want the chooser to be **all artwork and no white**, export the same
+design again at **4:5 (1080 × 1350)** or **1:1**. The first banner of each
+section is the one it shows, so only `welcome` and `market_welcome` matter for
+that screen — and the home carousel still wants its 16:9, so that is a second
+export rather than a replacement.
 
 ## What to put in the image
 
