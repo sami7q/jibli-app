@@ -1,7 +1,7 @@
 import { and, asc, count, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { AppError, ERROR_CODES, success } from '@jibli/contracts';
+import { AppError, ERROR_CODES, MERCHANT_TYPES, success } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
 import { uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
@@ -264,9 +264,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
     async (request, reply) => {
       const principal = requirePrincipal(request);
       assertAdminPermission(principal, 'config.write');
-      const body = z
-        .object({ ids: z.array(uuidSchema).min(1).max(200) })
-        .parse(request.body);
+      const body = z.object({ ids: z.array(uuidSchema).min(1).max(200) }).parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
         for (const [index, id] of body.ids.entries()) {
@@ -277,9 +275,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
         }
       });
 
-      return reply.send(
-        success({ ordered: body.ids.length }, { request_id: request.requestId }),
-      );
+      return reply.send(success({ ordered: body.ids.length }, { request_id: request.requestId }));
     },
   );
 
@@ -502,6 +498,17 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
     },
   );
 
+  /**
+   * Which storefront the app is asking for.
+   *
+   * Defaulted rather than required: the parameter did not exist before markets
+   * did, and a caller that omits it wants the food half — which is what it has
+   * always been given.
+   */
+  const storefrontQuerySchema = z.object({
+    merchant_type: z.enum(MERCHANT_TYPES).default('RESTAURANT'),
+  });
+
   // ── What the app reads ────────────────────────────────────────────────────
 
   /**
@@ -518,6 +525,16 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
   app.get('/api/v1/storefront', async (request, reply) => {
     const now = new Date();
 
+    /*
+     * Which storefront is asking.
+     *
+     * Absent means the restaurant one, not both — because merging the two
+     * would put grocery aisles in the food category strip, which is the exact
+     * confusion the column exists to end. A caller written before markets
+     * existed wanted food, and still gets it.
+     */
+    const { merchant_type: merchantType } = storefrontQuerySchema.parse(request.query);
+
     const categories = await ctx.db
       .select({
         key: appCategories.key,
@@ -526,7 +543,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
         imageAssetId: appCategories.imageAssetId,
       })
       .from(appCategories)
-      .where(eq(appCategories.isActive, true))
+      .where(and(eq(appCategories.isActive, true), eq(appCategories.merchantType, merchantType)))
       .orderBy(asc(appCategories.sortOrder), asc(appCategories.nameAr));
 
     const banners = await ctx.db
@@ -535,6 +552,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
       .where(
         and(
           eq(appBanners.isActive, true),
+          eq(appBanners.merchantType, merchantType),
           // Null means "no boundary", so each side is "unset, or satisfied".
           or(isNull(appBanners.startsAt), lte(appBanners.startsAt, now)),
           or(isNull(appBanners.endsAt), gt(appBanners.endsAt, now)),

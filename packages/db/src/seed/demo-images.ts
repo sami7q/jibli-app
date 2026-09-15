@@ -281,7 +281,47 @@ export const DEMO_BANNERS: readonly {
   to: string;
   linkType: 'NONE' | 'CATEGORY';
   linkValue: string | null;
+  /**
+   * Which storefront it runs in. Omitted means the food one, which is what
+   * every banner written before markets existed meant.
+   *
+   * The market banners use cooler, greener art than the food ones on purpose:
+   * the two halves should not be distinguishable only by their text, and a
+   * customer who has switched sections should be able to tell from across the
+   * room.
+   */
+  merchantType?: 'RESTAURANT' | 'MARKET';
 }[] = [
+  {
+    key: 'market_welcome',
+    titleAr: 'جيبلي ماركت',
+    subtitleAr: 'بقالتك كاملة، تصل خلال دقائق',
+    from: '#12b76a',
+    to: '#027a48',
+    linkType: 'NONE',
+    linkValue: null,
+    merchantType: 'MARKET',
+  },
+  {
+    key: 'market_produce',
+    titleAr: 'خضار وفواكه طازجة',
+    subtitleAr: 'من سوق الجملة كل صباح',
+    from: '#15803d',
+    to: '#14532d',
+    linkType: 'CATEGORY',
+    linkValue: 'mk_produce',
+    merchantType: 'MARKET',
+  },
+  {
+    key: 'market_household',
+    titleAr: 'تسوّق الشهر',
+    subtitleAr: 'كميات الجملة بتوصيل مجاني',
+    from: '#0e7490',
+    to: '#155e75',
+    linkType: 'CATEGORY',
+    linkValue: 'mk_household',
+    merchantType: 'MARKET',
+  },
   {
     key: 'welcome',
     titleAr: 'أهلاً بك في جيبلي',

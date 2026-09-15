@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiError, NetworkError } from '@/lib/api';
 import { SessionProvider, useSession } from '@/lib/session';
 import { AreaProvider } from '@/lib/area';
+import { VerticalProvider, useVertical } from '@/lib/vertical';
 import { CartProvider } from '@/lib/cart';
 import { OfflineBanner, startNetworkWatch } from '@/lib/network';
 import { ActiveOrderBar, OrderWatchProvider } from '@/lib/order-watch';
@@ -88,34 +89,36 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <SessionProvider>
-            <AreaProvider>
-              <CartProvider>
-                {/*
-                 * Inside the router's tree and outside every screen: the bar
-                 * has to survive navigation to be worth anything, and the
-                 * watcher behind it has to keep polling while the customer is
-                 * three screens away reading a different menu.
-                 */}
-                <OrderWatchProvider>
-                  <StatusBar style="dark" />
-                  <OfflineBanner />
-                  <Gate />
+            <VerticalProvider>
+              <AreaProvider>
+                <CartProvider>
                   {/*
-                   * After the screens, not before them. The card floats over
-                   * whatever is showing, and React Native stacks by order —
-                   * drawn first, it would sit under every screen it is meant
-                   * to float above.
+                   * Inside the router's tree and outside every screen: the bar
+                   * has to survive navigation to be worth anything, and the
+                   * watcher behind it has to keep polling while the customer is
+                   * three screens away reading a different menu.
                    */}
-                  <ActiveOrderBar />
-                  <GlobalCartBar />
-                  {/*
-                   * Last of all, so a dialog sits above every bar and sheet
-                   * the app can have open — which is the whole point of one.
-                   */}
-                  <DialogHost />
-                </OrderWatchProvider>
-              </CartProvider>
-            </AreaProvider>
+                  <OrderWatchProvider>
+                    <StatusBar style="dark" />
+                    <OfflineBanner />
+                    <Gate />
+                    {/*
+                     * After the screens, not before them. The card floats over
+                     * whatever is showing, and React Native stacks by order —
+                     * drawn first, it would sit under every screen it is meant
+                     * to float above.
+                     */}
+                    <ActiveOrderBar />
+                    <GlobalCartBar />
+                    {/*
+                     * Last of all, so a dialog sits above every bar and sheet
+                     * the app can have open — which is the whole point of one.
+                     */}
+                    <DialogHost />
+                  </OrderWatchProvider>
+                </CartProvider>
+              </AreaProvider>
+            </VerticalProvider>
           </SessionProvider>
         </QueryClientProvider>
       </ErrorBoundary>
@@ -136,6 +139,7 @@ export default function RootLayout() {
  */
 function Gate() {
   const { state } = useSession();
+  const { vertical } = useVertical();
   const router = useRouter();
   const segments = useSegments();
 
@@ -149,6 +153,24 @@ function Gate() {
     const path = segments as readonly string[];
     const inAuth = path[0] === '(auth)';
     const onWelcome = path[1] === 'welcome';
+    const onChooser = path[0] === 'choose';
+
+    /*
+     * Nothing can render until the half is known.
+     *
+     * The home screen's banner, category strip and merchant list all belong to
+     * one section or the other, so there is no correct thing to draw without
+     * an answer — a default would simply be a guess shown as fact. The chooser
+     * is the answer, and it sits outside the tabs so the tab bar does not
+     * appear under a screen that is not part of the app yet.
+     *
+     * Checked before the sign-in rules on purpose: browsing is public, and a
+     * guest picks a section exactly as a signed-in customer does.
+     */
+    if (!vertical && !onChooser && !inAuth) {
+      router.replace('/choose');
+      return;
+    }
 
     /*
      * Signed out and undecided: the welcome screen, not the phone screen.
@@ -198,7 +220,7 @@ function Gate() {
     ) {
       router.replace('/(tabs)');
     }
-  }, [state, segments, router]);
+  }, [state, vertical, segments, router]);
 
   if (state.status === 'loading') {
     return (

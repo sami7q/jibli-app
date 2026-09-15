@@ -1,3 +1,4 @@
+import type { MerchantType } from '@jibli/contracts';
 import { boolean, index, integer, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
 import { assets } from './platform.js';
 import { createdAt, fk, primaryId, updatedAt, utcTimestamp } from './_shared.js';
@@ -31,6 +32,13 @@ export const appCategories = pgTable(
      */
     key: text('key').notNull(),
     nameAr: text('name_ar').notNull(),
+    /**
+     * Which storefront this category belongs to (migration 0017).
+     *
+     * A cuisine tag and a grocery aisle are both categories and never appear
+     * together: «برجر» above a list of groceries is a filter that lies.
+     */
+    merchantType: text('merchant_type').$type<MerchantType>().notNull().default('RESTAURANT'),
     /** Shown when there is no image, and in dense lists where one would not fit. */
     emoji: text('emoji'),
     /** Uploaded through the same asset pipeline as a restaurant logo. */
@@ -66,6 +74,14 @@ export const appBanners = pgTable(
     id: primaryId(),
     titleAr: text('title_ar').notNull(),
     subtitleAr: text('subtitle_ar'),
+    /**
+     * Which storefront this banner runs in (migration 0017).
+     *
+     * The one paid placement in the app, sold per season and per partner. A
+     * Ramadan offer from a restaurant has no business rotating above a grocery
+     * basket — selling a placement means promising where it appears.
+     */
+    merchantType: text('merchant_type').$type<MerchantType>().notNull().default('RESTAURANT'),
     imageAssetId: fk('image_asset_id').references(() => assets.id, { onDelete: 'set null' }),
     linkType: text('link_type').$type<BannerLinkType>().notNull().default('NONE'),
     /** A category key, a restaurant id, or a URL, depending on `linkType`. */

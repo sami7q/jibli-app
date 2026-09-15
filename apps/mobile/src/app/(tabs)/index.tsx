@@ -22,7 +22,7 @@ import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import type { MerchantType } from '@jibli/contracts';
-import { VerticalSwitch } from '@/ui/vertical-switch';
+import { useVertical } from '@/lib/vertical';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
 
@@ -50,18 +50,21 @@ export default function HomeScreen() {
   const [pickingArea, setPickingArea] = useState(false);
 
   /*
-   * Which half of Jibli the customer is in.
+   * Which half of Jibli this is, decided on the screen before this one.
    *
-   * Food, always, on open. Not the last choice remembered: most sessions are a
-   * meal, and a customer who bought milk on Tuesday should not find the app
-   * showing them a grocery on Friday evening when they are hungry. The switch
-   * is one tap and always visible, which is the cheaper way to be wrong.
+   * Never null here: the Gate routes anyone without an answer to the chooser,
+   * so by the time this renders the question is settled. The fallback exists
+   * only to satisfy the type — a frame rendered during the redirect should
+   * show the commoner half rather than nothing.
    */
-  const [vertical, setVertical] = useState<MerchantType>('RESTAURANT');
+  const { vertical: chosen, clear: backToChooser } = useVertical();
+  const vertical = chosen ?? 'RESTAURANT';
 
   const storefront = useQuery({
-    queryKey: ['storefront'],
-    queryFn: () => api.storefront(),
+    // Keyed by the half, because the banners and the category strip differ
+    // between them — that is the reason the chooser exists.
+    queryKey: ['storefront', vertical],
+    queryFn: () => api.storefront(vertical),
     // Merchandising changes on the hour, not the minute.
     staleTime: 5 * 60_000,
   });
@@ -144,6 +147,14 @@ export default function HomeScreen() {
         onPressArea={() => setPickingArea(true)}
         isGuest={isGuest}
         onPressSignIn={() => router.push('/(auth)/phone')}
+        vertical={vertical}
+        onBack={() => {
+          // Clearing the choice is what sends the Gate back to the chooser;
+          // navigating there directly would leave a stale half behind it.
+          setCategory(null);
+          setSearch('');
+          backToChooser();
+        }}
       />
 
       {/*
@@ -158,32 +169,6 @@ export default function HomeScreen() {
        * Sixty milliseconds apart. Any slower and a returning customer, who
        * opens this ten times a day, starts waiting for it.
        */}
-      {/*
-       * The split, above the search rather than below it.
-       *
-       * The search means something different on each side — dishes in one,
-       * products in the other — so choosing the half first is the order the
-       * screen has to be read in, and putting the switch under the field
-       * would invite typing before choosing.
-       *
-       * Hidden while searching: a dish search already spans the city, and a
-       * switch that does nothing to the results in front of you is worse than
-       * no switch.
-       */}
-      {searching ? null : (
-        <Enter delay={0} style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
-          <VerticalSwitch
-            value={vertical}
-            onChange={(next) => {
-              setVertical(next);
-              // Categories belong to the half that defined them — «برجر» has
-              // no meaning in a grocery — so the filter clears with the switch.
-              setCategory(null);
-            }}
-          />
-        </Enter>
-      )}
-
       <Enter delay={40} style={{ paddingHorizontal: space[4], paddingTop: space[3] }}>
         <SearchBar
           value={search}
@@ -226,7 +211,12 @@ export default function HomeScreen() {
         </View>
       ) : (
         <Enter delay={120}>
-          <CategoryStrip categories={categories} selected={category} onSelect={setCategory} />
+          <CategoryStrip
+            categories={categories}
+            selected={category}
+            onSelect={setCategory}
+            vertical={vertical}
+          />
         </Enter>
       )}
 
@@ -373,12 +363,16 @@ function Header({
   onPressArea,
   isGuest,
   onPressSignIn,
+  vertical,
+  onBack,
 }: {
   areaLabel: string | null;
   isResolving: boolean;
   onPressArea: () => void;
   isGuest: boolean;
   onPressSignIn: () => void;
+  vertical: MerchantType;
+  onBack: () => void;
 }) {
   return (
     <View
@@ -391,6 +385,54 @@ function Header({
         borderBottomColor: color.borderSubtle,
       }}
     >
+      {/*
+       * Which half you are in, and the way out of it.
+       *
+       * A back arrow alone would be ambiguous — back to what? — so it carries
+       * the name of the section it leaves. It is the first row because it is
+       * the outermost thing about this screen: the area below it is a setting
+       * within the half, not above it.
+       */}
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel={`الرجوع لاختيار القسم. القسم الحالي ${
+          vertical === 'MARKET' ? 'جيبلي ماركت' : 'جيبلي أكل'
+        }`}
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row-reverse',
+            alignItems: 'center',
+            gap: space[2],
+            alignSelf: 'flex-start',
+            paddingVertical: space[1],
+            paddingHorizontal: space[2],
+            marginBottom: space[2],
+            borderRadius: radius.full,
+            backgroundColor: vertical === 'MARKET' ? palette.success[50] : color.brandSoft,
+          },
+          pressed ? { opacity: 0.7 } : null,
+        ]}
+      >
+        <MaterialCommunityIcons
+          name={vertical === 'MARKET' ? 'basket-outline' : 'silverware-fork-knife'}
+          size={16}
+          color={vertical === 'MARKET' ? palette.success[700] : color.textBrand}
+        />
+        <Text
+          variant="captionBold"
+          style={{ color: vertical === 'MARKET' ? palette.success[700] : color.textBrand }}
+        >
+          {vertical === 'MARKET' ? 'جيبلي ماركت' : 'جيبلي أكل'}
+        </Text>
+        {/* Points the way the language runs, which under forced RTL is left. */}
+        <MaterialCommunityIcons
+          name="chevron-left"
+          size={16}
+          color={vertical === 'MARKET' ? palette.success[700] : color.textBrand}
+        />
+      </Pressable>
+
       <Row justify="space-between" gap={space[3]}>
         <Pressable
           onPress={onPressArea}
@@ -618,10 +660,13 @@ function CategoryStrip({
   categories,
   selected,
   onSelect,
+  vertical,
 }: {
   categories: NonNullable<Awaited<ReturnType<typeof api.storefront>>>['categories'];
   selected: string | null;
   onSelect: (key: string | null) => void;
+  /** «اختر وجبتك» is the wrong instruction above a shelf of detergent. */
+  vertical: MerchantType;
 }) {
   if (categories.length === 0) return null;
 
@@ -630,7 +675,7 @@ function CategoryStrip({
       <Row justify="space-between" style={{ paddingHorizontal: space[4] }}>
         <Text variant="h3">التصنيفات</Text>
         <Text variant="caption" tone="muted">
-          اختر وجبتك
+          {vertical === 'MARKET' ? 'تسوّق حسب القسم' : 'اختر وجبتك'}
         </Text>
       </Row>
 

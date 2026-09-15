@@ -516,7 +516,17 @@ export const api = {
    * there is a session, and a home screen that needs a sign-in to show a
    * category strip is a home screen nobody reaches.
    */
-  storefront: () => apiRequest<Storefront>('/api/v1/storefront', { authenticated: false }),
+  /**
+   * The front page of one half of the app.
+   *
+   * The banners and the category strip belong to a section rather than to the
+   * app, so this always names one. Omitting it on the server means the food
+   * half, which is what callers written before markets existed meant.
+   */
+  storefront: (merchantType: 'RESTAURANT' | 'MARKET' = 'RESTAURANT') =>
+    apiRequest<Storefront>(`/api/v1/storefront?merchant_type=${merchantType}`, {
+      authenticated: false,
+    }),
 
   requestOtp: (phone: string) =>
     apiRequest<{ sent: boolean; resend_after_seconds: number; dev_code?: string }>(
