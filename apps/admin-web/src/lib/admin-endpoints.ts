@@ -1,3 +1,4 @@
+import type { MerchantType } from '@jibli/contracts';
 import { apiRequest } from './api';
 
 /**
@@ -63,6 +64,8 @@ export interface AppCategory {
   id: string;
   key: string;
   name_ar: string;
+  /** Which storefront it appears in. Absent on an API deployed before markets. */
+  merchant_type?: MerchantType;
   emoji: string | null;
   image_asset_id: string | null;
   sort_order: number;
@@ -74,6 +77,8 @@ export interface AppBanner {
   id: string;
   title_ar: string;
   subtitle_ar: string | null;
+  /** Which storefront it runs in. Absent on an API deployed before markets. */
+  merchant_type?: MerchantType;
   image_asset_id: string | null;
   link_type: 'NONE' | 'CATEGORY' | 'RESTAURANT' | 'URL';
   link_value: string | null;
@@ -715,12 +720,28 @@ export const admin = {
 
   // ── Categories and banners ────────────────────────────────────────────────
 
-  categories: (token: string) =>
-    apiRequest<AppCategory[]>('/api/v1/admin/categories', { accessToken: token }),
+  /**
+   * Categories, for one storefront or for both.
+   *
+   * `merchantType` is optional at the wire level so an older caller keeps
+   * working, but every screen here passes it: a list mixing «برجر» with «خضار
+   * وفواكه» and saying which is which nowhere is worse than two short lists.
+   */
+  categories: (token: string, merchantType?: MerchantType) =>
+    apiRequest<AppCategory[]>(
+      `/api/v1/admin/categories${merchantType ? `?merchant_type=${merchantType}` : ''}`,
+      { accessToken: token },
+    ),
 
   createCategory: (
     token: string,
-    body: { key: string; name_ar: string; emoji?: string; image_asset_id?: string },
+    body: {
+      key: string;
+      name_ar: string;
+      merchant_type?: MerchantType;
+      emoji?: string;
+      image_asset_id?: string;
+    },
   ) =>
     apiRequest<{ id: string }>('/api/v1/admin/categories', {
       method: 'POST',
@@ -757,8 +778,11 @@ export const admin = {
       body: { ids },
     }),
 
-  banners: (token: string) =>
-    apiRequest<AppBanner[]>('/api/v1/admin/banners', { accessToken: token }),
+  banners: (token: string, merchantType?: MerchantType) =>
+    apiRequest<AppBanner[]>(
+      `/api/v1/admin/banners${merchantType ? `?merchant_type=${merchantType}` : ''}`,
+      { accessToken: token },
+    ),
 
   createBanner: (token: string, body: Record<string, unknown>) =>
     apiRequest<{ id: string }>('/api/v1/admin/banners', {

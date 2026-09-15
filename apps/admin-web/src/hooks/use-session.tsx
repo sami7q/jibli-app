@@ -1,7 +1,12 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { PLATFORM_ROLE_LABELS } from '@jibli/ui-web';
+import {
+  endsSession,
+  MAX_SESSION_RETRIES,
+  PLATFORM_ROLE_LABELS,
+  retryDelayMs,
+} from '@jibli/ui-web';
 import { adminPermissionsFor, type AdminPermission, type PlatformRole } from '@jibli/contracts';
 import { apiRequest, ApiError } from '@/lib/api';
 
@@ -85,6 +90,12 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    /*
+     * Consecutive transport failures, reset by any success. Not state: it is
+     * read and written inside one async loop and nothing renders from it, so
+     * putting it in state would only schedule renders nobody sees.
+     */
+    let failures = 0;
 
     const load = async (): Promise<void> => {
       try {
@@ -103,6 +114,8 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
         });
 
         if (cancelled) return;
+
+        failures = 0;
 
         if (me.platform_roles.length === 0) {
           // A valid customer session is not an admin session. Saying so beats
@@ -131,9 +144,29 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
         );
       } catch (error) {
         if (cancelled) return;
+
+        const code = error instanceof ApiError ? error.code : undefined;
+        const status = error instanceof ApiError ? error.status : undefined;
+
+        /*
+         * Only a server that rejected the session ends it. Everything else —
+         * a sleeping API, a gateway timeout, a dropped connection — is retried
+         * while the page keeps showing its loading state, because the session
+         * in the cookie is still perfectly good and sending the operator to
+         * the sign-in form would be a lie about what went wrong.
+         */
+        if (!endsSession(code, status) && failures < MAX_SESSION_RETRIES) {
+          const delay = retryDelayMs(failures);
+          failures += 1;
+          timer = setTimeout(() => void load(), delay);
+          // Stay in `loading`: the session is unknown, not absent.
+          setState({ status: 'loading' });
+          return;
+        }
+
         setState({
           status: 'unauthenticated',
-          ...(error instanceof ApiError ? { reason: error.code } : {}),
+          ...(code ? { reason: code } : {}),
         });
       }
     };

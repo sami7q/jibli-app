@@ -36,6 +36,7 @@ export type IconName =
   | 'volume'
   | 'geography'
   | 'restaurants'
+  | 'markets'
   | 'applications'
   | 'categories'
   | 'live'
@@ -85,6 +86,11 @@ const PATHS: Record<IconName, string> = {
   volume: 'M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14',
   geography: 'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   restaurants: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6',
+  // A shop awning over a counter: the same silhouette as `restaurants` would
+  // make the one question the directory exists to answer — which of these is a
+  // market — unanswerable from the sidebar.
+  markets:
+    'M4 9h16l-1 11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1zM3 9l2-5h14l2 5M9 13v4M15 13v4',
   applications: 'M9 3h6a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2V4a1 1 0 0 1 1-1zM9 13l2 2 4-4',
   categories: 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',
   live: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 0 0 13M18.5 5.5a9 9 0 0 1 0 13',

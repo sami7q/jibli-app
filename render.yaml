@@ -70,6 +70,28 @@ services:
       - key: APP_ENV
         value: staging
 
+      # Apply pending migrations before serving the first request.
+      #
+      # This blueprint had no migration step at all. The image copies its
+      # `.sql` files in — the Dockerfile even says they travel with it "so a
+      # deploy applies the schema from the same artifact" — and nothing ever
+      # ran them. The cost of that was a day of production where the API had
+      # the code for `merchant_type` and the database did not have the column:
+      # the customer app's home screen, the restaurant portal's shell and the
+      # Admin directory all answered 500, `/health/ready` said "ok", and the
+      # symptom pointed at the application rather than at the deploy.
+      #
+      # Render's pre-deploy command is the tidier place for this and is a paid
+      # feature; doing it at boot needs no plan change and is safe here because
+      # the runner takes an advisory lock. If this ever moves to a paid
+      # instance, prefer:
+      #
+      #   preDeployCommand: node build/api/migrate.mjs
+      #
+      # and set this back to false.
+      - key: RUN_MIGRATIONS_ON_BOOT
+        value: 'true'
+
       - key: API_HOST
         value: 0.0.0.0
       # Render provides PORT; the app reads API_PORT, so they are aligned here.

@@ -5,10 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   JibliLogo,
+  loginFailureKind,
   quickLoginSupported,
   recallCredentials,
   rememberCredentials,
   safeReturnPath,
+  SLOW_REQUEST_HINT_AR,
+  SLOW_REQUEST_HINT_MS,
+  UNREACHABLE_MESSAGE_AR,
 } from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
 
@@ -75,6 +79,16 @@ function LoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const [failures, setFailures] = useState(0);
   const [lockedFor, setLockedFor] = useState(0);
+  /**
+   * Whether this attempt has been in flight long enough to need explaining.
+   *
+   * The API sleeps on a free instance. The first sign-in of the morning waits
+   * about a minute for it to wake, during which a silent spinner is
+   * indistinguishable from a form that has stopped working — and the thing
+   * somebody does about a form that has stopped working is press the button
+   * again, four times, into a rate limit.
+   */
+  const [slow, setSlow] = useState(false);
 
   const [quickLoginReady, setQuickLoginReady] = useState(false);
 
@@ -139,6 +153,8 @@ function LoginForm() {
 
     setSubmitting(true);
     setError(null);
+    setSlow(false);
+    const slowHint = setTimeout(() => setSlow(true), SLOW_REQUEST_HINT_MS);
 
     try {
       const response = await apiRequest<{
@@ -210,21 +226,40 @@ function LoginForm() {
       // authenticated session.
       router.replace(destination);
     } catch (caught) {
-      const next = failures + 1;
-      setFailures(next);
+      const code = caught instanceof ApiError ? caught.code : undefined;
+      const status = caught instanceof ApiError ? caught.status : undefined;
 
-      if (caught instanceof ApiError && caught.code === 'RATE_LIMITED') {
-        setError('محاولات كثيرة. انتظر قليلاً قبل إعادة المحاولة.');
-        setLockedFor(BACKOFF_SECONDS * 2);
-      } else {
-        setError(caught instanceof ApiError ? caught.messageAr : 'تعذّر تسجيل الدخول');
-        if (next >= BACKOFF_AFTER_ATTEMPTS) setLockedFor(BACKOFF_SECONDS);
+      switch (loginFailureKind(code, status)) {
+        case 'RATE_LIMITED':
+          setFailures(failures + 1);
+          setError('محاولات كثيرة. انتظر قليلاً قبل إعادة المحاولة.');
+          setLockedFor(BACKOFF_SECONDS * 2);
+          break;
+
+        /*
+         * Nothing read the password, so nothing about it was wrong — and the
+         * backoff exists to slow down guessing, which this is not. Counting it
+         * meant a sleeping API locked the operator out of the form for typing
+         * their own password correctly three times.
+         */
+        case 'UNREACHABLE':
+          setError(UNREACHABLE_MESSAGE_AR);
+          break;
+
+        default: {
+          const next = failures + 1;
+          setFailures(next);
+          setError(caught instanceof ApiError ? caught.messageAr : 'تعذّر تسجيل الدخول');
+          if (next >= BACKOFF_AFTER_ATTEMPTS) setLockedFor(BACKOFF_SECONDS);
+        }
       }
 
       // A rejected code returns to the code field, not the password the user
       // has already entered correctly.
       if (stage === 'MFA') setMfaCode('');
     } finally {
+      clearTimeout(slowHint);
+      setSlow(false);
       setSubmitting(false);
     }
   };
@@ -387,6 +422,12 @@ function LoginForm() {
         {error ? (
           <p className="alert-bar alert-bar--danger" role="alert">
             {error}
+          </p>
+        ) : null}
+
+        {slow ? (
+          <p className="auth__note" role="status">
+            {SLOW_REQUEST_HINT_AR}
           </p>
         ) : null}
 

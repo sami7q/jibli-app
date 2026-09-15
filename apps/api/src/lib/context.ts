@@ -6,6 +6,7 @@ import type { Logger } from '@jibli/logger';
 import type { Database } from '@jibli/db';
 import type { Principal } from '@jibli/auth';
 import type { PushProvider, SmsProvider } from '@jibli/notifications';
+import type { SchemaState } from './schema-guard.js';
 
 /**
  * Application context — the dependencies every route handler needs.
@@ -21,6 +22,12 @@ export interface AppContext {
   readonly logger: Logger;
   readonly sms: SmsProvider;
   readonly push: PushProvider;
+  /**
+   * Whether the database carries every migration this build ships. Decided
+   * once at boot; readiness reports it so a schema-behind-code deployment is
+   * visible from outside the process rather than only in its first log lines.
+   */
+  readonly schema: SchemaState;
 }
 
 declare module 'fastify' {

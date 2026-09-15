@@ -44,18 +44,42 @@ const EXTERNAL = [
 ];
 
 
+/**
+ * The third target is not a service.
+ *
+ * `migrate` bundles the migration runner beside the API so the image can apply
+ * its own schema — from a pre-deploy command, or by hand on a container that is
+ * already running. It shares the API's output directory rather than claiming
+ * one of its own, because it is that same artifact's schema and shipping it
+ * anywhere else is how the two come apart.
+ *
+ * It reads its `.sql` files from disk at runtime rather than from the bundle:
+ * they are data, and the image copies them in. MIGRATIONS_DIR says where.
+ */
+const TARGETS = {
+  api: { entry: 'apps/api/src/index.ts', outfile: 'apps/api/build/index.mjs', clean: true },
+  worker: { entry: 'apps/worker/src/index.ts', outfile: 'apps/worker/build/index.mjs', clean: true },
+  migrate: {
+    entry: 'packages/db/src/migrate.ts',
+    outfile: 'apps/api/build/migrate.mjs',
+    // Never cleans: it is written into the API's directory, after the API.
+    clean: false,
+  },
+};
+
 const target = process.argv[2];
-if (!target || !['api', 'worker'].includes(target)) {
-  console.error('Usage: node scripts/bundle.mjs <api|worker>');
+if (!target || !Object.hasOwn(TARGETS, target)) {
+  console.error(`Usage: node scripts/bundle.mjs <${Object.keys(TARGETS).join('|')}>`);
   process.exit(1);
 }
 
-const outdir = `apps/${target}/build`;
-await rm(outdir, { recursive: true, force: true });
+const { entry, outfile, clean } = TARGETS[target];
+const outdir = outfile.slice(0, outfile.lastIndexOf('/'));
+if (clean) await rm(outdir, { recursive: true, force: true });
 
 const result = await build({
-  entryPoints: [`apps/${target}/src/index.ts`],
-  outfile: `${outdir}/index.mjs`,
+  entryPoints: [entry],
+  outfile,
   bundle: true,
   platform: 'node',
   // Matches the engines field and the container's Node version.
@@ -89,4 +113,4 @@ const bytes = Object.values(result.metafile.outputs).reduce(
   (total, output) => total + output.bytes,
   0,
 );
-console.log(`\n${target}: ${(bytes / 1024).toFixed(0)} kB → ${outdir}/index.mjs`);
+console.log(`\n${target}: ${(bytes / 1024).toFixed(0)} kB → ${outfile}`);

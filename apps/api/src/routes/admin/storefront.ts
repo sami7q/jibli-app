@@ -26,6 +26,26 @@ import { jsonbArrayContains, jsonbArrayContainsColumn } from '../../lib/jsonb.js
 /** Gaps between saved positions, so a later insert has room between two rows. */
 const ORDER_STEP = 10;
 
+/**
+ * Which storefront a merchandising screen is working on.
+ *
+ * Optional, and absent means both — an older caller asked for "the
+ * categories" when there was only one set of them, and still gets all of them
+ * rather than an empty list.
+ *
+ * Every row now says which side it belongs to whether or not it was filtered,
+ * because a list mixing «برجر» with «خضار وفواكه» and labelling neither is
+ * worse than either list alone.
+ */
+const merchantFilterSchema = z.object({
+  merchant_type: z.enum(MERCHANT_TYPES).optional(),
+});
+
+/** Restrict a query to one storefront, or to neither if none was named. */
+const ofType = (column: typeof appCategories.merchantType | typeof appBanners.merchantType,
+  merchantType: (typeof MERCHANT_TYPES)[number] | undefined) =>
+  merchantType ? eq(column, merchantType) : undefined;
+
 const keySchema = z
   .string()
   .trim()
@@ -37,12 +57,14 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
   /** Every category, in app order, with how many restaurants sit in each. */
   app.get('/api/v1/admin/categories', { preHandler: app.authenticate }, async (request, reply) => {
     assertAdminPermission(requirePrincipal(request), 'restaurant.read');
+    const { merchant_type: merchantType } = merchantFilterSchema.parse(request.query);
 
     const rows = await ctx.db
       .select({
         id: appCategories.id,
         key: appCategories.key,
         nameAr: appCategories.nameAr,
+        merchantType: appCategories.merchantType,
         emoji: appCategories.emoji,
         imageAssetId: appCategories.imageAssetId,
         sortOrder: appCategories.sortOrder,
@@ -58,10 +80,12 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
         restaurantCount: sql<number>`(
           SELECT COUNT(*) FROM ${restaurants}
           WHERE ${restaurants.deletedAt} IS NULL
+            AND ${restaurants.merchantType} = ${appCategories.merchantType}
             AND ${jsonbArrayContainsColumn(restaurants.cuisineTags, appCategories.key)}
         )`,
       })
       .from(appCategories)
+      .where(ofType(appCategories.merchantType, merchantType))
       .orderBy(asc(appCategories.sortOrder), asc(appCategories.nameAr));
 
     return reply.send(
@@ -70,6 +94,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
           id: row.id,
           key: row.key,
           name_ar: row.nameAr,
+          merchant_type: row.merchantType,
           emoji: row.emoji,
           image_asset_id: row.imageAssetId,
           sort_order: row.sortOrder,
@@ -89,6 +114,19 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
       .object({
         key: keySchema,
         name_ar: z.string().trim().min(1).max(60),
+        /*
+         * Which storefront this category belongs to.
+         *
+         * Without it, Admin could only ever create restaurant categories —
+         * the column existed, the customer app filtered on it, and the one
+         * screen that creates categories always wrote RESTAURANT. So the
+         * market half of the app could be given aisles by a migration and
+         * never by a person, which is the same as saying it could not be
+         * merchandised at all.
+         *
+         * Defaulted, so a caller written before markets keeps its meaning.
+         */
+        merchant_type: z.enum(MERCHANT_TYPES).default('RESTAURANT'),
         emoji: z.string().trim().max(8).optional(),
         image_asset_id: uuidSchema.optional(),
       })
@@ -107,16 +145,23 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
       });
     }
 
-    // Last, with a gap. Nothing renumbers to make room at the end.
+    /*
+     * Last within its own storefront, with a gap. Nothing renumbers to make
+     * room at the end. Scoped to the type because the two lists are ordered
+     * independently: a new market aisle placed after the last *restaurant*
+     * category would sort below aisles it should sit beside.
+     */
     const [last] = await ctx.db
       .select({ value: sql<number>`COALESCE(MAX(${appCategories.sortOrder}), 0)` })
-      .from(appCategories);
+      .from(appCategories)
+      .where(eq(appCategories.merchantType, body.merchant_type));
 
     const id = uuidv7();
     await ctx.db.insert(appCategories).values({
       id,
       key: body.key,
       nameAr: body.name_ar,
+      merchantType: body.merchant_type,
       emoji: body.emoji ?? null,
       imageAssetId: body.image_asset_id ?? null,
       sortOrder: Number(last?.value ?? 0) + ORDER_STEP,
@@ -128,7 +173,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
       action: AUDIT_ACTIONS.CATEGORY_CREATE,
       entityType: 'app_category',
       entityId: id,
-      after: { key: body.key, nameAr: body.name_ar },
+      after: { key: body.key, nameAr: body.name_ar, merchantType: body.merchant_type },
       ip: clientIp(request),
       userAgent: userAgent(request),
       requestId: request.requestId,
@@ -223,11 +268,18 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
         throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'category' } });
       }
 
+      /*
+       * Scoped to the category's own storefront, like the count on the list.
+       * Keys are globally unique so this cannot currently differ — but the
+       * count that decides whether a delete is refused should ask the same
+       * question the screen showing the count asked.
+       */
       const [inUse] = await ctx.db
         .select({ value: count() })
         .from(restaurants)
         .where(
           and(
+            eq(restaurants.merchantType, category.merchantType),
             jsonbArrayContains(restaurants.cuisineTags, category.key),
             isNull(restaurants.deletedAt),
           ),
@@ -283,10 +335,12 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
 
   app.get('/api/v1/admin/banners', { preHandler: app.authenticate }, async (request, reply) => {
     assertAdminPermission(requirePrincipal(request), 'restaurant.read');
+    const { merchant_type: merchantType } = merchantFilterSchema.parse(request.query);
 
     const rows = await ctx.db
       .select()
       .from(appBanners)
+      .where(ofType(appBanners.merchantType, merchantType))
       .orderBy(asc(appBanners.sortOrder), asc(appBanners.createdAt));
 
     const now = Date.now();
@@ -297,6 +351,7 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
           id: row.id,
           title_ar: row.titleAr,
           subtitle_ar: row.subtitleAr,
+          merchant_type: row.merchantType,
           image_asset_id: row.imageAssetId,
           link_type: row.linkType,
           link_value: row.linkValue,
@@ -321,6 +376,14 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
 
   const bannerBody = z.object({
     title_ar: z.string().trim().min(1).max(80),
+    /*
+     * Which storefront the placement runs in. A banner is the one paid slot in
+     * the app and it is sold for one half of it — a Ramadan offer from a
+     * restaurant has no business rotating above a grocery basket. The column
+     * has existed since markets shipped; this is the field that lets anyone
+     * set it.
+     */
+    merchant_type: z.enum(MERCHANT_TYPES).default('RESTAURANT'),
     subtitle_ar: z.string().trim().max(140).nullable().optional(),
     image_asset_id: uuidSchema.nullable().optional(),
     link_type: z.enum(['NONE', 'CATEGORY', 'RESTAURANT', 'URL']).default('NONE'),
@@ -352,15 +415,18 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
     const body = bannerBody.parse(request.body);
     assertLinkCoherent(body.link_type, body.link_value);
 
+    // Last within its own storefront — see the note on category ordering.
     const [last] = await ctx.db
       .select({ value: sql<number>`COALESCE(MAX(${appBanners.sortOrder}), 0)` })
-      .from(appBanners);
+      .from(appBanners)
+      .where(eq(appBanners.merchantType, body.merchant_type));
 
     const id = uuidv7();
     await ctx.db.insert(appBanners).values({
       id,
       titleAr: body.title_ar,
       subtitleAr: body.subtitle_ar ?? null,
+      merchantType: body.merchant_type,
       imageAssetId: body.image_asset_id ?? null,
       linkType: body.link_type,
       linkValue: body.link_value ?? null,
@@ -416,6 +482,10 @@ export function registerAdminStorefrontRoutes(app: FastifyInstance, ctx: AppCont
         .set({
           ...(body.title_ar !== undefined ? { titleAr: body.title_ar } : {}),
           ...(body.subtitle_ar !== undefined ? { subtitleAr: body.subtitle_ar } : {}),
+          // Moving a placement between storefronts is a real operation — a
+          // slot sold for the wrong half has to be correctable without
+          // rebuilding the banner.
+          ...(body.merchant_type !== undefined ? { merchantType: body.merchant_type } : {}),
           ...(body.image_asset_id !== undefined ? { imageAssetId: body.image_asset_id } : {}),
           ...(body.link_type !== undefined ? { linkType: body.link_type } : {}),
           ...(body.link_value !== undefined ? { linkValue: body.link_value } : {}),

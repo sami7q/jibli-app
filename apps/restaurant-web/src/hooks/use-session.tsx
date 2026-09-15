@@ -15,6 +15,7 @@ import {
   type RestaurantPermission,
   type RestaurantRole,
 } from '@jibli/contracts';
+import { endsSession, MAX_SESSION_RETRIES, retryDelayMs } from '@jibli/ui-web';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '@/lib/api';
 
@@ -144,6 +145,8 @@ function useSessionState(active: boolean): SessionState {
     if (!active) return undefined;
     let cancelled = false;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    /** Consecutive transport failures, reset by any success. */
+    let failures = 0;
 
     const load = async (): Promise<void> => {
       try {
@@ -162,6 +165,8 @@ function useSessionState(active: boolean): SessionState {
         });
 
         if (cancelled) return;
+
+        failures = 0;
 
         if (me.restaurants.length === 0) {
           // Authenticated, but not a member of any restaurant — the portal has
@@ -187,8 +192,27 @@ function useSessionState(active: boolean): SessionState {
         refreshTimer = setTimeout(() => void load(), delayMs);
       } catch (error) {
         if (cancelled) return;
+
+        const code = error instanceof ApiError ? error.code : undefined;
+        const status = error instanceof ApiError ? error.status : undefined;
+
+        /*
+         * A sleeping API is not an expired session. See `endsSession` in
+         * @jibli/ui-web for why the two were indistinguishable here and what
+         * that cost: a till that signs itself out mid-service because the
+         * first request after a lull timed out.
+         */
+        if (!endsSession(code, status) && failures < MAX_SESSION_RETRIES) {
+          const delay = retryDelayMs(failures);
+          failures += 1;
+          refreshTimer = setTimeout(() => void load(), delay);
+          // `loaded` is left as it is: an authenticated portal keeps working
+          // from the token it already holds while the retry is in flight.
+          return;
+        }
+
         setLoaded(null);
-        setFailure(error instanceof ApiError ? { reason: error.code } : {});
+        setFailure(code ? { reason: code } : {});
       }
     };
 

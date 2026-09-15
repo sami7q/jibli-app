@@ -62,6 +62,9 @@ async function buildHarness(options: { level?: string } = {}): Promise<Harness> 
     logger,
     sms: new ConsoleSmsProvider(logger, false),
     push: new ConsolePushProvider(logger),
+    // The harness builds the server directly rather than booting it, so it
+    // states the schema verdict the boot sequence would have reached.
+    schema: { ok: true, checked: true, pending: [], changed: [] },
   };
 
   return {

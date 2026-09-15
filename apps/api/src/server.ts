@@ -196,10 +196,26 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
         .catch(() => false),
     ]);
 
-    const ready = dbOk && redisOk;
+    /*
+     * The schema check is a boot-time fact, not a probe: it is included here
+     * because this is the endpoint somebody curls when the API "is up but
+     * everything 500s", and that is precisely the symptom of a database behind
+     * its code. It fails readiness — Render probes /health/live, so the
+     * instance keeps running and keeps saying why.
+     */
+    const ready = dbOk && redisOk && ctx.schema.ok;
     return reply.status(ready ? 200 : 503).send({
       status: ready ? 'ok' : 'degraded',
-      checks: { database: dbOk, redis: redisOk },
+      checks: { database: dbOk, redis: redisOk, schema: ctx.schema.ok },
+      ...(ctx.schema.ok
+        ? {}
+        : {
+            schema_detail: {
+              pending_migrations: ctx.schema.pending,
+              changed_migrations: ctx.schema.changed,
+              note: 'Run `pnpm db:migrate` against this database.',
+            },
+          }),
       // Operational visibility, not a health signal: zero connections is
       // normal at 4am and must never fail the probe.
       realtime_connections: realtimeRef.current?.connectionCount() ?? 0,

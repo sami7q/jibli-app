@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dateAr, LogoUpload } from '@jibli/ui-web';
+import type { MerchantType } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
+import { StorefrontTabs } from '@/components/storefront-tabs';
 import { Badge, Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { Dropdown } from '@/components/dropdown';
 import { Icon } from '@/components/icon';
@@ -31,18 +33,26 @@ export default function AppearancePage() {
   const [editing, setEditing] = useState<AppBanner | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<AppBanner | null>(null);
+  /*
+   * Which storefront is being merchandised. The two never mix on screen: a
+   * banner is the one paid placement in the app and it is sold for one half of
+   * it, so a list showing both would invite selling a slot in the wrong one.
+   */
+  const [storefront, setStorefront] = useState<MerchantType>('RESTAURANT');
 
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const banners = useQuery({
-    queryKey: ['admin-banners'],
-    queryFn: () => admin.banners(token),
+    queryKey: ['admin-banners', storefront],
+    queryFn: () => admin.banners(token, storefront),
     enabled: session.status === 'authenticated',
   });
 
+  // The link picker offers categories, and it must offer the ones that exist
+  // in the storefront this banner will run in.
   const categories = useQuery({
-    queryKey: ['admin-categories'],
-    queryFn: () => admin.categories(token),
+    queryKey: ['admin-categories', storefront],
+    queryFn: () => admin.categories(token, storefront),
     enabled: session.status === 'authenticated',
   });
 
@@ -105,13 +115,20 @@ export default function AppearancePage() {
   return (
     <AdminShell
       title="شكل التطبيق"
-      subtitle="البنرات وترتيب التصنيفات كما يراها العميل"
+      subtitle={
+        storefront === 'MARKET'
+          ? 'بنرات واجهة الماركتات وترتيب أقسامها كما يراها العميل'
+          : 'بنرات واجهة المطاعم وترتيب تصنيفاتها كما يراها العميل'
+      }
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
-        <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
-          بنر جديد
-        </button>
+        <>
+          <StorefrontTabs value={storefront} onChange={setStorefront} />
+          <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
+            بنر جديد
+          </button>
+        </>
       }
     >
       <div className="appearance">
@@ -319,6 +336,7 @@ export default function AppearancePage() {
         <BannerDialog
           token={token}
           categories={categories.data ?? []}
+          storefront={storefront}
           onDone={() => {
             setCreating(false);
             invalidate();
@@ -548,12 +566,15 @@ function BannerDialog({
   token,
   banner,
   categories,
+  storefront = 'RESTAURANT',
   onDone,
   onCancel,
 }: {
   token: string;
   banner?: AppBanner;
   categories: AppCategory[];
+  /** Which storefront a new placement runs in; an existing one keeps its own. */
+  storefront?: MerchantType;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -574,6 +595,7 @@ function BannerDialog({
       const body = {
         title_ar: title.trim(),
         subtitle_ar: subtitle.trim() || null,
+        merchant_type: banner?.merchant_type ?? storefront,
         image_asset_id: assetId,
         link_type: linkType,
         link_value: linkType === 'NONE' ? null : linkValue.trim() || null,

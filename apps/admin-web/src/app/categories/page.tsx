@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogoUpload } from '@jibli/ui-web';
+import type { MerchantType } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import { Badge, Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError, adminApi } from '@/lib/api';
 import { admin, type AppCategory } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
+import { STOREFRONT_COPY, StorefrontTabs } from '@/components/storefront-tabs';
 import { useAdminSession } from '@/hooks/use-session';
 
 /**
@@ -36,12 +38,19 @@ export default function CategoriesPage() {
   const [editing, setEditing] = useState<AppCategory | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<AppCategory | null>(null);
+  /*
+   * Which storefront's categories are on screen. One at a time rather than one
+   * list with a column: the two are ordered independently, and an operator
+   * dragging «برجر» up is not thinking about groceries.
+   */
+  const [storefront, setStorefront] = useState<MerchantType>('RESTAURANT');
+  const copy = STOREFRONT_COPY[storefront];
 
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const categories = useQuery({
-    queryKey: ['admin-categories'],
-    queryFn: () => admin.categories(token),
+    queryKey: ['admin-categories', storefront],
+    queryFn: () => admin.categories(token, storefront),
     enabled: session.status === 'authenticated',
   });
 
@@ -93,16 +102,23 @@ export default function CategoriesPage() {
   return (
     <AdminShell
       title="التصنيفات"
-      subtitle="الأصناف التي يتصفّح بها العميل، بترتيب ظهورها في التطبيق"
+      subtitle={
+        storefront === 'MARKET'
+          ? 'أقسام الماركت التي يتصفّح بها العميل، بترتيب ظهورها في التطبيق'
+          : 'الأصناف التي يتصفّح بها العميل، بترتيب ظهورها في التطبيق'
+      }
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
         <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
-          تصنيف جديد
+          {storefront === 'MARKET' ? 'قسم جديد' : 'تصنيف جديد'}
         </button>
       }
     >
       <Card>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <StorefrontTabs value={storefront} onChange={setStorefront} />
+        </div>
         {categories.isError ? (
           <ErrorState
             message={
@@ -147,7 +163,7 @@ export default function CategoriesPage() {
                   {category.image_asset_id ? (
                     <img src={adminApi.assetUrl(category.image_asset_id)} alt="" />
                   ) : (
-                    <span className="cat__emoji">{category.emoji ?? '🍽️'}</span>
+                    <span className="cat__emoji">{category.emoji ?? copy.defaultEmoji}</span>
                   )}
                 </div>
 
@@ -159,10 +175,10 @@ export default function CategoriesPage() {
                 <div className="cat__count">
                   {category.restaurant_count > 0 ? (
                     <span>
-                      <strong>{category.restaurant_count}</strong> مطعم
+                      <strong>{category.restaurant_count}</strong> {copy.countedAr}
                     </span>
                   ) : (
-                    <span className="cat__empty">لا مطاعم بعد</span>
+                    <span className="cat__empty">{copy.noneYetAr}</span>
                   )}
                 </div>
 
@@ -198,7 +214,7 @@ export default function CategoriesPage() {
                     disabled={category.restaurant_count > 0}
                     title={
                       category.restaurant_count > 0
-                        ? 'لا يمكن حذف تصنيف فيه مطاعم — أخفِه بدلاً من ذلك'
+                        ? `لا يمكن حذف تصنيف فيه ${copy.countedAr}ات — أخفِه بدلاً من ذلك`
                         : undefined
                     }
                     onClick={() => setDeleting(category)}
@@ -220,6 +236,7 @@ export default function CategoriesPage() {
       {creating ? (
         <CategoryDialog
           token={token}
+          storefront={storefront}
           onDone={() => {
             setCreating(false);
             invalidate();
@@ -263,11 +280,20 @@ export default function CategoriesPage() {
 function CategoryDialog({
   token,
   category,
+  storefront = 'RESTAURANT',
   onDone,
   onCancel,
 }: {
   token: string;
   category?: AppCategory;
+  /**
+   * Which storefront a new category belongs to.
+   *
+   * Only read when creating: moving an existing category between storefronts
+   * would strand every merchant already tagged with it in a half of the app
+   * where the tag means nothing.
+   */
+  storefront?: MerchantType;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -289,6 +315,7 @@ function CategoryDialog({
         await admin.createCategory(token, {
           key: key.trim(),
           name_ar: nameAr.trim(),
+          merchant_type: storefront,
           ...(emoji.trim() ? { emoji: emoji.trim() } : {}),
           ...(assetId ? { image_asset_id: assetId } : {}),
         });

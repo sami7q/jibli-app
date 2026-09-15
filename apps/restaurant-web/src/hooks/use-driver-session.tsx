@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { endsSession, MAX_SESSION_RETRIES, retryDelayMs } from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
 import { driverApi, type DriverMe } from '@/lib/driver-endpoints';
 
@@ -57,6 +58,8 @@ export function useDriverSession(): DriverSessionState {
 
   useEffect(() => {
     let cancelled = false;
+    /** Consecutive transport failures, reset by any success. */
+    let failures = 0;
 
     const load = async (): Promise<void> => {
       try {
@@ -67,6 +70,7 @@ export function useDriverSession(): DriverSessionState {
         const profile = await driverApi.me(refreshed.access_token);
         if (cancelled) return;
 
+        failures = 0;
         setToken(refreshed.access_token);
         setMe(profile);
         setFailure(null);
@@ -75,9 +79,26 @@ export function useDriverSession(): DriverSessionState {
         timer.current = setTimeout(() => void load(), delayMs);
       } catch (error) {
         if (cancelled) return;
+
+        const code = error instanceof ApiError ? error.code : undefined;
+        const status = error instanceof ApiError ? error.status : undefined;
+
+        /*
+         * A driver on a phone, on Iraqi mobile data, mid-delivery. A dropped
+         * request is the expected case here, not the exceptional one, and
+         * signing them out of the screen holding the delivery PIN because one
+         * refresh missed is the worst possible response to it.
+         */
+        if (!endsSession(code, status) && failures < MAX_SESSION_RETRIES) {
+          const delay = retryDelayMs(failures);
+          failures += 1;
+          timer.current = setTimeout(() => void load(), delay);
+          return;
+        }
+
         setToken(null);
         setMe(null);
-        setFailure(error instanceof ApiError ? { reason: error.code } : {});
+        setFailure(code ? { reason: code } : {});
       }
     };
 

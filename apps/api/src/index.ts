@@ -10,6 +10,7 @@ import {
   type SmsProvider,
 } from '@jibli/notifications';
 import { createRedis, type AppContext } from './lib/context.js';
+import { ensureSchema } from './lib/schema-guard.js';
 import { buildServer } from './server.js';
 
 /**
@@ -192,10 +193,19 @@ async function main(): Promise<void> {
     throw error;
   });
 
+  /*
+   * Before anything is served: is this database the one this build expects?
+   *
+   * Placed here rather than inside a health check because the answer decides
+   * what the whole process can do, and because a deployment is the moment
+   * somebody is watching the log.
+   */
+  const schema = await ensureSchema(env, logger);
+
   const sms = buildSmsProvider(env, logger);
   const push = new ConsolePushProvider(logger);
 
-  const ctx: AppContext = { env, db, redis, logger, sms, push };
+  const ctx: AppContext = { env, db, redis, logger, sms, push, schema };
   const { app, realtime } = await buildServer(ctx);
 
   /**

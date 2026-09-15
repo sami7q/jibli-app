@@ -49,9 +49,22 @@ loopback or a compose service name gets TLS. `APP_ENV=production` additionally
 ### Apply the schema
 
 ```bash
-pnpm --filter @jibli/db migrate    # 0001 … 0004, recorded in schema_migrations
-pnpm --filter @jibli/db seed       # 19 governorates, 115 cities, platform config
+pnpm db:status     # read-only: what this checkout has that the database does not
+pnpm db:migrate    # apply them, recorded in schema_migrations
+pnpm db:seed       # 19 governorates, 115 cities, platform config
 ```
+
+Both commands read `.env` (real environment variables still win) and use
+`DATABASE_MIGRATION_URL` when it is set. That must be the **direct** connection
+string, not a pooled one: the runner takes a session-level advisory lock so two
+instances cannot migrate at once, and a transaction-mode pooler can move each
+statement to a different backend — the lock would then be taken on one
+connection and the migrations run on another, and it would look like it worked.
+
+`pnpm db:status` exits non-zero when anything is pending, so it can gate a
+release. Run it against production whenever the API "is up but everything
+500s": a database behind its code produces exactly that, and nothing else in
+the stack says so.
 
 The seed is safe to re-run and is required in **every** environment: all Iraqi
 governorates and cities must exist before launch, with every capability off
@@ -157,8 +170,29 @@ docker build -f infra/docker/Dockerfile.service --build-arg SERVICE=worker -t ji
 ```
 
 The image runs as `node`, not root, uses `tini` so `SIGTERM` actually reaches
-the graceful-shutdown handler, and carries the migrations so a deploy applies
-the schema from the same artifact as the code.
+the graceful-shutdown handler, and carries its own migrations — `MIGRATIONS_DIR`
+points at them, and `node build/api/migrate.mjs` applies them from the same
+artifact as the code.
+
+**Something must run them.** For a long time nothing did: the files were copied
+into the image and no deploy step, blueprint entry or release phase invoked
+them. The API then started against a database older than its own code, passed
+both health checks, and returned `500 INTERNAL_ERROR` to every request touching
+a column it did not have — the customer app's home screen, the restaurant
+portal's shell and the Admin directory at once, with no log line naming the
+cause. Choose one:
+
+  - a pre-deploy or release step: `node build/api/migrate.mjs`
+  - `RUN_MIGRATIONS_ON_BOOT=true`, which applies them before the first request
+
+The boot option is what `render.yaml` uses, because Render's pre-deploy command
+is a paid feature. It is safe with several instances: the runner takes an
+advisory lock, so they apply once and in order.
+
+Either way the API now checks at boot and says so. A database that is behind
+fails `/health/ready` with `"schema": false` and the names of the pending
+migrations, while `/health/live` keeps passing so the instance stays up to be
+asked.
 
 ### Portals
 

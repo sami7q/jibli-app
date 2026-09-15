@@ -109,6 +109,8 @@ RUN pnpm --filter @jibli/worker exec tsc --noEmit
 
 RUN node scripts/bundle.mjs api
 RUN node scripts/bundle.mjs worker
+# Written into the API's build directory, so it ships and versions with it.
+RUN node scripts/bundle.mjs migrate
 
 # Resolve the one external dependency into a flat, copyable tree. pnpm's
 # isolated linker uses symlinks that do not survive a COPY between stages.
@@ -138,6 +140,16 @@ COPY --from=build --chown=node:node /repo/apps/worker/build ./build/worker
 # Migrations travel with the image so a deploy applies the schema from the same
 # artifact as the code, never a separately-versioned one.
 COPY --from=build --chown=node:node /repo/packages/db/migrations ./migrations
+
+# Where the runner looks for them.
+#
+# They were copied here from the first day and nothing pointed at them: the
+# runner resolves the directory relative to its own module, which is a path
+# that exists in the repository and not in a bundle at /app/build/api. So the
+# image carried its schema and could not find it, the API started against a
+# database two migrations older than its own code, and every request touching
+# the new columns answered 500. One environment variable closes that gap.
+ENV MIGRATIONS_DIR=/app/migrations
 
 USER node
 

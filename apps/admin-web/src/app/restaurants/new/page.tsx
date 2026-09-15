@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -67,6 +67,27 @@ export default function NewRestaurantPage() {
     override_coverage: false,
     reason: '',
   });
+
+  /*
+   * Open on the kind the caller asked for.
+   *
+   * «إضافة ماركت» on the markets screen links here with `?type=MARKET`, and a
+   * button whose label promises a market has to produce a market form — or the
+   * one field that decides everything else is left on its default and quietly
+   * creates the wrong thing.
+   *
+   * Read in an effect rather than from `useSearchParams`: that hook forces the
+   * page into a Suspense boundary, which means Next serves a placeholder
+   * instead of the form. Reading `window.location` during render would instead
+   * make the server and the client disagree about a toggle. This costs one
+   * extra paint on a form nobody can fill in that fast.
+   */
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('type');
+    if (requested === 'MARKET' || requested === 'RESTAURANT') {
+      setForm((current) => ({ ...current, merchant_type: requested }));
+    }
+  }, []);
 
   const token = session.status === 'authenticated' ? session.accessToken : '';
   const authenticated = session.status === 'authenticated';

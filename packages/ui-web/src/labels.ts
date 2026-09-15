@@ -121,10 +121,30 @@ export const RESTAURANT_NAV = [
 /** Admin Portal navigation (plan §130). */
 export const ADMIN_NAV = [
   { group: null, items: [{ href: '/', labelAr: 'الرئيسية', icon: 'home' }] },
+  /*
+   * Both halves of the marketplace, in one group.
+   *
+   * Markets shipped as a kind of merchant rather than a parallel system — one
+   * column on `restaurants` — and the sidebar was the one place that never
+   * said so. A group called «إدارة المطاعم» containing only «المطاعم» is a
+   * navigation that denies a whole side of the business exists: an operator
+   * asked to add a market looked for the word, did not find it, and concluded
+   * the feature was missing. It was not missing; it was unreachable, which to
+   * the person holding the mouse is the same thing.
+   *
+   * «المطاعم» keeps showing both kinds — its type filter is set to «مطاعم
+   * وماركتات» by default, because somebody searching a partner by name rarely
+   * remembers which of the two it is. «الماركتات» is the same directory with
+   * the question already answered.
+   *
+   * «التصنيفات» and «شكل التطبيق» serve both storefronts and carry their own
+   * switch, which is why the group can no longer be named after one of them.
+   */
   {
-    group: 'إدارة المطاعم',
+    group: 'المطاعم والماركتات',
     items: [
       { href: '/restaurants', labelAr: 'المطاعم', icon: 'restaurants' },
+      { href: '/markets', labelAr: 'الماركتات', icon: 'markets' },
       { href: '/applications', labelAr: 'طلبات الانضمام', icon: 'applications' },
       { href: '/categories', labelAr: 'التصنيفات', icon: 'categories' },
       { href: '/appearance', labelAr: 'شكل التطبيق', icon: 'live' },
@@ -141,7 +161,8 @@ export const ADMIN_NAV = [
   {
     group: 'الأشخاص',
     items: [
-      { href: '/users', labelAr: 'ملاك المطاعم', icon: 'users' },
+      // Markets have owners too, and they appear on this screen.
+      { href: '/users', labelAr: 'ملاك المتاجر', icon: 'users' },
       { href: '/drivers', labelAr: 'المندوبون', icon: 'drivers' },
     ],
   },

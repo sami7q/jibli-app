@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate.ts",
+    "migrate:status": "tsx src/scripts/migration-status.ts",
     "verify": "tsx src/schema-drift.ts",
     "seed": "tsx src/seed/run.ts",
     "reset": "tsx src/scripts/reset.ts",

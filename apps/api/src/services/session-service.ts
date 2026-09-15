@@ -200,6 +200,24 @@ export async function issueSession(
  * A token that has already been superseded is a replay: the legitimate client
  * would be holding the newest one. Revoking the entire chain is the standard
  * response — it costs the real user one re-login and shuts an attacker out.
+ *
+ * With one qualification, learned the hard way. Strict rotation assumes the
+ * client received the new token; when it did not, the honest client is holding
+ * an old one through no fault of its own and looks exactly like an attacker.
+ * Two ways that happens here, both routine:
+ *
+ *   - the API sleeps on its free instance and the portal's proxy times out
+ *     before it wakes. The response carrying the rotated token is lost. The
+ *     next attempt presents the old one.
+ *   - two tabs load at the same moment and both send the cookie that was
+ *     current when they started.
+ *
+ * Either way every session the user has was revoked, on every device, because
+ * a request timed out. So a short reuse window is allowed: a token superseded
+ * seconds ago by an ordinary rotation is treated as the retry it almost
+ * certainly is. Outside that window nothing changes — it is still a replay and
+ * the chain still goes. The window is the same mechanism Auth0 calls rotation
+ * leeway, and for the same reason.
  */
 export async function refreshSession(
   ctx: AppContext,
@@ -215,13 +233,37 @@ export async function refreshSession(
 
   if (!session) throw new AppError(ERROR_CODES.SESSION_EXPIRED);
 
-  if (session.revokedAt || session.supersededBySessionId) {
+  const superseded = session.revokedAt !== null || session.supersededBySessionId !== null;
+
+  /*
+   * A lost response, not a stolen token: this exact session was rotated
+   * normally, moments ago, and nothing else has happened to it since.
+   * `revokedReason` carries the distinction — a session revoked by logout, by
+   * suspension or by an earlier replay does not qualify however recent it is.
+   */
+  const withinRotationLeeway =
+    superseded &&
+    session.revokedReason === 'ROTATED' &&
+    session.revokedAt !== null &&
+    Date.now() - session.revokedAt.getTime() <=
+      ctx.env.REFRESH_ROTATION_LEEWAY_SECONDS * 1000;
+
+  if (superseded && !withinRotationLeeway) {
     await revokeSessionChain(ctx, session.userId, 'REFRESH_TOKEN_REPLAY');
     ctx.logger.warn(
       { event: 'session.refresh_replay', userId: session.userId },
       'Refresh token replay detected; all sessions revoked',
     );
     throw new AppError(ERROR_CODES.SESSION_EXPIRED);
+  }
+
+  if (withinRotationLeeway) {
+    // Logged at info, not warn: this is expected traffic on a flaky link, and
+    // a warning that fires routinely is a warning nobody reads.
+    ctx.logger.info(
+      { event: 'session.refresh_reuse_in_leeway', userId: session.userId },
+      'Refresh token reused within the rotation window; treated as a retry',
+    );
   }
 
   if (session.expiresAt.getTime() < Date.now()) {
@@ -237,10 +279,22 @@ export async function refreshSession(
     mfaVerified: false,
   });
 
-  await ctx.db
-    .update(sessions)
-    .set({ supersededBySessionId: issued.sessionId, revokedAt: new Date(), revokedReason: 'ROTATED' })
-    .where(eq(sessions.id, session.id));
+  /*
+   * Only the first rotation records the successor. A retry inside the leeway
+   * window must not repoint the chain at its own new session, or the link back
+   * to what the first rotation actually issued is lost — and that link is what
+   * a later replay investigation reads.
+   */
+  if (!superseded) {
+    await ctx.db
+      .update(sessions)
+      .set({
+        supersededBySessionId: issued.sessionId,
+        revokedAt: new Date(),
+        revokedReason: 'ROTATED',
+      })
+      .where(eq(sessions.id, session.id));
+  }
 
   return issued;
 }

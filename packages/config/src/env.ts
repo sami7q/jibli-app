@@ -55,6 +55,18 @@ const authSchema = z.object({
   JWT_REFRESH_SECRET: secret,
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).default(900),
   REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().int().min(3600).default(60 * 60 * 24 * 30),
+  /**
+   * How long a just-rotated refresh token still works.
+   *
+   * Zero is the textbook answer and it is wrong for a client on mobile data
+   * talking to an instance that sleeps: a lost response makes an honest client
+   * present a superseded token, which is indistinguishable from a replay, and
+   * the penalty for a replay is every session on every device. Seconds of
+   * leeway remove that without meaningfully helping an attacker, who would
+   * have to use a stolen token inside the same window *and* race the real
+   * client. See refreshSession for the full account.
+   */
+  REFRESH_ROTATION_LEEWAY_SECONDS: z.coerce.number().int().min(0).max(300).default(60),
   /** Pepper for hashing OTP codes and delivery PINs at rest. */
   OTP_HASH_PEPPER: secret,
   SESSION_COOKIE_NAME: z.string().default('jibli_session'),
@@ -245,6 +257,21 @@ const apiSchema = z.object({
   TRUST_PROXY: booleanish.default(false),
   RATE_LIMIT_GLOBAL_PER_MINUTE: z.coerce.number().int().default(300),
   REQUEST_BODY_LIMIT_BYTES: z.coerce.number().int().default(1024 * 1024),
+
+  /**
+   * Apply pending migrations at boot, before the first request is served.
+   *
+   * Off by default, because a platform with a release phase should migrate
+   * there — one step, once, before any instance starts. It exists because this
+   * deployment has no such step: the image carries its migrations and nothing
+   * ran them, so the API served a database two migrations behind its own code
+   * and answered `500` to every request that touched the columns they add.
+   *
+   * Safe to leave on where it is on: the runner takes a Postgres advisory lock,
+   * so two instances booting together apply them once, in order, and the second
+   * waits rather than racing.
+   */
+  RUN_MIGRATIONS_ON_BOOT: booleanish.default(false),
 });
 
 const observabilitySchema = z.object({
