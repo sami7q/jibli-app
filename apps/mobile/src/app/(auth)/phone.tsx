@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
-import { BRAND, ROW, ROW_LTR, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
 import { useSession } from '@/lib/session';
@@ -394,12 +394,7 @@ const styles = StyleSheet.create({
   subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
 
   inputRow: {
-    /*
-     * The country prefix belongs on the right, where an Arabic reader starts.
-     * Plain 'row' put it on the left on every device where the native RTL flag
-     * has not taken effect — which is every device running this in Expo Go.
-     */
-    flexDirection: ROW,
+    flexDirection: 'row',
     alignItems: 'center',
     gap: space[2],
     borderWidth: 1,
@@ -410,19 +405,12 @@ const styles = StyleSheet.create({
     minHeight: TAP_TARGET + 8,
   },
   prefix: {
-    // The flag then the code, left to right — it is a Latin-ordered token.
-    flexDirection: ROW_LTR,
+    flexDirection: 'row',
     alignItems: 'center',
     gap: space[1],
-    /*
-     * Physical, not logical. With the row's visual order pinned by ROW, the
-     * prefix is always on the right and the divider always on its left —
-     * whereas `paddingEnd`/`borderEndWidth` follow the native flag and would
-     * put the rule on the far side of the field in one of the two modes.
-     */
-    paddingLeft: space[3],
-    borderLeftWidth: 1,
-    borderLeftColor: color.borderSubtle,
+    paddingEnd: space[3],
+    borderEndWidth: 1,
+    borderEndColor: color.borderSubtle,
   },
   prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
   input: {
@@ -430,11 +418,8 @@ const styles = StyleSheet.create({
     ...text.body,
     color: color.textPrimary,
     paddingVertical: space[3],
-    // Digits stay LTR regardless of layout direction, and start at the left
-    // edge of the field — `text.body` now aligns right, which is correct for
-    // Arabic and wrong for a phone number.
+    // Digits stay LTR regardless of layout direction.
     writingDirection: 'ltr',
-    textAlign: 'left',
   },
 
   error: {

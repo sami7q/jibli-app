@@ -26,20 +26,24 @@ import { BRAND, palette } from '@/theme';
  * land exactly where the single drawing puts them. No offsets to keep in sync:
  * the letter's position is in its own path data, where it already was.
  */
-const LETTERS: readonly ((tint: string, pinTint: string) => React.ReactNode)[] = [
-  // J — the pin is its dot
-  (tint, pinTint) => (
-    <G>
-      <Path
-        d="M 58 48 C 58 35.85 67.85 26 80 26 C 92.15 26 102 35.85 102 48 C 102 59.5 86 78 80 84 C 74 78 58 59.5 58 48 Z"
-        fill={tint}
-      />
-      <Circle cx={80} cy={47} r={6.5} fill={pinTint} />
-      <Path
-        d="M 72 88 L 88 88 L 88 120 C 88 136 76 148 56 148 C 36 148 24 135 24 122 C 24 116.5 28.5 112 34 112 C 39.5 112 43 116 48 120 C 51 122.5 55 124 59 124 C 67 124 72 118 72 110 L 72 88 Z"
-        fill={tint}
-      />
-    </G>
+/**
+ * The strokes of the mark, left to right, without the pin.
+ *
+ * Every stroke keeps the whole 340×160 viewBox and its own coordinates inside
+ * it, which is what lets the animated version stack them and have each land
+ * exactly where the single drawing puts it. No offsets to keep in sync: the
+ * letter's position is in its own path data, where it already was.
+ *
+ * The pin is not among them. It is drawn separately below, because in the
+ * animation it is not a letter — it is the last thing to arrive.
+ */
+const STROKES: readonly ((tint: string) => React.ReactNode)[] = [
+  // J — the hook, without its dot
+  (tint) => (
+    <Path
+      d="M 72 88 L 88 88 L 88 120 C 88 136 76 148 56 148 C 36 148 24 135 24 122 C 24 116.5 28.5 112 34 112 C 39.5 112 43 116 48 120 C 51 122.5 55 124 59 124 C 67 124 72 118 72 110 L 72 88 Z"
+      fill={tint}
+    />
   ),
   // i
   (tint) => (
@@ -71,36 +75,32 @@ const LETTERS: readonly ((tint: string, pinTint: string) => React.ReactNode)[] =
 ];
 
 /**
- * The letters converge into the mark.
+ * The pin — the J's dot, and the whole idea of the mark.
  *
- * `Enter` fades and lifts, which is the right entrance for a section of a
- * screen and the wrong one for a logo: five identical lifts read as five
- * things arriving, not as one word assembling. This starts each letter pushed
- * outward from the centre of the word and slightly small, then draws them in.
- * The eye reads it as the mark gathering itself, which is what it is.
- *
- * Native-driven, like `Enter`, and for the same reason: it runs while the
- * session resolves and the storefront fetches, and an entrance that stutters
- * on the first screen of the app is worse than none. `react-native-svg` cannot
- * hand its props to the native driver, so the transform lives on an
- * `Animated.View` wrapping a full-canvas `Svg` — each letter keeps the whole
- * viewBox, so they register exactly where the static drawing puts them.
- *
- * Reduce motion is honoured and assumed until proven otherwise, so a phone
- * with the setting on never sees a frame of movement.
+ * «جيبلي» is "bring it to me", and the thing that makes the wordmark mean that
+ * rather than just spell it is that the J is dotted with a map pin. In the
+ * animation it is therefore not a letter among five: it is the arrival. The
+ * strokes assemble, and then the pin drops onto the word and settles.
  */
-function Gather({
-  children,
-  index,
-  count,
-  style,
-}: {
-  children: React.ReactNode;
-  index: number;
-  count: number;
-  style?: React.ComponentProps<typeof Animated.View>['style'];
-}) {
-  const progress = useRef(new Animated.Value(0)).current;
+const PIN = (tint: string, pinTint: string) => (
+  <G>
+    <Path
+      d="M 58 48 C 58 35.85 67.85 26 80 26 C 92.15 26 102 35.85 102 48 C 102 59.5 86 78 80 84 C 74 78 58 59.5 58 48 Z"
+      fill={tint}
+    />
+    <Circle cx={80} cy={47} r={6.5} fill={pinTint} />
+  </G>
+);
+
+/**
+ * Whether the phone has asked for less movement.
+ *
+ * Assumed true until the async check says otherwise: `isReduceMotionEnabled`
+ * resolves a tick late, and defaulting to "motion allowed" would start every
+ * animation and cancel it a frame later — precisely the flash the setting
+ * exists to prevent.
+ */
+function useReduceMotion(): boolean {
   const [reduceMotion, setReduceMotion] = useState(true);
 
   useEffect(() => {
@@ -118,41 +118,59 @@ function Gather({
     };
   }, []);
 
+  return reduceMotion;
+}
+
+/**
+ * Drives one value from 0 to 1, once, respecting reduce motion.
+ *
+ * The reset before starting is load-bearing and was a real bug once: the
+ * initial state is «reduced until proven otherwise», so the first pass always
+ * sets the value to 1. When the async check comes back saying motion is
+ * allowed, the effect re-runs — and animating to 1 from 1 is a no-op. Every
+ * entrance in the app was silently arriving finished.
+ */
+function useEntrance(config: {
+  delay: number;
+  duration: number;
+  easing: (value: number) => number;
+}): Animated.Value {
+  const progress = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReduceMotion();
+  const { delay, duration, easing } = config;
+
   useEffect(() => {
     if (reduceMotion) {
       progress.setValue(1);
       return;
     }
 
-    // Reset first, or the effect's second pass animates from 1 to 1 and
-    // nothing ever moves — the bug `Enter` documents at length.
     progress.setValue(0);
-
     const animation = Animated.timing(progress, {
       toValue: 1,
-      duration: 520,
-      // Staggered from the outside in, so the word closes rather than wipes.
-      delay: Math.round(Math.abs(index - (count - 1) / 2) * 60),
-      /*
-       * A gentle overshoot: the letters arrive, pass their mark by a hair and
-       * settle, which is what makes it read as gathering rather than sliding
-       * to a stop. More tension than this and the mark wobbles, which on a
-       * logo looks like a mistake rather than a flourish.
-       */
-      easing: Easing.out(Easing.back(1.2)),
+      duration,
+      delay,
+      easing,
       useNativeDriver: true,
     });
-
     animation.start();
     return () => animation.stop();
-  }, [reduceMotion, progress, index, count]);
+  }, [reduceMotion, progress, delay, duration, easing]);
 
-  /*
-   * Outward from the middle of the word, proportional to the distance from it:
-   * the outer letters travel furthest, the middle ones barely move. That
-   * gradient is what makes five separate moves read as one word closing up.
-   */
-  const offset = (index - (count - 1) / 2) * 26;
+  return progress;
+}
+
+/** One stroke of the mark arriving: up a little, into focus. */
+function Rise({
+  children,
+  delay,
+  style,
+}: {
+  children: React.ReactNode;
+  delay: number;
+  style?: React.ComponentProps<typeof Animated.View>['style'];
+}) {
+  const progress = useEntrance({ delay, duration: 300, easing: Easing.out(Easing.cubic) });
 
   return (
     <Animated.View
@@ -161,15 +179,45 @@ function Gather({
         {
           opacity: progress,
           transform: [
-            {
-              translateX: progress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [offset, 0],
-              }),
-            },
-            {
-              scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }),
-            },
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * The pin, falling onto the word.
+ *
+ * It comes from well above the mark and overshoots slightly on landing, which
+ * is what makes it read as dropped rather than faded in. `Easing.bounce` is
+ * too much — a logo that bounces twice looks like a mistake — so this is a
+ * single soft overshoot.
+ */
+function Drop({
+  children,
+  delay,
+  style,
+}: {
+  children: React.ReactNode;
+  delay: number;
+  style?: React.ComponentProps<typeof Animated.View>['style'];
+}) {
+  const progress = useEntrance({ delay, duration: 460, easing: Easing.out(Easing.back(2.2)) });
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          // Opaque early in the fall, so it is a pin dropping rather than a
+          // shape fading in while it happens to move.
+          opacity: progress.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 1, 1] }),
+          transform: [
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [-44, 0] }) },
           ],
         },
       ]}
@@ -205,38 +253,65 @@ export function JibliWordmark({
   if (!animate) {
     return (
       <Svg width={width} height={height} viewBox="0 0 340 160" accessibilityLabel="Jibli">
-        {LETTERS.map((letter, index) => (
-          <G key={index}>{letter(tint, pinTint)}</G>
+        {STROKES.map((stroke, index) => (
+          <G key={index}>{stroke(tint)}</G>
         ))}
+        {PIN(tint, pinTint)}
       </Svg>
     );
   }
 
   /*
-   * Five stacked drawings rather than five animated groups.
+   * The mark writes itself, and then the pin lands on it.
    *
-   * `react-native-svg` cannot hand its props to the native driver, so animating
-   * a `<G>` would run the whole entrance on the JS thread — which on this
-   * screen is busy resolving a session and fetching two storefronts, and a
-   * logo that stutters while it assembles is worse than one that simply
-   * appears. An `Animated.View` per letter is native-driven, and because each
-   * letter keeps the full viewBox they register exactly.
+   * The strokes arrive in reading order — J, i, b, l, i — each rising a few
+   * pixels into place, 90ms apart. That is the part that reads as writing: a
+   * word appearing the way a word is written, rather than five things fading
+   * in at once. Then the pin drops from above onto the J and settles with a
+   * small bounce, which is the only flourish and the one worth having: the
+   * pin *is* the mark's idea, so the entrance ends on the thing the logo is
+   * about rather than on a generic sweep.
    *
-   * 70ms apart: enough to read as a sequence, short enough that the last
-   * letter lands before anybody has decided to look away.
+   * Stacked drawings rather than animated `<G>` elements. `react-native-svg`
+   * cannot hand its props to the native driver, so animating a group would run
+   * the whole entrance on the JS thread — which on this screen is busy
+   * resolving a session and fetching a storefront, and a logo that stutters
+   * while it assembles is worse than one that simply appears. An
+   * `Animated.View` per stroke is native-driven, and because each stroke keeps
+   * the full viewBox they register exactly.
    */
   return (
     <View style={{ width, height }} accessible accessibilityRole="image" accessibilityLabel="Jibli">
-      {LETTERS.map((letter, index) => (
-        <Gather key={index} index={index} count={LETTERS.length} style={StyleSheet.absoluteFill}>
+      {STROKES.map((stroke, index) => (
+        <Rise key={index} delay={index * STROKE_STEP} style={StyleSheet.absoluteFill}>
           <Svg width={width} height={height} viewBox="0 0 340 160">
-            {letter(tint, pinTint)}
+            {stroke(tint)}
           </Svg>
-        </Gather>
+        </Rise>
       ))}
+
+      <Drop delay={STROKES.length * STROKE_STEP + 90} style={StyleSheet.absoluteFill}>
+        <Svg width={width} height={height} viewBox="0 0 340 160">
+          {PIN(tint, pinTint)}
+        </Svg>
+      </Drop>
     </View>
   );
 }
+
+/** How far apart the strokes land. Long enough to read as a sequence. */
+const STROKE_STEP = 90;
+
+/**
+ * How long the whole entrance takes, so a screen can wait for it.
+ *
+ * Exported because the welcome screen brings its tagline and buttons in after
+ * the mark has finished — «until it completes, then enter» — and a screen
+ * timing that by a number copied from here would drift the first time this
+ * changes.
+ */
+export const WORDMARK_ENTRANCE_MS = STROKES.length * STROKE_STEP + 90 + 460;
+
 
 /**
  * The pin on its own — for a header, a tab bar, an empty state.

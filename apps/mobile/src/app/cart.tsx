@@ -7,7 +7,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, assetUrl } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
-import { ROW, TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
+import { TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, EmptyState, Row, Screen, Text } from '@/ui';
 import { Stepper, SummaryRow } from '@/ui/catalog';
@@ -89,7 +89,7 @@ export default function CartScreen() {
               key={line.key}
               style={[
                 {
-                  flexDirection: ROW,
+                  flexDirection: 'row',
                   gap: space[3],
                   padding: space[3],
                   backgroundColor: color.surfaceCard,

@@ -78,6 +78,14 @@ export function IconTile({
   );
 }
 
+/**
+ * Arabic that starts where Arabic starts.
+ *
+ * `textAlign` is physical, so this is right in either layout direction — which
+ * is what a row that opts into RTL inside an otherwise LTR app needs.
+ */
+export const RTL_TEXT = { textAlign: 'right', writingDirection: 'rtl' } as const;
+
 // ── SearchBar ───────────────────────────────────────────────────────────────
 
 export function SearchBar({
@@ -145,7 +153,7 @@ export function RatingPill({ rating, count }: { rating: number | null; count?: n
 
   return (
     <View
-      style={[pill(palette.warning[50], palette.warning[500]), { flexDirection: ROW, gap: 3 }]}
+      style={[pill(palette.warning[50], palette.warning[500]), { flexDirection: 'row', gap: 3 }]}
     >
       <MaterialCommunityIcons name="star" size={13} color={palette.warning[500]} />
       <Text variant="caption" style={{ color: palette.warning[700] }}>
@@ -305,6 +313,7 @@ export function ListRow({
   badge,
   onPress,
   destructive = false,
+  rtl = false,
 }: {
   label: string;
   sublabel?: string;
@@ -312,6 +321,17 @@ export function ListRow({
   badge?: string;
   onPress: () => void;
   destructive?: boolean;
+  /**
+   * Lay the row out right-to-left: icon on the right, label beside it reading
+   * inward, chevron on the far left.
+   *
+   * Opt-in rather than the default, and deliberately so. The rest of the app
+   * lays out left-to-right today; turning that over wholesale is a decision
+   * about the whole product, not about this component, and doing it from here
+   * would change nineteen screens nobody asked about. The account screen asks
+   * for it because it is a column of Arabic labels and nothing else.
+   */
+  rtl?: boolean;
 }) {
   return (
     <Pressable
@@ -320,9 +340,7 @@ export function ListRow({
       accessibilityLabel={label}
       style={({ pressed }) => [
         {
-          // The icon leads, and in Arabic leading means the right-hand edge.
-          // Plain 'row' put every row of the account screen back to front.
-          flexDirection: ROW,
+          flexDirection: rtl ? ROW : 'row',
           alignItems: 'center',
           gap: space[3],
           minHeight: TAP_TARGET + 8,
@@ -339,11 +357,15 @@ export function ListRow({
       ) : null}
 
       <View style={{ flex: 1 }}>
-        <Text variant="bodyBold" tone={destructive ? 'danger' : 'primary'}>
+        <Text
+          variant="bodyBold"
+          tone={destructive ? 'danger' : 'primary'}
+          style={rtl ? RTL_TEXT : null}
+        >
           {label}
         </Text>
         {sublabel ? (
-          <Text variant="caption" tone="muted">
+          <Text variant="caption" tone="muted" style={rtl ? RTL_TEXT : null}>
             {sublabel}
           </Text>
         ) : null}
@@ -746,8 +768,7 @@ export function CartBar({
             borderRadius: radius.full,
             backgroundColor: color.brand,
             paddingHorizontal: space[4],
-            // Cart on the right, total on the left — the reading order.
-            flexDirection: ROW,
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
           },

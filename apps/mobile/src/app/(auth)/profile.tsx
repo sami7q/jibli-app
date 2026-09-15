@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { fullNameSchema } from '@jibli/validation';
 import { useSession } from '@/lib/session';
 import { api, ApiError, NetworkError, type GeographyOption } from '@/lib/api';
-import { BRAND, ROW, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
 
 /**
  * Mandatory profile completion (plan §11).
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     gap: space[3],
   },
-  modalHeader: { flexDirection: ROW, alignItems: 'center', justifyContent: 'space-between' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   modalTitle: { ...text.h2, color: color.textPrimary },
   modalClose: { ...text.bodyBold, color: BRAND[600] },
 

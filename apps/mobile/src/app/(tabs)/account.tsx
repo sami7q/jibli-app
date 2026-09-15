@@ -11,7 +11,7 @@ import { confirmAsync, notify } from '@/lib/dialog';
 import { accent, color, radius, shadow, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
-import { ListRow, Sheet } from '@/ui/catalog';
+import { ListRow, RTL_TEXT, Sheet } from '@/ui/catalog';
 
 /**
  * Account (`9.html`).
@@ -51,7 +51,22 @@ export default function AccountScreen() {
   return (
     <Screen scroll edges={['top']} padded={false}>
       <View style={{ padding: space[4], gap: space[4] }}>
-        <Text variant="h2">حسابي</Text>
+        {/*
+         * This screen reads right-to-left, and the rest of the app does not.
+         *
+         * That is a deliberate, local decision rather than an oversight. The
+         * account screen is a column of Arabic labels with nothing else in it —
+         * no prices, no Latin names, no photographs to anchor the eye — and a
+         * column of Arabic that begins at the left edge is the one place the
+         * misalignment is impossible to read past. Turning the whole app over
+         * is a separate decision about the whole product.
+         *
+         * `RTL_TEXT` is physical alignment, so it holds whichever way the
+         * native layout flag happens to be set.
+         */}
+        <Text variant="h2" style={RTL_TEXT}>
+          حسابي
+        </Text>
 
         {isGuest ? (
           <View
@@ -62,12 +77,13 @@ export default function AccountScreen() {
               borderWidth: 1,
               borderColor: accent[200],
               gap: space[2],
+              alignItems: 'flex-end',
             }}
           >
-            <Text variant="bodyBold" tone="brand">
+            <Text variant="bodyBold" tone="brand" style={RTL_TEXT}>
               تتصفّح كضيف
             </Text>
-            <Text variant="small" tone="secondary">
+            <Text variant="small" tone="secondary" style={RTL_TEXT}>
               سجّل دخولك لحفظ عناوينك، متابعة طلباتك، وحفظ مطاعمك المفضّلة.
             </Text>
             <Button label="تسجيل الدخول" onPress={() => router.push('/(auth)/phone')} />
@@ -108,14 +124,14 @@ export default function AccountScreen() {
               </Text>
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text variant="h3" tone="inverse" numberOfLines={1}>
+              <Text variant="h3" tone="inverse" numberOfLines={1} style={RTL_TEXT}>
                 {me?.full_name ?? 'مستخدم جيبلي'}
               </Text>
-              <Text variant="caption" tone="inverse" style={{ opacity: 0.9 }}>
+              <Text variant="caption" tone="inverse" style={[RTL_TEXT, { opacity: 0.9 }]}>
                 {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'لم تُحدَّد المنطقة'}
               </Text>
               {state.status === 'offline-ready' ? (
-                <Text variant="caption" tone="inverse" style={{ opacity: 0.9 }}>
+                <Text variant="caption" tone="inverse" style={[RTL_TEXT, { opacity: 0.9 }]}>
                   أنت غير متصل — بعض البيانات قد تكون قديمة.
                 </Text>
               ) : null}
@@ -126,17 +142,20 @@ export default function AccountScreen() {
 
       <Group title="حسابي">
         <ListRow
+          rtl
           label="منطقة التوصيل"
           sublabel={area?.cityNameAr ?? 'اختر منطقتك'}
           icon={<MaterialCommunityIcons name="map-marker-outline" size={20} color={color.brand} />}
           onPress={() => setPickingArea(true)}
         />
         <ListRow
+          rtl
           label="المفضلة"
           icon={<MaterialCommunityIcons name="heart-outline" size={20} color={color.brand} />}
           onPress={() => router.push('/(tabs)/favorites')}
         />
         <ListRow
+          rtl
           label="طلباتي"
           icon={
             <MaterialCommunityIcons name="clipboard-list-outline" size={20} color={color.brand} />
@@ -155,6 +174,7 @@ export default function AccountScreen() {
        */}
       <Group title="العمل مع جيبلي">
         <ListRow
+          rtl
           label="الانضمام كمندوب توصيل"
           sublabel="وصّل الطلبات واكسب معنا"
           icon={<MaterialCommunityIcons name="motorbike" size={20} color={color.brand} />}
@@ -177,6 +197,7 @@ export default function AccountScreen() {
          * a courier borrowing a customer's phone is the ordinary case.
          */}
         <ListRow
+          rtl
           label={isDriver ? 'وضع المندوب' : 'دخول المندوبين'}
           sublabel={
             isDriver ? 'طلبات التوصيل المعيّنة لك' : 'لديك اسم مستخدم من المطعم؟ ادخل من هنا'
@@ -188,12 +209,14 @@ export default function AccountScreen() {
 
       <Group title="المساعدة">
         <ListRow
+          rtl
           label="المساعدة والدعم"
           sublabel="تواصل معنا مباشرة"
           icon={<MaterialCommunityIcons name="headset" size={20} color={color.brand} />}
           onPress={() => open(`tel:${extra?.supportPhone ?? ''}`)}
         />
         <ListRow
+          rtl
           label="سياسة الخصوصية"
           icon={
             <MaterialCommunityIcons name="shield-check-outline" size={20} color={color.brand} />
@@ -201,6 +224,7 @@ export default function AccountScreen() {
           onPress={() => open(extra?.privacyPolicyUrl ?? 'https://jibli.iq/privacy')}
         />
         <ListRow
+          rtl
           label="الشروط والأحكام"
           icon={
             <MaterialCommunityIcons name="file-document-outline" size={20} color={color.brand} />
@@ -212,6 +236,7 @@ export default function AccountScreen() {
       {!isGuest ? (
         <Group title="الحساب">
           <ListRow
+          rtl
             label="تسجيل الخروج"
             icon={<MaterialCommunityIcons name="logout" size={20} color={color.textSecondary} />}
             onPress={() =>
@@ -226,6 +251,7 @@ export default function AccountScreen() {
             }
           />
           <ListRow
+          rtl
             label="حذف حسابي"
             sublabel="حذف نهائي لبياناتك الشخصية"
             destructive
@@ -276,7 +302,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
       <Text
         variant="captionBold"
         tone="secondary"
-        style={{ paddingBottom: space[2], paddingHorizontal: space[1] }}
+        style={[RTL_TEXT, { paddingBottom: space[2], paddingHorizontal: space[1] }]}
       >
         {title}
       </Text>

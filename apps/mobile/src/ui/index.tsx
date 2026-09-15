@@ -12,7 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import { color, palette, radius, ROW, shadow, space, TAP_TARGET, text } from '@/theme';
+import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
 
 /**
  * The mobile UI kit.
@@ -216,7 +216,7 @@ export function Button({
           minHeight: size === 'lg' ? TAP_TARGET + 8 : TAP_TARGET,
           paddingHorizontal: space[5],
           borderRadius: radius.md,
-          flexDirection: ROW,
+          flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: space[2],
@@ -303,9 +303,7 @@ export function Row({
   return (
     <View
       style={[
-        // ROW, not 'row': the app must read right-to-left whether or not the
-        // native RTL flag has taken effect. See the note on ROW in the theme.
-        { flexDirection: ROW, alignItems: align, gap },
+        { flexDirection: 'row', alignItems: align, gap },
         justify ? { justifyContent: justify } : null,
         style,
       ]}

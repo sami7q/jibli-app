@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSession } from '@/lib/session';
 import { BRAND, TAP_TARGET, palette, radius, space } from '@/theme';
 import { Screen, Text } from '@/ui';
-import { IraqFlag, JibliWordmark } from '@/ui/brand';
+import { IraqFlag, JibliWordmark, WORDMARK_ENTRANCE_MS } from '@/ui/brand';
 
 /**
  * The first screen of a fresh install (`1.html`).
@@ -88,7 +88,7 @@ export default function WelcomeScreen() {
             <JibliWordmark animate width={248} />
             <Enter
               animate={!reduceMotion}
-              delay={420}
+              delay={WORDMARK_ENTRANCE_MS}
               style={{ alignItems: 'center', alignSelf: 'stretch' }}
             >
             <Text variant="h1" tone="inverse" align="center" style={{ marginTop: space[4] }}>
@@ -106,7 +106,18 @@ export default function WelcomeScreen() {
           </View>
         </View>
 
-        <Enter animate={!reduceMotion} delay={220} style={{ paddingBottom: space[6] }}>
+        {/*
+          The buttons come after the mark has finished, not alongside it.
+          «حتى تكتمل ثم تدخل»: the word assembles, the pin lands, and only then
+          is there something to press — which is what makes the entrance an
+          entrance rather than a logo animating over a screen you are already
+          using.
+        */}
+        <Enter
+          animate={!reduceMotion}
+          delay={WORDMARK_ENTRANCE_MS + 120}
+          style={{ paddingBottom: space[6] }}
+        >
           {/*
            * Sign in first, browsing second — the order matters. A customer
            * with an account should not have to hunt for the button, and a

@@ -11,7 +11,7 @@ import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { notify } from '@/lib/dialog';
-import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
@@ -217,7 +217,7 @@ export default function RestaurantScreen() {
               padding: space[3],
               borderRadius: radius.md,
               backgroundColor: color.warningSoft,
-              flexDirection: ROW,
+              flexDirection: 'row',
               alignItems: 'center',
               gap: space[2],
             }}
@@ -369,8 +369,7 @@ function Cover({
           top: space[10],
           insetInlineStart: space[4],
           insetInlineEnd: space[4],
-          // Back sits under the thumb on the right, where the chevron points.
-          flexDirection: ROW,
+          flexDirection: 'row',
           justifyContent: 'space-between',
         }}
       >

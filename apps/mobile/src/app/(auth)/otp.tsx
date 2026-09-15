@@ -14,7 +14,7 @@ import { formatIraqiPhoneDisplay, normalizeDigits } from '@jibli/validation';
 import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { BRAND, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
+import { BRAND, ROW_LTR, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
 
 const OTP_LENGTH = 4;
 
@@ -65,21 +65,47 @@ export default function OtpScreen() {
 
   const handleDigit = (index: number, value: string) => {
     // Arabic-Indic digits must verify identically to ASCII (plan §2).
-    const digit = normalizeDigits(value).replace(/\D/g, '').slice(-1);
-    const next = [...digits];
-    next[index] = digit;
-    setDigits(next);
+    const typed = normalizeDigits(value).replace(/\D/g, '');
     if (error) setError(null);
 
-    if (digit && index < OTP_LENGTH - 1) {
-      inputs.current[index + 1]?.focus();
+    /*
+     * More than one digit means it arrived whole: the SMS autofill strip, a
+     * paste, or a password manager. Spreading it across the boxes is the only
+     * way that gesture works at all — taking the last character, as this did,
+     * turned a correct four-digit code into a single digit in one box and left
+     * the customer to retype what their phone had already offered them.
+     */
+    const next = [...digits];
+    if (typed.length > 1) {
+      for (let offset = 0; offset < OTP_LENGTH - index; offset += 1) {
+        next[index + offset] = typed[offset] ?? '';
+      }
+    } else {
+      next[index] = typed;
+    }
+    setDigits(next);
+
+    const filled = next.filter(Boolean).length;
+    if (filled < OTP_LENGTH) {
+      // Land on the first box still waiting, not simply the next one along.
+      const target = next.findIndex((entry) => !entry);
+      if (typed) inputs.current[target === -1 ? index : target]?.focus();
+      return;
     }
 
-    // Auto-submit once the last box is filled — one less tap on a slow phone.
+    /*
+     * Complete: verify it, and do not ask for a tap.
+     *
+     * This existed and never ran. The guard was
+     * `assembled.length === OTP_LENGTH && !assembled.includes('')`, and
+     * `String.prototype.includes('')` is true of *every* string — so the
+     * second clause was always false and the first was never reached. The code
+     * read as if it auto-submitted; the customer typed four digits, waited,
+     * and then pressed «متابعة» like the comment said they would not have to.
+     */
     const assembled = next.join('');
-    if (assembled.length === OTP_LENGTH && !assembled.includes('')) {
-      void submit(assembled);
-    }
+    inputs.current[OTP_LENGTH - 1]?.blur();
+    void submit(assembled);
   };
 
   const handleKeyPress = (index: number, key: string) => {
@@ -390,21 +416,44 @@ const styles = StyleSheet.create({
    * forced-RTL layout is what produces left-to-right.
    */
   codeRow: {
-    flexDirection: 'row-reverse',
+    /*
+     * Left to right, because a verification code is a number.
+     *
+     * This was `row-reverse`, which put the first digit typed in the rightmost
+     * box: entering 1234 produced a row reading «4 3 2 1». The layout was
+     * following the language and the content is not language — it is four
+     * digits that have one order, the order they were read out or texted in.
+     *
+     * `ROW_LTR` rather than a literal, because "left to right" is spelled
+     * differently depending on whether the platform is already laying out
+     * right-to-left: `row` on a device where the native flag never took, and
+     * `row-reverse` in a browser under `dir="rtl"`, where CSS has already
+     * flipped the main axis.
+     */
+    flexDirection: ROW_LTR,
     gap: space[3],
-    marginVertical: space[5],
+    marginVertical: space[6],
     alignSelf: 'center',
   },
   codeBox: {
-    width: 64,
-    height: 76,
-    borderWidth: 2,
+    /*
+     * A little narrower and shorter than before, which reads as more
+     * deliberate rather than less: at 64×76 the four boxes ran nearly edge to
+     * edge on a small phone and a single digit floated in the middle of a
+     * large empty rectangle. 58×70 is close to square-and-a-bit, the
+     * proportion a digit actually fills.
+     */
+    width: 58,
+    height: 70,
+    borderWidth: 1.5,
     borderColor: color.borderSubtle,
     borderRadius: radius.lg,
     backgroundColor: color.surfacePage,
-    ...text.display,
+    ...text.h1,
     color: color.textPrimary,
     textAlign: 'center',
+    // The digits are the one thing on this screen that must not be reordered.
+    writingDirection: 'ltr',
     ...SUPPRESS_WEB_OUTLINE,
   },
   // Filled and focused are deliberately different: one says "this digit is
@@ -421,7 +470,7 @@ const styles = StyleSheet.create({
    */
   codeBoxFocused: {
     borderColor: BRAND[600],
-    borderWidth: 2.5,
+    borderWidth: 2,
     backgroundColor: color.surfaceCard,
   },
   codeBoxError: { borderColor: color.danger, backgroundColor: color.dangerSoft },

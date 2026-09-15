@@ -263,16 +263,6 @@ function type(size: number, weight: keyof typeof FAMILY_FOR_WEIGHT, ratio: numbe
     fontFamily: FAMILY_FOR_WEIGHT[weight],
     fontSize: size,
     lineHeight: Math.round(size * ratio),
-    /*
-     * Arabic starts at the right, and the default does not.
-     *
-     * React Native's default alignment follows `I18nManager.isRTL`, which on
-     * this device is false — so every unaligned line of Arabic in the app was
-     * starting at the left edge. `'right'` is physical and therefore correct in
-     * both modes; anything that wants otherwise (a button label, a centred
-     * empty state) overrides it, and `Ltr` overrides the direction too.
-     */
-    textAlign: 'right',
   };
 }
 

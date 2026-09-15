@@ -18,7 +18,7 @@ import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
 import { notify } from '@/lib/dialog';
-import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
@@ -465,7 +465,7 @@ function Header({
           accessibilityLabel="تغيير منطقة التوصيل"
           accessibilityValue={areaLabel ? { text: areaLabel } : undefined}
           style={({ pressed }) => [
-            { flexDirection: ROW, alignItems: 'center', gap: space[2], flex: 1 },
+            { flexDirection: 'row', alignItems: 'center', gap: space[2], flex: 1 },
             pressed ? { opacity: 0.7 } : null,
           ]}
         >
