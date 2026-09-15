@@ -25,7 +25,7 @@ import { space, TAB_BAR_HEIGHT } from '@/theme';
  * the cart. The rest end in a button of their own that a floating bar would
  * cover.
  */
-const NOT_HERE = new Set(['(auth)', '(driver)', 'cart', 'checkout', 'restaurant', 'order']);
+const NOT_HERE = new Set(['(auth)', '(driver)', 'choose', 'cart', 'checkout', 'restaurant', 'order']);
 
 export function GlobalCartBar() {
   const { itemCount, subtotalIqd } = useCart();

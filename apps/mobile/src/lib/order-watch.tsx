@@ -388,7 +388,7 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
  * order covering the way to place a new one is worse than not showing it at
  * all, and the tab bar still says «طلباتي».
  */
-const SCREENS_WITH_THEIR_OWN_DOCK = new Set(['(auth)', '(driver)', 'cart', 'checkout', 'restaurant']);
+const SCREENS_WITH_THEIR_OWN_DOCK = new Set(['(auth)', '(driver)', 'choose', 'cart', 'checkout', 'restaurant']);
 
 export function ActiveOrderBar() {
   const { active, announcement } = useOrderWatch();
