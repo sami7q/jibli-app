@@ -1,12 +1,12 @@
-import { Pressable, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { MerchantType } from '@jibli/contracts';
-import { api } from '@/lib/api';
+import { api, assetUrl } from '@/lib/api';
 import { useVertical } from '@/lib/vertical';
-import { color, palette, radius, space, text } from '@/theme';
+import { color, palette, space, text } from '@/theme';
 import { Screen, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import { JibliWordmark } from '@/ui/brand';
@@ -25,11 +25,17 @@ import { JibliWordmark } from '@/ui/brand';
  * that makes a card the right shape inside a scrolling page is simply absent
  * here — leaving margins around it would be decorating emptiness.
  *
- * Each panel carries its own section's live banner headline. That is what puts
- * merchandising on this screen without inventing a third place to manage it:
- * the strip is the top row of that half's own storefront, so an operator who
- * schedules a Ramadan banner sees it advertised on the way in, and a section
- * with nothing running simply shows nothing.
+ * Each panel is its own section's banner, and nothing else. It used to be a
+ * title, a caption, a list of examples and a promo chip — four ways of saying
+ * what a photograph of a burger and a photograph of a full basket say at a
+ * glance. Once real artwork arrived that became unarguable: the art already
+ * says «جيبلي ماركت» in its own typography, and the panel was repeating it
+ * underneath in a different one. The words survive in the accessibility
+ * label, where they are the whole content rather than a second headline.
+ *
+ * The banner shown is the top row of that half's own storefront, so this
+ * screen needs no third place to manage: an operator who schedules a Ramadan
+ * banner in Admin sees it advertised on the way in.
  */
 
 const HALVES: readonly {
@@ -74,12 +80,12 @@ export default function ChooseScreen() {
   const { height } = useWindowDimensions();
 
   /*
-   * Both storefronts, for their headlines only.
+   * Both storefronts, for their banners.
    *
    * Two requests on the first screen is worth it: they are small, cached for
    * the session, and they are the ones the home screen is about to make
    * anyway — so the half the customer picks is already loaded by the time it
-   * renders.
+   * renders, artwork included.
    */
   const food = useQuery({
     queryKey: ['storefront', 'RESTAURANT'],
@@ -92,23 +98,24 @@ export default function ChooseScreen() {
     staleTime: 5 * 60_000,
   });
 
-  /*
-   * The section's offer, not its first banner.
+  /**
+   * The section's first piece of artwork — the one its home screen opens on —
+   * and whether we know yet that there isn't one.
    *
-   * Taking `banners[0]` put «أهلاً بك في جيبلي» on the food panel and «جيبلي
-   * ماركت» on the market one — a welcome and a restatement of the title
-   * directly beneath the title. Neither is merchandising; both are the kind of
-   * filler that teaches people to stop reading a slot.
-   *
-   * A banner that links to a category is one somebody built to send traffic
-   * somewhere, which is the definition of an offer here. A section running
-   * only a welcome shows no chip at all, because an empty slot is more honest
-   * than a full one saying nothing.
+   * The two are separate answers. «no artwork» during the request and «no
+   * artwork» after it look identical from a null, and treating them the same
+   * puts the words on screen for as long as the fetch takes and then yanks
+   * them away. A panel that says one thing and then says something else is
+   * worse than a panel that waits.
    */
-  const headline = (type: MerchantType): string | null => {
-    const banners = (type === 'MARKET' ? market.data : food.data)?.banners ?? [];
-    const offer = banners.find((banner) => banner.link_type === 'CATEGORY');
-    return offer?.title_ar ?? null;
+  const artwork = (type: MerchantType): { url: string | null; known: boolean } => {
+    const query = type === 'MARKET' ? market : food;
+    const first = (query.data?.banners ?? []).find((banner) => banner.image_asset_id);
+
+    return {
+      url: first?.image_asset_id ? assetUrl(first.image_asset_id) : null,
+      known: query.isSuccess || query.isError,
+    };
   };
 
   const enter = (type: MerchantType) => {
@@ -148,7 +155,7 @@ export default function ChooseScreen() {
         </Enter>
 
         {HALVES.map((half, index) => {
-          const promo = headline(half.type);
+          const art = artwork(half.type);
 
           return (
             <Enter key={half.type} delay={90 + index * 90} style={{ flex: 1 }}>
@@ -167,74 +174,52 @@ export default function ChooseScreen() {
                   // happens to be two colours.
                   start={{ x: 1, y: 0 }}
                   end={{ x: 0, y: 1 }}
-                  style={{ flex: 1, justifyContent: 'center', paddingHorizontal: space[5] }}
+                  /*
+                   * The artwork is wider than the panel is tall, so it lands as
+                   * a band across the middle with the section's colour above
+                   * and below it. Filling the panel instead would crop about a
+                   * third off the sides, and these are designed 16:9 pieces
+                   * composed left to right — that third is where half the
+                   * design lives.
+                   */
+                  style={{ flex: 1, justifyContent: 'center', overflow: 'hidden' }}
                 >
-                  {/*
-                    The glyph is the texture, not an icon beside a label. At
-                    this size it reads as pattern and the panel still says one
-                    thing; at label size it would compete with the words.
-                  */}
-                  <MaterialCommunityIcons
-                    name={half.icon}
-                    size={panelHeight * 0.92}
-                    color="rgba(255,255,255,0.13)"
-                    style={{
-                      position: 'absolute',
-                      insetInlineStart: -panelHeight * 0.18,
-                      bottom: -panelHeight * 0.2,
-                    }}
-                  />
-
-                  <View style={{ gap: space[2] }}>
-                    <View
-                      style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: space[3] }}
-                    >
-                      <MaterialCommunityIcons name={half.icon} size={28} color={palette.white} />
-                      <Text style={{ ...text.display, color: palette.white }}>{half.label}</Text>
-                    </View>
-
-                    <Text style={{ ...text.body, color: palette.white, opacity: 0.95 }}>
-                      {half.caption}
-                    </Text>
-
-                    <Text style={{ ...text.small, color: palette.white, opacity: 0.8 }}>
-                      {half.examples}
-                    </Text>
-
-                    {/*
-                      The section's own headline, when it has one.
-                      Rendered as a chip rather than another line of copy: it
-                      is the only part of this panel that changes week to week,
-                      and it should look like it.
-                    */}
-                    {promo ? (
+                  {art.url ? (
+                    <Image
+                      source={{ uri: art.url }}
+                      style={{ width: '100%', aspectRatio: 16 / 9 }}
+                      resizeMode="cover"
+                    />
+                  ) : art.known ? (
+                    /*
+                     * Words, for a section with no banner scheduled.
+                     *
+                     * Two coloured bands with nothing in them is not a choice
+                     * anybody can make, so the panel falls back to saying what
+                     * it is — the same trade the home screen's banner makes in
+                     * the other direction.
+                     */
+                    <View style={{ gap: space[2], paddingHorizontal: space[5] }}>
                       <View
                         style={{
                           flexDirection: 'row-reverse',
                           alignItems: 'center',
-                          alignSelf: 'flex-start',
-                          gap: space[2],
-                          marginTop: space[2],
-                          paddingVertical: space[2],
-                          paddingHorizontal: space[3],
-                          borderRadius: radius.full,
-                          backgroundColor: 'rgba(255,255,255,0.22)',
+                          gap: space[3],
                         }}
                       >
-                        <MaterialCommunityIcons
-                          name="tag-outline"
-                          size={14}
-                          color={palette.white}
-                        />
-                        <Text
-                          style={{ ...text.captionBold, color: palette.white }}
-                          numberOfLines={1}
-                        >
-                          {promo}
-                        </Text>
+                        <MaterialCommunityIcons name={half.icon} size={28} color={palette.white} />
+                        <Text style={{ ...text.display, color: palette.white }}>{half.label}</Text>
                       </View>
-                    ) : null}
-                  </View>
+
+                      <Text style={{ ...text.body, color: palette.white, opacity: 0.95 }}>
+                        {half.caption}
+                      </Text>
+
+                      <Text style={{ ...text.small, color: palette.white, opacity: 0.8 }}>
+                        {half.examples}
+                      </Text>
+                    </View>
+                  ) : null}
                 </LinearGradient>
               </Pressable>
             </Enter>
