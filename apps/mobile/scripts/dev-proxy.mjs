@@ -358,7 +358,9 @@ const server = createServer(async (request, response) => {
   if (error) {
     console.error(`503 ${request.method} ${request.url} — ${upstream.url} unreachable: ${error}`);
     if (upstream.url === LOCAL) {
-      console.error('  Start it with `pnpm dev:api`, or unset JIBLI_PROXY_UPSTREAM to use the deployed API.');
+      console.error(
+        '  Start it with `pnpm dev:api`, or unset JIBLI_PROXY_UPSTREAM to use the deployed API.',
+      );
     }
     /*
      * Answer in the API's own error shape, with a code the app knows.
