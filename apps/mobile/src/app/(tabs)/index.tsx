@@ -18,7 +18,8 @@ import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
 import { notify } from '@/lib/dialog';
-import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
+import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { missingImageGlyph } from '@/ui/section-glyph';
 import { EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import type { MerchantType } from '@jibli/contracts';
@@ -477,7 +478,7 @@ function Header({
                 borderRadius: radius.full,
                 backgroundColor: color.brandSoft,
                 borderWidth: 1,
-                borderColor: palette.orange[200],
+                borderColor: accent[200],
                 alignItems: 'center',
                 justifyContent: 'center',
               },
@@ -883,11 +884,7 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
               resizeMode="cover"
             />
           ) : (
-            <MaterialCommunityIcons
-              name="silverware-fork-knife"
-              size={22}
-              color={palette.orange[300]}
-            />
+            <MaterialCommunityIcons name={missingImageGlyph()} size={22} color={accent[300]} />
           )}
         </View>
 

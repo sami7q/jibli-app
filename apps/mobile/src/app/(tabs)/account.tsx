@@ -8,7 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
 import { useIsGuest, useSession } from '@/lib/session';
 import { confirmAsync, notify } from '@/lib/dialog';
-import { color, palette, radius, shadow, space } from '@/theme';
+import { accent, color, radius, shadow, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
 import { ListRow, Sheet } from '@/ui/catalog';
@@ -60,7 +60,7 @@ export default function AccountScreen() {
               borderRadius: radius.lg,
               backgroundColor: color.brandSoft,
               borderWidth: 1,
-              borderColor: palette.orange[200],
+              borderColor: accent[200],
               gap: space[2],
             }}
           >

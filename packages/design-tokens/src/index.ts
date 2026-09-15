@@ -53,6 +53,35 @@ export const palette = {
     800: '#8f2c00',
     900: '#6b2100',
   },
+  /*
+   * Jibli Market's ramp, built to the same shape as the orange one.
+   *
+   * The two halves of the app are the same app — same cards, same badges,
+   * same buttons — and the only thing that separates them is which ramp they
+   * are drawn in, so the stops have to correspond one for one or a component
+   * that looks right in one section looks wrong in the other.
+   *
+   * Green rather than any other second colour because groceries are already
+   * green everywhere a customer has shopped, and because it has to be
+   * distinguishable from the orange at a glance and across a room — the
+   * chooser shows both at once.
+   *
+   * 500 is deliberately deeper than the mint that `success` uses: this one
+   * carries white text on buttons and price pills all day, and it must not be
+   * read as a success state when it appears beside one.
+   */
+  green: {
+    50: '#f0fdf6',
+    100: '#dcf7e9',
+    200: '#b5ecd0',
+    300: '#7ddcae',
+    400: '#38c487',
+    500: '#0ea968', // primary — Jibli Market
+    600: '#0a8d56',
+    700: '#077046',
+    800: '#065938',
+    900: '#04462c',
+  },
   ink: {
     50: '#f8f9fa',
     100: '#f1f3f5',
@@ -329,6 +358,7 @@ export function cssVariables(): CssVariable[] {
 
   const paletteNotes: Record<string, string> = {
     '--jibli-orange-500': 'primary — the logo orange',
+    '--jibli-green-500': 'primary — Jibli Market',
     '--jibli-ink-900': 'Admin sidebar, headings',
     '--jibli-violet-500': 'the fifth headline tile, so the row reads as five',
   };

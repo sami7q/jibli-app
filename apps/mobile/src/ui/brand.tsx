@@ -1,5 +1,5 @@
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
-import { color, palette } from '@/theme';
+import { BRAND, palette } from '@/theme';
 
 /**
  * The wordmark.
@@ -10,11 +10,16 @@ import { color, palette } from '@/theme';
  * that.
  *
  * Drawn on a 340×160 canvas; `width` scales the whole thing.
+ *
+ * The default tint is the fixed brand ramp, not the section's accent. Jibli
+ * Market repaints the app green, but a logo that changes colour with what the
+ * customer is shopping for is not a logo — it is decoration that happens to be
+ * shaped like one.
  */
 export function JibliWordmark({
   width = 220,
   tint = palette.white,
-  pinTint = color.brand,
+  pinTint = BRAND[500],
 }: {
   width?: number;
   /** The letterforms. White on the brand ground, brand on white. */
@@ -70,7 +75,7 @@ export function JibliWordmark({
 /**
  * The pin on its own — for a header, a tab bar, an empty state.
  */
-export function JibliPin({ size = 24, tint = palette.white, pinTint = color.brand }) {
+export function JibliPin({ size = 24, tint = palette.white, pinTint = BRAND[500] }) {
   return (
     <Svg width={size} height={size} viewBox="50 18 60 74">
       <Path

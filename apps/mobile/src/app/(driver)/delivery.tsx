@@ -14,7 +14,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { normalizeDigits } from '@jibli/validation';
 import { apiRequest, ApiError, idempotencyKey, NetworkError } from '@/lib/api';
 import { notify } from '@/lib/dialog';
-import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
  * Driver delivery task (plan §49, §50, §52, §132).
@@ -47,7 +47,13 @@ interface DeliveryTask {
   restaurant_navigation: NavigationLinks;
 }
 
-export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask; onChanged: () => void }) {
+export default function DeliveryScreen({
+  task,
+  onChanged,
+}: {
+  task: DeliveryTask;
+  onChanged: () => void;
+}) {
   const [pin, setPin] = useState('');
   const [isSubmitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -265,9 +271,7 @@ export default function DeliveryScreen({ task, onChanged }: { task: DeliveryTask
           />
 
           {pinAttemptsLeft !== null ? (
-            <Text style={styles.warning}>
-              المحاولات المتبقية: {pinAttemptsLeft}
-            </Text>
+            <Text style={styles.warning}>المحاولات المتبقية: {pinAttemptsLeft}</Text>
           ) : null}
 
           <Pressable
@@ -339,11 +343,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: space[4],
   },
-  buttonPrimary: { backgroundColor: color.brand },
+  buttonPrimary: { backgroundColor: BRAND[500] },
   buttonPrimaryText: { ...text.bodyBold, color: palette.white },
-  buttonGhost: { backgroundColor: color.brandSoft },
-  buttonGhostText: { ...text.bodyBold, color: color.brandDeep },
-  buttonOutline: { borderWidth: 1, borderColor: color.borderSubtle, backgroundColor: color.surfaceCard },
+  buttonGhost: { backgroundColor: BRAND[50] },
+  buttonGhostText: { ...text.bodyBold, color: BRAND[700] },
+  buttonOutline: {
+    borderWidth: 1,
+    borderColor: color.borderSubtle,
+    backgroundColor: color.surfaceCard,
+  },
   buttonOutlineText: { ...text.bodyBold, color: color.textSecondary },
   buttonDisabled: { backgroundColor: palette.ink[300] },
   textDisabled: { color: palette.ink[400] },

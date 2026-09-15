@@ -14,7 +14,7 @@ import { formatIraqiPhoneDisplay, normalizeDigits } from '@jibli/validation';
 import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import { TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
 
 const OTP_LENGTH = 4;
 
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
 
   step: {
     ...text.captionBold,
-    color: color.textBrand,
+    color: BRAND[600],
     letterSpacing: 0.5,
     marginBottom: space[1],
   },
@@ -369,17 +369,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: space[3],
-    backgroundColor: color.brandSoft,
+    backgroundColor: BRAND[50],
     borderWidth: 1,
-    borderColor: palette.orange[200],
+    borderColor: BRAND[200],
     borderRadius: radius.full,
     paddingVertical: space[2],
     paddingHorizontal: space[4],
     minHeight: TAP_TARGET,
   },
-  phonePillPressed: { backgroundColor: palette.orange[100] },
+  phonePillPressed: { backgroundColor: BRAND[100] },
   phoneText: { color: color.textPrimary },
-  phoneChange: { ...text.smallBold, color: color.textBrand },
+  phoneChange: { ...text.smallBold, color: BRAND[600] },
 
   /*
    * The boxes run left to right, against the page.
@@ -410,9 +410,9 @@ const styles = StyleSheet.create({
   // Filled and focused are deliberately different: one says "this digit is
   // entered", the other "this is where the next one goes".
   codeBoxFilled: {
-    borderColor: color.brand,
-    backgroundColor: color.brandSoft,
-    color: color.brandDeep,
+    borderColor: BRAND[500],
+    backgroundColor: BRAND[50],
+    color: BRAND[700],
   },
   /*
    * No shadow here, deliberately: `shadow` is a ViewStyle and these are
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
    * against the sunken boxes around it, which reads as clearly on a phone.
    */
   codeBoxFocused: {
-    borderColor: color.brandStrong,
+    borderColor: BRAND[600],
     borderWidth: 2.5,
     backgroundColor: color.surfaceCard,
   },
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: space[4],
   },
-  resendText: { ...text.bodyBold, color: color.textBrand, textAlign: 'center' },
+  resendText: { ...text.bodyBold, color: BRAND[600], textAlign: 'center' },
 
   devHint: {
     backgroundColor: color.warningSoft,
@@ -470,13 +470,13 @@ const styles = StyleSheet.create({
     borderTopColor: color.borderSubtle,
   },
   button: {
-    backgroundColor: color.brand,
+    backgroundColor: BRAND[500],
     minHeight: TAP_TARGET + 8,
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonPressed: { backgroundColor: color.brandStrong },
+  buttonPressed: { backgroundColor: BRAND[600] },
   buttonDisabled: { backgroundColor: palette.ink[200] },
   buttonText: { ...text.bodyBold, color: palette.white },
 });

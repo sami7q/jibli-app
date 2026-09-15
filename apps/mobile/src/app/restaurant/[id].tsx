@@ -11,7 +11,8 @@ import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { notify } from '@/lib/dialog';
-import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
+import { TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
+import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
 
@@ -326,11 +327,7 @@ function Cover({
             justifyContent: 'center',
           }}
         >
-          <MaterialCommunityIcons
-            name="silverware-fork-knife"
-            size={56}
-            color={palette.orange[300]}
-          />
+          <MaterialCommunityIcons name={missingImageGlyph()} size={56} color={accent[300]} />
         </View>
       )}
 

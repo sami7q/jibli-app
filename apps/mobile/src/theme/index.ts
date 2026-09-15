@@ -1,6 +1,6 @@
 import { I18nManager, Platform, type TextStyle, type ViewStyle } from 'react-native';
 import {
-  color,
+  color as tokenColor,
   duration,
   fontSize,
   fontWeight,
@@ -13,6 +13,7 @@ import {
   tapTarget,
   type ShadowToken,
 } from '@jibli/design-tokens';
+import type { MerchantType } from '@jibli/contracts';
 
 /**
  * The mobile theme.
@@ -27,7 +28,147 @@ import {
  * updated, and the phone quietly stops matching the portals.
  */
 
-export { color, palette, radius, space, fontSize, fontWeight, duration };
+export { palette, radius, space, fontSize, fontWeight, duration };
+
+// ── The accent ─────────────────────────────────────────────────────
+
+/**
+ * Jibli Market is the same app in green.
+ *
+ * Not a second design: the same cards, the same badges, the same buttons, one
+ * ramp swapped for another that has the same ten stops. That is the whole
+ * mechanism, and it is why a screen written for food is already correct for
+ * the market — nothing in a screen says «orange», it says `color.brand`.
+ *
+ * Swapped rather than passed down. A theme in context would mean every screen
+ * that draws anything reads a hook and re-renders through it, and the app has
+ * a hundred and eleven of those references across twenty-four files — the
+ * refactor would be larger than the feature and every new screen would have to
+ * remember to use it. A module-level ramp read through getters puts the
+ * decision in one place and leaves the screens alone.
+ *
+ * What makes that safe is where it is set: `VerticalProvider` assigns it while
+ * rendering, above every screen, so the pass that paints a green home screen
+ * is the same pass that made the ramp green. There is no frame in between.
+ */
+type Ramp = Readonly<Record<keyof typeof palette.orange, string>>;
+
+const RAMP_FOR_SECTION: Readonly<Record<MerchantType, Ramp>> = {
+  RESTAURANT: palette.orange,
+  MARKET: palette.green,
+};
+
+/** Orange until told otherwise — it is the brand, and the chooser is orange-led. */
+let ramp: Ramp = palette.orange;
+let section: MerchantType | null = null;
+
+/**
+ * Point the accent at a section's ramp.
+ *
+ * `null` — nobody has chosen — is the brand orange, which is what the sign-in
+ * flow, the chooser's header and the wordmark are drawn in.
+ *
+ * Idempotent, and cheap enough to call on every render of the provider.
+ */
+export function setAccentSection(next: MerchantType | null): void {
+  section = next;
+  ramp = next ? RAMP_FOR_SECTION[next] : palette.orange;
+}
+
+/**
+ * Which half the app is currently drawn for.
+ *
+ * For the few things a colour cannot carry — the glyph standing in for a
+ * missing picture is a fork in a restaurant and a basket in a market. Read
+ * from here rather than from `useVertical` so that a leaf component drawing a
+ * placeholder does not need to be inside the provider to render at all; the
+ * provider sets this above them, and a render that changes it re-renders them.
+ */
+export const currentSection = (): MerchantType | null => section;
+
+/**
+ * The brand's own ramp, which never shifts.
+ *
+ * For the screens that are not in a section: signing in, the driver's shift,
+ * the wordmark itself. Jibli is orange — a customer who taps «تسجيل الدخول»
+ * from the market has not left the market, and the sign-in screen is not a
+ * grocery screen; it belongs to the company rather than to either half.
+ *
+ * It also fixes a real hazard. Those screens build their styles with
+ * `StyleSheet.create` at module scope, which reads its colours exactly once —
+ * when the module first loads. Pointed at the shifting accent, the sign-in
+ * screen would keep whichever colour the app happened to be wearing the first
+ * time anybody opened it, forever, including back in the other section.
+ * Reading the fixed ramp makes that impossible rather than unlikely.
+ */
+export const BRAND = palette.orange;
+
+/**
+ * The current ramp, stop by stop.
+ *
+ * For the handful of places that need a shade the semantic names do not cover
+ * — a 200 hairline, a 300 empty-state glyph. Reaching for `palette.orange[300]`
+ * in a screen is what makes a screen untintable, which is the bug this exists
+ * to prevent.
+ */
+export const accent: Ramp = {
+  get 50() {
+    return ramp[50];
+  },
+  get 100() {
+    return ramp[100];
+  },
+  get 200() {
+    return ramp[200];
+  },
+  get 300() {
+    return ramp[300];
+  },
+  get 400() {
+    return ramp[400];
+  },
+  get 500() {
+    return ramp[500];
+  },
+  get 600() {
+    return ramp[600];
+  },
+  get 700() {
+    return ramp[700];
+  },
+  get 800() {
+    return ramp[800];
+  },
+  get 900() {
+    return ramp[900];
+  },
+};
+
+/**
+ * The semantic colours, with the brand family following the current section.
+ *
+ * Everything else passes through from the tokens unchanged — ink, surfaces,
+ * borders and the status colours mean the same thing in both halves, and a
+ * danger red that shifted with the section would stop being a danger red.
+ */
+export const color = {
+  ...tokenColor,
+  get brand() {
+    return ramp[500];
+  },
+  get brandStrong() {
+    return ramp[600];
+  },
+  get brandDeep() {
+    return ramp[700];
+  },
+  get brandSoft() {
+    return ramp[50];
+  },
+  get textBrand() {
+    return ramp[600];
+  },
+};
 
 /** Minimum touch target on a phone (plan §134). */
 export const TAP_TARGET = tapTarget.native;

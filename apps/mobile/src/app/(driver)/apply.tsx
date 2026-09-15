@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { api, ApiError } from '@/lib/api';
 import { useIsGuest } from '@/lib/session';
 import { notify } from '@/lib/dialog';
-import { color, palette, radius, space, TAP_TARGET, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, radius, space, text } from '@/theme';
 import { Button, EmptyState, Row, Screen, Skeleton, Text } from '@/ui';
 
 /**
@@ -83,10 +83,7 @@ export default function DriverApplyScreen() {
       }),
     onSuccess: () => void application.refetch(),
     onError: (error) =>
-      notify(
-        'تعذّر إرسال الطلب',
-        error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
-      ),
+      notify('تعذّر إرسال الطلب', error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.'),
   });
 
   const selected = VEHICLES.find((entry) => entry.value === vehicle);
@@ -134,9 +131,9 @@ export default function DriverApplyScreen() {
               style={{
                 padding: space[4],
                 borderRadius: radius.lg,
-                backgroundColor: color.brandSoft,
+                backgroundColor: BRAND[50],
                 borderWidth: 1,
-                borderColor: palette.orange[200],
+                borderColor: BRAND[200],
                 gap: space[1],
               }}
             >
@@ -164,8 +161,8 @@ export default function DriverApplyScreen() {
                       paddingHorizontal: space[3],
                       borderRadius: radius.md,
                       borderWidth: 1,
-                      borderColor: active ? color.brand : color.borderSubtle,
-                      backgroundColor: active ? color.brandSoft : color.surfaceCard,
+                      borderColor: active ? BRAND[500] : color.borderSubtle,
+                      backgroundColor: active ? BRAND[50] : color.surfaceCard,
                       justifyContent: 'center',
                     }}
                   >
@@ -173,7 +170,7 @@ export default function DriverApplyScreen() {
                       <MaterialCommunityIcons
                         name={entry.icon}
                         size={22}
-                        color={active ? color.brand : color.textMuted}
+                        color={active ? BRAND[500] : color.textMuted}
                       />
                       <Text
                         variant={active ? 'bodyBold' : 'body'}
@@ -183,7 +180,7 @@ export default function DriverApplyScreen() {
                         {entry.label}
                       </Text>
                       {active ? (
-                        <MaterialCommunityIcons name="check" size={20} color={color.brand} />
+                        <MaterialCommunityIcons name="check" size={20} color={BRAND[500]} />
                       ) : null}
                     </Row>
                   </Pressable>
@@ -252,7 +249,7 @@ function ApplicationStatus({
       ? color.successSoft
       : copy.tone === 'danger'
         ? color.dangerSoft
-        : color.brandSoft;
+        : BRAND[50];
 
   return (
     <View style={{ gap: space[4] }}>
@@ -273,7 +270,7 @@ function ApplicationStatus({
               ? color.successStrong
               : copy.tone === 'danger'
                 ? color.dangerStrong
-                : color.brand
+                : BRAND[500]
           }
         />
         <Text variant="h3" align="center" tone={copy.tone}>

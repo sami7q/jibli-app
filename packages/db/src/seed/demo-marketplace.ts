@@ -23,6 +23,7 @@ import {
   DEMO_BANNERS,
   DEMO_HUE_SHIFTS,
   promoBanner,
+  pruneSupersededBanners,
   restaurantCover,
   restaurantLogo,
   upsertImageAsset,
@@ -1407,12 +1408,15 @@ export async function seedDemoMarketplace(db: Database, cityCode: string): Promi
    * else. Keyed on the storage key of their art, so re-seeding rewrites rather
    * than duplicates.
    */
+  const bannerAssetIds: string[] = [];
+
   for (const [index, banner] of DEMO_BANNERS.entries()) {
     const imageAssetId = await upsertImageAsset(
       db,
       promoBanner(banner.key, banner.from, banner.to),
       null,
     );
+    bannerAssetIds.push(imageAssetId);
     result.images += 1;
 
     const [existing] = await db
@@ -1442,6 +1446,9 @@ export async function seedDemoMarketplace(db: Database, cityCode: string): Promi
     }
     result.banners += 1;
   }
+
+  // Whatever the banners used to point at is now unreachable.
+  await pruneSupersededBanners(db, bannerAssetIds);
 
   return { ...result, cityNameAr: city.nameAr };
 }

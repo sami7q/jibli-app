@@ -55,9 +55,16 @@ const HALVES: readonly {
     caption: 'بقالة ومواد غذائية خلال دقائق',
     examples: 'خضار · ألبان · لحوم · مخبوزات · منظفات',
     icon: 'basket-outline',
-    // Green, and not as decoration: the two halves have to be distinguishable
-    // from across the room, not only by reading them.
-    gradient: [palette.success[500], '#065f46'],
+    /*
+     * The market's own ramp, not a green picked for this screen.
+     *
+     * The panel is a promise about what is behind it: tapping it paints the
+     * whole app in `palette.green`, so the panel has to be that green. A
+     * hand-picked one here would mean the chooser and the section it opens
+     * disagree by a few degrees of hue, which is the kind of thing nobody can
+     * name and everybody notices.
+     */
+    gradient: [palette.green[400], palette.green[800]],
   },
 ];
 

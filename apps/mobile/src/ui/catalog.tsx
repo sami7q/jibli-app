@@ -14,7 +14,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
+import { TAP_TARGET, accent, color, palette, radius, shadow, space, text } from '@/theme';
+import { missingImageGlyph } from '@/ui/section-glyph';
 import { Row, Text } from './index';
 
 /**
@@ -66,7 +67,7 @@ export function IconTile({
           justifyContent: 'center',
           overflow: 'hidden',
           borderWidth: active ? 0 : 1,
-          borderColor: tone === 'brand' ? palette.orange[100] : color.borderSubtle,
+          borderColor: tone === 'brand' ? accent[100] : color.borderSubtle,
         },
         active ? shadow.sm : null,
         style,
@@ -624,7 +625,7 @@ export function PromoBanner({
            * right, which is why the stops read `x: 1 → 0`.
            */}
           <LinearGradient
-            colors={[palette.orange[600], palette.orange[500], palette.orange[400]]}
+            colors={[accent[600], accent[500], accent[400]]}
             start={{ x: 1, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={{ position: 'absolute', width: '100%', height: '100%' }}
@@ -942,11 +943,7 @@ export function RestaurantCard({
               justifyContent: 'center',
             }}
           >
-            <MaterialCommunityIcons
-              name="silverware-fork-knife"
-              size={44}
-              color={palette.orange[300]}
-            />
+            <MaterialCommunityIcons name={missingImageGlyph()} size={44} color={accent[300]} />
           </View>
         )}
 

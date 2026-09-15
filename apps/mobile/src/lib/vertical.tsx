@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { MerchantType } from '@jibli/contracts';
+import { setAccentSection } from '@/theme';
 
 /**
  * Which half of Jibli the customer is in — food, or the market.
@@ -28,6 +29,21 @@ const VerticalContext = createContext<VerticalApi | null>(null);
 
 export function VerticalProvider({ children }: { children: ReactNode }) {
   const [vertical, setVertical] = useState<MerchantType | null>(null);
+
+  /*
+   * The section decides the app's accent, and it is set here, in render.
+   *
+   * Not in an effect and not in `choose`: an effect runs after the tree has
+   * painted, so the first frame of a green home screen would be orange, and a
+   * callback is one place the section can change but not the only one. This
+   * provider is above every screen, so assigning during its render means the
+   * accent is already right by the time anything below reads `color.brand`.
+   *
+   * It is an assignment to a module variable derived entirely from state, so
+   * running it twice — or on a render React throws away — costs nothing and
+   * leaves the same value behind.
+   */
+  setAccentSection(vertical);
 
   const choose = useCallback((next: MerchantType) => setVertical(next), []);
   const clear = useCallback(() => setVertical(null), []);

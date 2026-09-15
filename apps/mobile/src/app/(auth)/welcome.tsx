@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSession } from '@/lib/session';
-import { color, palette, radius, space, TAP_TARGET } from '@/theme';
+import { BRAND, TAP_TARGET, palette, radius, space } from '@/theme';
 import { Screen, Text } from '@/ui';
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 
@@ -27,7 +27,14 @@ import { IraqFlag, JibliWordmark } from '@/ui/brand';
 /** The food outlines drifting behind the mark, from the comp's doodle layer. */
 const DOODLES = [
   { icon: 'taco', size: 150, top: '-2%', start: '-12%', rotate: '-12deg', drift: -8 },
-  { icon: 'food-drumstick-outline', size: 120, top: '40%', start: '-8%', rotate: '38deg', drift: 7 },
+  {
+    icon: 'food-drumstick-outline',
+    size: 120,
+    top: '40%',
+    start: '-8%',
+    rotate: '38deg',
+    drift: 7,
+  },
   { icon: 'hamburger', size: 160, top: '62%', start: '-6%', rotate: '-6deg', drift: -9 },
   { icon: 'french-fries', size: 170, top: '44%', end: '-10%', rotate: '12deg', drift: 8 },
   { icon: 'pizza', size: 145, top: '70%', end: '28%', rotate: '-12deg', drift: -7 },
@@ -57,7 +64,7 @@ export default function WelcomeScreen() {
   }, []);
 
   return (
-    <Screen background={color.brand} padded={false}>
+    <Screen background={BRAND[500]} padded={false}>
       <StatusBar style="light" />
 
       <DoodleLayer animate={!reduceMotion} />
@@ -268,4 +275,3 @@ function Doodle({ doodle, animate }: { doodle: (typeof DOODLES)[number]; animate
     </Animated.View>
   );
 }
-

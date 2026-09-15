@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { palette } from '@jibli/design-tokens';
 import { Canvas, hexToRgb, mix, rotateHue, type Rgb } from '@jibli/design-tokens/png';
-import { eq } from 'drizzle-orm';
+import { and, eq, like, notInArray } from 'drizzle-orm';
 import type { Database } from '../client.js';
 import { uuidv7 } from '../ids.js';
 import { assetBytes, assets } from '../schema/index.js';
@@ -56,15 +57,37 @@ export interface GeneratedImage {
 }
 
 /**
- * Where a banner's bytes live, whoever produced them.
+ * Where a banner's bytes live — keyed by what those bytes are.
  *
- * One key per banner rather than one per source: dropping finished art into
- * `seed-assets/banners/` then rewrites the placeholder's row in place instead
- * of minting a second asset and leaving the first behind with its bytes. The
- * asset id is the URL the app caches, so keeping it stable is also what lets
- * real art replace a placeholder without a cache bust.
+ * `GET /api/v1/assets/:id` answers `Cache-Control: immutable, max-age=1 year`,
+ * and that header is only true because an asset id is minted per upload and
+ * the bytes behind it never change. Re-seeding the same key with a new file
+ * would break exactly that: the phone would hold last week's banner for a year
+ * and no amount of re-seeding would reach it.
+ *
+ * So the digest goes in the key. New artwork is a new key, a new row, a new
+ * id, a new URL — which is a cache miss, which is the point. The same artwork
+ * seeded twice lands on the same key and rewrites nothing.
+ *
+ * Twelve hex characters: a collision needs about 16 million banners, and the
+ * cost of one would be a stale image rather than anything dangerous.
  */
-const bannerStorageKey = (key: string): string => `seed/banner/${key}.png`;
+const bannerStorageKey = (key: string, png: Buffer): string =>
+  `seed/banner/${key}-${createHash('sha1').update(png).digest('hex').slice(0, 12)}.png`;
+
+/** The prefix every banner asset shares, superseded ones included. */
+export const BANNER_STORAGE_PREFIX = 'seed/banner/';
+
+/**
+ * How large a banner may be before the seed says something.
+ *
+ * Not enforced — a warning, because the alternative is a seed that refuses to
+ * run over a file size, and the person who exported it is the one who should
+ * decide. 600KB is about where a 1920×1080 JPEG at quality 80 lands; a 2MB one
+ * is a full-quality export that nobody re-encoded, and the home screen is the
+ * first request a customer on a phone network makes.
+ */
+const BANNER_SIZE_WARNING = 600 * 1024;
 
 /**
  * Deterministic pseudo-randomness.
@@ -212,9 +235,18 @@ function bannerFromFile(key: string): GeneratedImage | null {
     const path = join(directory, `${key}.${extension}`);
     if (!existsSync(path)) continue;
 
+    const png = readFileSync(path);
+
+    if (png.byteLength > BANNER_SIZE_WARNING) {
+      console.warn(
+        `  ⚠ ${key}.${extension} is ${Math.round(png.byteLength / 1024)}KB. ` +
+          'The home screen loads it first; re-export at 1920×1080, quality ~80.',
+      );
+    }
+
     return {
-      storageKey: bannerStorageKey(key),
-      png: readFileSync(path),
+      storageKey: bannerStorageKey(key, png),
+      png,
       width: null,
       height: null,
       contentType,
@@ -278,9 +310,11 @@ export function promoBanner(seedText: string, from: string, to: string): Generat
     }
   }
 
+  const png = canvas.png();
+
   return {
-    storageKey: bannerStorageKey(seedText),
-    png: canvas.png(),
+    storageKey: bannerStorageKey(seedText, png),
+    png,
     width,
     height,
   };
@@ -340,6 +374,32 @@ export async function upsertImageAsset(
 }
 
 /**
+ * Delete the banner assets nothing points at any more.
+ *
+ * A digest in the key means replacing artwork inserts rather than overwrites,
+ * so every superseded banner would otherwise sit in `asset_bytes` forever — a
+ * couple of megabytes per revision, in a table whose whole purpose is being
+ * read by one route. `asset_bytes` cascades, so deleting the asset takes its
+ * bytes with it.
+ *
+ * Scoped to this prefix on purpose: it must never be able to reach an asset a
+ * restaurant uploaded.
+ */
+export async function pruneSupersededBanners(db: Database, keepIds: string[]): Promise<number> {
+  const deleted = await db
+    .delete(assets)
+    .where(
+      and(
+        like(assets.storageKey, `${BANNER_STORAGE_PREFIX}%`),
+        keepIds.length > 0 ? notInArray(assets.id, keepIds) : undefined,
+      ),
+    )
+    .returning({ id: assets.id });
+
+  return deleted.length;
+}
+
+/**
  * Hue offsets per demo restaurant.
  *
  * The brand orange sits at about 20° on the wheel, and food photography lives
@@ -370,8 +430,10 @@ export const DEMO_BANNERS: readonly {
    * Which storefront it runs in. Omitted means the food one, which is what
    * every banner written before markets existed meant.
    *
-   * The market banners use cooler, greener art than the food ones on purpose:
-   * the two halves should not be distinguishable only by their text, and a
+   * The market banners are drawn from `palette.green` and the food ones from
+   * `palette.orange` — the same two ramps the app itself is tinted with, so a
+   * placeholder matches the section it appears in rather than approximating
+   * it. The two halves should not be distinguishable only by their text: a
    * customer who has switched sections should be able to tell from across the
    * room.
    */
@@ -381,8 +443,8 @@ export const DEMO_BANNERS: readonly {
     key: 'market_welcome',
     titleAr: 'جيبلي ماركت',
     subtitleAr: 'بقالتك كاملة، تصل خلال دقائق',
-    from: '#12b76a',
-    to: '#027a48',
+    from: palette.green[400],
+    to: palette.green[700],
     linkType: 'NONE',
     linkValue: null,
     merchantType: 'MARKET',
@@ -391,8 +453,8 @@ export const DEMO_BANNERS: readonly {
     key: 'market_produce',
     titleAr: 'خضار وفواكه طازجة',
     subtitleAr: 'من سوق الجملة كل صباح',
-    from: '#15803d',
-    to: '#14532d',
+    from: palette.green[500],
+    to: palette.green[800],
     linkType: 'CATEGORY',
     linkValue: 'mk_produce',
     merchantType: 'MARKET',
@@ -401,8 +463,8 @@ export const DEMO_BANNERS: readonly {
     key: 'market_household',
     titleAr: 'تسوّق الشهر',
     subtitleAr: 'كميات الجملة بتوصيل مجاني',
-    from: '#0e7490',
-    to: '#155e75',
+    from: palette.green[600],
+    to: palette.green[900],
     linkType: 'CATEGORY',
     linkValue: 'mk_household',
     merchantType: 'MARKET',
@@ -411,8 +473,8 @@ export const DEMO_BANNERS: readonly {
     key: 'welcome',
     titleAr: 'أهلاً بك في جيبلي',
     subtitleAr: 'مطاعم بغداد تصلك أينما كنت',
-    from: '#ff7f3f',
-    to: '#b83800',
+    from: palette.orange[400],
+    to: palette.orange[700],
     linkType: 'NONE',
     linkValue: null,
   },
@@ -420,8 +482,8 @@ export const DEMO_BANNERS: readonly {
     key: 'grills',
     titleAr: 'مشاوي على الفحم',
     subtitleAr: 'كباب وتكة وقوزي من أفضل المطاعم',
-    from: '#e24500',
-    to: '#6b2100',
+    from: palette.orange[600],
+    to: palette.orange[900],
     linkType: 'CATEGORY',
     linkValue: 'grills',
   },
@@ -429,8 +491,8 @@ export const DEMO_BANNERS: readonly {
     key: 'sweets',
     titleAr: 'حلويات وقهوة',
     subtitleAr: 'بقلاوة وكنافة تُخبز كل صباح',
-    from: '#c2410c',
-    to: '#7c2d12',
+    from: palette.orange[700],
+    to: palette.orange[900],
     linkType: 'CATEGORY',
     linkValue: 'desserts',
   },

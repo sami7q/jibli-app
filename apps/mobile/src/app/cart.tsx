@@ -7,7 +7,8 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, assetUrl } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
-import { color, palette, radius, shadow, space, TAP_TARGET, text } from '@/theme';
+import { TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
+import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, EmptyState, Row, Screen, Text } from '@/ui';
 import { Stepper, SummaryRow } from '@/ui/catalog';
 
@@ -118,9 +119,9 @@ export default function CartScreen() {
                   />
                 ) : (
                   <MaterialCommunityIcons
-                    name="silverware-fork-knife"
+                    name={missingImageGlyph()}
                     size={20}
-                    color={palette.orange[300]}
+                    color={accent[300]}
                   />
                 )}
               </View>
@@ -205,9 +206,7 @@ export default function CartScreen() {
           <SummaryRow label="المجموع الفرعي" value={formatIqdArabic(iqd(subtotalIqd))} />
           <SummaryRow
             label="رسوم التوصيل"
-            value={
-              cart.deliveryFeeIqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(cart.deliveryFeeIqd))
-            }
+            value={cart.deliveryFeeIqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(cart.deliveryFeeIqd))}
             tone={cart.deliveryFeeIqd === 0 ? 'success' : undefined}
           />
           {serviceFeeIqd > 0 ? (
@@ -306,7 +305,12 @@ function TopBar({
           accessibilityRole="button"
           accessibilityLabel="تفريغ السلة"
           hitSlop={space[2]}
-          style={{ width: TAP_TARGET, height: TAP_TARGET, justifyContent: 'center', alignItems: 'flex-end' }}
+          style={{
+            width: TAP_TARGET,
+            height: TAP_TARGET,
+            justifyContent: 'center',
+            alignItems: 'flex-end',
+          }}
         >
           <Text variant="caption" tone="danger">
             تفريغ

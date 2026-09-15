@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
-import { TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
 import { useSession } from '@/lib/session';
@@ -181,7 +181,7 @@ export default function PhoneScreen() {
       ) : null}
 
       <View style={styles.header}>
-        <JibliWordmark width={168} tint={color.brand} pinTint={palette.white} />
+        <JibliWordmark width={168} tint={BRAND[500]} pinTint={palette.white} />
         <Text style={styles.title}>
           مرحباً بك في <Text style={styles.brand}>جيبلي</Text>
         </Text>
@@ -194,11 +194,11 @@ export default function PhoneScreen() {
           service is Iraq-only in Release 1 (plan §10).
         */}
         {/*
-          * The flag before the code, as the comp draws it — and drawn, not
-          * 🇮🇶: that emoji is two regional-indicator letters, and a font
-          * without the flag glyph renders them literally. This screen was
-          * showing "IQ".
-          */}
+         * The flag before the code, as the comp draws it — and drawn, not
+         * 🇮🇶: that emoji is two regional-indicator letters, and a font
+         * without the flag glyph renders them literally. This screen was
+         * showing "IQ".
+         */}
         <View style={styles.prefix}>
           <IraqFlag width={24} />
           <Text style={styles.prefixText}>+964</Text>
@@ -244,12 +244,12 @@ export default function PhoneScreen() {
       </Pressable>
 
       {/*
-        * The development shortcut.
-        *
-        * Rendered only when the bundle itself is a development one, and it
-        * still checks with the server before signing anyone in — a release
-        * build has `__DEV__` false and never draws it.
-        */}
+       * The development shortcut.
+       *
+       * Rendered only when the bundle itself is a development one, and it
+       * still checks with the server before signing anyone in — a release
+       * build has `__DEV__` false and never draws it.
+       */}
       {__DEV__ && devAvailable ? (
         <Pressable
           onPress={handleDevSignIn}
@@ -264,13 +264,13 @@ export default function PhoneScreen() {
       ) : null}
 
       {/*
-        * Google, when it is configured.
-        *
-        * It signs the customer in but does not give Jibli a number a driver
-        * can call, so the server answers `VERIFY_PHONE` and routes them
-        * straight back to this screen's sibling — the phone is not optional,
-        * it is only later.
-        */}
+       * Google, when it is configured.
+       *
+       * It signs the customer in but does not give Jibli a number a driver
+       * can call, so the server answers `VERIFY_PHONE` and routes them
+       * straight back to this screen's sibling — the phone is not optional,
+       * it is only later.
+       */}
       {isGoogleSignInConfigured() ? (
         <View style={styles.alternatives}>
           <Text style={styles.divider}>أو تابع باستخدام</Text>
@@ -303,14 +303,14 @@ export default function PhoneScreen() {
       </Text>
 
       {/*
-        * The couriers' door, at the bottom and quiet.
-        *
-        * Almost everybody arriving here is a customer with a phone number, so
-        * this is the last line rather than a second button beside the first —
-        * but it has to exist somewhere a driver can find without being told,
-        * and «سجّل بالرقم» is not a door they have a key to: their account was
-        * created by a restaurant, with a username and a password.
-        */}
+       * The couriers' door, at the bottom and quiet.
+       *
+       * Almost everybody arriving here is a customer with a phone number, so
+       * this is the last line rather than a second button beside the first —
+       * but it has to exist somewhere a driver can find without being told,
+       * and «سجّل بالرقم» is not a door they have a key to: their account was
+       * created by a restaurant, with a username and a password.
+       */}
       <Pressable
         onPress={() => router.push('/(auth)/driver-login')}
         accessibilityRole="button"
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   },
   header: { gap: space[2], alignItems: 'center', marginBottom: space[4] },
   title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
-  brand: { color: color.brand },
+  brand: { color: BRAND[500] },
   subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
 
   inputRow: {
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: color.brand,
+    backgroundColor: BRAND[500],
     minHeight: TAP_TARGET + 8,
     borderRadius: radius.md,
     alignItems: 'center',
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   legal: { ...text.small, color: color.textMuted, textAlign: 'center' },
-  link: { color: color.textBrand },
+  link: { color: BRAND[600] },
 });
 
 /** Opens one of the legal URLs from the Expo config. */

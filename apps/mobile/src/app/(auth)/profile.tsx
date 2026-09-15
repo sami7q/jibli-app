@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { fullNameSchema } from '@jibli/validation';
 import { useSession } from '@/lib/session';
 import { api, ApiError, NetworkError, type GeographyOption } from '@/lib/api';
-import { TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
 
 /**
  * Mandatory profile completion (plan §11).
@@ -205,7 +205,7 @@ export default function ProfileScreen() {
               accessibilityLabel={`المحافظة: ${governorate?.name_ar ?? 'لم يتم الاختيار'}`}
             >
               {loadingGovernorates ? (
-                <ActivityIndicator color={color.brand} />
+                <ActivityIndicator color={BRAND[500]} />
               ) : (
                 <>
                   <Text style={governorate ? styles.selectValue : styles.selectPlaceholder}>
@@ -236,7 +236,7 @@ export default function ProfileScreen() {
               accessibilityHint={!governorate ? 'اختر المحافظة أولاً' : undefined}
             >
               {loadingCities ? (
-                <ActivityIndicator color={color.brand} />
+                <ActivityIndicator color={BRAND[500]} />
               ) : (
                 <>
                   <Text style={city ? styles.selectValue : styles.selectPlaceholder}>
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   scroll: { padding: space[4], paddingTop: space[8], gap: space[4] },
 
   header: { gap: space[2], paddingHorizontal: space[1] },
-  step: { ...text.captionBold, color: color.textBrand, letterSpacing: 0.5 },
+  step: { ...text.captionBold, color: BRAND[600], letterSpacing: 0.5 },
   title: { ...text.display, color: color.textPrimary },
   subtitle: { ...text.body, color: color.textMuted },
 
@@ -460,13 +460,13 @@ const styles = StyleSheet.create({
     borderTopColor: color.borderSubtle,
   },
   button: {
-    backgroundColor: color.brand,
+    backgroundColor: BRAND[500],
     minHeight: TAP_TARGET + 8,
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonPressed: { backgroundColor: color.brandStrong },
+  buttonPressed: { backgroundColor: BRAND[600] },
   buttonDisabled: { backgroundColor: palette.ink[200] },
   buttonText: { ...text.bodyBold, color: palette.white },
 
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   modalTitle: { ...text.h2, color: color.textPrimary },
-  modalClose: { ...text.bodyBold, color: color.brandStrong },
+  modalClose: { ...text.bodyBold, color: BRAND[600] },
 
   option: {
     minHeight: TAP_TARGET,
