@@ -84,6 +84,16 @@ const HALVES: readonly {
  */
 const HEADER_HEIGHT = 188;
 
+/**
+ * The least air the pictures may leave, per gap.
+ *
+ * `space-evenly` shares out whatever is actually spare, so on a tall phone the
+ * three gaps are far wider than this. It matters at the other end: on a short
+ * one it is what stops the artwork from growing until the two pictures are
+ * touching each other and the question above them.
+ */
+const GAP = 20;
+
 /** After the last letter has landed: five at 70ms apart, plus the rise. */
 const LETTERS_SETTLE = 4 * 70 + 160;
 
@@ -179,29 +189,28 @@ export default function ChooseScreen() {
   const markWidth = Math.min(176, width * 0.44);
 
   /*
-   * How tall the picture wants to be, and how tall its half of the screen is.
+   * The panel is the picture. What the picture does not use is air.
    *
-   * These are two different numbers and the screen needs both. A 16:9 banner
-   * is 242pt on a 430pt phone and two of those leave 250pt over — real space
-   * that has to belong to something, because the alternatives are cropping a
-   * third off the artwork's width or leaving a hole.
+   * Two 16:9 banners are 484pt of a 932pt phone, and the 250pt left over was
+   * briefly filled with the section's colour and its glyph across it. That was
+   * worse than the hole it replaced: two large blocks of flat colour sitting
+   * between the artwork, competing with the thing they were there to support.
    *
-   * So the half is whatever is left, split evenly, and the picture sits at the
-   * top of it in its own ratio with the section's colour carrying on beneath.
-   * The page ends in colour rather than in white, the two halves stay the same
-   * size as each other, and the artwork is never cut. Give the same design a
-   * squarer export and the picture grows into the space until there is none.
+   * Air instead — between the pictures and around them, the page showing
+   * through. They end up the only marked thing on the screen, which is what
+   * makes a screen with two of them easy to read.
    *
-   * `artHeight` is bounded by the shorter of the two pictures for the same
-   * reason the halves are equal: past a picture's natural height it is being
-   * cropped, and neither half should be cropped for the other's sake.
+   * Bounded by the shorter of the two because past a picture's natural height
+   * it is being cropped, and neither half should be cropped for the other's
+   * sake; and by the space itself, so a squarer export grows into the air
+   * rather than pushing its other half off the bottom.
    */
   const naturalHeight = (type: MerchantType) => width / (ratios[type] ?? 16 / 9);
-  const halfHeight = Math.max((height - HEADER_HEIGHT) / 2, 120);
-  const artHeight = Math.min(halfHeight, naturalHeight('RESTAURANT'), naturalHeight('MARKET'));
-
-  /** What the picture leaves: the band of section colour under it. */
-  const stripHeight = Math.max(halfHeight - artHeight, 1);
+  const artHeight = Math.min(
+    Math.max((height - HEADER_HEIGHT - GAP * 3) / 2, 120),
+    naturalHeight('RESTAURANT'),
+    naturalHeight('MARKET'),
+  );
 
   return (
     <Screen edges={['top', 'bottom']} padded={false}>
@@ -235,100 +244,93 @@ export default function ChooseScreen() {
           </Enter>
         </View>
 
-        {HALVES.map((half, index) => {
-          const art = artwork(half.type);
+        {/*
+          The pair, with the same air above, between and below.
 
-          return (
-            <Enter key={half.type} delay={90 + index * 90}>
-              <Pressable
-                onPress={() => enter(half.type)}
-                accessibilityRole="button"
-                accessibilityLabel={`${half.label} — ${half.caption}`}
-                style={({ pressed }) => [
-                  { height: halfHeight },
-                  pressed ? { opacity: 0.94 } : null,
-                ]}
-              >
-                <LinearGradient
-                  colors={[...half.gradient]}
-                  // Diagonal: a vertical fade reads as a flat panel that
-                  // happens to be two colours.
-                  start={{ x: 1, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={{ flex: 1, alignItems: 'center', overflow: 'hidden' }}
+          `space-evenly` rather than a margin on each picture: the three gaps
+          are then one decision instead of three, and on a screen that has more
+          room than the pictures need, all three grow together rather than the
+          leftover pooling at whichever end the layout happens to favour.
+        */}
+        <View style={{ flex: 1, justifyContent: 'space-evenly' }}>
+          {HALVES.map((half, index) => {
+            const art = artwork(half.type);
+
+            return (
+              <Enter key={half.type} delay={90 + index * 90}>
+                <Pressable
+                  onPress={() => enter(half.type)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${half.label} — ${half.caption}`}
+                  style={({ pressed }) => [
+                    { height: artHeight },
+                    pressed ? { opacity: 0.94 } : null,
+                  ]}
                 >
-                  {/*
-                    The band under the picture, and what is in it.
-
-                    Whatever the artwork does not use is the section's own
-                    colour, and on a tall phone that is a hundred points of it.
-                    Flat, it reads as the page having run out; with the
-                    section's glyph across it at the size of a watermark it
-                    reads as the section, which is what the half is. Cropped by
-                    the panel on two sides on purpose — a mark that fits inside
-                    the band is an icon, and an icon in an empty band is a
-                    placeholder.
-                  */}
-                  <MaterialCommunityIcons
-                    name={half.icon}
-                    size={stripHeight * 1.9}
-                    color="rgba(255,255,255,0.14)"
-                    style={{
-                      position: 'absolute',
-                      bottom: -stripHeight * 0.55,
-                      insetInlineStart: -stripHeight * 0.35,
-                    }}
-                  />
-
-                  {art.url ? (
-                    <Image
-                      source={{ uri: art.url }}
-                      style={{ width: '100%', height: artHeight }}
-                      resizeMode="cover"
-                    />
-                  ) : art.known ? (
-                    /*
-                     * Words, for a section with no banner scheduled.
-                     *
-                     * Two coloured bands with nothing in them is not a choice
-                     * anybody can make, so the panel falls back to saying what
-                     * it is — the same trade the home screen's banner makes in
-                     * the other direction.
-                     */
-                    <View
-                      style={{
-                        width: '100%',
-                        height: artHeight,
-                        justifyContent: 'center',
-                        gap: space[2],
-                        paddingHorizontal: space[5],
-                      }}
-                    >
+                  <LinearGradient
+                    colors={[...half.gradient]}
+                    // Diagonal: a vertical fade reads as a flat panel that
+                    // happens to be two colours.
+                    start={{ x: 1, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={{ flex: 1, alignItems: 'center', overflow: 'hidden' }}
+                  >
+                    {art.url ? (
+                      <Image
+                        source={{ uri: art.url }}
+                        style={{ width: '100%', height: artHeight }}
+                        resizeMode="cover"
+                      />
+                    ) : art.known ? (
+                      /*
+                       * Words, for a section with no banner scheduled.
+                       *
+                       * Two coloured bands with nothing in them is not a choice
+                       * anybody can make, so the panel falls back to saying what
+                       * it is — the same trade the home screen's banner makes in
+                       * the other direction.
+                       */
                       <View
                         style={{
-                          flexDirection: 'row-reverse',
-                          alignItems: 'center',
-                          gap: space[3],
+                          width: '100%',
+                          height: artHeight,
+                          justifyContent: 'center',
+                          gap: space[2],
+                          paddingHorizontal: space[5],
                         }}
                       >
-                        <MaterialCommunityIcons name={half.icon} size={28} color={palette.white} />
-                        <Text style={{ ...text.display, color: palette.white }}>{half.label}</Text>
+                        <View
+                          style={{
+                            flexDirection: 'row-reverse',
+                            alignItems: 'center',
+                            gap: space[3],
+                          }}
+                        >
+                          <MaterialCommunityIcons
+                            name={half.icon}
+                            size={28}
+                            color={palette.white}
+                          />
+                          <Text style={{ ...text.display, color: palette.white }}>
+                            {half.label}
+                          </Text>
+                        </View>
+
+                        <Text style={{ ...text.body, color: palette.white, opacity: 0.95 }}>
+                          {half.caption}
+                        </Text>
+
+                        <Text style={{ ...text.small, color: palette.white, opacity: 0.8 }}>
+                          {half.examples}
+                        </Text>
                       </View>
-
-                      <Text style={{ ...text.body, color: palette.white, opacity: 0.95 }}>
-                        {half.caption}
-                      </Text>
-
-                      <Text style={{ ...text.small, color: palette.white, opacity: 0.8 }}>
-                        {half.examples}
-                      </Text>
-                    </View>
-                  ) : null}
-                </LinearGradient>
-              </Pressable>
-            </Enter>
-          );
-        })}
+                    ) : null}
+                  </LinearGradient>
+                </Pressable>
+              </Enter>
+            );
+          })}
+        </View>
       </View>
     </Screen>
   );
