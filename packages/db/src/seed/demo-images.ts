@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { palette } from '@jibli/design-tokens';
 import { Canvas, hexToRgb, mix, rotateHue, type Rgb } from '@jibli/design-tokens/png';
 import { eq } from 'drizzle-orm';
@@ -37,9 +40,31 @@ export const GENERATED_STORAGE_PREFIX = 'demo/generated/';
 export interface GeneratedImage {
   readonly storageKey: string;
   readonly png: Buffer;
-  readonly width: number;
-  readonly height: number;
+  /**
+   * Null when the bytes came from a file rather than the canvas.
+   *
+   * The column is nullable and nothing reads it, so the choice is between a
+   * measured number, no number, or a number that sounds right. Parsing a JPEG
+   * header to fill a field nobody queries is work for its own sake; writing
+   * 1920x1080 because that is the recommended export would be a value that
+   * looks measured and is not. Null says what is true.
+   */
+  readonly width: number | null;
+  readonly height: number | null;
+  /** Defaults to PNG, which is what everything drawn here produces. */
+  readonly contentType?: string;
 }
+
+/**
+ * Where a banner's bytes live, whoever produced them.
+ *
+ * One key per banner rather than one per source: dropping finished art into
+ * `seed-assets/banners/` then rewrites the placeholder's row in place instead
+ * of minting a second asset and leaving the first behind with its bytes. The
+ * asset id is the URL the app caches, so keeping it stable is also what lets
+ * real art replace a placeholder without a cache bust.
+ */
+const bannerStorageKey = (key: string): string => `seed/banner/${key}.png`;
 
 /**
  * Deterministic pseudo-randomness.
@@ -157,16 +182,67 @@ export function restaurantLogo(seedText: string, hueShift: number): GeneratedIma
   };
 }
 
+/** What a dropped-in file is actually made of, so it is not served as a lie. */
+const BANNER_MEDIA_TYPES: Readonly<Record<string, string>> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
 /**
- * A promo banner: 1000×500, matching the carousel's 2:1 slide.
+ * Finished artwork, when somebody has supplied it.
  *
- * The title and subtitle are drawn by the app over the top, so the art must
- * stay quiet on the start side — which under RTL is the right — and may carry
- * its interest on the left.
+ * `packages/db/seed-assets/banners/<key>.<ext>` replaces the generated
+ * placeholder for that banner and nothing else changes — same row, same link,
+ * same schedule, same asset id. A key with no file keeps its placeholder, so a
+ * designer can deliver them one at a time without the seed caring, and a
+ * checkout with an empty folder still comes up looking finished.
+ */
+function bannerFromFile(key: string): GeneratedImage | null {
+  const directory = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'seed-assets',
+    'banners',
+  );
+
+  for (const [extension, contentType] of Object.entries(BANNER_MEDIA_TYPES)) {
+    const path = join(directory, `${key}.${extension}`);
+    if (!existsSync(path)) continue;
+
+    return {
+      storageKey: bannerStorageKey(key),
+      png: readFileSync(path),
+      width: null,
+      height: null,
+      contentType,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * A promo banner, drawn only because nobody has supplied one.
+ *
+ * 16:9, because that is the slot: the app crops nothing, so a placeholder at
+ * any other ratio would be shown to developers in a shape no real banner will
+ * ever appear in. 1280×720 is enough — this is scaffolding for a demo
+ * database, and the real ones arrive as files.
+ *
+ * No text is drawn over a banner that has artwork, and this counts as artwork,
+ * so the art has the frame to itself and does not need to keep a quiet side
+ * clear for a headline.
  */
 export function promoBanner(seedText: string, from: string, to: string): GeneratedImage {
-  const width = 1000;
-  const height = 500;
+  // Real art wins over anything drawn here.
+  const supplied = bannerFromFile(seedText);
+  if (supplied) return supplied;
+
+  const width = 1280;
+  const height = 720;
   const canvas = new Canvas(width, height);
   const random = rng(hashOf(seedText));
 
@@ -186,16 +262,24 @@ export function promoBanner(seedText: string, from: string, to: string): Generat
   canvas.disc(width * 0.22, height * 0.52, height * 0.3, WHITE, 0.12);
   canvas.disc(width * 0.22, height * 0.52, height * 0.19, WHITE, 0.14);
 
-  // A soft veil on the text side, so white type holds at any brightness.
+  /*
+   * A corner weighted rather than a half veiled.
+   *
+   * There used to be an ink gradient over the right 55%, holding white type
+   * against a bright ground. The app stopped drawing that type — a banner with
+   * artwork is the artwork — so the veil became a shadow over nothing, and a
+   * placeholder dimmed down one side teaches the wrong thing about what this
+   * slot does to an image.
+   */
   for (let y = 0; y < height; y += 1) {
-    for (let x = Math.floor(width * 0.45); x < width; x += 1) {
-      const t = (x - width * 0.45) / (width * 0.55);
-      canvas.blend(x, y, INK, t * 0.22);
+    for (let x = Math.floor(width * 0.6); x < width; x += 1) {
+      const t = (x - width * 0.6) / (width * 0.4);
+      canvas.blend(x, y, INK, t * (y / height) * 0.14);
     }
   }
 
   return {
-    storageKey: `${GENERATED_STORAGE_PREFIX}banner-${seedText}.png`,
+    storageKey: bannerStorageKey(seedText),
     png: canvas.png(),
     width,
     height,
@@ -227,6 +311,7 @@ export async function upsertImageAsset(
     await db
       .update(assets)
       .set({
+        contentType: image.contentType ?? 'image/png',
         byteSize: image.png.byteLength,
         width: image.width,
         height: image.height,
@@ -240,7 +325,7 @@ export async function upsertImageAsset(
       storageKey: image.storageKey,
       bucket: 'demo',
       visibility: 'PUBLIC',
-      contentType: 'image/png',
+      contentType: image.contentType ?? 'image/png',
       byteSize: image.png.byteLength,
       width: image.width,
       height: image.height,

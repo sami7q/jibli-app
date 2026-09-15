@@ -38,3 +38,8 @@ ios/
 
 # Metro bundle output from `pnpm --filter @jibli/mobile bundle`.
 .expo-export/
+
+# Banner artwork dropped in for the seed. Large, often licensed, and not the
+# repository's to carry — the README beside them is.
+packages/db/seed-assets/banners/*
+!packages/db/seed-assets/banners/README.md

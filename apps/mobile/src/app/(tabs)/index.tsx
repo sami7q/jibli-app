@@ -192,9 +192,9 @@ export default function HomeScreen() {
        * edges reads as a mistake.
        */}
       {searching ? null : storefront.isLoading ? (
-        // The same 3:2 the real banner uses, so the layout does not jump the
+        // The same 16:9 the real banner uses, so the layout does not jump the
         // moment the carousel replaces it.
-        <Skeleton height={(windowWidth * 2) / 3} style={{ marginTop: space[4] }} />
+        <Skeleton height={(windowWidth * 9) / 16} style={{ marginTop: space[4] }} />
       ) : (
         <Enter delay={60}>
           <BannerCarousel

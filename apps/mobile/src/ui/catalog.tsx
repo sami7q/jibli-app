@@ -586,26 +586,19 @@ export function PromoBanner({
          * differently on each one: 1.88:1 on an SE, 2.15:1 on a Pro Max. A
          * designer exports one image and it lost a different slice of itself
          * per device, which is the kind of thing that only shows up once
-         * somebody puts two phones side by side. Sixteen-to-nine is the ratio
-         * these are drawn at — a shade taller than the 2:1 it started on,
-         * which read as a strip rather than a picture — and every screen now
-         * shows the same crop of it.
+         * somebody puts two phones side by side.
+         *
+         * Sixteen-to-nine because that is what the artwork is exported at.
+         * It was briefly 3:2 to give the slot more height, which was the wrong
+         * trade the moment real banners arrived: a ratio that does not match
+         * the file crops somebody's design, and the fix for a slot that feels
+         * small is a better image, not a different crop of it.
          *
          * The inset variant keeps its fixed height: it is a card in a column
          * of cards, and matching its neighbours matters more there than
          * matching itself across devices.
          */
-        /*
-         * 3:2 full bleed, not 16:9.
-         *
-         * 16:9 is a video ratio, and on a 430pt phone it left the slot 242pt
-         * tall — shorter than the two restaurant cards below it, so the one
-         * paid placement on the screen was also the least present. 3:2 adds
-         * about fifty points: enough for artwork to hold a dish and a sentence
-         * without pushing the categories below the fold, which is the line
-         * this cannot cross.
-         */
-        ...(fullBleed ? { aspectRatio: 3 / 2 } : { height: 164 }),
+        ...(fullBleed ? { aspectRatio: 16 / 9 } : { height: 164 }),
         borderRadius: fullBleed ? 0 : radius['2xl'],
         overflow: 'hidden',
         backgroundColor: color.brand,
