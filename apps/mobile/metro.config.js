@@ -28,7 +28,15 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [workspaceRoot];
+/*
+ * Added to Expo's own list, not substituted for it.
+ *
+ * `getDefaultConfig` sets watch folders of its own from SDK 54 onward, and
+ * assigning over them drops whatever it needed watched — `expo-doctor` flags
+ * exactly this. The root still has to be here for the pnpm store and the
+ * workspace symlinks.
+ */
+config.watchFolders = [...(config.watchFolders ?? []), workspaceRoot];
 
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
@@ -41,22 +49,20 @@ const SOURCE_EXTENSIONS = ['.ts', '.tsx'];
 /**
  * One React, always.
  *
- * This monorepo runs two React majors on purpose: the web portals are React 19
- * (Next.js 15) and the app is React 18, because React Native 0.76 does not
- * support 19. pnpm resolves a package's `react` from whichever importer pulled
- * it, so a transitive dependency can quietly end up holding the *other* copy —
- * and it did: a React 19 `jsx-runtime` was in the bundle beside React 18's
- * renderer.
+ * The repository no longer runs two React majors — SDK 54 brought the app to
+ * React 19, which is what the web portals were already on — so the specific
+ * failure this was written for is gone: a React 19 `jsx-runtime` beside React
+ * 18's renderer threw "Objects are not valid as a React child", because the
+ * two majors stamp elements with different symbols.
  *
- * That is not a version warning, it is a broken screen. React 19 stamps its
- * elements with `Symbol.for('react.transitional.element')` where 18 uses
- * `react.element`, so React 18's reconciler does not recognise them and throws
- * "Objects are not valid as a React child (found: object with keys {$$typeof,
- * type, key, props})" — an error that names nothing useful and renders nothing
- * at all.
+ * It stays because the hazard is pnpm's, not the version split's. pnpm
+ * resolves a package's `react` from whichever importer pulled it, so a
+ * transitive dependency can hold a *second copy* of the same version — and two
+ * copies of React 19 break hooks exactly as thoroughly as one copy each of 18
+ * and 19, with "Invalid hook call" instead.
  *
- * Pinning the whole React family to the app's own copies makes the mix
- * unrepresentable rather than unlikely.
+ * Pinning the whole family to the app's own copies makes both unrepresentable
+ * rather than unlikely.
  */
 const REACT_SINGLETONS = [
   'react',

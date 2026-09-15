@@ -34,8 +34,16 @@ Notifications.setNotificationHandler({
     const kind = notification.request.content.data?.['kind'];
     const isOrder = typeof kind === 'string' && kind.startsWith('order.');
 
+    /*
+     * `shouldShowAlert` was one switch; iOS 14 split the decision in two and
+     * expo-notifications followed in SDK 54. A banner is the transient drop
+     * from the top of the screen, the list is Notification Centre — and an
+     * order update wants both: seen now if the phone is in hand, and still
+     * there if it was not.
+     */
     return {
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       // A sound while the customer is already looking at the order they are
       // being told about is noise.
       shouldPlaySound: isOrder,

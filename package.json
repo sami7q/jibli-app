@@ -4,7 +4,7 @@
   "private": true,
   "description": "Jibli — Iraqi food delivery platform (customer app, driver mode, restaurant portal, admin portal)",
   "engines": {
-    "node": ">=20.9.0",
+    "node": ">=20.19.4",
     "pnpm": ">=9"
   },
   "packageManager": "pnpm@10.34.5",
@@ -58,10 +58,6 @@
     "ignoredBuiltDependencies": [
       "esbuild"
     ],
-    "overrides": {
-      "@jibli/mobile>@types/react": "18.3.31",
-      "expo-router>@types/react": "18.3.31",
-      "react-helmet-async>@types/react": "18.3.31"
-    }
+    "overrides": {}
   }
 }

@@ -91,6 +91,20 @@ const config: ExpoConfig = {
     bundleIdentifier: 'iq.jibli.app',
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
+      /*
+       * Answered here so the build does not stop to ask.
+       *
+       * Every App Store Connect upload prompts for an export-compliance answer
+       * and holds the build until somebody clicks through it — which, on a
+       * release being pushed at ten at night, is a wasted evening.
+       *
+       * `false` is the honest answer: the app uses HTTPS and the platform
+       * keychain, both of which are the exempt category. It performs no
+       * encryption of its own and ships no cryptographic implementation. If
+       * that ever changes — a bundled cipher, a custom protocol — this has to
+       * change with it, because the declaration is a legal one.
+       */
+      ITSAppUsesNonExemptEncryption: false,
       // Foreground-only, and only to help place a delivery pin (plan §13).
       /*
        * One capability, and the string says exactly what it is for.
@@ -111,6 +125,19 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'iq.jibli.app',
+    /*
+     * Target API level: 36, from the SDK rather than from here.
+     *
+     * Play refuses a new submission below API 36 as of 31 August 2026 — and it
+     * refuses it at upload, not at review, so the floor is not something an
+     * appeal can reach. Expo SDK 54 targets 36, which is the reason this
+     * project is on 54 at all.
+     *
+     * Deliberately not restated as `targetSdkVersion` here: that key belongs
+     * to `expo-build-properties`, and installing a config plugin to repeat a
+     * default is a dependency that exists only to be forgotten and drift. When
+     * the floor next moves, the SDK moves with it.
+     */
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#FF5400',
@@ -129,6 +156,14 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-secure-store',
     'expo-localization',
+    /*
+     * Required from SDK 54: fonts are embedded at build time by the plugin
+     * rather than loaded from the bundle at runtime. Without it the Cairo
+     * faces are missing on a release build and every screen falls back to the
+     * system Arabic face — which is exactly the reflow `useFonts` exists to
+     * prevent, except permanent.
+     */
+    'expo-font',
     /*
      * The splash is held by the app until fonts and the session have resolved
      * (see src/app/_layout.tsx), so the plugin must not hide it on its own.
