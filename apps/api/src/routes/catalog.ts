@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { AppError, ERROR_CODES, success } from '@jibli/contracts';
+import { AppError, ERROR_CODES, success, MERCHANT_TYPES } from '@jibli/contracts';
 import { normalizeArabicForSearch, searchQuerySchema, uuidSchema } from '@jibli/validation';
 import { evaluateOpenState } from '@jibli/domain';
 import {
@@ -32,6 +32,15 @@ const discoverQuerySchema = z.object({
   city_id: uuidSchema,
   q: searchQuerySchema.optional(),
   cuisine: z.string().max(40).optional(),
+  /*
+   * Which storefront is asking.
+   *
+   * Optional, and absent means both — because that is what every caller
+   * written before markets existed sends, and they must keep working
+   * unchanged. The app's two tabs each name their type; a search across
+   * everything simply leaves it off.
+   */
+  merchant_type: z.enum(MERCHANT_TYPES).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).max(1000).default(0),
 });
@@ -77,6 +86,10 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
       conditions.push(sql`${restaurants.cuisineTags} ? ${query.cuisine}` as never);
     }
 
+    if (query.merchant_type) {
+      conditions.push(eq(restaurants.merchantType, query.merchant_type));
+    }
+
     const rows = await ctx.db
       .select({
         restaurantId: restaurants.id,
@@ -85,6 +98,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
         logoAssetId: restaurants.logoAssetId,
         coverAssetId: restaurants.coverAssetId,
         cuisineTags: restaurants.cuisineTags,
+        merchantType: restaurants.merchantType,
         ratingAverage: restaurants.ratingAverage,
         ratingCount: restaurants.ratingCount,
         minimumOrderIqd: restaurants.minimumOrderIqd,
@@ -132,6 +146,9 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
         branch_id: row.branchId,
         display_name: row.displayName,
         description_ar: row.descriptionAr,
+        // So a card knows which storefront it belongs to without the caller
+        // having to remember what it asked for — search returns both.
+        merchant_type: row.merchantType,
         logo_asset_id: row.logoAssetId,
         cover_asset_id: row.coverAssetId,
         cuisine_tags: row.cuisineTags,
@@ -329,9 +346,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
         Number(right.restaurant.accepts_orders) - Number(left.restaurant.accepts_orders),
     );
 
-    return reply.send(
-      success(data, { request_id: request.requestId, page_size: query.limit }),
-    );
+    return reply.send(success(data, { request_id: request.requestId, page_size: query.limit }));
   });
 
   /** Restaurant detail with its full menu. */
@@ -544,7 +559,12 @@ export async function loadHours(ctx: AppContext, branchIds: string[]) {
   const map = new Map<
     string,
     {
-      rules: { dayOfWeek: number; opensAtMinute: number; closesAtMinute: number; isClosed: boolean }[];
+      rules: {
+        dayOfWeek: number;
+        opensAtMinute: number;
+        closesAtMinute: number;
+        isClosed: boolean;
+      }[];
       exceptions: {
         localDate: string;
         isClosed: boolean;

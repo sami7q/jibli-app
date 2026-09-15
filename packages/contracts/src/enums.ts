@@ -54,6 +54,36 @@ export const PROVIDER_TYPES = [
 ] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
 
+/**
+ * Which storefront a merchant appears in.
+ *
+ * Narrower than `ProviderType`, and not a duplicate of it. `ProviderType`
+ * describes what kind of business a provider is — the extension points in plan
+ * §16, most of which do not exist yet. This answers a question the customer
+ * app asks on every load: which of the two tabs does this merchant belong to.
+ *
+ * Two values, because the home screen has two tabs. A third would mean a third
+ * tab, and that is a product decision rather than a schema one.
+ */
+export const MERCHANT_TYPES = ['RESTAURANT', 'MARKET'] as const;
+export type MerchantType = (typeof MERCHANT_TYPES)[number];
+
+/**
+ * What each is called, and what its catalog is called.
+ *
+ * Kept together because they are always needed together: a portal screen that
+ * says «القائمة» to a grocer is as wrong as one that says «المنتجات» to a
+ * cook, and splitting the two labels across files is how one of them gets
+ * updated and the other does not.
+ */
+export const MERCHANT_TYPE_LABELS: Record<
+  MerchantType,
+  { readonly nameAr: string; readonly catalogAr: string; readonly itemAr: string }
+> = {
+  RESTAURANT: { nameAr: 'مطعم', catalogAr: 'القائمة', itemAr: 'الصنف' },
+  MARKET: { nameAr: 'ماركت', catalogAr: 'المنتجات', itemAr: 'المنتج' },
+};
+
 export const ONBOARDING_STATUSES = [
   'DRAFT',
   'UNDER_REVIEW',

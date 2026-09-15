@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import type {
   BusyMode,
+  MerchantType,
   OnboardingStatus,
   OperationalStatus,
   ProviderType,
@@ -52,6 +53,18 @@ export const restaurants = pgTable(
     partnerCode: text('partner_code').notNull(),
     descriptionAr: text('description_ar'),
 
+    /**
+     * Which storefront this merchant appears in (migration 0016).
+     *
+     * The table is still called `restaurants` because renaming one that
+     * fourteen route modules and forty-seven portal and Admin pages reach into
+     * is churn that buys nothing. A market is a row here with this set to
+     * MARKET: same branches, same catalog, same orders, same courier, same
+     * commission — and different words in the portal, from
+     * MERCHANT_TYPE_LABELS.
+     */
+    merchantType: text('merchant_type').$type<MerchantType>().notNull().default('RESTAURANT'),
+
     onboardingStatus: text('onboarding_status')
       .$type<OnboardingStatus>()
       .notNull()
@@ -92,6 +105,9 @@ export const restaurants = pgTable(
   (table) => [
     uniqueIndex('restaurants_partner_code_key').on(table.partnerCode),
     index('restaurants_status_idx').on(table.onboardingStatus, table.operationalStatus),
+    // The storefront split: every open merchant of one type, which is the
+    // query behind both tabs of the home screen (migration 0016).
+    index('restaurants_merchant_type_idx').on(table.merchantType, table.operationalStatus),
     index('restaurants_provider_idx').on(table.providerId),
   ],
 );

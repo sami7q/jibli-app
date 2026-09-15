@@ -1,5 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { hashPassword } from '@jibli/auth';
+import type { MerchantType } from '@jibli/contracts';
 import type { Database } from '../client.js';
 import { uuidv7 } from '../ids.js';
 import {
@@ -103,6 +104,11 @@ interface DemoModifierGroup {
 interface DemoRestaurant {
   readonly partnerCode: string;
   readonly name: string;
+  /**
+   * Which storefront it appears in. Omitted means RESTAURANT, which is what
+   * every entry written before markets existed means.
+   */
+  readonly merchantType?: MerchantType;
   readonly description: string;
   readonly cuisines: readonly string[];
   readonly minimumOrderIqd: number;
@@ -149,6 +155,89 @@ function daily(open: string, close: string): Record<number, readonly [string, st
 function always(): Record<number, readonly [string, string]> {
   return daily('00:00', '24:00');
 }
+
+/*
+ * A market, seeded beside the restaurants because the home screen now has two
+ * tabs and an empty one proves nothing.
+ *
+ * Its catalog is shaped the way a grocery's is rather than a kitchen's: aisles
+ * instead of courses, packaged goods with a size in the name, no preparation
+ * time worth speaking of, and a low delivery fee on a larger basket. The
+ * ordering, delivery, commission and portal behind it are the restaurants'
+ * unchanged — which is the point of the whole discriminator.
+ */
+const DEMO_MARKET: DemoRestaurant = {
+  partnerCode: 'DEMO-2001',
+  merchantType: 'MARKET',
+  name: 'ماركت الرشيد',
+  description: 'بقالة ومواد غذائية، توصيل سريع لكل ما ينقص البيت.',
+  cuisines: ['grocery'],
+  minimumOrderIqd: 5000,
+  deliveryFeeIqd: 1500,
+  // A market picks from a shelf; it does not cook. Ten minutes is packing.
+  prepMinutes: 10,
+  rating: 4.5,
+  ratingCount: 186,
+  address: 'شارع فلسطين، حي البنوك',
+  district: 'البنوك',
+  phone: '+9647701110007',
+  ownerUsername: 'demo.market',
+  ownerName: 'أبو أحمد الرشيد',
+  hours: always(),
+  menu: [
+    {
+      name: 'ألبان وأجبان',
+      description: 'مبرّدة، تصل باردة',
+      items: [
+        { name: 'حليب طازج ١ لتر', description: 'مبستر، كامل الدسم', priceIqd: 2000 },
+        { name: 'لبن رائب ٥٠٠ غم', priceIqd: 1500 },
+        { name: 'جبن أبيض ٤٠٠ غم', priceIqd: 4500 },
+        { name: 'زبدة ٢٠٠ غم', priceIqd: 3500 },
+        { name: 'بيض طازج ٣٠ حبة', description: 'محلي', priceIqd: 7000 },
+      ],
+    },
+    {
+      name: 'مواد غذائية أساسية',
+      items: [
+        { name: 'رز بسمتي ٥ كغم', priceIqd: 12_000 },
+        { name: 'سكر ٢ كغم', priceIqd: 2500 },
+        { name: 'زيت دوار الشمس ١.٨ لتر', priceIqd: 6500 },
+        { name: 'طحين ٥ كغم', priceIqd: 5000 },
+        { name: 'معجون طماطم ٨٠٠ غم', priceIqd: 3000 },
+        { name: 'شاي أسود ٤٠٠ غم', description: 'سيلاني', priceIqd: 5500 },
+      ],
+    },
+    {
+      name: 'خضار وفواكه',
+      description: 'من سوق الجملة كل صباح',
+      items: [
+        { name: 'طماطم ١ كغم', priceIqd: 1500 },
+        { name: 'خيار ١ كغم', priceIqd: 1250 },
+        { name: 'بصل ١ كغم', priceIqd: 1000 },
+        { name: 'بطاطا ٢ كغم', priceIqd: 2500 },
+        { name: 'تفاح أحمر ١ كغم', priceIqd: 4000 },
+        { name: 'موز ١ كغم', priceIqd: 3500, unavailable: true },
+      ],
+    },
+    {
+      name: 'مشروبات',
+      items: [
+        { name: 'ماء ١.٥ لتر — ٦ قناني', priceIqd: 3000 },
+        { name: 'بيبسي ٣٣٠ مل — ٦ علب', priceIqd: 4500 },
+        { name: 'عصير برتقال ١ لتر', priceIqd: 3000 },
+      ],
+    },
+    {
+      name: 'منظفات ومستلزمات',
+      items: [
+        { name: 'مسحوق غسيل ٣ كغم', priceIqd: 8000 },
+        { name: 'صابون أطباق ٧٥٠ مل', priceIqd: 2500 },
+        { name: 'مناديل ورقية — ٥ علب', priceIqd: 4000 },
+        { name: 'أكياس قمامة — ٥٠ كيس', priceIqd: 2000 },
+      ],
+    },
+  ],
+};
 
 const DEMO_RESTAURANTS: readonly DemoRestaurant[] = [
   {
@@ -212,7 +301,12 @@ const DEMO_RESTAURANTS: readonly DemoRestaurant[] = [
             options: ['الحجم', 'إضافات'],
           },
           { name: 'مظبي لحم', description: 'مشوي على الحجر الساخن', priceIqd: 20_000 },
-          { name: 'مندي سمك', description: 'حسب الصيد اليومي', priceIqd: 16_000, unavailable: true },
+          {
+            name: 'مندي سمك',
+            description: 'حسب الصيد اليومي',
+            priceIqd: 16_000,
+            unavailable: true,
+          },
         ],
       },
       {
@@ -556,7 +650,12 @@ const DEMO_RESTAURANTS: readonly DemoRestaurant[] = [
           },
           { name: 'تكة دجاج', priceIqd: 16_000, options: ['مستوى التتبيل'] },
           { name: 'تكة غنم', priceIqd: 24_000, options: ['مستوى التتبيل'] },
-          { name: 'قوزي كامل', description: 'يتطلب طلباً مسبقاً', priceIqd: 95_000, unavailable: true },
+          {
+            name: 'قوزي كامل',
+            description: 'يتطلب طلباً مسبقاً',
+            priceIqd: 95_000,
+            unavailable: true,
+          },
         ],
       },
       {
@@ -590,10 +689,7 @@ export interface DemoSeedResult {
  * The city must already exist and be enabled; `seed/run.ts` activates Baghdad
  * immediately before calling this.
  */
-export async function seedDemoMarketplace(
-  db: Database,
-  cityCode: string,
-): Promise<DemoSeedResult> {
+export async function seedDemoMarketplace(db: Database, cityCode: string): Promise<DemoSeedResult> {
   const [city] = await db
     .select({ id: cities.id, governorateId: cities.governorateId, nameAr: cities.nameAr })
     .from(cities)
@@ -616,7 +712,9 @@ export async function seedDemoMarketplace(
     banners: 0,
   };
 
-  for (const demo of DEMO_RESTAURANTS) {
+  // The market runs through the same loop as the restaurants, because it is
+  // the same shape — that is the whole argument for the discriminator.
+  for (const demo of [...DEMO_RESTAURANTS, DEMO_MARKET]) {
     await db.transaction(async (tx) => {
       const [existing] = await tx
         .select({ id: restaurants.id, providerId: restaurants.providerId })
@@ -649,6 +747,10 @@ export async function seedDemoMarketplace(
             minimumOrderIqd: demo.minimumOrderIqd,
             ratingAverage: demo.rating,
             ratingCount: demo.ratingCount,
+            // Also on update: a database seeded before this column existed has
+            // the market filed as a restaurant, and a re-seed should fix that
+            // rather than leave it in the wrong tab.
+            merchantType: demo.merchantType ?? 'RESTAURANT',
             onboardingStatus: 'APPROVED',
             operationalStatus: 'ACTIVE',
             approvedAt: now,
@@ -675,6 +777,7 @@ export async function seedDemoMarketplace(
           partnerCode: demo.partnerCode,
           descriptionAr: demo.description,
           cuisineTags: [...demo.cuisines],
+          merchantType: demo.merchantType ?? 'RESTAURANT',
           onboardingStatus: 'APPROVED',
           operationalStatus: 'ACTIVE',
           minimumOrderIqd: demo.minimumOrderIqd,
