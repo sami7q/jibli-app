@@ -35,6 +35,100 @@ though any provider meeting the three criteria qualifies. Two safe routes:
 
 Shipping a Google button on iOS without either is a rejection, not a risk.
 
+## Blocking, and verified as of 16 September 2026
+
+Each of these was checked against the running system, not assumed. None is a
+form; all of them are work.
+
+### The legal URLs had no domain behind them
+
+`jibli.iq` did not resolve at all — no DNS — so `extra.privacyPolicyUrl` and
+`extra.termsUrl` pointed at nothing, from two rows in the account screen that
+App Review opens. Both stores refuse a submission without a reachable privacy
+policy, and Play additionally requires a **web** account-deletion page beside
+the in-app flow.
+
+`apps/legal` is that site: three static pages, no API, no session, cacheable at
+the edge. It is deliberately not part of either portal — `portalNextConfig`
+sends `Cache-Control: private, no-store` and proxies `/api/*`, and a policy page
+that depends on a backend is down when the backend is.
+
+Deploying it is one action in the Vercel dashboard: **New Project → import this
+repo → Root Directory `apps/legal`**. It then redeploys on every push like the
+other two. After that, either point `jibli.iq` at it, or set
+`EXPO_PUBLIC_PRIVACY_URL` and `EXPO_PUBLIC_TERMS_URL` in `eas.json`'s build
+profiles to the deployed origin — the app bakes them in at build time, so a
+build made before this is a build with dead links in it.
+
+### Only one phone number could sign in
+
+The deployed API runs `OTP_PROVIDER=console`, which generates a real code and
+hands it to a provider that logs that an SMS went out and never the code. Every
+number except `OTP_TEST_PHONES` therefore got a code nobody could read.
+
+The OTPIQ configuration that works is already proven in the repo root `.env`
+and matches the recipe in `render.yaml` line for line. Moving it to Render is
+copying nine keys:
+
+```
+OTP_PROVIDER=sms_gateway
+SMS_GATEWAY_URL=https://api.otpiq.com/api/sms
+SMS_GATEWAY_API_KEY           (sk_live_… — a secret, set it unsynced)
+SMS_GATEWAY_AUTH_SCHEME=bearer
+SMS_GATEWAY_TO_FIELD=phoneNumber
+SMS_GATEWAY_SENDER_FIELD=senderId
+SMS_GATEWAY_NUMBER_FORMAT=e164_no_plus
+SMS_GATEWAY_BODY_FIELD=verificationCode
+SMS_GATEWAY_BODY_MODE=code
+SMS_GATEWAY_EXTRA_FIELDS={"smsType":"verification","provider":"auto"}
+```
+
+`provider: auto` is the WhatsApp path: OTPIQ tries WhatsApp, then Telegram,
+then SMS, and degrades on its own for a customer who has none of them.
+
+Two things to check on Render afterwards, both of which fail silently:
+
+- **`OTP_PHONE_ALLOWLIST` must be empty.** While `APP_ENV` is anything but
+  `production`, a non-empty allowlist refuses delivery to every number not in
+  it — which looks exactly like a broken gateway.
+- **Keep `OTP_TEST_PHONES` until review is over.** It is how App Review signs
+  in without an Iraqi number, and the env schema forbids it in production, so
+  it has to go before `APP_ENV` moves.
+
+### `APP_ENV=production` is a separate, later step
+
+It is tempting to set it at the same time. Do not: the schema refuses to boot
+production unless *all* of real Redis, a real OTP provider, a real push
+provider, TLS on the database, no test phones, and no localhost in CORS are
+satisfied — and `PUSH_PROVIDER` is still `console`. Switching the OTP provider
+while staying on `staging` makes sign-in work for real customers today; the
+production hardening is its own piece of work.
+
+### The API sleeps
+
+Render's free plan spins the instance down after about fifteen minutes and
+takes roughly a minute to wake. A reviewer who opens the app cold sees a
+spinner, and "the app did not load" is a 2.1 rejection that costs a review
+cycle. Move `jibli-api` to a paid plan before submitting.
+
+### EAS is not linked
+
+`eas-cli` is logged in on the build machine, but `app.config.ts` carries no
+`extra.eas.projectId`, so `eas init` has never run. `eas.json` already has both
+profiles — `preview` builds an APK for internal testing, `production` an AAB —
+and `submit.production` is empty and needs the App Store Connect app id and a
+Play service-account key.
+
+### Smaller
+
+- `assets/adaptive-icon.png` is 432×432. Android wants 1024×1024; it works at
+  432 but is soft on large launchers.
+- A new **personal** Play developer account must run a closed test with a dozen
+  testers opted in continuously for two weeks before production access can even
+  be requested. It is the longest item on the calendar and it runs in parallel
+  with everything else, so open the account and start the test first. Confirm
+  the current numbers in the Play Console — this rule has been revised before.
+
 ## Still a form
 
 Nothing below is code. All of it is filled in by a person, and a wrong answer
