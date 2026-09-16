@@ -13,7 +13,21 @@ import { fileURLToPath } from 'node:url';
  * It also has no API origin at all. Nothing on this site fetches; the whole
  * point is that a privacy policy cannot be down because the database is.
  */
-const workspaceRoot = fileURLToPath(new URL('..', import.meta.url));
+/*
+ * The monorepo root, counted from *this* file.
+ *
+ * `config/next-portal.mjs` — which the two portals share — writes `'..'`,
+ * because it sits one level down. This file sits two, and copying the literal
+ * across pointed the tracing root at `apps/` instead of the repository. Next
+ * then emitted file references relative to a root that does not contain
+ * `node_modules`, the build passed every local check, and Vercel failed at the
+ * very last step with `Cannot find module
+ * 'next/dist/compiled/next-server/server.runtime.prod.js'` and a require stack
+ * naming a path that never existed: `/vercel/path0/legal/noop.js`.
+ *
+ * The depth is the whole content of this line. Moving this file changes it.
+ */
+const workspaceRoot = fileURLToPath(new URL('../..', import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const config = {
