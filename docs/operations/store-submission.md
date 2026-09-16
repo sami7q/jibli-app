@@ -111,18 +111,39 @@ takes roughly a minute to wake. A reviewer who opens the app cold sees a
 spinner, and "the app did not load" is a 2.1 rejection that costs a review
 cycle. Move `jibli-api` to a paid plan before submitting.
 
-### EAS is not linked
+### EAS is linked, and updates are wired
 
-`eas-cli` is logged in on the build machine, but `app.config.ts` carries no
-`extra.eas.projectId`, so `eas init` has never run. `eas.json` already has both
-profiles — `preview` builds an APK for internal testing, `production` an AAB —
-and `submit.production` is empty and needs the App Store Connect app id and a
-Play service-account key.
+`@sam7iq/jibli` (`1ff0b9e5-8d38-484c-8d8a-232641ede9cc`). `eas.json` has both
+profiles — `preview` builds an APK for internal testing on the `preview`
+channel, `production` an AAB on the `production` channel — and
+`submit.production` is still empty: it needs the App Store Connect app id and a
+Play service-account key, both of which only exist once the store accounts do.
+
+`expo-updates` is configured, which is what makes "ship it and improve it"
+possible on a store timeline. Both stores review a binary and neither reviews
+the JavaScript inside it, so a wrong Arabic string or a crash on one screen is:
+
+```sh
+cd apps/mobile
+eas update --branch production --message "what changed"
+```
+
+Minutes, not a review cycle. `runtimeVersion` follows `version`, so an update
+only ever reaches binaries built from the same `version` — add a native module
+or bump the version and old binaries stop being offered updates rather than
+being handed JavaScript that calls into native code they do not have. That is
+the rule to remember: **a JavaScript change ships as an update; anything that
+touches native needs a new build and a new submission.**
+
+Bumping `version` in `app.config.ts` therefore cuts the update line. Do it when
+you mean to, not to mark a JavaScript release.
 
 ### Smaller
 
-- `assets/adaptive-icon.png` is 432×432. Android wants 1024×1024; it works at
-  432 but is soft on large launchers.
+- `assets/adaptive-icon.png` is 1024×1024, regenerated from `icon.png` — the
+  432 version was that same artwork downscaled, and the mark sits at about 42%
+  of the canvas, inside Android's 66% safe zone and a comfortable fill of the
+  masked circle.
 - A new **personal** Play developer account must run a closed test with a dozen
   testers opted in continuously for two weeks before production access can even
   be requested. It is the longest item on the calendar and it runs in parallel

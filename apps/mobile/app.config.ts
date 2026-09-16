@@ -11,14 +11,43 @@ import type { ExpoConfig } from 'expo/config';
 const config: ExpoConfig = {
   name: 'جيبلي',
   slug: 'jibli',
+  /** The EAS account the builds and updates belong to. */
+  owner: 'sam7iq',
   version: '1.0.0',
   orientation: 'portrait',
   scheme: 'jibli',
   userInterfaceStyle: 'light',
   icon: './assets/icon.png',
+
+  /**
+   * Over-the-air updates.
+   *
+   * Both stores review a binary. They do not review the JavaScript inside it,
+   * provided an update does not change what the app is for — which is why a
+   * typo in an Arabic string, a wrong delivery fee label or a crash on one
+   * screen does not have to cost a review cycle. Without this, every one of
+   * those is a new build, a new submission and days of waiting.
+   *
+   * `runtimeVersion` from `appVersion` is the safety catch that makes it
+   * honest: an update is only ever offered to a binary built from the same
+   * `version`. Add a native module or bump the version and the old binaries
+   * simply stop being offered updates rather than being handed JavaScript that
+   * calls into native code they do not contain.
+   *
+   * `fallbackToCacheTimeout: 0` because the alternative is holding the splash
+   * screen while a phone on Iraqi mobile data decides whether an update exists.
+   * The app launches on what it already has and picks the new bundle up on the
+   * next launch.
+   */
+  runtimeVersion: { policy: 'appVersion' },
+  updates: {
+    url: 'https://u.expo.dev/1ff0b9e5-8d38-484c-8d8a-232641ede9cc',
+    fallbackToCacheTimeout: 0,
+  },
   // The app is Arabic-only in Release 1 and RTL is forced, not inferred from
   // the device locale (plan §2).
   extra: {
+    eas: { projectId: '1ff0b9e5-8d38-484c-8d8a-232641ede9cc' },
     forceRTL: true,
     /*
      * Where the app talks to.
