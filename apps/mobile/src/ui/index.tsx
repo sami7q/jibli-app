@@ -12,6 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { Image as ExpoImage, type ImageStyle } from 'expo-image';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import {
   ALIGN_START,
@@ -121,6 +122,66 @@ export function Ltr({
     <Text variant={variant} tone={tone} style={[{ writingDirection: 'ltr' }, style]}>
       {children}
     </Text>
+  );
+}
+
+// ── Images ──────────────────────────────────────────────────────────────────
+
+/**
+ * Every photograph the app loads over the network.
+ *
+ * One component rather than ten call sites, for the same reason the buttons
+ * are one component: the policy below is a decision about the product, and it
+ * was previously nowhere — ten `<Image>` tags each carrying `resizeMode` and
+ * nothing else.
+ *
+ * What the policy is, and why each part of it:
+ *
+ *   **Decoded at the size it is drawn.** React Native's `Image` decodes a
+ *   bitmap at the source's own resolution, so the 1920×1080 banner the portal
+ *   now uploads is about 8 MB of ARGB in memory for a strip 200 points tall.
+ *   Three of those and a cheap Android phone starts evicting. `expo-image`
+ *   samples down to the view's size at the screen's own pixel density, which
+ *   is the same picture to the eye and a tenth of the memory. Nothing is lost
+ *   from the stored file — that is still full resolution, and still what a
+ *   larger view gets.
+ *
+ *   **Kept on disk.** Assets are served `immutable` for a year against a
+ *   UUIDv7 that is minted per upload, so a cached copy can never be stale.
+ *   The API is a single small instance with no CDN in front of it, which makes
+ *   the second load of a menu the difference between instant and a round trip
+ *   per dish.
+ *
+ *   **Faded in, not popped in.** 180ms. On the connection most customers have,
+ *   images arrive one by one after the text, and a card that snaps between
+ *   grey and photograph reads as the page reloading.
+ *
+ *   **`recyclingKey`.** A list reuses views as it scrolls; without this the
+ *   recycled view keeps the previous dish's picture until the new one decodes,
+ *   which is the wrong photograph next to the right name.
+ */
+export function RemoteImage({
+  uri,
+  style,
+  contentFit = 'cover',
+  priority = 'normal',
+}: {
+  uri: string;
+  style?: StyleProp<ImageStyle>;
+  contentFit?: 'cover' | 'contain';
+  /** `high` for the one image a screen is about: a banner, a cover. */
+  priority?: 'low' | 'normal' | 'high';
+}) {
+  return (
+    <ExpoImage
+      source={uri}
+      style={style}
+      contentFit={contentFit}
+      cachePolicy="memory-disk"
+      priority={priority}
+      transition={180}
+      recyclingKey={uri}
+    />
   );
 }
 

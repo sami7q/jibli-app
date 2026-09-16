@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, View, useWindowDimensions } from 'react-native';
+import { FlatList, Pressable, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -32,7 +32,7 @@ import {
   space,
 } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
-import { EmptyState, ErrorState, HScroll, Row, Screen, Skeleton, Text } from '@/ui';
+import { EmptyState, ErrorState, HScroll, RemoteImage, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import type { MerchantType } from '@jibli/contracts';
 import { useVertical } from '@/lib/vertical';
@@ -869,10 +869,9 @@ function CategoryTile({
         ]}
       >
         {category.image_asset_id ? (
-          <Image
-            source={{ uri: assetUrl(category.image_asset_id) }}
+          <RemoteImage
+            uri={assetUrl(category.image_asset_id)}
             style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
           />
         ) : (
           <Text style={{ fontSize: 30, lineHeight: 38 }}>{category.emoji ?? '🍽️'}</Text>
@@ -973,10 +972,9 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
           }}
         >
           {dish.image_asset_id ? (
-            <Image
-              source={{ uri: assetUrl(dish.image_asset_id) }}
+            <RemoteImage
+              uri={assetUrl(dish.image_asset_id)}
               style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
             />
           ) : (
             <MaterialCommunityIcons name={missingImageGlyph()} size={22} color={accent[300]} />

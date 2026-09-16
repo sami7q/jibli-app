@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -13,7 +13,7 @@ import { useIsGuest } from '@/lib/session';
 import { notify } from '@/lib/dialog';
 import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
-import { Button, ErrorState, HScroll, Row, Screen, Skeleton, Text } from '@/ui';
+import { Button, ErrorState, HScroll, RemoteImage, Row, Screen, Skeleton, Text } from '@/ui';
 import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
 
 /**
@@ -307,10 +307,10 @@ function Cover({
   return (
     <View style={{ height: 268, backgroundColor: color.surfaceSunken }}>
       {coverUrl ? (
-        <Image
-          source={{ uri: coverUrl }}
+        <RemoteImage
+          uri={coverUrl}
           style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
+          priority="high"
         />
       ) : (
         /*
@@ -509,11 +509,7 @@ function InfoCard({
           }}
         >
           {logoUrl ? (
-            <Image
-              source={{ uri: logoUrl }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
+            <RemoteImage uri={logoUrl} style={{ width: '100%', height: '100%' }} />
           ) : (
             <Text variant="h2" tone="brand">
               {name.slice(0, 1)}
@@ -768,10 +764,9 @@ function MenuItemRow({
           }}
         >
           {item.image_asset_id ? (
-            <Image
-              source={{ uri: assetUrl(item.image_asset_id) }}
+            <RemoteImage
+              uri={assetUrl(item.image_asset_id)}
               style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
             />
           ) : (
             // Seeded by the item so a dish keeps its own plate between
@@ -972,11 +967,10 @@ function ItemSheet({
           }}
         >
           {item.image_asset_id ? (
-            <Image
-              source={{ uri: assetUrl(item.image_asset_id) }}
+            <RemoteImage
+              uri={assetUrl(item.image_asset_id)}
               style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-              accessibilityIgnoresInvertColors
+              priority="high"
             />
           ) : (
             <DishPlaceholder size={SHEET_DISH} seed={item.id} />

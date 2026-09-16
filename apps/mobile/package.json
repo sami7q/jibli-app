@@ -31,6 +31,7 @@
     "expo-constants": "~57.0.18",
     "expo-crypto": "~57.0.3",
     "expo-font": "~57.0.4",
+    "expo-image": "~57.0.5",
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.10",
     "expo-localization": "~57.0.2",
@@ -54,7 +55,9 @@
   "expo": {
     "install": {
       "//": "SDK 57 pairs with TypeScript 6, and this is one package in a workspace of nineteen that share one compiler. Moving all of them to a major release to satisfy a version table is a change with its own risk and no benefit here: the app typechecks clean on 5.9.3 and `expo export` produces both bundles. It moves when the monorepo moves.",
-      "exclude": ["typescript"]
+      "exclude": [
+        "typescript"
+      ]
     }
   },
   "devDependencies": {

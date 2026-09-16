@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, Pressable, View, useWindowDimensions } from 'react-native';
+import { Image as RNImage, Pressable, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,7 +8,7 @@ import type { MerchantType } from '@jibli/contracts';
 import { api, assetUrl } from '@/lib/api';
 import { useVertical } from '@/lib/vertical';
 import { ROW, color, palette, space, text } from '@/theme';
-import { Screen, Text } from '@/ui';
+import { RemoteImage, Screen, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import { JibliWordmark } from '@/ui/brand';
 
@@ -151,8 +151,12 @@ export default function ChooseScreen() {
    *
    * Measured, the panel grows to whatever it is given. Drop a squarer export
    * in for this slot and the two halves fill the screen; leave the 16:9 one
-   * and nothing changes. `Image.getSize` reads the header of an image the
-   * screen is about to display anyway, so it costs a cache hit.
+   * and nothing changes. `getSize` reads the header of an image the screen is
+   * about to display anyway, so it costs a cache hit.
+   *
+   * React Native's own `Image` rather than `expo-image`, which draws every
+   * picture in the app but has no equivalent static reader. Aliased so that it
+   * is visibly not a render path — nothing on this screen paints through it.
    */
   const [ratios, setRatios] = useState<Partial<Record<MerchantType, number>>>({});
 
@@ -165,7 +169,7 @@ export default function ChooseScreen() {
       ['MARKET', marketArt],
     ] as const) {
       if (!url) continue;
-      Image.getSize(
+      RNImage.getSize(
         url,
         (w, h) => h > 0 && setRatios((current) => ({ ...current, [type]: w / h })),
         // A banner whose header will not parse still gets a panel; it just
@@ -276,10 +280,10 @@ export default function ChooseScreen() {
                     style={{ flex: 1, alignItems: 'center', overflow: 'hidden' }}
                   >
                     {art.url ? (
-                      <Image
-                        source={{ uri: art.url }}
+                      <RemoteImage
+                        uri={art.url}
                         style={{ width: '100%', height: artHeight }}
-                        resizeMode="cover"
+                        priority="high"
                       />
                     ) : art.known ? (
                       /*

@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import {
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -28,7 +27,7 @@ import {
   text,
 } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
-import { Row, Text } from './index';
+import { RemoteImage, Row, Text } from './index';
 
 /**
  * The components the design comps need, beyond the primitives.
@@ -659,10 +658,10 @@ export function PromoBanner({
       }}
     >
       {imageUrl ? (
-        <Image
-          source={{ uri: imageUrl }}
+        <RemoteImage
+          uri={imageUrl}
           style={{ position: 'absolute', width: '100%', height: '100%' }}
-          resizeMode="cover"
+          priority="high"
         />
       ) : null}
 
@@ -972,11 +971,7 @@ export function RestaurantCard({
     >
       <View style={{ height: 176, backgroundColor: color.surfaceSunken }}>
         {coverUrl ? (
-          <Image
-            source={{ uri: coverUrl }}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
+          <RemoteImage uri={coverUrl} style={{ width: '100%', height: '100%' }} />
         ) : (
           /*
            * A restaurant with no photograph yet.

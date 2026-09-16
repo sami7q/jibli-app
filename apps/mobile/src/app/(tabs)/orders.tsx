@@ -11,6 +11,7 @@ import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { Badge, EmptyState, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import { RateOrderSheet } from '@/ui/rate-order';
+import { isLiveOrderStatus } from '@/lib/order-watch';
 
 /**
  * My orders.
@@ -29,7 +30,22 @@ export default function OrdersScreen() {
     queryKey: ['my-orders'],
     queryFn: () => api.myOrders(),
     enabled: !isGuest,
-    refetchInterval: 30_000,
+    /*
+     * Only while something can still change, and on the watcher's clock.
+     *
+     * This was a flat thirty seconds, which is a request every thirty seconds
+     * for as long as the tab is open — including for the customer whose orders
+     * were all delivered last week and cannot move again. It also ran beside
+     * `OrderWatchProvider`, which polls this very key: one key, two observers,
+     * two independent timers, so a live order was fetched twice on overlapping
+     * schedules.
+     *
+     * Same rule as the watcher now, so the two coincide and React Query serves
+     * one request to both — and a history of finished orders costs nothing at
+     * all to sit and look at.
+     */
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((order) => isLiveOrderStatus(order.status)) ? 20_000 : false,
   });
 
   /*

@@ -4,13 +4,23 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
-import {
-  Cairo_400Regular,
-  Cairo_500Medium,
-  Cairo_600SemiBold,
-  Cairo_700Bold,
-  Cairo_800ExtraBold,
-} from '@expo-google-fonts/cairo';
+/*
+ * Five faces, imported one file at a time.
+ *
+ * `@expo-google-fonts/cairo` has no `exports` map and its index `require()`s
+ * all eight weights, so naming five of them still bundled ExtraLight, Light and
+ * Black — 290 KB of font the app has no way to render, since `FAMILY_FOR_WEIGHT`
+ * maps only these five. Metro keeps a required asset whether or not anything
+ * reads the binding.
+ *
+ * Reaching past the index is what drops them: each path is one asset, and the
+ * three nobody uses are no longer reachable from the graph at all.
+ */
+import Cairo_400Regular from '@expo-google-fonts/cairo/Cairo_400Regular.ttf';
+import Cairo_500Medium from '@expo-google-fonts/cairo/Cairo_500Medium.ttf';
+import Cairo_600SemiBold from '@expo-google-fonts/cairo/Cairo_600SemiBold.ttf';
+import Cairo_700Bold from '@expo-google-fonts/cairo/Cairo_700Bold.ttf';
+import Cairo_800ExtraBold from '@expo-google-fonts/cairo/Cairo_800ExtraBold.ttf';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiError, NetworkError } from '@/lib/api';

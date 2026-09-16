@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -9,7 +9,7 @@ import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
 import { ALIGN_END, ROW, TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
-import { Button, EmptyState, Row, Screen, Text } from '@/ui';
+import { Button, EmptyState, RemoteImage, Row, Screen, Text } from '@/ui';
 import { Stepper, SummaryRow } from '@/ui/catalog';
 
 /**
@@ -112,10 +112,9 @@ export default function CartScreen() {
                 }}
               >
                 {line.imageAssetId ? (
-                  <Image
-                    source={{ uri: assetUrl(line.imageAssetId) }}
+                  <RemoteImage
+                    uri={assetUrl(line.imageAssetId)}
                     style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
                   />
                 ) : (
                   <MaterialCommunityIcons

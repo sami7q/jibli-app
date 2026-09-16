@@ -184,6 +184,19 @@ const config: ExpoConfig = {
       'expo-splash-screen',
       { backgroundColor: '#FF5400', image: './assets/splash.png', resizeMode: 'contain' },
     ],
+    /*
+     * Every photograph in the app goes through `expo-image` rather than React
+     * Native's own `Image`, and on SDK 57 that is a config plugin — `expo
+     * install` prints this block and refuses to write a dynamic config, which
+     * is easy to miss until a release build has no pictures in it.
+     *
+     * What it buys, in order of how much it matters here: a bitmap decoded to
+     * the size it is drawn at rather than the size it was stored at, which is
+     * what makes a 1920-wide banner affordable on a cheap Android phone; a
+     * disk cache that survives the process; and a fade instead of a pop when
+     * an image lands on a slow connection, which is most of them.
+     */
+    'expo-image',
   ],
   experiments: {
     typedRoutes: true,
