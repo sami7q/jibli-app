@@ -138,6 +138,27 @@ touches native needs a new build and a new submission.**
 Bumping `version` in `app.config.ts` therefore cuts the update line. Do it when
 you mean to, not to mark a JavaScript release.
 
+**What enabling this costs, stated plainly.** An update channel is a second way
+to put code on a customer's phone, and it does not pass through either store's
+review. Whoever can sign into the EAS account can ship JavaScript to every
+installed copy of Jibli — which, in an app that holds phone numbers and home
+addresses, is worth saying out loud rather than discovering. `u.expo.dev` is
+Expo's own service and the `projectId` in the URL is not a secret (it ships in
+every binary); the account is the thing being trusted.
+
+Two mitigations, in the order they are worth doing:
+
+1. **Two-factor on the Expo account, and on the GitHub account that can push to
+   `main`.** The cheapest real protection, and the one that is missing most
+   often.
+2. **Code signing for updates** (`npx expo-updates codesigning:generate`). The
+   binary then refuses any update not signed with a key you hold, so a
+   compromised EAS account can no longer ship code by itself. It is not set up
+   here because it introduces a private key that must be kept out of the
+   repository and available at release time, and that is a decision about how
+   this project handles secrets rather than a line of configuration. Worth
+   doing before the app has real customers, not after.
+
 ### Smaller
 
 - `assets/adaptive-icon.png` is 1024×1024, regenerated from `icon.png` — the
