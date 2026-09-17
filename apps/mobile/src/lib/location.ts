@@ -1,4 +1,4 @@
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 
@@ -144,39 +144,3 @@ export const LOCATION_MESSAGES_AR: Record<Exclude<LocationOutcome['status'], 'ok
   disabled: 'خدمة الموقع مغلقة في جهازك. فعّلها أو اكتب العنوان يدوياً.',
   unavailable: 'تعذّر تحديد موقعك الآن. اكتب العنوان يدوياً.',
 };
-
-/**
- * Open a point in whatever maps app the phone has.
- *
- * `geo:` on Android is the intent every maps app registers for, so the driver
- * keeps using the one they already trust. iOS has no equivalent scheme that
- * offers a choice, so it goes to Apple Maps, which is always installed. The
- * https fallback is for anything that answers neither.
- */
-export async function openInMaps(
-  coordinates: { latitude: number; longitude: number },
-  label?: string,
-): Promise<boolean> {
-  const { latitude, longitude } = coordinates;
-  const name = encodeURIComponent(label ?? 'عنوان التوصيل');
-
-  const candidates =
-    Platform.OS === 'android'
-      ? [`geo:${latitude},${longitude}?q=${latitude},${longitude}(${name})`]
-      : [`maps://?ll=${latitude},${longitude}&q=${name}`];
-
-  candidates.push(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
-
-  for (const url of candidates) {
-    try {
-      if (await Linking.canOpenURL(url)) {
-        await Linking.openURL(url);
-        return true;
-      }
-    } catch {
-      /* try the next one */
-    }
-  }
-
-  return false;
-}

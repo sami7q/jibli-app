@@ -365,12 +365,6 @@ export function Card({
   );
 }
 
-export function Divider({ spacing = space[3] }: { spacing?: number }) {
-  return (
-    <View style={{ height: 1, backgroundColor: color.borderSubtle, marginVertical: spacing }} />
-  );
-}
-
 /**
  * A row, reading right to left.
  *

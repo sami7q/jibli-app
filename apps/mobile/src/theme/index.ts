@@ -206,9 +206,6 @@ const FAMILY_FOR_WEIGHT: Record<string, string> = {
   [fontWeight.extrabold]: 'Cairo_800ExtraBold',
 };
 
-/** Every family the app must load before its first text renders. */
-export const FONT_FAMILIES = Object.values(FAMILY_FOR_WEIGHT);
-
 /**
  * Type styles, with line height resolved to absolute pixels.
  *

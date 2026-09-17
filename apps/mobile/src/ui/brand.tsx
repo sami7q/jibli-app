@@ -444,22 +444,6 @@ export function JibliWordmark({
 export const WORDMARK_ENTRANCE_MS = MARK_SETTLED_MS;
 
 
-
-/**
- * The pin on its own — for a header, a tab bar, an empty state.
- */
-export function JibliPin({ size = 24, tint = palette.white, pinTint = BRAND[500] }) {
-  return (
-    <Svg width={size} height={size} viewBox="50 18 60 74">
-      <Path
-        d="M 58 48 C 58 35.85 67.85 26 80 26 C 92.15 26 102 35.85 102 48 C 102 59.5 86 78 80 84 C 74 78 58 59.5 58 48 Z"
-        fill={tint}
-      />
-      <Circle cx={80} cy={47} r={6.5} fill={pinTint} />
-    </Svg>
-  );
-}
-
 /**
  * The flag of Iraq.
  *

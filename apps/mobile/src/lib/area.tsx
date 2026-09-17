@@ -1,6 +1,5 @@
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -136,15 +135,4 @@ export function useArea(): AreaApi {
     throw new Error('useArea must be used inside <AreaProvider>');
   }
   return context;
-}
-
-/** The city id every discovery query needs, or null while there is none. */
-export function useCityId(): string | null {
-  return useArea().area?.cityId ?? null;
-}
-
-/** Stable reference for a screen that only wants to open the picker. */
-export function useSetArea(): (area: DeliveryArea) => Promise<void> {
-  const { setArea } = useArea();
-  return useCallback((next: DeliveryArea) => setArea(next), [setArea]);
 }

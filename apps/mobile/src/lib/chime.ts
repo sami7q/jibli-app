@@ -52,11 +52,6 @@ function audioContextConstructor(): AudioContextConstructor | null {
  */
 let context: AudioContext | null = null;
 
-/** Whether a browser will currently let this page make a sound. */
-export function chimeSupported(): boolean {
-  return audioContextConstructor() !== null;
-}
-
 /**
  * Play it.
  *
