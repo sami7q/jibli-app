@@ -146,17 +146,40 @@ Everything else on the screen is optional and collapsed.
 
 Each phase is shippable and independently useful.
 
-**1 — Sign in and look.** Owner login, shop picker, product list, read-only.
-Proves auth, scope and the vertical gate with no write path. `menu.read`.
+**1 — Sign in and look. Shipped.** Owner login, shop picker, product list,
+product form. Tested end to end against the live API with a real merchant
+credential: the same username and password the shop uses on the portal.
 
-**2 — Add and edit.** The product form, photo capture, the upload pipeline.
-`menu.write`. This is the phase the feature exists for.
+**2 — The photograph.** Capture and the upload pipeline, which need
+`expo-image-picker` and `expo-image-manipulator` — native modules, so a new
+build rather than an over-the-air update. The slot is drawn and says so.
 
 **3 — The shop itself.** Change the picture, toggle accepting orders.
 `settings.write`.
 
 **4 — Cosmetics.** Widen the predicate. Expected diff: an enum value and a
 label. If it is more than that, phases 1–3 got the abstraction wrong.
+
+## What could not be tested, and why
+
+The market screens have not been exercised end to end, because **the pilot
+database has no market merchant** — checked across all three
+ordering-enabled cities, zero. The obvious way to fix that is to create one,
+and it is the wrong way: a fake shop in the pilot database appears to real
+customers browsing the market half.
+
+So the vertical gate — the one rule everything else hangs off — is pinned by
+`src/lib/owner-vertical.test.ts` instead, which is why that rule lives in a
+module with no React in it. What *was* tested against the live API, with a
+real merchant credential:
+
+- sign-in with the shop's own portal username and password
+- the session surviving the customer profile gate an owner cannot satisfy
+- routing into `(owner)` without being bounced to the customer chooser
+- the vertical gate refusing a restaurant, with the honest reason on screen
+- «متجري» appearing in «حسابي» only once the account holds a shop role
+
+Give Owner Mode a real market merchant and the rest is a five-minute pass.
 
 ## Risks worth naming now
 

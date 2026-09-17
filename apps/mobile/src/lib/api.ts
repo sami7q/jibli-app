@@ -116,6 +116,15 @@ export interface RequestOptions {
   /** Required for money-moving commands (plan §28). */
   readonly idempotencyKey?: string;
   readonly authenticated?: boolean;
+  /**
+   * Which shop a portal request is about.
+   *
+   * A *selector*, never a grant: `resolveRestaurantScope` on the server throws
+   * TENANT_MISMATCH unless the session already proves membership of it. It is
+   * needed because an owner may hold two shops, and the server refuses to guess
+   * which one a write is for.
+   */
+  readonly restaurantId?: string;
   readonly signal?: AbortSignal;
   /** Internal: prevents an infinite refresh loop. */
   readonly _isRetry?: boolean;
@@ -192,6 +201,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.idempotencyKey) headers['X-Idempotency-Key'] = options.idempotencyKey;
+  if (options.restaurantId) headers['X-Restaurant-Id'] = options.restaurantId;
 
   if (options.authenticated !== false) {
     const session = await loadSession();
@@ -496,6 +506,59 @@ export interface DishResult {
 }
 
 /** One entry in the notification centre. */
+/**
+ * One shop this account belongs to — `GET /restaurant-portal/me`.
+ *
+ * `merchant_type` is the whole of how Owner Mode decides what to show. The
+ * endpoint has carried it since before there was a phone client, with a comment
+ * saying it exists "so the portal can say «المنتجات» to a grocer and «القائمة»
+ * to a cook."
+ */
+export interface OwnerShop {
+  readonly id: string;
+  readonly display_name: string;
+  readonly partner_code: string;
+  readonly merchant_type: 'RESTAURANT' | 'MARKET';
+  readonly operational_status: string;
+  readonly roles: string[];
+  readonly permissions: string[];
+}
+
+/** One product. A market's product is a menu item; there is no second table. */
+export interface OwnerProduct {
+  readonly id: string;
+  readonly name_ar: string;
+  readonly description_ar: string | null;
+  readonly base_price_iqd: number;
+  readonly image_asset_id: string | null;
+  readonly is_active: boolean;
+  readonly is_available: boolean;
+  readonly sort_order: number;
+}
+
+export interface OwnerCategory {
+  readonly id: string;
+  readonly name_ar: string;
+  readonly sort_order: number;
+  readonly is_active: boolean;
+  readonly items: OwnerProduct[];
+}
+
+export interface OwnerCatalog {
+  readonly menu_version: number;
+  readonly categories: OwnerCategory[];
+}
+
+/** What the server accepts when creating a product. */
+export interface OwnerProductInput {
+  readonly category_id: string;
+  readonly name_ar: string;
+  readonly base_price_iqd: number;
+  readonly description_ar?: string;
+  readonly image_asset_id?: string | null;
+  readonly sort_order?: number;
+}
+
 export interface OrderNotification {
   id: string;
   order_id: string;
@@ -803,5 +866,71 @@ export const api = {
     apiRequest<{ submitted: boolean }>(`/api/v1/orders/${orderId}/review`, {
       method: 'POST',
       body: { rating, ...(comment ? { comment } : {}) },
+    }),
+
+  // ── Owner Mode ────────────────────────────────────────────────────────────
+  //
+  // The same `/restaurant-portal/*` endpoints the web portal calls, from the
+  // phone. Not a second API: a parallel namespace would be a second copy of
+  // every permission check and every tenant guard, and the two would part
+  // company the first time one of them gained a rule.
+  //
+  // Every write carries `restaurantId`, which the server treats as a selector
+  // among shops the session already proves membership of — see RequestOptions.
+
+  /** The shops this account belongs to, with the role held in each. */
+  ownerShops: () =>
+    apiRequest<{
+      user: { id: string; full_name: string | null };
+      restaurants: OwnerShop[];
+    }>('/api/v1/restaurant-portal/me'),
+
+  /** The whole product tree for one shop. */
+  ownerCatalog: (restaurantId: string) =>
+    apiRequest<OwnerCatalog>('/api/v1/restaurant-portal/menu', { restaurantId }),
+
+  ownerCreateCategory: (restaurantId: string, body: { name_ar: string; sort_order?: number }) =>
+    apiRequest<{ id: string }>('/api/v1/restaurant-portal/menu/categories', {
+      method: 'POST',
+      restaurantId,
+      body: { sort_order: 0, ...body },
+    }),
+
+  ownerCreateProduct: (restaurantId: string, body: OwnerProductInput) =>
+    apiRequest<{ id: string }>('/api/v1/restaurant-portal/menu/items', {
+      method: 'POST',
+      restaurantId,
+      body,
+    }),
+
+  ownerUpdateProduct: (restaurantId: string, itemId: string, body: Partial<OwnerProductInput>) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/menu/items/${itemId}`, {
+      method: 'PATCH',
+      restaurantId,
+      body,
+    }),
+
+  ownerDeleteProduct: (restaurantId: string, itemId: string) =>
+    apiRequest<{ deleted: boolean }>(`/api/v1/restaurant-portal/menu/items/${itemId}`, {
+      method: 'DELETE',
+      restaurantId,
+    }),
+
+  /**
+   * Store an image and get its id back.
+   *
+   * `data` is a base64 data URL. The caller shrinks it first — see
+   * `src/lib/upload.ts` — because a phone photograph posted raw is several
+   * megabytes against a five-megabyte ceiling.
+   */
+  ownerUploadImage: (
+    restaurantId: string,
+    data: string,
+    purpose: 'MENU_ITEM' | 'RESTAURANT_LOGO' | 'RESTAURANT_COVER',
+  ) =>
+    apiRequest<{ asset_id: string; url: string }>('/api/v1/uploads', {
+      method: 'POST',
+      restaurantId,
+      body: { data, purpose, restaurant_id: restaurantId },
     }),
 };

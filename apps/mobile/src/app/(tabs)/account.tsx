@@ -33,6 +33,16 @@ export default function AccountScreen() {
   const isDriver =
     (state.status === 'ready' || state.status === 'needs-profile') &&
     state.me.modes.includes('DRIVER');
+  /**
+   * Whether this account holds a role in any shop.
+   *
+   * Read off the `me` the session already has — `/auth/me` has always returned
+   * `restaurant_roles` — so the row appears without a second request, and a
+   * customer who owns nothing never sees it at all.
+   */
+  const ownsShop =
+    (state.status === 'ready' || state.status === 'needs-profile') &&
+    Object.keys(state.me.restaurant_roles ?? {}).length > 0;
   const { area } = useArea();
 
   const [pickingArea, setPickingArea] = useState(false);
@@ -194,6 +204,30 @@ export default function AccountScreen() {
           }
           icon={<MaterialCommunityIcons name="moped" size={20} color={color.brand} />}
           onPress={() => router.push(isDriver ? '/(driver)/delivery' : '/(auth)/driver-login')}
+        />
+
+        {/*
+         * The shop owner's door, shown to everyone.
+         *
+         * It has to be. A grocer who installs the app to manage their shop
+         * arrives as a guest like anybody else — hiding this row until the
+         * session already proves a shop role would mean the only way to sign in
+         * as an owner is to be signed in as one already.
+         *
+         * Which is why it reads as a sign-in and not an invitation. Nobody
+         * becomes a shop by tapping a row; the partnership is agreed off the
+         * app and the credential is issued with it. Same shape as «دخول
+         * المندوبين» above, and for the same reason.
+         */}
+        <ListRow
+          label={ownsShop ? 'متجري' : 'دخول أصحاب المتاجر'}
+          sublabel={
+            ownsShop
+              ? 'أضف المنتجات وعدّل الأسعار من هاتفك'
+              : 'لديك حساب متجر على لوحة التحكم؟ ادخل من هنا'
+          }
+          icon={<MaterialCommunityIcons name="storefront-outline" size={20} color={color.brand} />}
+          onPress={() => router.push(ownsShop ? '/(owner)' : '/(auth)/owner-login')}
         />
       </Group>
 

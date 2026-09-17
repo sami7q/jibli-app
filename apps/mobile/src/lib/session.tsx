@@ -45,6 +45,17 @@ export interface Me {
   readonly city_name_ar: string | null;
   readonly modes: ('CUSTOMER' | 'DRIVER')[];
   readonly driver_id: string | null;
+  /**
+   * The shops this account holds a role in, keyed by shop id.
+   *
+   * `/api/v1/auth/me` has always returned this; the app simply never read it.
+   * It is what tells Owner Mode that there is anything to offer, without a
+   * second request before the account screen can draw a row.
+   *
+   * Optional because an older server — or a cached `me` from before this
+   * shipped — has no such field, and an owner with no shops is a real state.
+   */
+  readonly restaurant_roles?: Record<string, string[]>;
 }
 
 export type SessionState =
@@ -120,7 +131,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
        * order without a complete profile regardless, and `ApiError.needsProfile`
        * routes them here the moment they try to order.
        */
-      const heldByProfile = !me.profile_completed && !me.modes.includes('DRIVER');
+      /*
+       * A driver is not held by the customer profile flow. Nor is a shop owner,
+       * and for exactly the same reason.
+       *
+       * The mandatory profile exists so that an order has a name, a governorate
+       * and a city behind it (plan §11) — and neither a courier signing in to
+       * deliver nor a grocer signing in to price a shelf is placing one. A
+       * portal account is created by staff with a username and no address, so
+       * without this exemption every owner lands on «أكمل ملفك» and cannot
+       * leave: the screen they came for is behind the gate.
+       *
+       * Nothing is loosened. The server refuses to quote or place an order
+       * without a complete profile regardless, and `ApiError.needsProfile`
+       * routes them here the moment they try to order something.
+       */
+      const ownsShop = Object.keys(me.restaurant_roles ?? {}).length > 0;
+      const heldByProfile = !me.profile_completed && !me.modes.includes('DRIVER') && !ownsShop;
       commit(heldByProfile ? { status: 'needs-profile', me } : { status: 'ready', me });
     } catch (error) {
       if (error instanceof NetworkError) {

@@ -164,6 +164,16 @@ function Gate() {
     const inAuth = path[0] === '(auth)';
     const onWelcome = path[1] === 'welcome';
     const onChooser = path[0] === 'choose';
+    /*
+     * The two groups that are not the customer app.
+     *
+     * A courier on a delivery and a grocer pricing a shelf are both signed in
+     * to do one job, and neither of the rules below is about them: they have no
+     * answer to «أكل أم ماركت؟» because they are not shopping, and bouncing
+     * them to the chooser strands them one screen short of the thing they
+     * opened the app for.
+     */
+    const inWorkMode = path[0] === '(driver)' || path[0] === '(owner)';
 
     /*
      * Nothing can render until the half is known.
@@ -177,7 +187,7 @@ function Gate() {
      * Checked before the sign-in rules on purpose: browsing is public, and a
      * guest picks a section exactly as a signed-in customer does.
      */
-    if (!vertical && !onChooser && !inAuth) {
+    if (!vertical && !onChooser && !inAuth && !inWorkMode) {
       router.replace('/choose');
       return;
     }
@@ -215,18 +225,18 @@ function Gate() {
      * Signed in and complete, but still sitting on a sign-in screen: this is
      * the hop after a successful OTP.
      *
-     * The courier sign-in is the exception, and it has to be an explicit one.
-     * That screen sends its own user to `/(driver)/delivery`, and effects run
-     * child-first — so without this the Gate would win the race every time and
-     * land a driver on the customer home screen a tick before their own screen
-     * could ask for anything.
+     * The two portal sign-ins are the exception, and it has to be an explicit
+     * one. Each sends its own user onward — a courier to `/(driver)/delivery`,
+     * a shopkeeper to `/(owner)` — and effects run child-first, so without this
+     * the Gate would win the race every time and land them on the customer home
+     * screen a tick before their own screen could ask for anything.
      */
-    const onDriverLogin = path[1] === 'driver-login';
+    const onPortalSignIn = path[1] === 'driver-login' || path[1] === 'owner-login';
 
     if (
       (state.status === 'ready' || state.status === 'offline-ready') &&
       inAuth &&
-      !onDriverLogin
+      !onPortalSignIn
     ) {
       router.replace('/(tabs)');
     }
