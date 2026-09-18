@@ -469,6 +469,44 @@ export interface Address {
   orderable: boolean;
 }
 
+/** A row of `GET /driver/deliveries`. */
+export interface DriverDeliverySummary {
+  assignment_id: string;
+  order_id: string;
+  public_order_number: string;
+  status: string;
+  order_status: string;
+  restaurant_name: string;
+  payment_method: string;
+  cash_to_collect_iqd: number;
+  assigned_at: string;
+  customer: { name: string; phone: string | null };
+  delivery_address: Record<string, unknown>;
+  restaurant_location: Record<string, unknown> | null;
+}
+
+/** Links that carry coordinates and nothing else — never a token or the PIN. */
+export interface DriverNavigationLinks {
+  googleMaps: string | null;
+  waze: string | null;
+  copyableAddress: string | null;
+  hasCoordinates: boolean;
+}
+
+/** `GET /driver/deliveries/:assignmentId` — one task, in full. */
+export interface DriverDeliveryTask {
+  assignment_id: string;
+  order_id: string;
+  public_order_number: string;
+  status: string;
+  cash_to_collect_iqd: number;
+  customer: { name: string; phone: string };
+  customer_notes: string | null;
+  delivery_address: Record<string, unknown>;
+  navigation: DriverNavigationLinks;
+  restaurant_navigation: DriverNavigationLinks;
+}
+
 export interface Quote {
   items_subtotal_iqd: number;
   discount_total_iqd: number;
@@ -887,6 +925,20 @@ export const api = {
       applied_at: string;
       already_applied: boolean;
     }>('/api/v1/driver/apply', { method: 'POST', body: payload }),
+
+  /**
+   * The assignments a courier is carrying right now.
+   *
+   * Summaries only — no navigation links, because building a Maps URL for
+   * twenty rows to show one is work nobody asked for. The screen asks for the
+   * one it is about.
+   */
+  driverDeliveries: (status: 'active' | 'history' = 'active') =>
+    apiRequest<DriverDeliverySummary[]>(`/api/v1/driver/deliveries?status=${status}`),
+
+  /** One assignment, with the Maps and Waze links for it. */
+  driverDelivery: (assignmentId: string) =>
+    apiRequest<DriverDeliveryTask>(`/api/v1/driver/deliveries/${assignmentId}`),
 
   /** My application, or null. Reachable while still pending, unlike `/driver/me`. */
   driverApplication: () =>
