@@ -111,11 +111,11 @@ export function PinHomeCard() {
         visible={sheetOpen}
         title="ثبّت منزلك"
         onClose={() => setSheetOpen(false)}
-        onCreated={async () => {
+        onSaved={() => {
           setSheetOpen(false);
           // The card disappears because the address now has a point, not
           // because it was dismissed — so nothing is remembered here.
-          await queryClient.invalidateQueries({ queryKey: ['addresses'] });
+          void queryClient.invalidateQueries({ queryKey: ['addresses'] });
         }}
       />
     </>

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { api, ApiError, type Address } from '@/lib/api';
-import { useArea } from '@/lib/area';
+import { api, ApiError, type Address, type GeographyOption } from '@/lib/api';
+import { useArea, type DeliveryArea } from '@/lib/area';
 import {
   captureCurrentLocation,
+  describePlace,
   hasLocationPermission,
   LOCATION_MESSAGES_AR,
   type Coordinates,
@@ -14,28 +15,35 @@ import { notify } from '@/lib/dialog';
 import { color, radius, space, TAP_TARGET, TEXT_START, text } from '@/theme';
 import { Button, Row, Text } from '@/ui';
 import { MapPicker } from '@/ui/map-picker';
+import { AreaChoice, areaStepTitle } from '@/ui/area-choice';
 import { Sheet } from '@/ui/catalog';
 
 /**
- * Saving an address, with the pin the courier will actually drive to.
+ * The whole address, in one sheet.
  *
- * Lived inside `checkout.tsx`, which meant the only moment a customer could
- * put their home on the map was the moment they were trying to pay for food.
- * It is shared now: the home screen offers it on a first visit, and checkout
- * opens the same sheet.
+ * It used to be two half-answers in two places. «منطقة التوصيل» in حسابي asked
+ * for a governorate and a city and stopped there — but a city is not an
+ * address, and a courier handed one has been told the country. The details and
+ * the map lived in checkout, which meant the only moment a customer could
+ * describe where they live was the moment they were trying to pay for food.
+ * Almost nobody did, so almost no address had anything on it.
  *
- * **The map opens where the customer is standing.** That is the whole point of
- * the change. Before, it opened on Tahrir Square at a zoom where a house is one
- * building among four hundred, and the customer had to notice a button to move
- * it — so most addresses were saved with no useful point, or worse, with the
- * fallback reported as a real one. Now, if the permission has already been
- * granted (the home screen asks on the way in), the sheet takes a fix before it
- * draws and opens centred on it, pin down, at building zoom.
+ * So one sheet asks all of it, in the order somebody can actually answer: which
+ * city, where the phone says they are standing, and then the things only they
+ * know — the alley, the landmark, which floor, the bell that does not work.
  *
- * The fix is still a starting point, not an answer. A phone indoors is
- * routinely fifty metres out and fifty metres is the next building along, so
- * the map is draggable and the caption says to correct it.
+ * **The map opens where the customer is.** Before, it opened on Tahrir Square
+ * at a zoom where a house is one building among four hundred. Now, when the
+ * permission has already been granted, the sheet takes a fix before it draws,
+ * opens on it at building zoom, and offers the phone's own guess at the
+ * district into the empty fields.
+ *
+ * Every one of those is a starting point, not an answer. A phone indoors is
+ * routinely fifty metres out, a reverse geocode in Baghdad names a street the
+ * customer would not, and neither can know «قرب صيدلية النور». The map is
+ * draggable, the fields are editable, and nothing typed is ever overwritten.
  */
+
 /**
  * Below which two coordinates are the same place: 1e-5 degrees, about 1.1 m.
  *
@@ -48,24 +56,48 @@ const SAME_POINT_DEGREES = 1e-5;
 export function AddressSheet({
   visible,
   onClose,
-  onCreated,
+  onSaved,
   title = 'عنوان جديد',
+  address,
+  initialArea,
 }: {
-  visible: boolean;
-  onClose: () => void;
-  onCreated: (address: Address) => void;
-  title?: string;
+  readonly visible: boolean;
+  readonly onClose: () => void;
+  readonly onSaved: (addressId: string) => void;
+  readonly title?: string;
+  /**
+   * The address being replaced, if this is an edit.
+   *
+   * There is no update endpoint: saving writes a new default and retires this
+   * row. Historical orders keep pointing at it, which is why the delete is soft
+   * and why editing is safe.
+   */
+  readonly address?: Address | null;
+  /**
+   * The area to start from when there is no saved one to read — the city a new
+   * customer chose thirty seconds ago on the profile screen, before the session
+   * has caught up with it.
+   */
+  readonly initialArea?: DeliveryArea | null;
 }) {
-  const { area } = useArea();
+  const { area: currentArea, setArea } = useArea();
+
+  const [step, setStep] = useState<'form' | 'area'>('form');
+  const [governorate, setGovernorate] = useState<GeographyOption | null>(null);
+
+  const [area, setLocalArea] = useState<DeliveryArea | null>(null);
   const [label, setLabel] = useState('المنزل');
   const [district, setDistrict] = useState('');
   const [street, setStreet] = useState('');
+  const [building, setBuilding] = useState('');
+  const [floor, setFloor] = useState('');
   const [landmark, setLandmark] = useState('');
+  const [notes, setNotes] = useState('');
 
   /**
    * The point on the address.
    *
-   * `null` means nobody has chosen one — and the map is now careful to leave it
+   * `null` means nobody has chosen one — and the map is careful to leave it
    * null rather than reporting wherever it happened to open. Everything still
    * works without it: in a city addressed by landmarks, «قرب صيدلية النور» is
    * what gets the driver there, and the courier's link falls back to searching
@@ -77,32 +109,101 @@ export function AddressSheet({
   /**
    * Whether the sheet has already tried to open on the customer's position.
    *
-   * Once per opening, not once per render — and reset on close so that the next
+   * Once per opening, not once per render — and reset on close so the next
    * address starts from wherever the customer is *then*, which for a second
    * address is usually somewhere else entirely.
    */
   const autoLocated = useRef(false);
 
-  const locate = useCallback(async (announce: boolean) => {
-    setLocating(true);
-    const outcome = await captureCurrentLocation();
-    setLocating(false);
-
-    if (outcome.status === 'ok') {
-      setCoordinates(outcome.coordinates);
-      return;
-    }
-    // Silent when the sheet asked on its own: a customer who opened a form was
-    // not asking about GPS, and a toast they did not provoke is noise. The
-    // button beside the map says the same thing when they do ask.
-    if (announce) notify('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
-  }, []);
-
+  /*
+   * Everything resets to the address being edited each time the sheet opens.
+   *
+   * On open rather than on close: emptying the form as it slides away looks
+   * like the answer was thrown out.
+   */
   useEffect(() => {
     if (!visible) {
       autoLocated.current = false;
       return;
     }
+
+    setStep('form');
+    setGovernorate(null);
+    setLocalArea(
+      address
+        ? {
+            governorateId: address.governorate.id,
+            governorateNameAr: address.governorate.name_ar,
+            cityId: address.city.id,
+            cityNameAr: address.city.name_ar,
+          }
+        : /*
+           * The explicit choice wins over the remembered one. `initialArea` is
+           * passed only by the signup screen, where the customer picked a city
+           * thirty seconds ago — and a guest who had browsed somewhere else
+           * first would otherwise have that stale area override it.
+           */
+          (initialArea ?? currentArea ?? null),
+    );
+    setLabel(address?.label ?? 'المنزل');
+    setDistrict(address?.district_text ?? '');
+    setStreet(address?.street ?? '');
+    setBuilding(address?.building ?? '');
+    setFloor(address?.floor ?? '');
+    setLandmark(address?.landmark ?? '');
+    setNotes(address?.delivery_notes ?? '');
+    setCoordinates(
+      address?.latitude != null && address.longitude != null
+        ? { latitude: address.latitude, longitude: address.longitude, accuracy: null }
+        : null,
+    );
+    // Deliberately keyed on the opening alone. `currentArea` and `initialArea`
+    // are read here and not followed: reacting to them afterwards would
+    // overwrite the city the customer picked inside the sheet.
+  }, [visible, address]);
+
+  /**
+   * Take a fix, and offer what the phone thinks is there.
+   *
+   * `announce` separates the two callers. The button means somebody asked, so a
+   * failure gets a message; the automatic attempt on open did not, and a toast
+   * nobody provoked is noise.
+   */
+  const locate = useCallback(async (announce: boolean) => {
+    setLocating(true);
+    const outcome = await captureCurrentLocation();
+
+    if (outcome.status !== 'ok') {
+      setLocating(false);
+      if (announce) notify('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
+      return;
+    }
+
+    setCoordinates(outcome.coordinates);
+
+    /*
+     * Into what is empty, and nothing else.
+     *
+     * The geocoder's «شارع ٥٢» is a guess, and a guess must never land on top
+     * of the sentence somebody typed about their own street. Checked against
+     * the value at the moment the answer arrives, because a second or two has
+     * passed and they may well have started typing in it.
+     */
+    const place = await describePlace(outcome.coordinates);
+    if (place?.district) {
+      const suggested = place.district;
+      setDistrict((value) => (value.trim() ? value : suggested));
+    }
+    if (place?.street) {
+      const suggested = place.street;
+      setStreet((value) => (value.trim() ? value : suggested));
+    }
+
+    setLocating(false);
+  }, []);
+
+  useEffect(() => {
+    if (!visible || step !== 'form') return;
     if (autoLocated.current || coordinates) return;
     autoLocated.current = true;
 
@@ -110,179 +211,282 @@ export function AddressSheet({
       /*
        * Only when the answer is already yes.
        *
-       * `captureCurrentLocation` would raise the system dialog, and a permission
+       * `captureCurrentLocation` raises the system dialog, and a permission
        * prompt that appears because a sheet opened — rather than because
        * somebody pressed something — is the one every customer denies. The home
-       * screen asks once, early, on its own terms; this reads that answer.
+       * screen and the signup flow ask once, deliberately; this reads that
+       * answer.
        */
       if (!(await hasLocationPermission())) return;
       await locate(false);
     })();
-  }, [visible, coordinates, locate]);
+  }, [visible, step, coordinates, locate]);
 
   /*
    * The map moved, so the pin moved.
    *
    * A point chosen by hand has no accuracy figure and should not borrow one
-   * from a GPS fix that is no longer what is being saved — `null` says «this
-   * is where somebody pointed», which is the honest thing for the driver's
-   * screen to receive.
+   * from a GPS fix that is no longer what is being saved — `null` says «this is
+   * where somebody pointed», which is the honest thing for the driver's screen
+   * to receive.
    *
-   * Unless the map is only echoing back the point it was handed. It reports
-   * its opening position so that somebody who is already in the right place
-   * can just save, and when that position came from the GPS a moment earlier,
-   * taking the echo at face value would throw the accuracy away and downgrade
-   * «دقة تقريبية ٣٠ متر» to a vaguer sentence about dragging. A metre is below
-   * what any phone can resolve and above Leaflet's pixel rounding at this
-   * zoom, so a move smaller than that is not a move.
+   * Unless the map is only echoing back the point it was handed. It reports its
+   * opening position so that somebody already in the right place can just save,
+   * and when that position came from the GPS a moment earlier, taking the echo
+   * at face value would throw the accuracy away.
    */
   const pickOnMap = useCallback((next: { latitude: number; longitude: number }) => {
     setCoordinates((current) =>
-      current && Math.abs(current.latitude - next.latitude) < SAME_POINT_DEGREES
-        && Math.abs(current.longitude - next.longitude) < SAME_POINT_DEGREES
+      current &&
+      Math.abs(current.latitude - next.latitude) < SAME_POINT_DEGREES &&
+      Math.abs(current.longitude - next.longitude) < SAME_POINT_DEGREES
         ? current
         : { latitude: next.latitude, longitude: next.longitude, accuracy: null },
     );
   }, []);
 
-  const create = useMutation({
-    mutationFn: () =>
-      api.createAddress({
+  const areaMoved = useMemo(
+    () => Boolean(area) && area?.cityId !== currentArea?.cityId,
+    [area, currentArea],
+  );
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!area) throw new Error('no area');
+
+      const created = await api.createAddress({
         label,
-        governorate_id: area?.governorateId,
-        city_id: area?.cityId,
-        ...(district ? { district_text: district } : {}),
-        ...(street ? { street } : {}),
-        ...(landmark ? { landmark } : {}),
+        governorate_id: area.governorateId,
+        city_id: area.cityId,
+        ...(district.trim() ? { district_text: district.trim() } : {}),
+        ...(street.trim() ? { street: street.trim() } : {}),
+        ...(building.trim() ? { building: building.trim() } : {}),
+        ...(floor.trim() ? { floor: floor.trim() } : {}),
+        ...(landmark.trim() ? { landmark: landmark.trim() } : {}),
+        ...(notes.trim() ? { delivery_notes: notes.trim() } : {}),
         ...(coordinates
-          ? {
-              coordinates: {
-                latitude: coordinates.latitude,
-                longitude: coordinates.longitude,
-              },
-            }
+          ? { coordinates: { latitude: coordinates.latitude, longitude: coordinates.longitude } }
           : {}),
         is_default: true,
-      }),
-    onSuccess: onCreated,
+      });
+
+      /*
+       * Retire the row this one replaces, after the replacement exists.
+       *
+       * In that order because `POST` clears the previous default inside its own
+       * transaction: the customer is never left without one, and a delete that
+       * fails costs a stale row in a list rather than an address.
+       */
+      if (address) await api.deleteAddress(address.id).catch(() => undefined);
+
+      // Where they are having it delivered is where they are ordering from.
+      if (areaMoved) await setArea(area);
+
+      return created;
+    },
+    onSuccess: (created) => onSaved(created.id),
     onError: (error) => {
       notify('تعذّر حفظ العنوان', error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.');
     },
   });
 
-  const canSave = Boolean(area) && district.trim().length > 0;
+  const canSave = Boolean(area) && district.trim().length > 0 && !save.isPending;
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={title}
+      title={step === 'area' ? areaStepTitle(governorate) : title}
       footer={
-        <Button
-          label="حفظ العنوان"
-          block
-          disabled={!canSave || create.isPending}
-          loading={create.isPending}
-          onPress={() => create.mutate()}
-        />
+        step === 'form' ? (
+          <Button
+            label={address ? 'حفظ التعديل' : 'حفظ العنوان'}
+            block
+            disabled={!canSave}
+            loading={save.isPending}
+            onPress={() => save.mutate()}
+          />
+        ) : undefined
       }
     >
-      {area ? (
-        <Row gap={space[2]}>
-          <MaterialCommunityIcons name="map-marker-outline" size={18} color={color.brand} />
-          <Text variant="small" tone="secondary">
-            {area.governorateNameAr} — {area.cityNameAr}
-          </Text>
-        </Row>
+      {step === 'area' ? (
+        <AreaChoice
+          governorate={governorate}
+          onGovernorate={setGovernorate}
+          selected={area ? { governorateId: area.governorateId, cityId: area.cityId } : null}
+          onChoose={(chosen, city) => {
+            setLocalArea({
+              governorateId: chosen.id,
+              governorateNameAr: chosen.name_ar,
+              cityId: city.id,
+              cityNameAr: city.name_ar,
+            });
+            setStep('form');
+          }}
+        />
       ) : (
-        <Text variant="small" tone="danger">
-          اختر منطقتك من الشاشة الرئيسية أولاً.
-        </Text>
-      )}
+        <>
+          {/*
+           * The city, as a row that can be changed rather than a line of text.
+           *
+           * It was read-only here and editable only from another screen, so a
+           * customer whose city was wrong had to abandon the address they were
+           * in the middle of writing in order to fix it.
+           */}
+          <Pressable
+            onPress={() => {
+              setGovernorate(null);
+              setStep('area');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`المنطقة: ${area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'لم تُحدَّد'}`}
+            style={({ pressed }) => [
+              {
+                minHeight: TAP_TARGET + 6,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: area ? color.borderSubtle : color.danger,
+                backgroundColor: color.surfaceCard,
+                paddingHorizontal: space[3],
+                justifyContent: 'center',
+              },
+              pressed ? { opacity: 0.7 } : null,
+            ]}
+          >
+            <Row justify="space-between">
+              <Row gap={space[2]}>
+                <MaterialCommunityIcons name="city-variant-outline" size={20} color={color.brand} />
+                <View style={{ gap: 2 }}>
+                  <Text variant="caption" tone="muted">
+                    المحافظة والمدينة
+                  </Text>
+                  <Text variant="smallBold" tone={area ? 'primary' : 'danger'}>
+                    {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'اختر منطقتك'}
+                  </Text>
+                </View>
+              </Row>
+              <MaterialCommunityIcons name="chevron-left" size={20} color={color.textMuted} />
+            </Row>
+          </Pressable>
 
-      {/*
-        * The map, before the fields.
-        *
-        * «قرب صيدلية النور» is only unambiguous to somebody who already knows
-        * the street. A point is what turns it into an address a courier can
-        * reach without phoning, and this is where it gets set: the map opens on
-        * the customer, the pin stays in the middle, and what is under it is
-        * saved with the order and handed to the driver as a navigation link.
-        */}
-      <MapPicker
-        latitude={coordinates?.latitude ?? null}
-        longitude={coordinates?.longitude ?? null}
-        onPick={pickOnMap}
-      />
-
-      <Pressable
-        onPress={() => void locate(true)}
-        disabled={locating}
-        accessibilityRole="button"
-        accessibilityLabel="تحديد موقعي الحالي"
-        style={({ pressed }) => [
-          {
-            minHeight: TAP_TARGET + 6,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderStyle: coordinates ? 'solid' : 'dashed',
-            borderColor: coordinates ? color.success : color.borderStrong,
-            backgroundColor: coordinates ? color.successSoft : color.surfaceCard,
-            paddingHorizontal: space[3],
-            justifyContent: 'center',
-          },
-          pressed ? { opacity: 0.7 } : null,
-        ]}
-      >
-        <Row gap={space[2]}>
-          <MaterialCommunityIcons
-            name={coordinates ? 'map-marker-check' : 'crosshairs-gps'}
-            size={20}
-            color={coordinates ? color.successStrong : color.brand}
+          {/*
+           * The map, before the fields.
+           *
+           * «قرب صيدلية النور» is only unambiguous to somebody who already knows
+           * the street. A point is what turns it into an address a courier can
+           * reach without phoning, and this is where it gets set: the map opens
+           * on the customer, the pin stays in the middle, and what is under it
+           * is saved with the order and handed to the driver as a navigation
+           * link.
+           */}
+          <MapPicker
+            latitude={coordinates?.latitude ?? null}
+            longitude={coordinates?.longitude ?? null}
+            onPick={pickOnMap}
           />
-          <View style={{ flex: 1 }}>
-            <Text variant="smallBold" tone={coordinates ? 'success' : 'brand'}>
-              {locating
-                ? 'جارٍ تحديد الموقع…'
-                : coordinates
-                  ? 'تم تثبيت المنزل على الخريطة'
-                  : 'تحديد موقعي الحالي'}
-            </Text>
-            <Text variant="caption" tone="muted">
-              {coordinates
-                ? coordinates.accuracy
-                  ? `دقة تقريبية ${Math.round(coordinates.accuracy)} متر — اسحب الخريطة للتصحيح`
-                  : 'اسحب الخريطة لضبط الدبوس بدقة'
-                : 'اسحب الخريطة إلى منزلك، أو اضغط هنا لاستخدام موقعك'}
-            </Text>
-          </View>
-        </Row>
-      </Pressable>
 
-      <LabelledInput
-        label="الاسم"
-        value={label}
-        onChangeText={setLabel}
-        placeholder="المنزل، العمل…"
-      />
-      <LabelledInput
-        label="المنطقة / الحي"
-        value={district}
-        onChangeText={setDistrict}
-        placeholder="المنصور، حي الجامعة…"
-      />
-      <LabelledInput
-        label="الشارع"
-        value={street}
-        onChangeText={setStreet}
-        placeholder="شارع ١٤ رمضان"
-      />
-      <LabelledInput
-        label="أقرب نقطة دالة"
-        value={landmark}
-        onChangeText={setLandmark}
-        placeholder="قرب صيدلية النور"
-      />
+          <Pressable
+            onPress={() => void locate(true)}
+            disabled={locating}
+            accessibilityRole="button"
+            accessibilityLabel="تحديد موقعي الحالي"
+            style={({ pressed }) => [
+              {
+                minHeight: TAP_TARGET + 6,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderStyle: coordinates ? 'solid' : 'dashed',
+                borderColor: coordinates ? color.success : color.borderStrong,
+                backgroundColor: coordinates ? color.successSoft : color.surfaceCard,
+                paddingHorizontal: space[3],
+                justifyContent: 'center',
+              },
+              pressed ? { opacity: 0.7 } : null,
+            ]}
+          >
+            <Row gap={space[2]}>
+              <MaterialCommunityIcons
+                name={coordinates ? 'map-marker-check' : 'crosshairs-gps'}
+                size={20}
+                color={coordinates ? color.successStrong : color.brand}
+              />
+              <View style={{ flex: 1 }}>
+                <Text variant="smallBold" tone={coordinates ? 'success' : 'brand'}>
+                  {locating
+                    ? 'جارٍ تحديد الموقع…'
+                    : coordinates
+                      ? 'تم تثبيت المنزل على الخريطة'
+                      : 'استخدم موقعي الحالي'}
+                </Text>
+                <Text variant="caption" tone="muted">
+                  {coordinates
+                    ? coordinates.accuracy
+                      ? `دقة تقريبية ${Math.round(coordinates.accuracy)} متر — اسحب الخريطة للتصحيح`
+                      : 'اسحب الخريطة لضبط الدبوس بدقة'
+                    : 'فعّل الموقع ليفتح الدبوس على مكانك مباشرة'}
+                </Text>
+              </View>
+            </Row>
+          </Pressable>
+
+          <LabelledInput
+            label="اسم العنوان"
+            value={label}
+            onChangeText={setLabel}
+            placeholder="المنزل، العمل…"
+          />
+          <LabelledInput
+            label="المنطقة / الحي"
+            value={district}
+            onChangeText={setDistrict}
+            placeholder="المنصور، حي الجامعة…"
+          />
+          <LabelledInput
+            label="الشارع أو الزقاق"
+            value={street}
+            onChangeText={setStreet}
+            placeholder="شارع ١٤ رمضان، زقاق ٣٢"
+          />
+
+          {/*
+           * Two short answers on one line.
+           *
+           * A house number and a floor are three characters each; giving them a
+           * full row apiece is what turns a form into a page nobody finishes.
+           */}
+          <Row gap={space[3]} align="flex-start">
+            <View style={{ flex: 1 }}>
+              <LabelledInput
+                label="رقم الدار"
+                value={building}
+                onChangeText={setBuilding}
+                placeholder="١٢/٤"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <LabelledInput
+                label="الطابق"
+                value={floor}
+                onChangeText={setFloor}
+                placeholder="الثاني"
+              />
+            </View>
+          </Row>
+
+          <LabelledInput
+            label="أقرب نقطة دالة"
+            value={landmark}
+            onChangeText={setLandmark}
+            placeholder="قرب صيدلية النور"
+          />
+          <LabelledInput
+            label="ملاحظات للمندوب"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="الجرس لا يعمل، اتصل عند الوصول"
+          />
+        </>
+      )}
     </Sheet>
   );
 }

@@ -156,6 +156,49 @@ export async function ensureLocationPermissionAsked(): Promise<void> {
   }
 }
 
+/**
+ * What a phone thinks is at a set of coordinates.
+ *
+ * The OS geocoder, which costs nothing and needs no key — `expo-location` is
+ * already in the binary. It exists to save typing, never to replace it: a
+ * reverse geocode in Baghdad is frequently a street the customer would not
+ * call their own, and in a city addressed by landmarks it cannot possibly
+ * know «قرب صيدلية النور». So what comes back is offered into empty fields
+ * and never over something somebody typed.
+ */
+export interface PlaceDescription {
+  readonly district: string | null;
+  readonly street: string | null;
+}
+
+export async function describePlace(coordinates: {
+  latitude: number;
+  longitude: number;
+}): Promise<PlaceDescription | null> {
+  // No geocoder in a browser: `expo-location` throws there rather than
+  // returning nothing, and the web preview would surface it as a failure.
+  if (isWeb) return null;
+
+  try {
+    const [place] = await Location.reverseGeocodeAsync(coordinates);
+    if (!place) return null;
+
+    const street = [place.street, place.streetNumber].filter(Boolean).join(' ').trim();
+
+    return {
+      // `district` is the neighbourhood on both platforms; `subregion` is the
+      // district of the governorate, which is the better of the two wrong
+      // answers when the first is missing.
+      district: place.district ?? place.subregion ?? null,
+      street: street.length > 0 ? street : null,
+    };
+  } catch {
+    // An unavailable geocoder is not an error the customer can act on, and
+    // the fields they were going to type are still right there.
+    return null;
+  }
+}
+
 /** What to tell the customer when it did not work. */
 export const LOCATION_MESSAGES_AR: Record<Exclude<LocationOutcome['status'], 'ok'>, string> = {
   denied: 'لم تُمنح صلاحية الموقع. يمكنك كتابة العنوان يدوياً.',

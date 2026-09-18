@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { api as apiClient } from './api';
 import { loadArea, saveArea } from './secure-session';
-import { useMe } from './session';
+import { useMe, useSession } from './session';
 
 /**
  * Where the customer is ordering to.
@@ -63,6 +64,7 @@ function parse(serialized: string | null): DeliveryArea | null {
 
 export function AreaProvider({ children }: { children: ReactNode }) {
   const me = useMe();
+  const { refresh } = useSession();
   const [area, setLocalArea] = useState<DeliveryArea | null>(null);
   const [isResolving, setResolving] = useState(true);
 
@@ -121,9 +123,28 @@ export function AreaProvider({ children }: { children: ReactNode }) {
       setArea: async (next) => {
         setLocalArea(next);
         await saveArea(JSON.stringify(next));
+
+        /*
+         * A signed-in customer's area is part of their profile, so the change
+         * follows them to another phone. Deliberately not awaited: the screen
+         * is already showing the new city and a slow request must not hold a
+         * sheet open.
+         *
+         * A failure costs the sync, not the choice, and one failure is
+         * expected rather than exceptional — the lists offered here are
+         * filtered by the `ordering` capability while the profile is validated
+         * against `customer_signup`, so a city open for ordering but not for
+         * signup is refused. Browsing it still works, which is what was asked
+         * for; only the cross-device default does not move.
+         */
+        if (!me) return;
+        void apiClient
+          .updateProfile({ governorate_id: next.governorateId, city_id: next.cityId })
+          .then(() => refresh())
+          .catch(() => undefined);
       },
     }),
-    [area, isResolving],
+    [area, isResolving, me, refresh],
   );
 
   return <AreaContext.Provider value={api}>{children}</AreaContext.Provider>;

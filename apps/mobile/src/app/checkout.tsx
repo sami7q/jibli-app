@@ -310,8 +310,8 @@ export default function CheckoutScreen() {
       <AddressSheet
         visible={addingAddress}
         onClose={() => setAddingAddress(false)}
-        onCreated={(created) => {
-          setAddressId(created.id);
+        onSaved={(saved) => {
+          setAddressId(saved);
           setAddingAddress(false);
           void addresses.refetch();
         }}

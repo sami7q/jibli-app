@@ -15,6 +15,9 @@ import {
 import { useRouter } from 'expo-router';
 import { fullNameSchema } from '@jibli/validation';
 import { useSession } from '@/lib/session';
+import { ensureLocationPermissionAsked } from '@/lib/location';
+import { AddressSheet } from '@/ui/address-sheet';
+import type { DeliveryArea } from '@/lib/area';
 import { api, ApiError, NetworkError, type GeographyOption } from '@/lib/api';
 import { BRAND, ROW, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
 
@@ -47,6 +50,19 @@ export default function ProfileScreen() {
   const [loadingCities, setLoadingCities] = useState(false);
 
   const [picker, setPicker] = useState<'governorate' | 'city' | null>(null);
+  /**
+   * The third step, which is not numbered.
+   *
+   * Asking for the address here — while the customer is already answering
+   * questions about themselves and nothing is at stake — is the whole reason
+   * addresses have pins on them. The alternative is checkout, where somebody
+   * hungry and mid-payment is asked to drag a map, and where almost nobody did.
+   *
+   * It opens *before* `refresh()`, and that ordering is load-bearing: the Gate
+   * sends a completed profile straight to `/(tabs)`, so re-resolving the
+   * session first would unmount this screen and the sheet with it.
+   */
+  const [askingAddress, setAskingAddress] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
 
@@ -97,15 +113,20 @@ export default function ProfileScreen() {
       });
 
       /*
-       * Re-resolve before navigating, or the Gate sends us straight back.
+       * The address, before the session is re-resolved.
        *
-       * The session's status is derived from `/auth/me`, and it still says
-       * `needs-profile` — the profile this request just completed. Leaving
-       * `(auth)` with that stale status is a redirect back to this screen, an
-       * endless one, on the only screen a new customer cannot skip.
+       * Permission first, and deliberately: this is the one moment in the app
+       * where a location prompt explains itself, because the customer is
+       * visibly filling in where they live. `ensureLocationPermissionAsked`
+       * only ever raises one dialog in the lifetime of an install, so the
+       * address form and the home screen cannot both ask.
+       *
+       * A denial is fine — the sheet simply opens without a fix and offers the
+       * button. So is skipping the sheet entirely; the home screen offers it
+       * again, once.
        */
-      await refresh();
-      router.replace('/(tabs)');
+      await ensureLocationPermissionAsked();
+      setAskingAddress(true);
     } catch (caught) {
       if (caught instanceof ApiError) {
         setError(caught.messageAr);
@@ -142,6 +163,18 @@ export default function ProfileScreen() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  /**
+   * Leave for the app, whether or not an address was saved.
+   *
+   * `refresh()` is what makes the session `ready`; without it the Gate reads a
+   * stale `needs-profile` and sends this screen straight back to itself.
+   */
+  const finish = async () => {
+    setAskingAddress(false);
+    await refresh();
+    router.replace('/(tabs)');
   };
 
   const nameInvalid = fullName.length > 0 && !nameResult.success;
@@ -285,6 +318,30 @@ export default function ProfileScreen() {
           )}
         </Pressable>
       </View>
+
+      <AddressSheet
+        visible={askingAddress}
+        title="أين نوصّل طلبك؟"
+        /*
+         * The city chosen a moment ago, handed over directly.
+         *
+         * `useArea` reads the profile, and the profile this screen just wrote
+         * has not been re-resolved yet — on purpose. Without this the sheet
+         * would open asking for a city that is already on screen above it.
+         */
+        initialArea={
+          governorate && city
+            ? ({
+                governorateId: governorate.id,
+                governorateNameAr: governorate.name_ar,
+                cityId: city.id,
+                cityNameAr: city.name_ar,
+              } satisfies DeliveryArea)
+            : null
+        }
+        onClose={() => void finish()}
+        onSaved={() => void finish()}
+      />
 
       <OptionPicker
         visible={picker !== null}

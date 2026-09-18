@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Linking, View } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
@@ -11,6 +11,7 @@ import { confirmAsync, notify } from '@/lib/dialog';
 import { ALIGN_START, ROW, accent, color, radius, shadow, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
+import { AddressSheet } from '@/ui/address-sheet';
 import { ListRow, RTL_TEXT, Sheet } from '@/ui/catalog';
 
 /**
@@ -46,7 +47,39 @@ export default function AccountScreen() {
   const { area } = useArea();
 
   const [pickingArea, setPickingArea] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
+
+  /*
+   * The address this screen is about.
+   *
+   * A guest has none and cannot have one — there is no account to hang it on —
+   * so for them the row stays what it was: a city, for deciding which
+   * restaurants to show.
+   */
+  const addresses = useQuery({
+    queryKey: ['addresses'],
+    queryFn: () => api.addresses(),
+    enabled: !isGuest,
+    staleTime: 5 * 60_000,
+  });
+
+  const home = useMemo(
+    () => (addresses.data ?? []).find((entry) => entry.is_default) ?? addresses.data?.[0] ?? null,
+    [addresses.data],
+  );
+
+  /**
+   * The address in one line, most specific part first.
+   *
+   * «بغداد» told a customer nothing they did not know. What they need to see is
+   * whether what the courier will be handed is enough to find them.
+   */
+  const homeLine = useMemo(() => {
+    if (!home) return null;
+    return [home.district_text, home.street, home.landmark].filter(Boolean).join(' — ');
+  }, [home]);
 
   const me = state.status === 'ready' || state.status === 'needs-profile' ? state.me : null;
   const extra = Constants.expoConfig?.extra as
@@ -146,12 +179,47 @@ export default function AccountScreen() {
       </View>
 
       <Group title="حسابي">
-        <ListRow
-          label="منطقة التوصيل"
-          sublabel={area?.cityNameAr ?? 'اختر منطقتك'}
-          icon={<MaterialCommunityIcons name="map-marker-outline" size={20} color={color.brand} />}
-          onPress={() => setPickingArea(true)}
-        />
+        {isGuest ? (
+          <ListRow
+            label="منطقة التوصيل"
+            sublabel={area?.cityNameAr ?? 'اختر منطقتك'}
+            icon={
+              <MaterialCommunityIcons name="map-marker-outline" size={20} color={color.brand} />
+            }
+            onPress={() => setPickingArea(true)}
+          />
+        ) : (
+          /*
+           * One row for the whole address, not a row for the city.
+           *
+           * The pin is called out in the sublabel because it is the difference
+           * between a courier who arrives and a courier who phones from the end
+           * of the street, and nothing on this screen used to say whether the
+           * address had one.
+           */
+          <ListRow
+            label="عنوان التوصيل"
+            sublabel={
+              home
+                ? `${home.city.name_ar}${homeLine ? ` — ${homeLine}` : ''}${
+                    home.latitude != null && home.longitude != null ? '' : ' • بلا دبوس'
+                  }`
+                : 'أضف عنوانك وثبّت منزلك على الخريطة'
+            }
+            icon={
+              <MaterialCommunityIcons
+                name={
+                  home?.latitude != null && home.longitude != null
+                    ? 'map-marker-check'
+                    : 'map-marker-plus-outline'
+                }
+                size={20}
+                color={color.brand}
+              />
+            }
+            onPress={() => setEditingAddress(true)}
+          />
+        )}
         <ListRow
           label="المفضلة"
           icon={<MaterialCommunityIcons name="heart-outline" size={20} color={color.brand} />}
@@ -299,6 +367,17 @@ export default function AccountScreen() {
       </View>
 
       <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
+
+      <AddressSheet
+        visible={editingAddress}
+        address={home}
+        title={home ? 'عنوان التوصيل' : 'أضف عنوانك'}
+        onClose={() => setEditingAddress(false)}
+        onSaved={() => {
+          setEditingAddress(false);
+          void queryClient.invalidateQueries({ queryKey: ['addresses'] });
+        }}
+      />
       <DeleteAccountSheet visible={deleting} onClose={() => setDeleting(false)} />
     </Screen>
   );

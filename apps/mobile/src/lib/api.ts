@@ -413,26 +413,45 @@ export interface ModifierGroup {
   modifiers: { id: string; name_ar: string; price_iqd: number; is_available: boolean }[];
 }
 
+/**
+ * A saved delivery address, as `GET /addresses` actually returns it.
+ *
+ * This type used to describe something else: flat `city_id` and
+ * `governorate_id` that the endpoint has never sent, no `floor`, no
+ * `orderable`, and no coordinates. Nothing broke only because nothing read
+ * them — the address list showed the free-text lines and stopped there. Now
+ * that the address screen shows the city and the pin, the shape has to be the
+ * real one.
+ */
 export interface Address {
   id: string;
   label: string | null;
-  city_id: string;
-  governorate_id: string;
+  /** Nested, with the Arabic name — the endpoint joins both tables for this. */
+  governorate: { id: string; name_ar: string };
+  city: { id: string; name_ar: string };
   district_text: string | null;
   street: string | null;
   building: string | null;
+  floor: string | null;
   landmark: string | null;
   delivery_notes: string | null;
   is_default: boolean;
   /**
    * The point a courier is routed to, when the customer put one down.
    *
-   * `GET /addresses` has always returned these two; the type simply never
-   * declared them, so nothing in the app could tell a pinned address from one
-   * the driver will have to phone about.
+   * `null` is not a defect: in a city addressed by landmarks the driver's link
+   * falls back to searching the text, and that fallback is why a wrong point
+   * is worse than none.
    */
   latitude: number | null;
   longitude: number | null;
+  /**
+   * Whether this address is in a city currently taking orders.
+   *
+   * An address in a closed city stays saved — the customer may be waiting for
+   * a launch — and is judged at checkout rather than deleted.
+   */
+  orderable: boolean;
 }
 
 export interface Quote {
@@ -794,8 +813,27 @@ export const api = {
 
   addresses: () => apiRequest<Address[]>('/api/v1/addresses'),
 
+  /**
+   * Returns the new id, not the address.
+   *
+   * `POST /addresses` answers `{ id }` and always has; the client simply
+   * declared `Address` and got away with it because the only caller read
+   * `.id`. Editing an address reads the rest, so the lie had to go before it
+   * became a crash.
+   */
   createAddress: (payload: Record<string, unknown>) =>
-    apiRequest<Address>('/api/v1/addresses', { method: 'POST', body: payload }),
+    apiRequest<{ id: string }>('/api/v1/addresses', { method: 'POST', body: payload }),
+
+  /**
+   * Soft delete — historical orders still point at the row.
+   *
+   * There is no update endpoint, so editing an address is saving the new one
+   * as the default and retiring the old. `POST` clears the previous default
+   * inside its own transaction, so the window where neither is default does
+   * not exist.
+   */
+  deleteAddress: (addressId: string) =>
+    apiRequest<{ deleted: boolean }>(`/api/v1/addresses/${addressId}`, { method: 'DELETE' }),
 
   favorites: () => apiRequest<FavoriteCard[]>('/api/v1/favorites'),
 
