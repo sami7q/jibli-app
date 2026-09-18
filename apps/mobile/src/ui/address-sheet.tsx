@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { api, ApiError, type Address, type GeographyOption } from '@/lib/api';
 import { useArea, type DeliveryArea } from '@/lib/area';
@@ -11,6 +11,7 @@ import {
   LOCATION_MESSAGES_AR,
   type Coordinates,
 } from '@/lib/location';
+import { matchArea, metresBetween } from '@/lib/place-match';
 import { notify } from '@/lib/dialog';
 import { color, radius, space, TAP_TARGET, TEXT_START, text } from '@/theme';
 import { Button, Row, Text } from '@/ui';
@@ -19,29 +20,27 @@ import { AreaChoice, areaStepTitle } from '@/ui/area-choice';
 import { Sheet } from '@/ui/catalog';
 
 /**
- * The whole address, in one sheet.
+ * The address, as a pin and a sentence.
  *
- * It used to be two half-answers in two places. «منطقة التوصيل» in حسابي asked
- * for a governorate and a city and stopped there — but a city is not an
- * address, and a courier handed one has been told the country. The details and
- * the map lived in checkout, which meant the only moment a customer could
- * describe where they live was the moment they were trying to pay for food.
- * Almost nobody did, so almost no address had anything on it.
+ * It asked seven questions before this — name, district, street, house number,
+ * floor, landmark, a note for the courier — which is a form, and a form is what
+ * people abandon. Everything on it was trying to describe a place that the pin
+ * already identifies to the metre. So the pin is the address now, and the only
+ * thing left to type is the part a map cannot show: which gate, which floor,
+ * the bell that does not work.
  *
- * So one sheet asks all of it, in the order somebody can actually answer: which
- * city, where the phone says they are standing, and then the things only they
- * know — the alley, the landmark, which floor, the bell that does not work.
+ * **The city is read off the pin, not off the profile.** That was a live bug
+ * and a serious one. The form took the governorate and city from the
+ * customer's profile while taking the point from their phone, so standing in
+ * حديثة with بغداد on the profile produced an address whose city said Baghdad
+ * and whose pin was two hundred kilometres up the Euphrates — an order the API
+ * accepts, because Baghdad is open, and a courier sent somewhere nobody
+ * delivers. The phone's geocoder names the place and `matchArea` turns that
+ * name into one of Jibli's own cities; it follows the pin when the pin moves.
  *
- * **The map opens where the customer is.** Before, it opened on Tahrir Square
- * at a zoom where a house is one building among four hundred. Now, when the
- * permission has already been granted, the sheet takes a fix before it draws,
- * opens on it at building zoom, and offers the phone's own guess at the
- * district into the empty fields.
- *
- * Every one of those is a starting point, not an answer. A phone indoors is
- * routinely fifty metres out, a reverse geocode in Baghdad names a street the
- * customer would not, and neither can know «قرب صيدلية النور». The map is
- * draggable, the fields are editable, and nothing typed is ever overwritten.
+ * What it will not do is guess. Where the platform has no city under the pin,
+ * the sheet says so and asks — because «we do not deliver where you are
+ * standing» is information, and silently keeping the old city is the bug.
  */
 
 /**
@@ -53,11 +52,23 @@ import { Sheet } from '@/ui/catalog';
  */
 const SAME_POINT_DEGREES = 1e-5;
 
+/**
+ * How far the pin must travel before the city is looked up again: 300 m.
+ *
+ * Nudging the pin onto the right doorway must not cost a geocoder call, and
+ * dragging it across town must not leave the old city sitting under it. No
+ * Iraqi city boundary is decided by 300 m of a customer's dragging.
+ */
+const RESOLVE_AGAIN_AFTER_M = 300;
+
+/** Long enough for a drag to finish before anything is asked about it. */
+const SETTLE_MS = 700;
+
 export function AddressSheet({
   visible,
   onClose,
   onSaved,
-  title = 'عنوان جديد',
+  title = 'ثبّت منزلك',
   address,
   initialArea,
 }: {
@@ -74,9 +85,8 @@ export function AddressSheet({
    */
   readonly address?: Address | null;
   /**
-   * The area to start from when there is no saved one to read — the city a new
-   * customer chose thirty seconds ago on the profile screen, before the session
-   * has caught up with it.
+   * The area to fall back to before the pin has said anything — the city a new
+   * customer chose thirty seconds ago on the profile screen.
    */
   readonly initialArea?: DeliveryArea | null;
 }) {
@@ -86,49 +96,56 @@ export function AddressSheet({
   const [governorate, setGovernorate] = useState<GeographyOption | null>(null);
 
   const [area, setLocalArea] = useState<DeliveryArea | null>(null);
-  const [label, setLabel] = useState('المنزل');
-  const [district, setDistrict] = useState('');
-  const [street, setStreet] = useState('');
-  const [building, setBuilding] = useState('');
-  const [floor, setFloor] = useState('');
-  const [landmark, setLandmark] = useState('');
-  const [notes, setNotes] = useState('');
+  /** Where the area came from, which is the difference between a fact and a leftover. */
+  const [source, setSource] = useState<'pin' | 'chosen' | 'carried' | 'unmatched'>('carried');
+  const [description, setDescription] = useState('');
+  /** The geocoder's neighbourhood, kept for the address list rather than shown. */
+  const [districtHint, setDistrictHint] = useState<string | null>(null);
 
   /**
    * The point on the address.
    *
    * `null` means nobody has chosen one — and the map is careful to leave it
-   * null rather than reporting wherever it happened to open. Everything still
-   * works without it: in a city addressed by landmarks, «قرب صيدلية النور» is
-   * what gets the driver there, and the courier's link falls back to searching
-   * the text. What must never happen is a confident wrong point.
+   * null rather than reporting wherever it happened to open. A wrong point is
+   * worse than none, because none still falls back to searching the text.
    */
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
+  const [resolving, setResolving] = useState(false);
+
+  /** Once per opening, not once per render. */
+  const autoLocated = useRef(false);
+  /** The last point the city was looked up for, so a nudge costs nothing. */
+  const lastResolved = useRef<{ latitude: number; longitude: number } | null>(null);
 
   /**
-   * Whether the sheet has already tried to open on the customer's position.
+   * Every city the platform serves, in one request.
    *
-   * Once per opening, not once per render — and reset on close so the next
-   * address starts from wherever the customer is *then*, which for a second
-   * address is usually somewhere else entirely.
+   * Matching a pin has to consider all of them at once, and `ordering` is the
+   * right list for a delivery address: a city we cannot deliver to is not an
+   * answer to «where shall we bring it».
    */
-  const autoLocated = useRef(false);
+  const tree = useQuery({
+    queryKey: ['geography', 'tree', 'ordering'],
+    queryFn: () => api.geographyTree('ordering'),
+    staleTime: 30 * 60_000,
+    enabled: visible,
+  });
 
   /*
-   * Everything resets to the address being edited each time the sheet opens.
-   *
-   * On open rather than on close: emptying the form as it slides away looks
-   * like the answer was thrown out.
+   * Everything resets each time the sheet opens, not when it closes: a form
+   * that empties itself as it slides away looks like the answer was thrown out.
    */
   useEffect(() => {
     if (!visible) {
       autoLocated.current = false;
+      lastResolved.current = null;
       return;
     }
 
     setStep('form');
     setGovernorate(null);
+    setSource('carried');
     setLocalArea(
       address
         ? {
@@ -137,69 +154,66 @@ export function AddressSheet({
             cityId: address.city.id,
             cityNameAr: address.city.name_ar,
           }
-        : /*
-           * The explicit choice wins over the remembered one. `initialArea` is
-           * passed only by the signup screen, where the customer picked a city
-           * thirty seconds ago — and a guest who had browsed somewhere else
-           * first would otherwise have that stale area override it.
-           */
+        : // The explicit choice wins over the remembered one: `initialArea`
+          // comes from the signup screen, where a city was picked seconds ago.
           (initialArea ?? currentArea ?? null),
     );
-    setLabel(address?.label ?? 'المنزل');
-    setDistrict(address?.district_text ?? '');
-    setStreet(address?.street ?? '');
-    setBuilding(address?.building ?? '');
-    setFloor(address?.floor ?? '');
-    setLandmark(address?.landmark ?? '');
-    setNotes(address?.delivery_notes ?? '');
+    setDescription(address?.landmark ?? '');
+    setDistrictHint(address?.district_text ?? null);
     setCoordinates(
       address?.latitude != null && address.longitude != null
         ? { latitude: address.latitude, longitude: address.longitude, accuracy: null }
         : null,
     );
-    // Deliberately keyed on the opening alone. `currentArea` and `initialArea`
-    // are read here and not followed: reacting to them afterwards would
-    // overwrite the city the customer picked inside the sheet.
+    // Deliberately keyed on the opening alone: reacting to the area afterwards
+    // would overwrite what the pin, or the customer, has since said.
   }, [visible, address]);
 
-  /**
-   * Take a fix, and offer what the phone thinks is there.
-   *
-   * `announce` separates the two callers. The button means somebody asked, so a
-   * failure gets a message; the automatic attempt on open did not, and a toast
-   * nobody provoked is noise.
-   */
+  /** Read the city under a point, and the neighbourhood if there is one. */
+  const resolveFrom = useCallback(
+    async (point: { latitude: number; longitude: number }) => {
+      const branches = tree.data;
+      if (!branches) return;
+
+      setResolving(true);
+      const place = await describePlace(point);
+      setResolving(false);
+      // No geocoder on this platform — the browser preview, mostly. The area
+      // that is already there stays, and the row below it can still be tapped.
+      if (!place) return;
+
+      if (place.district) setDistrictHint(place.district);
+
+      const matched = matchArea(place.names, branches);
+      if (matched) {
+        setLocalArea(matched);
+        setSource('pin');
+      } else {
+        /*
+         * Left as it was, and said out loud.
+         *
+         * Overwriting the area with nothing would be worse than useless, but so
+         * is pretending: if the pin is somewhere Jibli has no city, the line
+         * above the field has to admit it rather than show a city the customer
+         * is demonstrably not in.
+         */
+        setSource('unmatched');
+      }
+    },
+    [tree.data],
+  );
+
+  /** Take a fix. `announce` is the difference between a press and an attempt. */
   const locate = useCallback(async (announce: boolean) => {
     setLocating(true);
     const outcome = await captureCurrentLocation();
+    setLocating(false);
 
     if (outcome.status !== 'ok') {
-      setLocating(false);
       if (announce) notify('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
       return;
     }
-
     setCoordinates(outcome.coordinates);
-
-    /*
-     * Into what is empty, and nothing else.
-     *
-     * The geocoder's «شارع ٥٢» is a guess, and a guess must never land on top
-     * of the sentence somebody typed about their own street. Checked against
-     * the value at the moment the answer arrives, because a second or two has
-     * passed and they may well have started typing in it.
-     */
-    const place = await describePlace(outcome.coordinates);
-    if (place?.district) {
-      const suggested = place.district;
-      setDistrict((value) => (value.trim() ? value : suggested));
-    }
-    if (place?.street) {
-      const suggested = place.street;
-      setStreet((value) => (value.trim() ? value : suggested));
-    }
-
-    setLocating(false);
   }, []);
 
   useEffect(() => {
@@ -223,17 +237,35 @@ export function AddressSheet({
   }, [visible, step, coordinates, locate]);
 
   /*
-   * The map moved, so the pin moved.
+   * The city follows the pin, once the pin has stopped moving.
    *
-   * A point chosen by hand has no accuracy figure and should not borrow one
-   * from a GPS fix that is no longer what is being saved — `null` says «this is
-   * where somebody pointed», which is the honest thing for the driver's screen
-   * to receive.
-   *
-   * Unless the map is only echoing back the point it was handed. It reports its
-   * opening position so that somebody already in the right place can just save,
-   * and when that position came from the GPS a moment earlier, taking the echo
-   * at face value would throw the accuracy away.
+   * On settle rather than on every frame, and only when it has actually gone
+   * somewhere: a drag across Baghdad fires `moveend` a dozen times, and asking
+   * the geocoder each time would be a dozen questions with one answer.
+   */
+  useEffect(() => {
+    if (!visible || !coordinates || !tree.data) return;
+    if (
+      lastResolved.current &&
+      metresBetween(lastResolved.current, coordinates) < RESOLVE_AGAIN_AFTER_M
+    ) {
+      return;
+    }
+
+    const point = { latitude: coordinates.latitude, longitude: coordinates.longitude };
+    const timer = setTimeout(() => {
+      lastResolved.current = point;
+      void resolveFrom(point);
+    }, SETTLE_MS);
+
+    return () => clearTimeout(timer);
+  }, [visible, coordinates, tree.data, resolveFrom]);
+
+  /*
+   * The map moved, so the pin moved — unless it is only echoing back the point
+   * it was handed. It reports its opening position so somebody already in the
+   * right place can just save, and taking that echo at face value would throw
+   * away the accuracy figure the GPS came with.
    */
   const pickOnMap = useCallback((next: { latitude: number; longitude: number }) => {
     setCoordinates((current) =>
@@ -245,25 +277,28 @@ export function AddressSheet({
     );
   }, []);
 
-  const areaMoved = useMemo(
-    () => Boolean(area) && area?.cityId !== currentArea?.cityId,
-    [area, currentArea],
-  );
-
   const save = useMutation({
     mutationFn: async () => {
       if (!area) throw new Error('no area');
 
       const created = await api.createAddress({
-        label,
+        label: address?.label ?? 'المنزل',
         governorate_id: area.governorateId,
         city_id: area.cityId,
-        ...(district.trim() ? { district_text: district.trim() } : {}),
-        ...(street.trim() ? { street: street.trim() } : {}),
-        ...(building.trim() ? { building: building.trim() } : {}),
-        ...(floor.trim() ? { floor: floor.trim() } : {}),
-        ...(landmark.trim() ? { landmark: landmark.trim() } : {}),
-        ...(notes.trim() ? { delivery_notes: notes.trim() } : {}),
+        ...(districtHint ? { district_text: districtHint } : {}),
+        ...(description.trim() ? { landmark: description.trim() } : {}),
+        /*
+         * Carried through rather than asked for.
+         *
+         * The street, house number, floor and courier note are no longer on
+         * this form, but the driver's screen still prints them and an address
+         * saved before the form was simplified may well have them. Dropping
+         * them on an unrelated edit would quietly delete something useful.
+         */
+        ...(address?.street ? { street: address.street } : {}),
+        ...(address?.building ? { building: address.building } : {}),
+        ...(address?.floor ? { floor: address.floor } : {}),
+        ...(address?.delivery_notes ? { delivery_notes: address.delivery_notes } : {}),
         ...(coordinates
           ? { coordinates: { latitude: coordinates.latitude, longitude: coordinates.longitude } }
           : {}),
@@ -271,16 +306,16 @@ export function AddressSheet({
       });
 
       /*
-       * Retire the row this one replaces, after the replacement exists.
-       *
-       * In that order because `POST` clears the previous default inside its own
-       * transaction: the customer is never left without one, and a delete that
-       * fails costs a stale row in a list rather than an address.
+       * Retire the row this one replaces, after the replacement exists, because
+       * `POST` clears the previous default inside its own transaction: the
+       * customer is never left without one, and a failed delete costs a stale
+       * row rather than an address.
        */
       if (address) await api.deleteAddress(address.id).catch(() => undefined);
 
-      // Where they are having it delivered is where they are ordering from.
-      if (areaMoved) await setArea(area);
+      // Where it is being delivered is where they are ordering from. Without
+      // this, the pin says حديثة and the storefront still lists Baghdad.
+      if (area.cityId !== currentArea?.cityId) await setArea(area);
 
       return created;
     },
@@ -290,7 +325,13 @@ export function AddressSheet({
     },
   });
 
-  const canSave = Boolean(area) && district.trim().length > 0 && !save.isPending;
+  /*
+   * A pin is enough. A description alone is enough too — somebody who refused
+   * the location permission and will not drag a map still has «قرب صيدلية
+   * النور», which is how the city has always been addressed.
+   */
+  const canSave =
+    Boolean(area) && (coordinates !== null || description.trim().length > 0) && !save.isPending;
 
   return (
     <Sheet
@@ -300,7 +341,7 @@ export function AddressSheet({
       footer={
         step === 'form' ? (
           <Button
-            label={address ? 'حفظ التعديل' : 'حفظ العنوان'}
+            label="حفظ العنوان"
             block
             disabled={!canSave}
             loading={save.isPending}
@@ -321,63 +362,18 @@ export function AddressSheet({
               cityId: city.id,
               cityNameAr: city.name_ar,
             });
+            setSource('chosen');
             setStep('form');
           }}
         />
       ) : (
         <>
           {/*
-           * The city, as a row that can be changed rather than a line of text.
+           * The map first, because the map is the address.
            *
-           * It was read-only here and editable only from another screen, so a
-           * customer whose city was wrong had to abandon the address they were
-           * in the middle of writing in order to fix it.
-           */}
-          <Pressable
-            onPress={() => {
-              setGovernorate(null);
-              setStep('area');
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`المنطقة: ${area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'لم تُحدَّد'}`}
-            style={({ pressed }) => [
-              {
-                minHeight: TAP_TARGET + 6,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: area ? color.borderSubtle : color.danger,
-                backgroundColor: color.surfaceCard,
-                paddingHorizontal: space[3],
-                justifyContent: 'center',
-              },
-              pressed ? { opacity: 0.7 } : null,
-            ]}
-          >
-            <Row justify="space-between">
-              <Row gap={space[2]}>
-                <MaterialCommunityIcons name="city-variant-outline" size={20} color={color.brand} />
-                <View style={{ gap: 2 }}>
-                  <Text variant="caption" tone="muted">
-                    المحافظة والمدينة
-                  </Text>
-                  <Text variant="smallBold" tone={area ? 'primary' : 'danger'}>
-                    {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'اختر منطقتك'}
-                  </Text>
-                </View>
-              </Row>
-              <MaterialCommunityIcons name="chevron-left" size={20} color={color.textMuted} />
-            </Row>
-          </Pressable>
-
-          {/*
-           * The map, before the fields.
-           *
-           * «قرب صيدلية النور» is only unambiguous to somebody who already knows
-           * the street. A point is what turns it into an address a courier can
-           * reach without phoning, and this is where it gets set: the map opens
-           * on the customer, the pin stays in the middle, and what is under it
-           * is saved with the order and handed to the driver as a navigation
-           * link.
+           * It opens on the customer, the pin stays in the middle, and what is
+           * under it is saved with the order and handed to the courier as a
+           * navigation link.
            */}
           <MapPicker
             latitude={coordinates?.latitude ?? null}
@@ -429,104 +425,104 @@ export function AddressSheet({
             </Row>
           </Pressable>
 
-          <LabelledInput
-            label="اسم العنوان"
-            value={label}
-            onChangeText={setLabel}
-            placeholder="المنزل، العمل…"
-          />
-          <LabelledInput
-            label="المنطقة / الحي"
-            value={district}
-            onChangeText={setDistrict}
-            placeholder="المنصور، حي الجامعة…"
-          />
-          <LabelledInput
-            label="الشارع أو الزقاق"
-            value={street}
-            onChangeText={setStreet}
-            placeholder="شارع ١٤ رمضان، زقاق ٣٢"
-          />
+          {/*
+           * The city, read off the pin.
+           *
+           * Shown rather than asked, because the pin already answers it — and
+           * tappable, because a geocoder can be wrong and because there is no
+           * geocoder at all in a browser. The line underneath says where the
+           * answer came from, so «بغداد» sitting under a pin in الأنبار can
+           * never look like a confirmed fact again.
+           */}
+          <Pressable
+            onPress={() => {
+              setGovernorate(null);
+              setStep('area');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`المدينة: ${area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'لم تُحدَّد'} — اضغط للتغيير`}
+            style={({ pressed }) => [
+              {
+                minHeight: TAP_TARGET + 6,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor:
+                  !area || source === 'unmatched' ? color.danger : color.borderSubtle,
+                backgroundColor: color.surfaceCard,
+                paddingHorizontal: space[3],
+                justifyContent: 'center',
+              },
+              pressed ? { opacity: 0.7 } : null,
+            ]}
+          >
+            <Row justify="space-between">
+              <Row gap={space[2]}>
+                <MaterialCommunityIcons
+                  name="map-marker-radius-outline"
+                  size={20}
+                  color={source === 'unmatched' || !area ? color.dangerStrong : color.brand}
+                />
+                <View style={{ gap: 2, flex: 1 }}>
+                  <Text
+                    variant="smallBold"
+                    tone={source === 'unmatched' || !area ? 'danger' : 'primary'}
+                  >
+                    {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'اختر مدينتك'}
+                  </Text>
+                  <Text variant="caption" tone="muted">
+                    {resolving
+                      ? 'جارٍ قراءة المدينة من الموقع…'
+                      : source === 'pin'
+                        ? 'من موقعك على الخريطة'
+                        : source === 'unmatched'
+                          ? 'لا نوصّل إلى موقعك الحالي — تأكد من المدينة'
+                          : 'اضغط للتغيير'}
+                  </Text>
+                </View>
+              </Row>
+              <MaterialCommunityIcons name="chevron-left" size={20} color={color.textMuted} />
+            </Row>
+          </Pressable>
 
           {/*
-           * Two short answers on one line.
+           * The one thing left to type.
            *
-           * A house number and a floor are three characters each; giving them a
-           * full row apiece is what turns a form into a page nobody finishes.
+           * Everything the old form asked — street, house number, floor — was
+           * an attempt to say where a pin already says. What a pin cannot say
+           * is which of the three doors is yours, so that is what is asked,
+           * once, in the customer's own words.
            */}
-          <Row gap={space[3]} align="flex-start">
-            <View style={{ flex: 1 }}>
-              <LabelledInput
-                label="رقم الدار"
-                value={building}
-                onChangeText={setBuilding}
-                placeholder="١٢/٤"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <LabelledInput
-                label="الطابق"
-                value={floor}
-                onChangeText={setFloor}
-                placeholder="الثاني"
-              />
-            </View>
-          </Row>
-
-          <LabelledInput
-            label="أقرب نقطة دالة"
-            value={landmark}
-            onChangeText={setLandmark}
-            placeholder="قرب صيدلية النور"
-          />
-          <LabelledInput
-            label="ملاحظات للمندوب"
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="الجرس لا يعمل، اتصل عند الوصول"
-          />
+          <View style={{ gap: space[1] }}>
+            <Text variant="caption" tone="muted">
+              وصف المكان للمندوب
+            </Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="قرب صيدلية النور، الباب الأزرق، الطابق الثاني"
+              placeholderTextColor={color.textMuted}
+              accessibilityLabel="وصف المكان للمندوب"
+              multiline
+              style={[
+                text.small,
+                {
+                  minHeight: TAP_TARGET + 18,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: color.borderSubtle,
+                  backgroundColor: color.surfaceCard,
+                  paddingHorizontal: space[3],
+                  paddingTop: space[3],
+                  paddingBottom: space[3],
+                  color: color.textPrimary,
+                  textAlign: TEXT_START,
+                  textAlignVertical: 'top',
+                },
+              ]}
+            />
+          </View>
         </>
       )}
     </Sheet>
-  );
-}
-
-function LabelledInput({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (next: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <View style={{ gap: space[1] }}>
-      <Text variant="caption" tone="muted">
-        {label}
-      </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={color.textMuted}
-        accessibilityLabel={label}
-        style={[
-          text.small,
-          {
-            minHeight: TAP_TARGET,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: color.borderSubtle,
-            backgroundColor: color.surfaceCard,
-            paddingHorizontal: space[3],
-            color: color.textPrimary,
-            textAlign: TEXT_START,
-          },
-        ]}
-      />
-    </View>
   );
 }

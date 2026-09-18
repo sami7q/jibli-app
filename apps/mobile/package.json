@@ -21,6 +21,7 @@
     "@expo/vector-icons": "^15.1.1",
     "@jibli/contracts": "workspace:*",
     "@jibli/design-tokens": "workspace:*",
+    "@jibli/geography": "workspace:*",
     "@jibli/money": "workspace:*",
     "@jibli/validation": "workspace:*",
     "@react-native-community/netinfo": "12.0.1",

@@ -302,6 +302,21 @@ export interface GeographyOption {
   name_ar: string;
 }
 
+/**
+ * A governorate with its selectable cities, from `GET /geography/tree`.
+ *
+ * One round trip rather than two, which matters here for a reason the picker
+ * does not have: matching a pin to a city has to look at every city at once,
+ * and drilling per governorate to do it would be nineteen requests to answer
+ * one question.
+ */
+export interface GeographyBranch {
+  id: string;
+  code: string;
+  name_ar: string;
+  cities: GeographyOption[];
+}
+
 export interface RestaurantCard {
   id: string;
   branch_id: string;
@@ -700,6 +715,11 @@ export const api = {
 
   governorates: (capability: 'customer_signup' | 'ordering' = 'customer_signup') =>
     apiRequest<GeographyOption[]>(`/api/v1/geography/governorates?capability=${capability}`, {
+      authenticated: false,
+    }),
+
+  geographyTree: (capability: 'customer_signup' | 'ordering' = 'ordering') =>
+    apiRequest<GeographyBranch[]>(`/api/v1/geography/tree?capability=${capability}`, {
       authenticated: false,
     }),
 

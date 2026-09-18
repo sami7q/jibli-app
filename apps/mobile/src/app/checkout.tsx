@@ -309,6 +309,9 @@ export default function CheckoutScreen() {
 
       <AddressSheet
         visible={addingAddress}
+        // Not «ثبّت منزلك» here: somebody adding a second address mid-checkout
+        // is sending this order to the office, not moving house.
+        title="عنوان جديد"
         onClose={() => setAddingAddress(false)}
         onSaved={(saved) => {
           setAddressId(saved);

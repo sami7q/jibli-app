@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
+import type { PlaceNames } from './place-match';
 
 /** `expo-secure-store` is `export default {}` on web; the flag is not a secret. */
 const isWeb = Platform.OS === 'web';
@@ -160,15 +161,24 @@ export async function ensureLocationPermissionAsked(): Promise<void> {
  * What a phone thinks is at a set of coordinates.
  *
  * The OS geocoder, which costs nothing and needs no key — `expo-location` is
- * already in the binary. It exists to save typing, never to replace it: a
- * reverse geocode in Baghdad is frequently a street the customer would not
- * call their own, and in a city addressed by landmarks it cannot possibly
- * know «قرب صيدلية النور». So what comes back is offered into empty fields
- * and never over something somebody typed.
+ * already in the binary. It answers two different questions at once, and they
+ * are worth separating.
+ *
+ * The **names** are load-bearing: they are how the app works out which of its
+ * own cities the pin is in, and an address whose city disagrees with its pin is
+ * the two-hundred-kilometre delivery `place-match` exists to prevent.
+ *
+ * The **description** is not. A reverse geocode in Baghdad frequently names a
+ * street the customer would not call their own, and it cannot possibly know
+ * «قرب صيدلية النور», so what comes back is offered into an empty field and
+ * never over something somebody typed.
  */
 export interface PlaceDescription {
+  /** The neighbourhood, when the geocoder has one. */
   readonly district: string | null;
   readonly street: string | null;
+  /** The administrative names, for matching against the platform's geography. */
+  readonly names: PlaceNames;
 }
 
 export async function describePlace(coordinates: {
@@ -191,10 +201,24 @@ export async function describePlace(coordinates: {
       // answers when the first is missing.
       district: place.district ?? place.subregion ?? null,
       street: street.length > 0 ? street : null,
+      /*
+       * Passed through untouched, all of them.
+       *
+       * The platforms disagree about which field holds a town — iOS tends to
+       * `city`, Android often `subregion`, and a rural fix sometimes fills only
+       * `name` — so choosing one here would be choosing which phones work.
+       */
+      names: {
+        city: place.city,
+        district: place.district,
+        subregion: place.subregion,
+        region: place.region,
+        name: place.name,
+      },
     };
   } catch {
-    // An unavailable geocoder is not an error the customer can act on, and
-    // the fields they were going to type are still right there.
+    // An unavailable geocoder is not an error the customer can act on, and the
+    // field they were going to type is still right there.
     return null;
   }
 }

@@ -220,6 +220,9 @@ importers:
       '@jibli/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@jibli/geography':
+        specifier: workspace:*
+        version: link:../../packages/geography
       '@jibli/money':
         specifier: workspace:*
         version: link:../../packages/money
