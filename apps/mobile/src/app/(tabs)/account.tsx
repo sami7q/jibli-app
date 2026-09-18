@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Linking, View } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
@@ -11,7 +11,7 @@ import { confirmAsync, notify } from '@/lib/dialog';
 import { ALIGN_START, ROW, accent, color, radius, shadow, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
-import { AddressSheet } from '@/ui/address-sheet';
+import { AddressListSheet } from '@/ui/address-list-sheet';
 import { ListRow, RTL_TEXT, Sheet } from '@/ui/catalog';
 
 /**
@@ -49,7 +49,6 @@ export default function AccountScreen() {
   const [pickingArea, setPickingArea] = useState(false);
   const [editingAddress, setEditingAddress] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const queryClient = useQueryClient();
 
   /*
    * The address this screen is about.
@@ -198,7 +197,7 @@ export default function AccountScreen() {
            * address had one.
            */
           <ListRow
-            label="عنوان التوصيل"
+            label="عناويني"
             sublabel={
               home
                 ? `${home.city.name_ar}${homeLine ? ` — ${homeLine}` : ''}${
@@ -368,16 +367,7 @@ export default function AccountScreen() {
 
       <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
 
-      <AddressSheet
-        visible={editingAddress}
-        address={home}
-        title={home ? 'عنوان التوصيل' : 'أضف عنوانك'}
-        onClose={() => setEditingAddress(false)}
-        onSaved={() => {
-          setEditingAddress(false);
-          void queryClient.invalidateQueries({ queryKey: ['addresses'] });
-        }}
-      />
+      <AddressListSheet visible={editingAddress} onClose={() => setEditingAddress(false)} />
       <DeleteAccountSheet visible={deleting} onClose={() => setDeleting(false)} />
     </Screen>
   );

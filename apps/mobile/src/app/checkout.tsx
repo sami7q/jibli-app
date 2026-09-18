@@ -12,6 +12,7 @@ import { color, radius, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { SummaryRow } from '@/ui/catalog';
 import { AddressSheet } from '@/ui/address-sheet';
+import { loadPreferredAddressId, resolvePreferred } from '@/lib/preferred-address';
 
 /**
  * Checkout: where the order is going, what it costs, and placing it.
@@ -52,12 +53,26 @@ export default function CheckoutScreen() {
     queryFn: () => api.addresses(),
   });
 
-  // Default to the address the customer marked as default, else the first.
+  /*
+   * Start from the address this phone last chose, then the account's default.
+   *
+   * The header lets somebody switch to «الأنبار — حديثة» without a round trip,
+   * and there is no endpoint to move the server's default — so checkout has to
+   * read the same local preference, or the choice made two screens ago quietly
+   * does not apply to the order.
+   */
+  const preferredId = useQuery({
+    queryKey: ['addresses', 'preferred'],
+    queryFn: () => loadPreferredAddressId(),
+    staleTime: Infinity,
+  });
+
   useEffect(() => {
     if (addressId || !addresses.data || addresses.data.length === 0) return;
-    const preferred = addresses.data.find((entry) => entry.is_default) ?? addresses.data[0];
+    if (preferredId.isLoading) return;
+    const preferred = resolvePreferred(addresses.data, preferredId.data ?? null);
     if (preferred) setAddressId(preferred.id);
-  }, [addresses.data, addressId]);
+  }, [addresses.data, addressId, preferredId.data, preferredId.isLoading]);
 
   const quote = useQuery({
     queryKey: ['quote', cart?.restaurantId, addressId, lines],

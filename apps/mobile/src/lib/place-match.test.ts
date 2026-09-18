@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchArea, metresBetween, normalisePlaceName, type GeographyBranch } from './place-match';
+import { lookupArea, metresBetween, normalisePlaceName, type GeographyBranch } from './place-match';
 
 /**
  * Reading the city off the pin.
@@ -55,11 +55,14 @@ describe('normalising a place name', () => {
 
 describe('matching a geocoded place to a city', () => {
   it('finds حديثة from an Arabic phone', () => {
-    expect(matchArea({ city: 'حديثة', region: 'الأنبار' }, TREE)).toEqual({
-      governorateId: 'gov-anbar',
-      governorateNameAr: 'الأنبار',
-      cityId: 'city-haditha',
-      cityNameAr: 'حديثة',
+    expect(lookupArea({ city: 'حديثة', region: 'الأنبار' }, TREE)).toEqual({
+      status: 'matched',
+      area: {
+        governorateId: 'gov-anbar',
+        governorateNameAr: 'الأنبار',
+        cityId: 'city-haditha',
+        cityNameAr: 'حديثة',
+      },
     });
   });
 
@@ -69,53 +72,92 @@ describe('matching a geocoded place to a city', () => {
      * and the API only ever says «حديثة». The seed dataset carries both against
      * `IQ-AN-HADITHA`, so the two never have to be compared to each other.
      */
-    expect(matchArea({ city: 'Haditha', region: 'Al Anbar' }, TREE)?.cityId).toBe('city-haditha');
+    const found = lookupArea({ city: 'Haditha', region: 'Al Anbar' }, TREE);
+    expect(found).toMatchObject({ status: 'matched' });
+    expect(found.status === 'matched' && found.area.cityId).toBe('city-haditha');
+  });
+
+  it('sees through the administrative wrapper a real phone returns', () => {
+    /*
+     * The reported bug, from a phone standing in حديثة. The geocoder does not
+     * answer «حديثة» — it answers «قضاء حديثة», or "Haditha District", or
+     * "Al Anbar Governorate" — and an exact comparison missed all of them. The
+     * screen then told somebody in an open city that Jibli does not deliver
+     * there.
+     */
+    for (const spelling of ['قضاء حديثة', 'ناحية حديثة', 'مركز قضاء حديثة', 'Haditha District']) {
+      const found = lookupArea({ city: spelling }, TREE);
+      expect(found.status === 'matched' && found.area.cityId, spelling).toBe('city-haditha');
+    }
+
+    const viaRegion = lookupArea({ city: 'Al Anbar Governorate' }, TREE);
+    expect(viaRegion.status).toBe('governorate');
   });
 
   it('looks in every field the platforms use for a town', () => {
-    expect(matchArea({ subregion: 'Haditha' }, TREE)?.cityId).toBe('city-haditha');
-    expect(matchArea({ district: 'حديثة' }, TREE)?.cityId).toBe('city-haditha');
-    expect(matchArea({ name: 'Haditha' }, TREE)?.cityId).toBe('city-haditha');
+    for (const place of [
+      { subregion: 'Haditha' },
+      { district: 'حديثة' },
+      { name: 'Haditha' },
+    ]) {
+      const found = lookupArea(place, TREE);
+      expect(found.status === 'matched' && found.area.cityId).toBe('city-haditha');
+    }
   });
 
   it('prefers the city over the region when they disagree', () => {
     // The specific fact wins: somebody in Haditha is in Anbar whatever the
     // `region` field claims.
-    expect(matchArea({ city: 'حديثة', region: 'بغداد' }, TREE)?.cityId).toBe('city-haditha');
+    const found = lookupArea({ city: 'حديثة', region: 'بغداد' }, TREE);
+    expect(found.status === 'matched' && found.area.cityId).toBe('city-haditha');
   });
 
   it('falls back to a governorate that offers only one city', () => {
     // A Baghdad fix usually names the neighbourhood — «المنصور» is not a city
     // in the dataset — but Baghdad governorate lists exactly one city, so there
     // is nothing to guess between.
-    expect(matchArea({ district: 'المنصور', region: 'بغداد' }, TREE)?.cityId).toBe('city-baghdad');
+    const found = lookupArea({ district: 'المنصور', region: 'بغداد' }, TREE);
+    expect(found.status === 'matched' && found.area.cityId).toBe('city-baghdad');
   });
 
-  it('refuses to guess between several cities in a governorate', () => {
-    // Anbar offers Ramadi and Haditha. Knowing only «الأنبار» does not say
-    // which, and picking one would be inventing the answer.
-    expect(matchArea({ region: 'الأنبار' }, TREE)).toBeNull();
-  });
-
-  it('answers null where the platform has no city', () => {
+  it('reports the governorate rather than guessing between its cities', () => {
     /*
-     * Not a failure to be papered over. «We do not deliver where you are
-     * standing» is the information, and the screen has to say it — keeping the
-     * previous area silently is exactly the two-hundred kilometre delivery.
+     * Anbar offers Ramadi and Haditha, and «الأنبار» does not say which. Not a
+     * failure: the caller compares it with the city already selected, and a
+     * selected city inside this governorate agrees with the pin.
      */
-    expect(matchArea({ city: 'البصرة', region: 'البصرة' }, TREE)).toBeNull();
-    expect(matchArea({ city: 'Paris', region: 'Île-de-France' }, TREE)).toBeNull();
+    expect(lookupArea({ region: 'الأنبار' }, TREE)).toEqual({
+      status: 'governorate',
+      governorateId: 'gov-anbar',
+      governorateNameAr: 'الأنبار',
+    });
   });
 
-  it('answers null when there is nothing to go on', () => {
-    expect(matchArea({}, TREE)).toBeNull();
-    expect(matchArea({ city: '', region: null }, TREE)).toBeNull();
+  it('says «outside» only for a place Iraq has and Jibli does not serve', () => {
+    // Basra is a real governorate that this pilot does not deliver to. That is
+    // a fact about coverage, and the screen may say so.
+    expect(lookupArea({ city: 'البصرة', region: 'البصرة' }, TREE)).toEqual({
+      status: 'outside',
+      placeNameAr: 'البصرة',
+    });
+
+    // Fallujah is in the seed data and not in this tree: the answer comes from
+    // what the API offers, not from what Iraq contains.
+    expect(lookupArea({ city: 'الفلوجة', region: 'الأنبار' }, TREE)).toMatchObject({
+      status: 'outside',
+      placeNameAr: 'الفلوجة',
+    });
   });
 
-  it('ignores a city the platform does not serve, even though the dataset has it', () => {
-    // Fallujah is in the seed data and not in this tree: the match must come
-    // from what the API offers, not from what Iraq contains.
-    expect(matchArea({ city: 'الفلوجة', region: 'الأنبار' }, TREE)).toBeNull();
+  it('says «unknown» when it simply does not recognise the place', () => {
+    /*
+     * The distinction the bug turned on. Not recognising a name says nothing
+     * about whether delivery reaches there, so it must never be reported as a
+     * refusal.
+     */
+    expect(lookupArea({ city: 'Paris', region: 'Île-de-France' }, TREE).status).toBe('unknown');
+    expect(lookupArea({}, TREE).status).toBe('unknown');
+    expect(lookupArea({ city: '', region: null }, TREE).status).toBe('unknown');
   });
 });
 

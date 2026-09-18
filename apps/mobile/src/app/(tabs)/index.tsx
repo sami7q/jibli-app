@@ -38,6 +38,7 @@ import type { MerchantType } from '@jibli/contracts';
 import { useVertical } from '@/lib/vertical';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
+import { AddressListSheet } from '@/ui/address-list-sheet';
 import { PinHomeCard } from '@/ui/pin-home-card';
 
 /**
@@ -359,7 +360,24 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
+      {/*
+        * Two different questions behind one line.
+        *
+        * A signed-in customer has addresses, and «التوصيل إلى» means «to which
+        * of them» — asking them to find their governorate in a list is asking
+        * them to repeat what the pin already said. A guest has none and nothing
+        * to attach one to, so for them it stays what it was: which city to
+        * browse.
+        */}
+      {isGuest ? (
+        <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
+      ) : (
+        <AddressListSheet
+          visible={pickingArea}
+          title="التوصيل إلى"
+          onClose={() => setPickingArea(false)}
+        />
+      )}
     </Screen>
   );
 }

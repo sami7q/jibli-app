@@ -85,13 +85,53 @@ export function normalisePlaceName(value: string): string {
 
   const letters = latin.replace(/[^\p{L}\p{N}]/gu, '');
 
+  /*
+   * The administrative noise a geocoder wraps a place in.
+   *
+   * This is what broke it on a real phone in حديثة: the OS does not answer
+   * «حديثة», it answers «قضاء حديثة» or "Haditha District", and an exact
+   * comparison against the seed name misses every time. The screen then said
+   * «we do not deliver to your location» to somebody standing in a city that
+   * is open for delivery.
+   *
+   * None of Iraq's city or governorate names contains one of these words, so
+   * removing them cannot turn one place into another.
+   */
+  const stripped = ADMINISTRATIVE_WORDS.reduce(
+    (value, word) => value.split(word).join(''),
+    letters,
+  );
+
   // The definite article, in both scripts. «الرمادي» and "Ramadi" are the same
   // city, and so are "Al Anbar" and "Anbar".
-  if (letters.startsWith('ال') && letters.length > 4) return letters.slice(2);
-  if (letters.startsWith('al') && letters.length > 4) return letters.slice(2);
+  if (stripped.startsWith('ال') && stripped.length > 4) return stripped.slice(2);
+  if (stripped.startsWith('al') && stripped.length > 4) return stripped.slice(2);
 
-  return letters;
+  return stripped;
 }
+
+/**
+ * Words that describe what kind of place something is, not which place it is.
+ *
+ * Normalised the same way the names are — «محافظة» has already become
+ * «محافظه» by the time this runs — and matched as substrings, because
+ * punctuation and spacing are gone by then.
+ */
+const ADMINISTRATIVE_WORDS: readonly string[] = [
+  'governorate',
+  'province',
+  'subdistrict',
+  'district',
+  'municipality',
+  'qadha',
+  'qada',
+  'nahiya',
+  'محافظه',
+  'قضاء',
+  'ناحيه',
+  'مركز',
+  'مدينه',
+];
 
 /** Every spelling the seed data knows for a place, normalised. */
 function spellings(nameAr: string, nameEnInternal: string | null | undefined): string[] {
@@ -99,34 +139,49 @@ function spellings(nameAr: string, nameEnInternal: string | null | undefined): s
     .filter((value) => value.length > 0);
 }
 
-/** The seed code for a place named like this, in either language. */
-function cityCodeFor(name: string): string | null {
+/** The seed row for a place named like this, in either language. */
+function citySeedFor(name: string): { code: string; nameAr: string } | null {
   const wanted = normalisePlaceName(name);
   if (!wanted) return null;
-  return CITIES.find((city) => spellings(city.nameAr, city.nameEnInternal).includes(wanted))?.code
-    ?? null;
+  const found = CITIES.find((city) =>
+    spellings(city.nameAr, city.nameEnInternal).includes(wanted),
+  );
+  return found ? { code: found.code, nameAr: found.nameAr } : null;
 }
 
-function governorateCodeFor(name: string): string | null {
+function governorateSeedFor(name: string): { code: string; nameAr: string } | null {
   const wanted = normalisePlaceName(name);
   if (!wanted) return null;
-  return (
-    GOVERNORATES.find((governorate) =>
-      spellings(governorate.nameAr, governorate.nameEnInternal).includes(wanted),
-    )?.code ?? null
+  const found = GOVERNORATES.find((governorate) =>
+    spellings(governorate.nameAr, governorate.nameEnInternal).includes(wanted),
   );
+  return found ? { code: found.code, nameAr: found.nameAr } : null;
 }
 
 /**
- * The area a geocoded place belongs to, or `null` when the platform has no
- * city there.
+ * What the geography knows about a geocoded place.
  *
- * `null` is a real answer and the screen must say so rather than quietly
- * keeping whatever area was there before — «we do not deliver where you are
- * standing» is information, and the silent alternative is the two-hundred
- * kilometre delivery this module exists to prevent.
+ * Four answers, and keeping them apart is the whole point. Conflating the last
+ * two is what told a customer standing in حديثة — an open city — that Jibli
+ * does not deliver to their location: the geocoder had said «قضاء حديثة», the
+ * match had failed, and a failure to recognise a name was reported as a
+ * refusal to deliver. They are not the same fact and must not read the same.
  */
-export function matchArea(place: PlaceNames, tree: readonly GeographyBranch[]): AreaMatch | null {
+export type AreaLookup =
+  /** This is the city, and the platform serves it. */
+  | { readonly status: 'matched'; readonly area: AreaMatch }
+  /**
+   * The governorate is certain, the city is not — several of its cities are
+   * open and a `region` alone does not say which. The caller decides: if the
+   * city already selected sits in this governorate, the pin agrees with it.
+   */
+  | { readonly status: 'governorate'; readonly governorateId: string; readonly governorateNameAr: string }
+  /** A place Iraq has and Jibli does not serve. Worth saying out loud. */
+  | { readonly status: 'outside'; readonly placeNameAr: string }
+  /** Nothing recognisable. Says nothing about where delivery goes. */
+  | { readonly status: 'unknown' };
+
+export function lookupArea(place: PlaceNames, tree: readonly GeographyBranch[]): AreaLookup {
   /*
    * City first, and the governorate taken from whichever branch holds it.
    *
@@ -136,52 +191,81 @@ export function matchArea(place: PlaceNames, tree: readonly GeographyBranch[]): 
    * agree on which one it is: iOS puts Haditha in `city`, Android frequently in
    * `subregion`, and a rural fix sometimes only fills `name`.
    */
-  const candidates = [place.city, place.subregion, place.district, place.name];
+  const townFields = [place.city, place.subregion, place.district, place.name];
 
-  for (const candidate of candidates) {
+  /** A city Iraq has under this pin, whether or not Jibli serves it. */
+  let knownCity: { code: string; nameAr: string } | null = null;
+
+  for (const candidate of townFields) {
     if (!candidate) continue;
-    const code = cityCodeFor(candidate);
-    if (!code) continue;
+    const seed = citySeedFor(candidate);
+    if (!seed) continue;
+    knownCity ??= seed;
 
     for (const branch of tree) {
-      const city = branch.cities.find((entry) => entry.code === code);
+      const city = branch.cities.find((entry) => entry.code === seed.code);
       if (city) {
         return {
-          governorateId: branch.id,
-          governorateNameAr: branch.name_ar,
-          cityId: city.id,
-          cityNameAr: city.name_ar,
+          status: 'matched',
+          area: {
+            governorateId: branch.id,
+            governorateNameAr: branch.name_ar,
+            cityId: city.id,
+            cityNameAr: city.name_ar,
+          },
         };
       }
     }
   }
 
   /*
-   * Failing that, a governorate with exactly one city open.
+   * A city that was recognised and is not in the tree settles it.
    *
-   * Baghdad is the case that matters: the governorate and its only listed city
-   * share a name, and a geocode inside it often names the neighbourhood rather
-   * than the city. Where a governorate offers a choice, guessing which of its
-   * towns somebody is standing in would be inventing an answer.
+   * Before this ran below the governorate fallback, and a pin in الفلوجة —
+   * Anbar, not served — came back as «the governorate is الأنبار», which would
+   * have let a selected حديثة stand. That is the same bug in miniature: a
+   * hundred kilometres instead of two hundred. Knowing the city beats knowing
+   * the governorate whether the answer is yes or no.
    */
-  const governorateCode = [place.region, place.subregion]
-    .map((name) => (name ? governorateCodeFor(name) : null))
-    .find((code) => code !== null);
+  if (knownCity) return { status: 'outside', placeNameAr: knownCity.nameAr };
 
-  if (governorateCode) {
-    const branch = tree.find((entry) => entry.code === governorateCode);
-    const only = branch?.cities.length === 1 ? branch.cities[0] : undefined;
-    if (branch && only) {
-      return {
-        governorateId: branch.id,
-        governorateNameAr: branch.name_ar,
-        cityId: only.id,
-        cityNameAr: only.name_ar,
-      };
+  const governorateSeed = [place.region, place.subregion, place.city]
+    .map((name) => (name ? governorateSeedFor(name) : null))
+    .find((seed) => seed !== null);
+
+  if (governorateSeed) {
+    const branch = tree.find((entry) => entry.code === governorateSeed.code);
+
+    if (branch) {
+      /*
+       * One open city means there is nothing to choose between — Baghdad, where
+       * a geocode names the neighbourhood rather than the city. More than one,
+       * and picking would be inventing the answer, so the governorate is
+       * reported and the caller weighs it against what is already selected.
+       */
+      const only = branch.cities.length === 1 ? branch.cities[0] : undefined;
+      return only
+        ? {
+            status: 'matched',
+            area: {
+              governorateId: branch.id,
+              governorateNameAr: branch.name_ar,
+              cityId: only.id,
+              cityNameAr: only.name_ar,
+            },
+          }
+        : {
+            status: 'governorate',
+            governorateId: branch.id,
+            governorateNameAr: branch.name_ar,
+          };
     }
+
+    // Iraq has the governorate; Jibli does not serve it.
+    return { status: 'outside', placeNameAr: governorateSeed.nameAr };
   }
 
-  return null;
+  return { status: 'unknown' };
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   LOCATION_MESSAGES_AR,
   type Coordinates,
 } from '@/lib/location';
-import { matchArea, metresBetween } from '@/lib/place-match';
+import { lookupArea, metresBetween } from '@/lib/place-match';
 import { notify } from '@/lib/dialog';
 import { color, radius, space, TAP_TARGET, TEXT_START, text } from '@/theme';
 import { Button, Row, Text } from '@/ui';
@@ -35,12 +35,15 @@ import { Sheet } from '@/ui/catalog';
  * حديثة with بغداد on the profile produced an address whose city said Baghdad
  * and whose pin was two hundred kilometres up the Euphrates — an order the API
  * accepts, because Baghdad is open, and a courier sent somewhere nobody
- * delivers. The phone's geocoder names the place and `matchArea` turns that
+ * delivers. The phone's geocoder names the place and `lookupArea` turns that
  * name into one of Jibli's own cities; it follows the pin when the pin moves.
  *
- * What it will not do is guess. Where the platform has no city under the pin,
- * the sheet says so and asks — because «we do not deliver where you are
- * standing» is information, and silently keeping the old city is the bug.
+ * What it will not do is guess, and it is careful about which failure it
+ * reports. «We could not read your city» and «we do not deliver to your city»
+ * are different facts, and the first dressed as the second is what told a
+ * customer standing in حديثة — an open city, reached by a courier every day —
+ * that Jibli does not come there. Only a place that was positively identified
+ * and is positively not served earns that sentence.
  */
 
 /**
@@ -96,8 +99,18 @@ export function AddressSheet({
   const [governorate, setGovernorate] = useState<GeographyOption | null>(null);
 
   const [area, setLocalArea] = useState<DeliveryArea | null>(null);
-  /** Where the area came from, which is the difference between a fact and a leftover. */
-  const [source, setSource] = useState<'pin' | 'chosen' | 'carried' | 'unmatched'>('carried');
+  /**
+   * Where the city came from, which is the difference between a fact and a
+   * leftover — and, in two of these cases, the difference between «we could not
+   * tell» and «we do not deliver there». Reporting the first as the second is
+   * what told a customer standing in حديثة, an open city, that Jibli does not
+   * reach them.
+   */
+  const [source, setSource] = useState<
+    'carried' | 'chosen' | 'pin' | 'narrow' | 'outside' | 'unknown'
+  >('carried');
+  /** The place the geocoder named, when it is worth repeating back. */
+  const [detectedPlace, setDetectedPlace] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   /** The geocoder's neighbourhood, kept for the address list rather than shown. */
   const [districtHint, setDistrictHint] = useState<string | null>(null);
@@ -117,6 +130,15 @@ export function AddressSheet({
   const autoLocated = useRef(false);
   /** The last point the city was looked up for, so a nudge costs nothing. */
   const lastResolved = useRef<{ latitude: number; longitude: number } | null>(null);
+  /**
+   * The selected area, readable from inside the lookup.
+   *
+   * A governorate-only answer has to be weighed against what is already
+   * selected — «you are in الأنبار» agrees with حديثة and disagrees with بغداد
+   * — and the callback that receives it must not be rebuilt every time the area
+   * changes, or the settle timer restarts on its own state.
+   */
+  const areaRef = useRef<DeliveryArea | null>(null);
 
   /**
    * Every city the platform serves, in one request.
@@ -146,6 +168,7 @@ export function AddressSheet({
     setStep('form');
     setGovernorate(null);
     setSource('carried');
+    setDetectedPlace(null);
     setLocalArea(
       address
         ? {
@@ -169,6 +192,10 @@ export function AddressSheet({
     // would overwrite what the pin, or the customer, has since said.
   }, [visible, address]);
 
+  useEffect(() => {
+    areaRef.current = area;
+  }, [area]);
+
   /** Read the city under a point, and the neighbourhood if there is one. */
   const resolveFrom = useCallback(
     async (point: { latitude: number; longitude: number }) => {
@@ -184,21 +211,36 @@ export function AddressSheet({
 
       if (place.district) setDistrictHint(place.district);
 
-      const matched = matchArea(place.names, branches);
-      if (matched) {
-        setLocalArea(matched);
+      const found = lookupArea(place.names, branches);
+
+      if (found.status === 'matched') {
+        setLocalArea(found.area);
+        setDetectedPlace(null);
         setSource('pin');
-      } else {
-        /*
-         * Left as it was, and said out loud.
-         *
-         * Overwriting the area with nothing would be worse than useless, but so
-         * is pretending: if the pin is somewhere Jibli has no city, the line
-         * above the field has to admit it rather than show a city the customer
-         * is demonstrably not in.
-         */
-        setSource('unmatched');
+        return;
       }
+
+      if (found.status === 'governorate') {
+        /*
+         * The governorate is certain and the city is not. If what is already
+         * selected sits inside it, the pin and the selection agree and there is
+         * nothing to ask — that is the common case for somebody who set their
+         * city once and has not moved governorate since.
+         */
+        setDetectedPlace(found.governorateNameAr);
+        setSource(
+          areaRef.current?.governorateId === found.governorateId ? 'pin' : 'narrow',
+        );
+        return;
+      }
+
+      /*
+       * The area is left exactly as it was for both of the remaining answers,
+       * because neither of them names a city to replace it with. What changes
+       * is what the screen says — and these two must never say the same thing.
+       */
+      setDetectedPlace(found.status === 'outside' ? found.placeNameAr : null);
+      setSource(found.status);
     },
     [tree.data],
   );
@@ -333,6 +375,30 @@ export function AddressSheet({
   const canSave =
     Boolean(area) && (coordinates !== null || description.trim().length > 0) && !save.isPending;
 
+  /*
+   * Red is for something the customer has to act on, and nothing else.
+   *
+   * Not knowing the name of a place says nothing about whether Jibli delivers
+   * there, and the city carried over may well be right — alarming somebody
+   * about it is how «لا نوصّل إلى موقعك» ended up on the screen of a customer
+   * standing in a city that is open.
+   */
+  const needsAttention = !area || source === 'narrow' || source === 'outside';
+
+  const cityNote = resolving
+    ? 'جارٍ قراءة المدينة من الموقع…'
+    : source === 'pin'
+      ? 'من موقعك على الخريطة'
+      : source === 'narrow'
+        ? `موقعك في ${detectedPlace ?? 'محافظة أخرى'} — اختر مدينتك`
+        : source === 'outside'
+          ? `لا نوصّل إلى ${detectedPlace ?? 'موقعك'} بعد`
+          : source === 'unknown'
+            ? 'تعذّر قراءة المدينة من الموقع — تأكد منها'
+            : source === 'chosen'
+              ? 'اخترتها بنفسك'
+              : 'اضغط للتغيير';
+
   return (
     <Sheet
       visible={visible}
@@ -446,8 +512,7 @@ export function AddressSheet({
                 minHeight: TAP_TARGET + 6,
                 borderRadius: radius.md,
                 borderWidth: 1,
-                borderColor:
-                  !area || source === 'unmatched' ? color.danger : color.borderSubtle,
+                borderColor: needsAttention ? color.danger : color.borderSubtle,
                 backgroundColor: color.surfaceCard,
                 paddingHorizontal: space[3],
                 justifyContent: 'center',
@@ -460,23 +525,14 @@ export function AddressSheet({
                 <MaterialCommunityIcons
                   name="map-marker-radius-outline"
                   size={20}
-                  color={source === 'unmatched' || !area ? color.dangerStrong : color.brand}
+                  color={needsAttention ? color.dangerStrong : color.brand}
                 />
                 <View style={{ gap: 2, flex: 1 }}>
-                  <Text
-                    variant="smallBold"
-                    tone={source === 'unmatched' || !area ? 'danger' : 'primary'}
-                  >
+                  <Text variant="smallBold" tone={needsAttention ? 'danger' : 'primary'}>
                     {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'اختر مدينتك'}
                   </Text>
                   <Text variant="caption" tone="muted">
-                    {resolving
-                      ? 'جارٍ قراءة المدينة من الموقع…'
-                      : source === 'pin'
-                        ? 'من موقعك على الخريطة'
-                        : source === 'unmatched'
-                          ? 'لا نوصّل إلى موقعك الحالي — تأكد من المدينة'
-                          : 'اضغط للتغيير'}
+                    {cityNote}
                   </Text>
                 </View>
               </Row>
