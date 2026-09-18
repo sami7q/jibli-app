@@ -11,7 +11,7 @@ import { confirmAsync, notify } from '@/lib/dialog';
 import { ALIGN_START, ROW, accent, color, radius, shadow, space } from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
-import { AddressListSheet } from '@/ui/address-list-sheet';
+import { AddressSheet } from '@/ui/address-sheet';
 import { ListRow, RTL_TEXT, Sheet } from '@/ui/catalog';
 
 /**
@@ -367,7 +367,7 @@ export default function AccountScreen() {
 
       <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
 
-      <AddressListSheet visible={editingAddress} onClose={() => setEditingAddress(false)} />
+      <AddressSheet visible={editingAddress} start="list" onClose={() => setEditingAddress(false)} />
       <DeleteAccountSheet visible={deleting} onClose={() => setDeleting(false)} />
     </Screen>
   );
@@ -418,6 +418,15 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  */
 function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { signOut } = useSession();
+  /**
+   * The failure, said in the sheet.
+   *
+   * `notify` draws a `Modal` and iOS will not present one over this sheet — so
+   * a failed deletion used to show nothing at all and wedge the dialog queue,
+   * on the screen App Review opens first. The success path is safe because the
+   * sheet is already gone by then.
+   */
+  const [problem, setProblem] = useState<string | null>(null);
 
   const remove = useMutation({
     mutationFn: () => api.deleteAccount(),
@@ -428,10 +437,7 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
       notify('تم حذف الحساب', 'نأسف لرحيلك. يمكنك إنشاء حساب جديد في أي وقت.');
     },
     onError: (error) =>
-      notify(
-        'تعذّر حذف الحساب',
-        error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى لاحقاً.',
-      ),
+      setProblem(error instanceof ApiError ? error.messageAr : 'تعذّر حذف الحساب، حاول لاحقاً.'),
   });
 
   return (
@@ -458,6 +464,21 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
         </Row>
       }
     >
+      {problem ? (
+        <View
+          style={{
+            borderRadius: radius.md,
+            backgroundColor: color.dangerSoft,
+            paddingVertical: space[2],
+            paddingHorizontal: space[3],
+          }}
+        >
+          <Text variant="caption" tone="danger">
+            {problem}
+          </Text>
+        </View>
+      ) : null}
+
       <Text tone="secondary">هذا الإجراء لا يمكن التراجع عنه. عند الحذف:</Text>
 
       <Bullet icon="check" text="يُحذف اسمك ورقم هاتفك وعناوينك المحفوظة." />

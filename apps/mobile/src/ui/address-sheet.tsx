@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { api, ApiError, type Address, type GeographyOption } from '@/lib/api';
 import { useArea, type DeliveryArea } from '@/lib/area';
@@ -12,38 +12,45 @@ import {
   type Coordinates,
 } from '@/lib/location';
 import { lookupArea, metresBetween } from '@/lib/place-match';
-import { notify } from '@/lib/dialog';
+import { loadPreferredAddressId, savePreferredAddressId } from '@/lib/preferred-address';
 import { color, radius, space, TAP_TARGET, TEXT_START, text } from '@/theme';
-import { Button, Row, Text } from '@/ui';
+import { Button, ErrorState, Row, Text } from '@/ui';
 import { MapPicker } from '@/ui/map-picker';
 import { AreaChoice, areaStepTitle } from '@/ui/area-choice';
 import { Sheet } from '@/ui/catalog';
 
 /**
- * The address, as a pin and a sentence.
+ * Addresses: the list, the form, and the city — in one sheet, deliberately.
  *
- * It asked seven questions before this — name, district, street, house number,
- * floor, landmark, a note for the courier — which is a form, and a form is what
- * people abandon. Everything on it was trying to describe a place that the pin
- * already identifies to the metre. So the pin is the address now, and the only
- * thing left to type is the part a map cannot show: which gate, which floor,
- * the bell that does not work.
+ * **One `Modal`, and that is the whole architecture of this file.** The list
+ * used to live in its own sheet and open the form in a second one, and the
+ * delete button asked `confirmAsync`, which draws a third. On iOS a modal
+ * presented while another is already presenting does not appear — it fails
+ * silently — so «تعديل» did nothing, «حذف» did nothing, and the dialog queue
+ * was left with `showing = true` and no dialog on screen, which killed every
+ * confirmation and every error message in the app until it was restarted. That
+ * is what «التطبيق يجمد» was.
  *
- * **The city is read off the pin, not off the profile.** That was a live bug
- * and a serious one. The form took the governorate and city from the
- * customer's profile while taking the point from their phone, so standing in
- * حديثة with بغداد on the profile produced an address whose city said Baghdad
- * and whose pin was two hundred kilometres up the Euphrates — an order the API
- * accepts, because Baghdad is open, and a courier sent somewhere nobody
- * delivers. The phone's geocoder names the place and `lookupArea` turns that
- * name into one of Jibli's own cities; it follows the pin when the pin moves.
+ * So there is one sheet with three steps, and nothing inside it is allowed to
+ * open a dialog. Deleting asks in the row itself, and failures are written into
+ * the sheet rather than thrown at a global alert that cannot be drawn.
  *
- * What it will not do is guess, and it is careful about which failure it
- * reports. «We could not read your city» and «we do not deliver to your city»
- * are different facts, and the first dressed as the second is what told a
- * customer standing in حديثة — an open city, reached by a courier every day —
- * that Jibli does not come there. Only a place that was positively identified
- * and is positively not served earns that sentence.
+ * What the steps are for:
+ *
+ *   list — the customer's own addresses, because «التوصيل إلى» used to open a
+ *          catalogue of Iraq and ask them to find themselves in it, after they
+ *          had already pinned their home on a map
+ *   form — a pin and a sentence; everything else a form used to ask is a worse
+ *          description of what the pin already says to the metre
+ *   area — the governorate list, kept as the correction for a misread city
+ *
+ * **The city is read off the pin, not off the profile.** Standing in حديثة with
+ * بغداد on the profile used to produce an address whose city said Baghdad and
+ * whose pin was two hundred kilometres up the Euphrates — an order the API
+ * accepts and a courier sent where nobody delivers. And it is careful about
+ * which failure it reports: «we could not read your city» and «we do not
+ * deliver to your city» are different facts, and the first dressed as the
+ * second told a customer in an open city that Jibli does not come there.
  */
 
 /**
@@ -59,8 +66,7 @@ const SAME_POINT_DEGREES = 1e-5;
  * How far the pin must travel before the city is looked up again: 300 m.
  *
  * Nudging the pin onto the right doorway must not cost a geocoder call, and
- * dragging it across town must not leave the old city sitting under it. No
- * Iraqi city boundary is decided by 300 m of a customer's dragging.
+ * dragging it across town must not leave the old city sitting under it.
  */
 const RESOLVE_AGAIN_AFTER_M = 300;
 
@@ -71,21 +77,20 @@ export function AddressSheet({
   visible,
   onClose,
   onSaved,
-  title = 'ثبّت منزلك',
+  start = 'form',
+  title,
   address,
   initialArea,
 }: {
   readonly visible: boolean;
   readonly onClose: () => void;
-  readonly onSaved: (addressId: string) => void;
+  /** Fired after a save, with the new id. The list stays open; a lone form closes. */
+  readonly onSaved?: (addressId: string) => void;
+  /** Which step to open on. `list` for «التوصيل إلى», `form` for «أضف عنوانك». */
+  readonly start?: 'list' | 'form';
+  /** The title of the opening step; later steps title themselves. */
   readonly title?: string;
-  /**
-   * The address being replaced, if this is an edit.
-   *
-   * There is no update endpoint: saving writes a new default and retires this
-   * row. Historical orders keep pointing at it, which is why the delete is soft
-   * and why editing is safe.
-   */
+  /** Open straight into editing this address. Only meaningful with `start: 'form'`. */
   readonly address?: Address | null;
   /**
    * The area to fall back to before the pin has said anything — the city a new
@@ -94,17 +99,27 @@ export function AddressSheet({
   readonly initialArea?: DeliveryArea | null;
 }) {
   const { area: currentArea, setArea } = useArea();
+  const queryClient = useQueryClient();
 
-  const [step, setStep] = useState<'form' | 'area'>('form');
+  const [step, setStep] = useState<'list' | 'form' | 'area'>(start);
+  /** The address the form is editing, or `null` while adding one. */
+  const [editing, setEditing] = useState<Address | null>(address ?? null);
+  /**
+   * Bumped every time a form is opened.
+   *
+   * The seeding effect keys on this rather than on `step`, because returning
+   * from the city step is also an arrival at the form — and reseeding there
+   * would wipe the city the customer had just gone to choose.
+   */
+  const [formSession, setFormSession] = useState(0);
+
   const [governorate, setGovernorate] = useState<GeographyOption | null>(null);
 
   const [area, setLocalArea] = useState<DeliveryArea | null>(null);
   /**
    * Where the city came from, which is the difference between a fact and a
    * leftover — and, in two of these cases, the difference between «we could not
-   * tell» and «we do not deliver there». Reporting the first as the second is
-   * what told a customer standing in حديثة, an open city, that Jibli does not
-   * reach them.
+   * tell» and «we do not deliver there».
    */
   const [source, setSource] = useState<
     'carried' | 'chosen' | 'pin' | 'narrow' | 'outside' | 'unknown'
@@ -126,7 +141,19 @@ export function AddressSheet({
   const [locating, setLocating] = useState(false);
   const [resolving, setResolving] = useState(false);
 
-  /** Once per opening, not once per render. */
+  /**
+   * What went wrong, said here rather than thrown at a global dialog.
+   *
+   * `notify` draws a `Modal`, and a `Modal` cannot be presented over this one.
+   * Calling it from inside a sheet does not show a message — it wedges the
+   * dialog queue and silences every message after it.
+   */
+  const [problem, setProblem] = useState<string | null>(null);
+
+  /** The row whose delete is waiting to be confirmed, in the row itself. */
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+
+  /** Once per form session, not once per render. */
   const autoLocated = useRef(false);
   /** The last point the city was looked up for, so a nudge costs nothing. */
   const lastResolved = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -134,18 +161,32 @@ export function AddressSheet({
    * The selected area, readable from inside the lookup.
    *
    * A governorate-only answer has to be weighed against what is already
-   * selected — «you are in الأنبار» agrees with حديثة and disagrees with بغداد
-   * — and the callback that receives it must not be rebuilt every time the area
-   * changes, or the settle timer restarts on its own state.
+   * selected — «you are in الأنبار» agrees with حديثة and disagrees with بغداد.
    */
   const areaRef = useRef<DeliveryArea | null>(null);
+
+  useEffect(() => {
+    areaRef.current = area;
+  }, [area]);
+
+  const addresses = useQuery({
+    queryKey: ['addresses'],
+    queryFn: () => api.addresses(),
+    enabled: visible,
+    staleTime: 5 * 60_000,
+  });
+
+  const preferred = useQuery({
+    queryKey: ['addresses', 'preferred'],
+    queryFn: () => loadPreferredAddressId(),
+    staleTime: Infinity,
+  });
 
   /**
    * Every city the platform serves, in one request.
    *
    * Matching a pin has to consider all of them at once, and `ordering` is the
-   * right list for a delivery address: a city we cannot deliver to is not an
-   * answer to «where shall we bring it».
+   * right list for a delivery address.
    */
   const tree = useQuery({
     queryKey: ['geography', 'tree', 'ordering'],
@@ -154,10 +195,19 @@ export function AddressSheet({
     enabled: visible,
   });
 
-  /*
-   * Everything resets each time the sheet opens, not when it closes: a form
-   * that empties itself as it slides away looks like the answer was thrown out.
-   */
+  /** Open the form on an address, or on nothing. */
+  const openForm = useCallback((target: Address | null) => {
+    setEditing(target);
+    setGovernorate(null);
+    setProblem(null);
+    setConfirmingDelete(null);
+    autoLocated.current = false;
+    lastResolved.current = null;
+    setFormSession((session) => session + 1);
+    setStep('form');
+  }, []);
+
+  /* Opening the sheet returns it to its starting step. */
   useEffect(() => {
     if (!visible) {
       autoLocated.current = false;
@@ -165,36 +215,46 @@ export function AddressSheet({
       return;
     }
 
-    setStep('form');
+    setStep(start);
+    setProblem(null);
+    setConfirmingDelete(null);
     setGovernorate(null);
+    setEditing(address ?? null);
+    setFormSession((session) => session + 1);
+  }, [visible, start, address]);
+
+  /*
+   * Seed the form for one session.
+   *
+   * Everything is read once, when a form is opened: following `currentArea`
+   * afterwards would overwrite what the pin — or the customer — has since said.
+   */
+  useEffect(() => {
+    if (!visible) return;
+
+    const target = editing;
     setSource('carried');
     setDetectedPlace(null);
     setLocalArea(
-      address
+      target
         ? {
-            governorateId: address.governorate.id,
-            governorateNameAr: address.governorate.name_ar,
-            cityId: address.city.id,
-            cityNameAr: address.city.name_ar,
+            governorateId: target.governorate.id,
+            governorateNameAr: target.governorate.name_ar,
+            cityId: target.city.id,
+            cityNameAr: target.city.name_ar,
           }
         : // The explicit choice wins over the remembered one: `initialArea`
           // comes from the signup screen, where a city was picked seconds ago.
           (initialArea ?? currentArea ?? null),
     );
-    setDescription(address?.landmark ?? '');
-    setDistrictHint(address?.district_text ?? null);
+    setDescription(target?.landmark ?? '');
+    setDistrictHint(target?.district_text ?? null);
     setCoordinates(
-      address?.latitude != null && address.longitude != null
-        ? { latitude: address.latitude, longitude: address.longitude, accuracy: null }
+      target?.latitude != null && target.longitude != null
+        ? { latitude: target.latitude, longitude: target.longitude, accuracy: null }
         : null,
     );
-    // Deliberately keyed on the opening alone: reacting to the area afterwards
-    // would overwrite what the pin, or the customer, has since said.
-  }, [visible, address]);
-
-  useEffect(() => {
-    areaRef.current = area;
-  }, [area]);
+  }, [formSession]);
 
   /** Read the city under a point, and the neighbourhood if there is one. */
   const resolveFrom = useCallback(
@@ -206,7 +266,7 @@ export function AddressSheet({
       const place = await describePlace(point);
       setResolving(false);
       // No geocoder on this platform — the browser preview, mostly. The area
-      // that is already there stays, and the row below it can still be tapped.
+      // already there stays, and the row below it can still be tapped.
       if (!place) return;
 
       if (place.district) setDistrictHint(place.district);
@@ -224,20 +284,17 @@ export function AddressSheet({
         /*
          * The governorate is certain and the city is not. If what is already
          * selected sits inside it, the pin and the selection agree and there is
-         * nothing to ask — that is the common case for somebody who set their
-         * city once and has not moved governorate since.
+         * nothing to ask.
          */
         setDetectedPlace(found.governorateNameAr);
-        setSource(
-          areaRef.current?.governorateId === found.governorateId ? 'pin' : 'narrow',
-        );
+        setSource(areaRef.current?.governorateId === found.governorateId ? 'pin' : 'narrow');
         return;
       }
 
       /*
-       * The area is left exactly as it was for both of the remaining answers,
-       * because neither of them names a city to replace it with. What changes
-       * is what the screen says — and these two must never say the same thing.
+       * The area is left exactly as it was for both remaining answers, because
+       * neither names a city to replace it with. What changes is what the screen
+       * says — and these two must never say the same thing.
        */
       setDetectedPlace(found.status === 'outside' ? found.placeNameAr : null);
       setSource(found.status);
@@ -252,9 +309,10 @@ export function AddressSheet({
     setLocating(false);
 
     if (outcome.status !== 'ok') {
-      if (announce) notify('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
+      if (announce) setProblem(LOCATION_MESSAGES_AR[outcome.status]);
       return;
     }
+    setProblem(null);
     setCoordinates(outcome.coordinates);
   }, []);
 
@@ -269,9 +327,7 @@ export function AddressSheet({
        *
        * `captureCurrentLocation` raises the system dialog, and a permission
        * prompt that appears because a sheet opened — rather than because
-       * somebody pressed something — is the one every customer denies. The home
-       * screen and the signup flow ask once, deliberately; this reads that
-       * answer.
+       * somebody pressed something — is the one every customer denies.
        */
       if (!(await hasLocationPermission())) return;
       await locate(false);
@@ -279,14 +335,13 @@ export function AddressSheet({
   }, [visible, step, coordinates, locate]);
 
   /*
-   * The city follows the pin, once the pin has stopped moving.
-   *
-   * On settle rather than on every frame, and only when it has actually gone
-   * somewhere: a drag across Baghdad fires `moveend` a dozen times, and asking
-   * the geocoder each time would be a dozen questions with one answer.
+   * The city follows the pin, once the pin has stopped moving — and only when
+   * it has actually gone somewhere. A drag across Baghdad fires `moveend` a
+   * dozen times, and asking the geocoder each time is a dozen questions with
+   * one answer.
    */
   useEffect(() => {
-    if (!visible || !coordinates || !tree.data) return;
+    if (!visible || step !== 'form' || !coordinates || !tree.data) return;
     if (
       lastResolved.current &&
       metresBetween(lastResolved.current, coordinates) < RESOLVE_AGAIN_AFTER_M
@@ -301,7 +356,7 @@ export function AddressSheet({
     }, SETTLE_MS);
 
     return () => clearTimeout(timer);
-  }, [visible, coordinates, tree.data, resolveFrom]);
+  }, [visible, step, coordinates, tree.data, resolveFrom]);
 
   /*
    * The map moved, so the pin moved — unless it is only echoing back the point
@@ -319,28 +374,52 @@ export function AddressSheet({
     );
   }, []);
 
+  /** Make an address the one this phone orders to, and move the storefront with it. */
+  const choose = useCallback(
+    async (entry: Address) => {
+      await savePreferredAddressId(entry.id);
+      await setArea({
+        governorateId: entry.governorate.id,
+        governorateNameAr: entry.governorate.name_ar,
+        cityId: entry.city.id,
+        cityNameAr: entry.city.name_ar,
+      });
+      await preferred.refetch();
+      onClose();
+    },
+    [setArea, preferred, onClose],
+  );
+
+  const remove = useMutation({
+    mutationFn: (entry: Address) => api.deleteAddress(entry.id),
+    onSuccess: async () => {
+      setConfirmingDelete(null);
+      await queryClient.invalidateQueries({ queryKey: ['addresses'] });
+    },
+    onError: (error) =>
+      setProblem(error instanceof ApiError ? error.messageAr : 'تعذّر حذف العنوان.'),
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       if (!area) throw new Error('no area');
 
       const created = await api.createAddress({
-        label: address?.label ?? 'المنزل',
+        label: editing?.label ?? 'المنزل',
         governorate_id: area.governorateId,
         city_id: area.cityId,
         ...(districtHint ? { district_text: districtHint } : {}),
         ...(description.trim() ? { landmark: description.trim() } : {}),
         /*
-         * Carried through rather than asked for.
-         *
-         * The street, house number, floor and courier note are no longer on
-         * this form, but the driver's screen still prints them and an address
-         * saved before the form was simplified may well have them. Dropping
-         * them on an unrelated edit would quietly delete something useful.
+         * Carried through rather than asked for: the street, house number,
+         * floor and courier note are no longer on this form, the driver's
+         * screen still prints them, and an address saved before it was
+         * simplified may well have them.
          */
-        ...(address?.street ? { street: address.street } : {}),
-        ...(address?.building ? { building: address.building } : {}),
-        ...(address?.floor ? { floor: address.floor } : {}),
-        ...(address?.delivery_notes ? { delivery_notes: address.delivery_notes } : {}),
+        ...(editing?.street ? { street: editing.street } : {}),
+        ...(editing?.building ? { building: editing.building } : {}),
+        ...(editing?.floor ? { floor: editing.floor } : {}),
+        ...(editing?.delivery_notes ? { delivery_notes: editing.delivery_notes } : {}),
         ...(coordinates
           ? { coordinates: { latitude: coordinates.latitude, longitude: coordinates.longitude } }
           : {}),
@@ -353,18 +432,26 @@ export function AddressSheet({
        * customer is never left without one, and a failed delete costs a stale
        * row rather than an address.
        */
-      if (address) await api.deleteAddress(address.id).catch(() => undefined);
+      if (editing) await api.deleteAddress(editing.id).catch(() => undefined);
 
-      // Where it is being delivered is where they are ordering from. Without
-      // this, the pin says حديثة and the storefront still lists Baghdad.
+      // The address just saved is the one they meant to order to, and where it
+      // is delivered is where they are ordering from.
+      await savePreferredAddressId(created.id);
       if (area.cityId !== currentArea?.cityId) await setArea(area);
 
       return created;
     },
-    onSuccess: (created) => onSaved(created.id),
-    onError: (error) => {
-      notify('تعذّر حفظ العنوان', error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.');
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      await preferred.refetch();
+      onSaved?.(created.id);
+      // Opened from the list, it goes back to the list; opened on its own — from
+      // checkout, or the card on the home screen — it has nothing to go back to.
+      if (start === 'list') setStep('list');
+      else onClose();
     },
+    onError: (error) =>
+      setProblem(error instanceof ApiError ? error.messageAr : 'تعذّر حفظ العنوان.'),
   });
 
   /*
@@ -376,12 +463,8 @@ export function AddressSheet({
     Boolean(area) && (coordinates !== null || description.trim().length > 0) && !save.isPending;
 
   /*
-   * Red is for something the customer has to act on, and nothing else.
-   *
-   * Not knowing the name of a place says nothing about whether Jibli delivers
-   * there, and the city carried over may well be right — alarming somebody
-   * about it is how «لا نوصّل إلى موقعك» ended up on the screen of a customer
-   * standing in a city that is open.
+   * Red is for something the customer has to act on, and nothing else. Not
+   * knowing the name of a place says nothing about whether Jibli delivers there.
    */
   const needsAttention = !area || source === 'narrow' || source === 'outside';
 
@@ -399,11 +482,24 @@ export function AddressSheet({
               ? 'اخترتها بنفسك'
               : 'اضغط للتغيير';
 
+  const rows = addresses.data ?? [];
+
+  const sheetTitle =
+    step === 'area'
+      ? areaStepTitle(governorate)
+      : step === 'list'
+        ? (title ?? 'عناويني')
+        : editing
+          ? 'تعديل العنوان'
+          : start === 'form'
+            ? (title ?? 'ثبّت منزلك')
+            : 'عنوان جديد';
+
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={step === 'area' ? areaStepTitle(governorate) : title}
+      title={sheetTitle}
       footer={
         step === 'form' ? (
           <Button
@@ -416,31 +512,119 @@ export function AddressSheet({
         ) : undefined
       }
     >
-      {step === 'area' ? (
-        <AreaChoice
-          governorate={governorate}
-          onGovernorate={setGovernorate}
-          selected={area ? { governorateId: area.governorateId, cityId: area.cityId } : null}
-          onChoose={(chosen, city) => {
-            setLocalArea({
-              governorateId: chosen.id,
-              governorateNameAr: chosen.name_ar,
-              cityId: city.id,
-              cityNameAr: city.name_ar,
-            });
-            setSource('chosen');
-            setStep('form');
+      {/*
+        * Anything that went wrong, in the sheet.
+        *
+        * Never `notify` from in here: it draws a `Modal`, a `Modal` cannot be
+        * presented over this one, and the attempt leaves the dialog queue
+        * believing a dialog is open — which silences every message afterwards.
+        */}
+      {problem ? (
+        <View
+          style={{
+            borderRadius: radius.md,
+            backgroundColor: color.dangerSoft,
+            paddingVertical: space[2],
+            paddingHorizontal: space[3],
           }}
+        >
+          <Text variant="caption" tone="danger">
+            {problem}
+          </Text>
+        </View>
+      ) : null}
+
+      {step === 'list' ? (
+        <AddressList
+          rows={rows}
+          loading={addresses.isLoading}
+          error={
+            addresses.isError
+              ? addresses.error instanceof ApiError
+                ? addresses.error.messageAr
+                : 'تعذّر تحميل العناوين'
+              : null
+          }
+          onRetry={() => void addresses.refetch()}
+          preferredId={preferred.data ?? null}
+          confirmingDelete={confirmingDelete}
+          deleting={remove.isPending}
+          onChoose={(entry) => void choose(entry)}
+          onEdit={(entry) => openForm(entry)}
+          onAskDelete={setConfirmingDelete}
+          onConfirmDelete={(entry) => remove.mutate(entry)}
+          onAdd={() => openForm(null)}
         />
-      ) : (
+      ) : step === 'area' ? (
         <>
           {/*
-           * The map first, because the map is the address.
-           *
-           * It opens on the customer, the pin stays in the middle, and what is
-           * under it is saved with the order and handed to the courier as a
-           * navigation link.
-           */}
+            * A way out that is not «choose a city».
+            *
+            * Without this the only exits from the city list were picking one or
+            * dismissing the whole sheet, which throws away a half-written
+            * address for the crime of looking.
+            */}
+          <Pressable
+            onPress={() => setStep('form')}
+            accessibilityRole="button"
+            accessibilityLabel="رجوع إلى العنوان"
+            style={({ pressed }) => [
+              { minHeight: TAP_TARGET, justifyContent: 'center' },
+              pressed ? { opacity: 0.6 } : null,
+            ]}
+          >
+            <Row gap={space[1]}>
+              <MaterialCommunityIcons name="close" size={16} color={color.textMuted} />
+              <Text variant="caption" tone="muted">
+                رجوع إلى العنوان
+              </Text>
+            </Row>
+          </Pressable>
+
+          <AreaChoice
+            governorate={governorate}
+            onGovernorate={setGovernorate}
+            selected={area ? { governorateId: area.governorateId, cityId: area.cityId } : null}
+            onChoose={(chosen, city) => {
+              setLocalArea({
+                governorateId: chosen.id,
+                governorateNameAr: chosen.name_ar,
+                cityId: city.id,
+                cityNameAr: city.name_ar,
+              });
+              setSource('chosen');
+              setDetectedPlace(null);
+              setStep('form');
+            }}
+          />
+        </>
+      ) : (
+        <>
+          {start === 'list' ? (
+            <Pressable
+              onPress={() => setStep('list')}
+              accessibilityRole="button"
+              accessibilityLabel="رجوع إلى عناويني"
+              style={({ pressed }) => [
+                { minHeight: TAP_TARGET, justifyContent: 'center' },
+                pressed ? { opacity: 0.6 } : null,
+              ]}
+            >
+              <Row gap={space[1]}>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={color.brand} />
+                <Text variant="smallBold" tone="brand">
+                  عناويني
+                </Text>
+              </Row>
+            </Pressable>
+          ) : null}
+
+          {/*
+            * The map first, because the map is the address. It opens on the
+            * customer, the pin stays in the middle, and what is under it is
+            * saved with the order and handed to the courier as a navigation
+            * link.
+            */}
           <MapPicker
             latitude={coordinates?.latitude ?? null}
             longitude={coordinates?.longitude ?? null}
@@ -492,14 +676,10 @@ export function AddressSheet({
           </Pressable>
 
           {/*
-           * The city, read off the pin.
-           *
-           * Shown rather than asked, because the pin already answers it — and
-           * tappable, because a geocoder can be wrong and because there is no
-           * geocoder at all in a browser. The line underneath says where the
-           * answer came from, so «بغداد» sitting under a pin in الأنبار can
-           * never look like a confirmed fact again.
-           */}
+            * The city, read off the pin — shown rather than asked, and tappable
+            * because a geocoder can be wrong and there is none at all in a
+            * browser.
+            */}
           <Pressable
             onPress={() => {
               setGovernorate(null);
@@ -541,13 +721,10 @@ export function AddressSheet({
           </Pressable>
 
           {/*
-           * The one thing left to type.
-           *
-           * Everything the old form asked — street, house number, floor — was
-           * an attempt to say where a pin already says. What a pin cannot say
-           * is which of the three doors is yours, so that is what is asked,
-           * once, in the customer's own words.
-           */}
+            * The one thing left to type. Everything the old form asked — street,
+            * house number, floor — was an attempt to say what a pin already
+            * says. What a pin cannot say is which of the three doors is yours.
+            */}
           <View style={{ gap: space[1] }}>
             <Text variant="caption" tone="muted">
               وصف المكان للمندوب
@@ -580,5 +757,245 @@ export function AddressSheet({
         </>
       )}
     </Sheet>
+  );
+}
+
+/** The saved addresses, with the actions that belong to each one. */
+function AddressList({
+  rows,
+  loading,
+  error,
+  onRetry,
+  preferredId,
+  confirmingDelete,
+  deleting,
+  onChoose,
+  onEdit,
+  onAskDelete,
+  onConfirmDelete,
+  onAdd,
+}: {
+  readonly rows: readonly Address[];
+  readonly loading: boolean;
+  readonly error: string | null;
+  readonly onRetry: () => void;
+  readonly preferredId: string | null;
+  readonly confirmingDelete: string | null;
+  readonly deleting: boolean;
+  readonly onChoose: (entry: Address) => void;
+  readonly onEdit: (entry: Address) => void;
+  readonly onAskDelete: (addressId: string | null) => void;
+  readonly onConfirmDelete: (entry: Address) => void;
+  readonly onAdd: () => void;
+}) {
+  if (loading) {
+    return (
+      <View style={{ paddingVertical: space[8], alignItems: 'center' }}>
+        <ActivityIndicator color={color.brand} />
+      </View>
+    );
+  }
+
+  if (error) return <ErrorState message={error} onRetry={onRetry} />;
+
+  return (
+    <>
+      {rows.length === 0 ? (
+        <Text tone="muted" align="center">
+          لا عناوين محفوظة بعد — أضف عنوانك وثبّته على الخريطة.
+        </Text>
+      ) : (
+        rows.map((entry) => {
+          const chosen = preferredId ? preferredId === entry.id : entry.is_default;
+          const pinned = entry.latitude != null && entry.longitude != null;
+          const confirming = confirmingDelete === entry.id;
+
+          return (
+            <View
+              key={entry.id}
+              style={{
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: confirming ? color.danger : chosen ? color.brand : color.borderSubtle,
+                backgroundColor: chosen ? color.brandSoft : color.surfaceCard,
+                overflow: 'hidden',
+              }}
+            >
+              <Pressable
+                onPress={() => onChoose(entry)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: chosen }}
+                accessibilityLabel={`${entry.governorate.name_ar} ${entry.city.name_ar}${entry.landmark ? ` — ${entry.landmark}` : ''}`}
+                style={({ pressed }) => [
+                  {
+                    minHeight: TAP_TARGET + 10,
+                    paddingHorizontal: space[3],
+                    justifyContent: 'center',
+                  },
+                  pressed ? { opacity: 0.7 } : null,
+                ]}
+              >
+                <Row gap={space[2]}>
+                  <MaterialCommunityIcons
+                    name={pinned ? 'map-marker-check' : 'map-marker-alert-outline'}
+                    size={20}
+                    color={pinned ? color.successStrong : color.dangerStrong}
+                  />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text variant="smallBold" tone={chosen ? 'brand' : 'primary'}>
+                      {entry.governorate.name_ar} — {entry.city.name_ar}
+                    </Text>
+                    <Text variant="caption" tone="muted" numberOfLines={2}>
+                      {/*
+                        * A missing pin is called out rather than left blank: it
+                        * is the difference between a courier arriving and a
+                        * courier phoning, and it is fixable in two taps.
+                        */}
+                      {pinned
+                        ? (entry.landmark ?? entry.district_text ?? 'مثبّت على الخريطة')
+                        : 'بلا دبوس — افتحه وثبّته على الخريطة'}
+                    </Text>
+                  </View>
+                  {chosen ? (
+                    <MaterialCommunityIcons name="check-circle" size={20} color={color.brand} />
+                  ) : null}
+                </Row>
+              </Pressable>
+
+              {/*
+                * Deleting asks in the row.
+                *
+                * `confirmAsync` draws a dialog, and a dialog is a `Modal` that
+                * cannot be presented over the sheet holding this list — the ask
+                * never appeared, the delete never happened, and the queue was
+                * left wedged. An inline confirmation is also simply better: the
+                * question sits on the thing it is about.
+                */}
+              <Row
+                justify="space-between"
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: color.borderSubtle,
+                  paddingHorizontal: space[3],
+                }}
+              >
+                {confirming ? (
+                  <>
+                    <Pressable
+                      onPress={() => onConfirmDelete(entry)}
+                      disabled={deleting}
+                      accessibilityRole="button"
+                      accessibilityLabel="تأكيد حذف العنوان"
+                      style={({ pressed }) => [
+                        { minHeight: TAP_TARGET, justifyContent: 'center' },
+                        pressed ? { opacity: 0.6 } : null,
+                      ]}
+                    >
+                      <Row gap={space[1]}>
+                        {deleting ? (
+                          <ActivityIndicator size="small" color={color.dangerStrong} />
+                        ) : (
+                          <MaterialCommunityIcons
+                            name="trash-can"
+                            size={16}
+                            color={color.dangerStrong}
+                          />
+                        )}
+                        <Text variant="captionBold" tone="danger">
+                          تأكيد الحذف
+                        </Text>
+                      </Row>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => onAskDelete(null)}
+                      accessibilityRole="button"
+                      accessibilityLabel="تراجع عن الحذف"
+                      style={({ pressed }) => [
+                        { minHeight: TAP_TARGET, justifyContent: 'center' },
+                        pressed ? { opacity: 0.6 } : null,
+                      ]}
+                    >
+                      <Text variant="caption" tone="muted">
+                        تراجع
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => onEdit(entry)}
+                      accessibilityRole="button"
+                      accessibilityLabel="تعديل العنوان"
+                      style={({ pressed }) => [
+                        { minHeight: TAP_TARGET, justifyContent: 'center' },
+                        pressed ? { opacity: 0.6 } : null,
+                      ]}
+                    >
+                      <Row gap={space[1]}>
+                        <MaterialCommunityIcons
+                          name="pencil-outline"
+                          size={16}
+                          color={color.brand}
+                        />
+                        <Text variant="caption" tone="brand">
+                          تعديل
+                        </Text>
+                      </Row>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => onAskDelete(entry.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel="حذف العنوان"
+                      style={({ pressed }) => [
+                        { minHeight: TAP_TARGET, justifyContent: 'center' },
+                        pressed ? { opacity: 0.6 } : null,
+                      ]}
+                    >
+                      <Row gap={space[1]}>
+                        <MaterialCommunityIcons
+                          name="trash-can-outline"
+                          size={16}
+                          color={color.dangerStrong}
+                        />
+                        <Text variant="caption" tone="danger">
+                          حذف
+                        </Text>
+                      </Row>
+                    </Pressable>
+                  </>
+                )}
+              </Row>
+            </View>
+          );
+        })
+      )}
+
+      <Pressable
+        onPress={onAdd}
+        accessibilityRole="button"
+        accessibilityLabel="إضافة عنوان جديد"
+        style={({ pressed }) => [
+          {
+            minHeight: TAP_TARGET + 6,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: color.brand,
+            justifyContent: 'center',
+            paddingHorizontal: space[3],
+          },
+          pressed ? { opacity: 0.7 } : null,
+        ]}
+      >
+        <Row gap={space[2]}>
+          <MaterialCommunityIcons name="plus" size={20} color={color.brand} />
+          <Text variant="smallBold" tone="brand">
+            إضافة عنوان جديد
+          </Text>
+        </Row>
+      </Pressable>
+    </>
   );
 }

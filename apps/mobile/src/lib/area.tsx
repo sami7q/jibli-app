@@ -116,6 +116,21 @@ export function AreaProvider({ children }: { children: ReactNode }) {
     void saveArea(JSON.stringify(fromProfile));
   }, [me]);
 
+  /*
+   * The session, read without being depended on.
+   *
+   * `me` and `refresh` change identity as the session resolves, and putting
+   * them in the memo below rebuilds `setArea` — and with it the whole context
+   * value — on every one of those renders, re-rendering every screen that reads
+   * the area. Refs keep the value stable while still seeing the current session.
+   */
+  const meRef = useRef(me);
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    meRef.current = me;
+    refreshRef.current = refresh;
+  }, [me, refresh]);
+
   const api = useMemo<AreaApi>(
     () => ({
       area,
@@ -137,14 +152,14 @@ export function AreaProvider({ children }: { children: ReactNode }) {
          * signup is refused. Browsing it still works, which is what was asked
          * for; only the cross-device default does not move.
          */
-        if (!me) return;
+        if (!meRef.current) return;
         void apiClient
           .updateProfile({ governorate_id: next.governorateId, city_id: next.cityId })
-          .then(() => refresh())
+          .then(() => refreshRef.current())
           .catch(() => undefined);
       },
     }),
-    [area, isResolving, me, refresh],
+    [area, isResolving],
   );
 
   return <AreaContext.Provider value={api}>{children}</AreaContext.Provider>;

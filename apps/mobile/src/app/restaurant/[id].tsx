@@ -290,7 +290,24 @@ export default function RestaurantScreen() {
         <CartBar count={itemCount} totalIqd={subtotalIqd} onPress={() => router.push('/cart')} />
       ) : null}
 
-      <ItemSheet item={openItem} restaurant={detail} onClose={() => setOpenItem(null)} />
+      <ItemSheet
+        item={openItem}
+        restaurant={detail}
+        onClose={(replacedCart) => {
+          setOpenItem(null);
+          /*
+           * Told here, after the sheet is gone.
+           *
+           * `notify` draws a `Modal`, and iOS will not present one over the
+           * sheet's own — the attempt shows nothing and leaves the dialog queue
+           * believing a dialog is open, which silences every message after it.
+           * The screen underneath is not a modal, so it can say this safely.
+           */
+          if (replacedCart) {
+            notify('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
+          }
+        }}
+      />
     </Screen>
   );
 }
@@ -834,7 +851,8 @@ function ItemSheet({
     delivery_fee_iqd: number;
     minimum_order_iqd: number;
   };
-  onClose: () => void;
+  /** `replacedCart` is a message for the screen to deliver once this is gone. */
+  onClose: (replacedCart?: boolean) => void;
 }) {
   const { add } = useCart();
   const [quantity, setQuantity] = useState(1);
@@ -913,12 +931,9 @@ function ItemSheet({
       },
     );
 
-    if (result === 'replaced') {
-      notify('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
-    }
-
     reset();
-    onClose();
+    // Handed up rather than shown: a dialog cannot be drawn over this sheet.
+    onClose(result === 'replaced');
   };
 
   return (

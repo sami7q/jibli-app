@@ -19,6 +19,19 @@
  * module is the imperative half — a queue and a subscription, no React — so
  * that the nineteen call sites keep calling a plain function from wherever
  * they are, including from inside a `catch`.
+ *
+ * **Never call these from inside an open `Sheet`.** `DialogHost` is a `Modal`
+ * and so is `Sheet`, and iOS will not present a modal over one that is already
+ * presenting: the dialog does not appear, `resolve` is never called, and
+ * `showing` below stays `true` for the rest of the process — which silences
+ * every confirmation and every error message in the app until it is restarted.
+ * The browser hides this completely, because `Modal` there is an ordinary
+ * `div` that stacks happily, so it cannot be caught in the web preview.
+ *
+ * A sheet says things in itself: an error line in its own body, and a
+ * confirmation on the row it is about. Where a message really belongs to the
+ * screen behind, the sheet hands it up through `onClose` and the screen — which
+ * is not a modal — says it once the sheet is gone.
  */
 
 export interface ConfirmOptions {

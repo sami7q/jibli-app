@@ -38,7 +38,7 @@ import type { MerchantType } from '@jibli/contracts';
 import { useVertical } from '@/lib/vertical';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
-import { AddressListSheet } from '@/ui/address-list-sheet';
+import { AddressSheet } from '@/ui/address-sheet';
 import { PinHomeCard } from '@/ui/pin-home-card';
 
 /**
@@ -372,8 +372,9 @@ export default function HomeScreen() {
       {isGuest ? (
         <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
       ) : (
-        <AddressListSheet
+        <AddressSheet
           visible={pickingArea}
+          start="list"
           title="التوصيل إلى"
           onClose={() => setPickingArea(false)}
         />
