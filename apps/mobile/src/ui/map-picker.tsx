@@ -54,7 +54,35 @@ export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPick
     >
       <WebView
         ref={webview}
-        originWhitelist={['*']}
+        /*
+         * `about:blank` and nothing else.
+         *
+         * A document loaded from `source={{ html }}` has no origin, so the old
+         * `['*']` was not "allow the map's own host" — it was "this WebView may
+         * navigate anywhere". The document pulls Leaflet from a CDN and tiles
+         * from a third-party vendor, so a redirect from either, or a crafted
+         * tile response, could steer it somewhere else entirely — inside the
+         * app's own WebView, in front of a customer who is mid-checkout.
+         *
+         * Subresource integrity already guarantees the *script* is the one we
+         * expect. This is the other half: nothing gets to replace the page.
+         */
+        originWhitelist={['about:blank']}
+        /*
+         * The map picks a point. It never navigates, so any attempt to is a
+         * redirect nobody asked for.
+         *
+         * Returning false does not break the map: tiles, CSS and the Leaflet
+         * bundle are subresource loads, which this does not see. It only
+         * governs top-level navigation.
+         */
+        onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
+        /*
+         * Android's WebView honours `window.open` by default and hands the new
+         * window to the system browser. Nothing here opens one, so the only
+         * caller would be something that should not be running.
+         */
+        setSupportMultipleWindows={false}
         source={{ html }}
         onLoadEnd={() => setReady(true)}
         onMessage={(event) => {

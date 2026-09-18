@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DishPlaceholder } from '@/ui/dish-placeholder';
 import { cuisineLabelAr } from '@jibli/contracts';

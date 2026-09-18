@@ -18,6 +18,39 @@ Each of these is a documented rejection reason that has already been closed.
 | **Permission purpose strings**                                                   | `NSLocationWhenInUseUsageDescription`, in Arabic, naming the one screen that uses it  |
 | **Least privilege**                                                              | Android asks for three permissions. No camera, and never `ACCESS_BACKGROUND_LOCATION` |
 | **Privacy policy and terms reachable in-app**                                    | Two rows in `(tabs)/account.tsx`, from `extra.privacyPolicyUrl` / `extra.termsUrl`    |
+| **RTL on first launch**                                                          | `['expo-localization', { forcesRTL: true }]` — see "The first launch was mirrored"   |
+| **iOS privacy manifest**                                                         | `ios.privacyManifests` in `app.config.ts`, `NSPrivacyTracking: false`                |
+| **Android 12+ splash**                                                           | A square `assets/splash-android.png`; the tall one is masked to a circle             |
+| **Forced update path**                                                           | `APP_VERSION_UNSUPPORTED` → `src/ui/update-gate.tsx`                                 |
+| **Store build cannot bake a placeholder URL**                                    | `requireForStore()` in `app.config.ts` throws on `EAS_BUILD_PROFILE=production`      |
+
+### The first launch was mirrored, and that is what review would have seen
+
+`enforceRtl()` calls `I18nManager.forceRTL(true)`, which writes a flag the
+native layer reads **at process start**. On a fresh install it was therefore
+written by a process that had already laid itself out left-to-right — so the
+very first run of the app, for every new customer and for App Review on a
+device that has never seen it, drew the whole Arabic UI mirrored. The second
+launch was correct, which is precisely why it survived development.
+
+`forcesRTL: true` on the `expo-localization` plugin writes
+`ExpoLocalization_forcesRTL` into `Info.plist` and `strings.xml` at build time,
+so the flag is already true before any JavaScript runs. `enforceRtl()` stays for
+the web preview, which has no native layer.
+
+**It cannot be verified in Expo Go** — it changes native resources. Confirm it on
+a `preview` APK installed on a phone that has never had the app.
+
+### Before every production build
+
+```sh
+cd apps/mobile && pnpm release:check
+```
+
+Separate from `pnpm mobile:check`, which answers "can I run this on my phone".
+This one answers "will a store take it": whether the baked-in legal URLs resolve,
+whether FCM credentials exist, whether a tile provider is configured, and whether
+the generated assets are present. It exits non-zero on anything that blocks.
 
 ### Google sign-in and Guideline 4.8
 
@@ -158,6 +191,39 @@ Two mitigations, in the order they are worth doing:
    repository and available at release time, and that is a decision about how
    this project handles secrets rather than a line of configuration. Worth
    doing before the app has real customers, not after.
+
+### The app's name in the two places it appears
+
+They are different things and only one of them is in this repository.
+
+**On the home screen**, under the icon. `name` in `app.config.ts` is «جيبلي», and
+`locales/en.json` overrides it to «Jibli» for a phone set to English. That is
+iOS only — `@expo/config-plugins` pins localized `Info.plist` strings to iOS, so
+Android shows «جيبلي» to everyone. Deliberate: localizing the Android label needs
+a config plugin to maintain across SDK upgrades, for a label almost no Iraqi user
+will see.
+
+Do **not** set `name` to «جيبلي Jibli». The home screen truncates near eleven
+characters, so it renders «جيبلي Jib…», and a short mixed-script string in an RTL
+context orders differently between the two platforms.
+
+**In the store listing**, which is what search actually ranks — and where both
+scripts belong. Set per-locale in App Store Connect and Play Console, 30
+characters each:
+
+| Store     | Locale  | Name                          |
+| --------- | ------- | ----------------------------- |
+| App Store | ar      | `جيبلي Jibli — توصيل طعام`    |
+| App Store | en      | `Jibli جيبلي — Food Delivery` |
+| Play      | ar      | `جيبلي Jibli: توصيل طلبات`    |
+| Play      | en      | `Jibli — Food Delivery Iraq`  |
+
+Apple's keyword field (100 characters, comma-separated, no spaces after commas):
+`توصيل,طعام,مطاعم,ماركت,اكل,طلبات,بغداد,العراق,delivery,food,iraq,baghdad`.
+Do not repeat the app name in it — the title and subtitle are already indexed,
+and Apple combines terms, so `توصيل` plus `طعام` covers the phrase. Play has no
+keyword field; it ranks from the two descriptions, so both names belong there in
+prose.
 
 ### Smaller
 

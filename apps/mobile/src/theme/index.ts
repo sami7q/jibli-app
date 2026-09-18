@@ -1,4 +1,5 @@
 import { I18nManager, Platform, type TextStyle, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   color as tokenColor,
   duration,
@@ -174,16 +175,26 @@ export const color = {
 export const TAP_TARGET = tapTarget.native;
 
 /**
- * How tall the bottom tab bar is.
+ * The tab bar's own height, before the system's inset is added to it.
  *
  * Here rather than in the tabs layout because two things need it and only one
  * of them draws it: anything floating above the bar — a live-order card, a
  * toast — has to know where the bar ends, and a second copy of the number is
  * how such a thing ends up half a centimetre out on one platform.
  *
- * The iOS figure covers the home indicator, which the bar sits over.
+ * It used to be this plus a constant for the area below: 34 on iOS for the home
+ * indicator, and 14 on Android. The iOS number is right because the home
+ * indicator is always the same height. The Android one was a guess, and wrong
+ * for the common case — three-button navigation reserves roughly 48 — which put
+ * the tab icons underneath the system bar. Under API 36 that is no longer even
+ * a device-specific problem: Android 15 enforces edge-to-edge and removes the
+ * opt-out, so the system bar overlaps by default everywhere.
+ *
+ * So the constant is now only the part that *is* constant, and every consumer
+ * adds `useSafeAreaInsets().bottom` — the measured value, on both platforms —
+ * via `useTabBarHeight()` below.
  */
-export const TAB_BAR_HEIGHT = TAP_TARGET + (Platform.OS === 'ios' ? 34 : 14);
+export const TAB_BAR_CONTENT_HEIGHT = TAP_TARGET + space[1];
 
 /**
  * One bundled font file per weight, named by the family React Native will ask
@@ -390,4 +401,16 @@ export function enforceRtl(): void {
 /** True once the native layer is actually laying out RTL. */
 export function isRtlActive(): boolean {
   return I18nManager.isRTL;
+}
+
+/**
+ * How much room the tab bar takes at the bottom of the screen, for this device.
+ *
+ * The one number anything floating above the bar should use. Kept beside the
+ * bar's own constant so the card that hovers over it and the bar itself cannot
+ * drift apart — which is what happened when each added its own guess at the
+ * system inset.
+ */
+export function useTabBarHeight(): number {
+  return TAB_BAR_CONTENT_HEIGHT + useSafeAreaInsets().bottom;
 }

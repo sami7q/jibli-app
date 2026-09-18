@@ -84,10 +84,45 @@ const SINGLETON_PATHS = new Map(
   }),
 );
 
+/**
+ * A feature this app does not use, and pays 1.2 MB on Android to carry.
+ *
+ * `src/app/(tabs)/_layout.tsx` uses expo-router's ordinary `Tabs`. It has never
+ * used `NativeTabs`. But `expo-router`'s entry point re-exports the native-tabs
+ * module, and Metro resolves statically — it cannot know a component is never
+ * rendered — so the whole chain below it lands in the bundle:
+ *
+ *     expo-router  →  native-tabs  →  @expo/ui/jetpack-compose   (~263 KB, 80 modules)
+ *                                 →  expo-symbols
+ *                                      →  MaterialSymbols_400Regular.ttf  (966 KB)
+ *
+ * That font is a *thousand* icon glyphs, shipped so that a tab bar the app does
+ * not draw could label itself. It is Android-only — on iOS `expo-symbols` maps
+ * to the system's SF Symbols and no font is bundled — which is most of why the
+ * Android payload was 1.2 MB heavier than the iOS one for identical JavaScript.
+ *
+ * `type: 'empty'` rather than a blockList: the import still resolves, to an
+ * empty module, so any code path that merely *references* these keeps working
+ * and only one that actually calls into them would fail. Nothing in this app
+ * does, because nothing renders `NativeTabs`.
+ *
+ * ⚠️ If a screen ever adopts `NativeTabs`, delete this. The symptom would be an
+ * undefined component at render time, which is a confusing error a long way
+ * from its cause — hence this comment rather than a one-line exclusion.
+ */
+const UNUSED_NATIVE_TABS = [
+  /^@expo\/ui(\/.*)?$/,
+  /^@expo-google-fonts\/material-symbols(\/.*)?$/,
+];
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const singleton = SINGLETON_PATHS.get(moduleName);
   if (singleton) {
     return { type: 'sourceFile', filePath: singleton };
+  }
+
+  if (UNUSED_NATIVE_TABS.some((pattern) => pattern.test(moduleName))) {
+    return { type: 'empty' };
   }
 
   const relative = moduleName.startsWith('.');

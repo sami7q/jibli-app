@@ -57,6 +57,17 @@ import {
 
 // ── Text ────────────────────────────────────────────────────────────────────
 
+/**
+ * How far the app lets the system's text-size setting grow the type.
+ *
+ * Set here, once, because every string in the app renders through `Text` below
+ * — which is also why the app had no ceiling at all until now: there was one
+ * place to add it and nobody had.
+ *
+ * See the note on the prop for why this is a cap rather than a switch.
+ */
+export const TEXT_SCALE_CEILING = 1.4;
+
 export type TextVariant = keyof typeof text;
 
 export function Text({
@@ -66,6 +77,7 @@ export function Text({
   align,
   style,
   numberOfLines,
+  maxFontSizeMultiplier,
 }: {
   children: ReactNode;
   variant?: TextVariant;
@@ -74,6 +86,13 @@ export function Text({
   align?: 'start' | 'center';
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
+  /**
+   * Let this one piece of text grow further than the app-wide ceiling.
+   *
+   * For a number or a heading that is the whole point of its screen and has
+   * room to grow into. Defaults to `TEXT_SCALE_CEILING`.
+   */
+  maxFontSizeMultiplier?: number;
 }) {
   const tones: Record<string, string> = {
     primary: color.textPrimary,
@@ -93,6 +112,26 @@ export function Text({
         align ? { textAlign: align === 'start' ? TEXT_START : ('center' as const) } : null,
         style,
       ]}
+      /*
+       * Accessibility text scaling, capped rather than ignored or disabled.
+       *
+       * Nothing set this, so the app inherited the platform default of
+       * unlimited: Android 14 allows 2.0× and, combined with Display Size,
+       * more. This app is full of containers with deliberate fixed heights —
+       * `TAP_TARGET` buttons, the tab bar, price rows, badges — so unbounded
+       * growth did not reflow, it clipped. A customer who has turned text up
+       * because they need it turned up was the one who could not read the
+       * total.
+       *
+       * `allowFontScaling={false}` is the usual reflex and is the wrong fix:
+       * it means someone who set larger text gets ignored, which is worse than
+       * a cramped layout and is an accessibility failure in its own right.
+       *
+       * 1.4 is where this app's layouts hold. It honours most of the range
+       * people actually use while keeping the extreme end from breaking the
+       * screens — and a screen that genuinely has room can opt out per call.
+       */
+      maxFontSizeMultiplier={maxFontSizeMultiplier ?? TEXT_SCALE_CEILING}
       {...(numberOfLines === undefined ? {} : { numberOfLines })}
     >
       {children}

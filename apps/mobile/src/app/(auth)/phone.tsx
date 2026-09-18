@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';

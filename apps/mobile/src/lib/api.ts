@@ -125,11 +125,86 @@ export interface RequestOptions {
    * which one a write is for.
    */
   readonly restaurantId?: string;
+  /**
+   * A caller's own abort signal — a screen cancelling on unmount, say.
+   *
+   * Composed with the default timeout below rather than replacing it: passing
+   * one should not silently opt a request out of ever giving up.
+   */
   readonly signal?: AbortSignal;
+  /**
+   * Override the default timeout for this request, in milliseconds.
+   *
+   * `0` disables it, which nothing should need — it exists so that a future
+   * long-running upload has a way to say so explicitly rather than by
+   * forgetting.
+   */
+  readonly timeoutMs?: number;
   /** Internal: prevents an infinite refresh loop. */
   readonly _isRetry?: boolean;
   /** Internal: how many cold-start retries this request has already spent. */
   readonly _coldStartAttempt?: number;
+}
+
+/**
+ * How long a request may hang before the app stops waiting for it.
+ *
+ * `fetch` has no default timeout — not in React Native, not anywhere. A TCP
+ * connection that opens and is never answered, which is an ordinary event on
+ * Iraqi mobile data and the normal one on a train or in a lift, left the app
+ * on a spinner *forever*: no error, no retry, no way out but force-quitting.
+ * Every screen in the app had this, because every screen goes through here.
+ *
+ * Two numbers, because the two cases are not the same risk. A read that gives
+ * up early can simply be retried, and fifteen seconds is already far past the
+ * point a customer decides the app is broken. A write is given twice that: it
+ * may have reached the server and be committing, and aborting the *client*
+ * does not abort that — so the longer wait buys the answer rather than an
+ * uncertainty the customer has to resolve by guessing.
+ *
+ * The cold-start path already handles the other shape of slowness — a gateway
+ * that answers quickly to say the server is still waking — so this is only
+ * about silence.
+ */
+const READ_TIMEOUT_MS = 15_000;
+const WRITE_TIMEOUT_MS = 30_000;
+
+/**
+ * One signal that fires when either the caller's or the timeout's does.
+ *
+ * `AbortSignal.any` is the obvious way to write this and is not on Hermes, so
+ * this is the same thing with a listener. The timer is cleared by the caller
+ * once the request settles, or a request that finishes in 200 ms still holds a
+ * 15-second timer and, on a busy list screen, a few hundred of them.
+ */
+function withTimeout(
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal | undefined; done: () => void; timedOut: () => boolean } {
+  if (timeoutMs <= 0) return { signal, done: () => {}, timedOut: () => false };
+
+  const controller = new AbortController();
+  let expired = false;
+
+  const timer = setTimeout(() => {
+    expired = true;
+    controller.abort();
+  }, timeoutMs);
+
+  const forward = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) forward();
+    else signal.addEventListener('abort', forward);
+  }
+
+  return {
+    signal: controller.signal,
+    done: () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', forward);
+    },
+    timedOut: () => expired,
+  };
 }
 
 let refreshInFlight: Promise<boolean> | null = null;
@@ -149,11 +224,27 @@ async function refreshAccessToken(): Promise<boolean> {
       const session = await loadSession();
       if (!session) return false;
 
-      const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: session.refreshToken }),
-      });
+      /*
+       * Its own timeout, because this one does not go through `apiRequest`.
+       *
+       * It cannot: `apiRequest` is what calls *this* on a 401, and routing the
+       * refresh back through it would recurse. So the guarantee has to be
+       * repeated here — and it matters more here than anywhere, since every
+       * request waiting on a 401 is waiting on this single promise. A refresh
+       * that hangs hangs the whole app, not one screen.
+       */
+      const refresh = withTimeout(undefined, WRITE_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: session.refreshToken }),
+          ...(refresh.signal ? { signal: refresh.signal } : {}),
+        });
+      } finally {
+        refresh.done();
+      }
 
       if (!response.ok) {
         await clearSession();
@@ -208,19 +299,34 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     if (session) headers.Authorization = `Bearer ${session.accessToken}`;
   }
 
+  const httpMethod = options.method ?? 'GET';
+  const timeout = withTimeout(
+    options.signal,
+    options.timeoutMs ?? (httpMethod === 'GET' ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS),
+  );
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      method: options.method ?? 'GET',
+      method: httpMethod,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      ...(options.signal ? { signal: options.signal } : {}),
+      ...(timeout.signal ? { signal: timeout.signal } : {}),
     });
   } catch (error) {
     // A network failure is NOT a business outcome. For a placed order the
     // caller resolves it by idempotency key rather than assuming failure
     // (plan §109).
+    //
+    // A timeout arrives here as an AbortError and is the same thing as far as
+    // the caller is concerned — the request has no answer — so it is reported
+    // as one rather than as a fourth error class every screen would have to
+    // learn. `timedOut()` distinguishes it from a caller who cancelled on
+    // purpose, which must stay an abort and not become a red banner.
+    if (options.signal?.aborted && !timeout.timedOut()) throw error;
     throw new NetworkError(error);
+  } finally {
+    timeout.done();
   }
 
   if (response.status === 401 && !options._isRetry && options.authenticated !== false) {
@@ -239,10 +345,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
    * server knows; a duplicated order is a worse outcome than a retry the
    * customer performs themselves (plan §109).
    */
-  const method = options.method ?? 'GET';
   if (
     COLD_START_STATUSES.has(response.status) &&
-    method === 'GET' &&
+    httpMethod === 'GET' &&
     (options._coldStartAttempt ?? 0) < COLD_START_RETRIES
   ) {
     const attempt = (options._coldStartAttempt ?? 0) + 1;
@@ -274,9 +379,19 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
      */
     const fallback: ErrorCode = response.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR';
     const code = (payload?.error?.code ?? fallback) as ErrorCode;
+    const messageAr =
+      payload?.error?.message ?? ERROR_MESSAGES_AR[code] ?? ERROR_MESSAGES_AR.INTERNAL_ERROR;
+
+    /*
+     * Announced before it is thrown, because the throw is caught by whichever
+     * caller happened to be asking and would otherwise be shown as that
+     * screen's local failure.
+     */
+    if (code === 'APP_VERSION_UNSUPPORTED') announceVersionUnsupported(messageAr);
+
     throw new ApiError(
       code,
-      payload?.error?.message ?? ERROR_MESSAGES_AR[code] ?? ERROR_MESSAGES_AR.INTERNAL_ERROR,
+      messageAr,
       payload?.error?.details ?? {},
       response.status,
       payload?.error?.request_id ?? '',
@@ -286,6 +401,43 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (response.status === 204) return undefined as T;
   const envelope = (await response.json()) as Envelope<T>;
   return envelope.data;
+}
+
+// ── "This version can no longer be used" ───────────────────────────────────
+
+/**
+ * The server's answer that the app itself is the problem (plan §119).
+ *
+ * `ApiError.needsUpdate` has existed since this file was written and nothing
+ * ever read it, so the one error the customer *can* act on — «حدّث التطبيق» —
+ * arrived as the generic «تعذّر الاتصال» on whichever screen happened to ask.
+ * The version is sent on every request as `X-App-Version`, so the server can
+ * raise this at any moment, from any call.
+ *
+ * That is exactly why it is a broadcast rather than a return value: no single
+ * screen owns it. It is a fact about the binary, so it is published once here
+ * and `UpdateGate` draws over everything when it hears it.
+ *
+ * One-way on purpose. A version does not become supported again while the app
+ * is running, and a gate that could be dismissed would be a gate the customer
+ * taps past on the way to a checkout the server is going to refuse anyway.
+ */
+type VersionListener = (messageAr: string) => void;
+
+const versionListeners = new Set<VersionListener>();
+let versionUnsupportedMessage: string | null = null;
+
+export function onVersionUnsupported(listener: VersionListener): () => void {
+  versionListeners.add(listener);
+  // A listener mounting after the fact still needs to know.
+  if (versionUnsupportedMessage) listener(versionUnsupportedMessage);
+  return () => versionListeners.delete(listener);
+}
+
+function announceVersionUnsupported(messageAr: string): void {
+  if (versionUnsupportedMessage) return;
+  versionUnsupportedMessage = messageAr;
+  for (const listener of versionListeners) listener(messageAr);
 }
 
 /** Stable idempotency key for a command the user may retry (plan §28). */

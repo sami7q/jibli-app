@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import { onlineManager } from '@tanstack/react-query';
-import { View } from 'react-native';
+import { focusManager, onlineManager } from '@tanstack/react-query';
+import { AppState, Platform, View, type AppStateStatus } from 'react-native';
 import { color, space } from '@/theme';
 import { Text } from '@/ui';
 
@@ -40,7 +40,46 @@ export function startNetworkWatch(): () => void {
     return unsubscribe;
   });
 
-  return () => unsubscribe?.();
+  const stopFocusWatch = startFocusWatch();
+
+  return () => {
+    unsubscribe?.();
+    stopFocusWatch();
+  };
+}
+
+/**
+ * Tell React Query when the app is actually being looked at.
+ *
+ * React Query's idea of "focus" is a browser's `window.focus`, which no phone
+ * has — so without this it believes the app is permanently in front of
+ * somebody. Two consequences, and both were live:
+ *
+ *   **The 20-second order poll kept running in the background.** On Android JS
+ *   timers survive backgrounding, so a phone in a pocket went on asking the
+ *   API whether the order had moved, every twenty seconds, on mobile data,
+ *   with the screen off. iOS suspends timers and hid the same bug.
+ *
+ *   **Coming back showed stale state.** Reopening the app after an hour is
+ *   precisely when the order status is most likely to have changed and most
+ *   worth refetching, and nothing asked for it until the next interval.
+ *
+ * `active` is the only state that counts as focused: `inactive` is the iOS
+ * moment during the app switcher or a system prompt, and treating that as a
+ * blur would cancel polling every time a permission dialog appeared.
+ */
+function startFocusWatch(): () => void {
+  focusManager.setEventListener((handleFocus) => {
+    const subscription = AppState.addEventListener('change', (status: AppStateStatus) => {
+      // Web has real focus events of its own; letting AppState drive it there
+      // would fight them.
+      if (Platform.OS !== 'web') handleFocus(status === 'active');
+    });
+
+    return () => subscription.remove();
+  });
+
+  return () => focusManager.setEventListener(() => () => {});
 }
 
 export function useIsOffline(): boolean {

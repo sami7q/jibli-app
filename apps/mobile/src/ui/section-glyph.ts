@@ -1,7 +1,12 @@
-import type MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { currentSection } from '@/theme';
+import type { IconName } from '@/ui/icon';
 
-type GlyphName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+/*
+ * Named against the subset rather than the full typeface, so that a glyph this
+ * file returns but the font no longer carries is a type error here rather than
+ * a blank square on a merchant card.
+ */
+type GlyphName = IconName;
 
 /**
  * The glyph that stands in for a picture nobody uploaded.

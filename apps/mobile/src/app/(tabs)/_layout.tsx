@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
 import { View, type ColorValue } from 'react-native';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { color, LAID_OUT_RTL, radius, space, TAB_BAR_HEIGHT, text } from '@/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MaterialCommunityIcons from '@/ui/icon';
+import { color, LAID_OUT_RTL, radius, space, TAB_BAR_CONTENT_HEIGHT, text } from '@/theme';
 
 /**
  * The shell.
@@ -55,6 +56,25 @@ export default function TabsLayout() {
    */
   const ordered = LAID_OUT_RTL ? TABS : [...TABS].reverse();
 
+  /*
+   * The bar's height is the bar plus whatever the system is occupying below it.
+   *
+   * It used to be a constant — 48 plus 34 on iOS for the home indicator, plus a
+   * guessed 14 on Android. The 34 is right; the 14 was a number, not a
+   * measurement. An Android phone on three-button navigation reserves about 48
+   * there, and because setting `height` explicitly overrides the inset
+   * React Navigation would otherwise add, the icons and labels were pushed into
+   * the system navigation bar.
+   *
+   * That stopped being a cosmetic problem when the app moved to API 36:
+   * Android 15 enforces edge-to-edge and an app can no longer opt out, so the
+   * system bar is drawn over the app's own layout by default on every device.
+   *
+   * Reading the real inset costs a hook and is correct on all of them — gesture
+   * navigation, three-button, and the iOS home indicator alike.
+   */
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       initialRouteName={HOME}
@@ -66,8 +86,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: color.surfaceCard,
           borderTopColor: color.borderSubtle,
-          height: TAB_BAR_HEIGHT,
+          height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
           paddingTop: space[1],
+          paddingBottom: insets.bottom,
         },
         tabBarLabelStyle: text.caption,
       }}

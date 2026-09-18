@@ -24,7 +24,9 @@ import Cairo_800ExtraBold from '@expo-google-fonts/cairo/Cairo_800ExtraBold.ttf'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiError, NetworkError } from '@/lib/api';
+import { usePushNavigation } from '@/lib/push';
 import { SessionProvider, useSession } from '@/lib/session';
+import { UpdateGate } from '@/ui/update-gate';
 import { AreaProvider } from '@/lib/area';
 import { VerticalProvider, useVertical } from '@/lib/vertical';
 import { CartProvider } from '@/lib/cart';
@@ -33,6 +35,7 @@ import { ActiveOrderBar, OrderWatchProvider } from '@/lib/order-watch';
 import { GlobalCartBar } from '@/lib/cart-dock';
 import { ErrorBoundary } from '@/lib/error-boundary';
 import { DialogHost } from '@/ui/dialog-host';
+import { ICON_FONT, ICON_FONT_FAMILY } from '@/ui/icon';
 import { color, enforceRtl, palette } from '@/theme';
 
 /**
@@ -81,6 +84,20 @@ export default function RootLayout() {
     Cairo_600SemiBold,
     Cairo_700Bold,
     Cairo_800ExtraBold,
+    /*
+     * The icon font, loaded here rather than left to itself.
+     *
+     * `createIconSet` loads its own font in `componentDidMount` and renders an
+     * empty `<Text/>` until it arrives — so every icon on the first screen pops
+     * in a frame or two late, which on the tab bar is four holes that fill
+     * themselves. Loading it with the text faces means it is already there when
+     * the splash lifts, at no extra cost: it is the same file either way, 17 KB,
+     * and the splash is already being held for Cairo.
+     *
+     * The key must be the family name `src/ui/icon.tsx` passed to
+     * `createIconSet`, because that is what its `Font.isLoaded` check asks for.
+     */
+    [ICON_FONT_FAMILY]: ICON_FONT,
   });
 
   useEffect(() => startNetworkWatch(), []);
@@ -125,6 +142,13 @@ export default function RootLayout() {
                      * the app can have open — which is the whole point of one.
                      */}
                     <DialogHost />
+                    {/*
+                     * Above even the dialogs. When the server has said this
+                     * binary may no longer be used, there is nothing underneath
+                     * worth interacting with — including a dialog asking to
+                     * confirm something the next request will refuse.
+                     */}
+                    <UpdateGate />
                   </OrderWatchProvider>
                 </CartProvider>
               </AreaProvider>
@@ -152,6 +176,12 @@ function Gate() {
   const { vertical } = useVertical();
   const router = useRouter();
   const segments = useSegments();
+
+  /*
+   * Here rather than in `RootLayout` because it navigates, and the navigator
+   * only exists from this point down. A tap handled above it goes nowhere.
+   */
+  usePushNavigation();
 
   useEffect(() => {
     if (state.status === 'loading') return;

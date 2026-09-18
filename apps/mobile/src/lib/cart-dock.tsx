@@ -2,7 +2,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { useCart } from './cart';
 import { useOrderWatch } from './order-watch';
 import { CartBar } from '@/ui/catalog';
-import { space, TAB_BAR_HEIGHT } from '@/theme';
+import { space, useTabBarHeight } from '@/theme';
 
 /**
  * The cart, wherever a customer can add to it.
@@ -32,6 +32,7 @@ export function GlobalCartBar() {
   const { announcement } = useOrderWatch();
   const router = useRouter();
   const segments = useSegments() as readonly string[];
+  const tabBarHeight = useTabBarHeight();
 
   if (itemCount === 0) return null;
   if (NOT_HERE.has(segments[0] ?? '')) return null;
@@ -50,7 +51,7 @@ export function GlobalCartBar() {
       count={itemCount}
       totalIqd={subtotalIqd}
       onPress={() => router.push('/cart')}
-      bottom={TAB_BAR_HEIGHT + space[3]}
+      bottom={tabBarHeight + space[3]}
     />
   );
 }

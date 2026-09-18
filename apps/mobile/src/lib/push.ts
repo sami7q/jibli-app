@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import { apiRequest } from './api';
 
 /**
@@ -28,11 +30,37 @@ import { apiRequest } from './api';
  *   itself is a routing address and lives in ordinary storage.
  */
 
+/**
+ * What the worker actually puts in a push payload.
+ *
+ * `apps/worker/src/jobs/outbox-publisher.ts` sends
+ * `{ orderId, eventType }` — and this file used to read `data.kind`, a key
+ * nothing has ever sent. So `isOrder` was false for every notification the
+ * platform produces: no sound and no high priority on exactly the messages
+ * both were written for, silently, because a missing key reads as "not an
+ * order" rather than as an error.
+ *
+ * Typed and parsed in one place so the next divergence is a type error rather
+ * than a behaviour nobody notices.
+ */
+export interface OrderPushData {
+  readonly orderId: string;
+  readonly eventType: string;
+}
+
+export function readOrderPush(data: unknown): OrderPushData | null {
+  if (typeof data !== 'object' || data === null) return null;
+
+  const { orderId, eventType } = data as Record<string, unknown>;
+  if (typeof orderId !== 'string' || orderId.length === 0) return null;
+
+  return { orderId, eventType: typeof eventType === 'string' ? eventType : '' };
+}
+
 /** Foreground behaviour: an order update should interrupt, a promo should not. */
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    const kind = notification.request.content.data?.['kind'];
-    const isOrder = typeof kind === 'string' && kind.startsWith('order.');
+    const isOrder = readOrderPush(notification.request.content.data) !== null;
 
     /*
      * `shouldShowAlert` was one switch; iOS 14 split the decision in two and
@@ -128,4 +156,74 @@ export async function registerForPush(): Promise<PushOutcome> {
     console.warn('Push registration failed', error);
     return { status: 'unavailable', reason: String(error) };
   }
+}
+
+// ── Opening the thing the notification is about ─────────────────────────────
+
+/**
+ * Take the customer to the order a notification is about.
+ *
+ * Without this, tapping «تم قبول طلبك» opened the app on the home screen and
+ * left them to find the order themselves — which is most of the value of
+ * sending the notification, thrown away at the last step. A push that does not
+ * deep-link is a push that only tells you to go looking.
+ *
+ * Two entry points, because a notification arrives in two different worlds and
+ * only one of them is an event:
+ *
+ *   **The app was running.** `addNotificationResponseReceivedListener` fires
+ *   with the tap.
+ *
+ *   **The app was not running, and the tap started it.** There is no event to
+ *   listen for — it happened before any listener existed.
+ *   `useLastNotificationResponse` holds it instead, which is why this is a hook
+ *   and not a function called once at startup.
+ *
+ * Mounted inside the router's tree (see `src/app/_layout.tsx`), because
+ * navigating before the navigator exists is a no-op that loses the tap
+ * silently.
+ */
+export function usePushNavigation(): void {
+  const router = useRouter();
+  const last = Notifications.useLastNotificationResponse();
+
+  /*
+   * The cold-start tap, handled once.
+   *
+   * `useLastNotificationResponse` keeps returning the same response for the
+   * life of the process, so without the guard every re-render of the layout
+   * would navigate again — including after the customer has deliberately
+   * browsed somewhere else, which would drag them back to the order screen
+   * until they force-quit.
+   */
+  const handled = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!last) return;
+
+    const id = last.notification.request.identifier;
+    if (handled.current === id) return;
+    handled.current = id;
+
+    const payload = readOrderPush(last.notification.request.content.data);
+    if (payload) router.push(`/order/${payload.orderId}`);
+  }, [last, router]);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      /*
+       * The cold-start response is delivered here too on some platforms, so the
+       * same guard applies — otherwise one tap navigates twice and the back
+       * button has to be pressed twice to leave.
+       */
+      const id = response.notification.request.identifier;
+      if (handled.current === id) return;
+      handled.current = id;
+
+      const payload = readOrderPush(response.notification.request.content.data);
+      if (payload) router.push(`/order/${payload.orderId}`);
+    });
+
+    return () => subscription.remove();
+  }, [router]);
 }

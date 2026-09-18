@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import { api } from '@/lib/api';
 import { useIsGuest } from '@/lib/session';
 import { dismissPinHome, pinHomeDismissed } from '@/lib/home-pin-store';

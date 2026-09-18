@@ -3,7 +3,7 @@ import { Image as RNImage, Pressable, View, useWindowDimensions } from 'react-na
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import type { MerchantType } from '@jibli/contracts';
 import { api, assetUrl } from '@/lib/api';
 import { useVertical } from '@/lib/vertical';

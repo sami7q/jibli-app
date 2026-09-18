@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError, type GeographyOption } from '@/lib/api';
 import { color, radius, space, TAP_TARGET } from '@/theme';

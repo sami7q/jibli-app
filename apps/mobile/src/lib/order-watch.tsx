@@ -10,14 +10,14 @@ import {
 import { AppState, Platform, Pressable, View } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
 import { playChime } from './chime';
 import { useSession } from './session';
 import { useCart } from './cart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { color, radius, shadow, space, TAB_BAR_HEIGHT } from '@/theme';
+import { color, radius, shadow, space, useTabBarHeight } from '@/theme';
 import { Row, Text } from '@/ui';
 import { RateOrderSheet } from '@/ui/rate-order';
 
@@ -367,6 +367,7 @@ export function ActiveOrderBar() {
   const router = useRouter();
   const segments = useSegments() as readonly string[];
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useTabBarHeight();
 
   if (SCREENS_WITH_THEIR_OWN_DOCK.has(segments[0] ?? '')) return null;
 
@@ -443,7 +444,7 @@ export function ActiveOrderBar() {
         // physical sides behave identically on every renderer.
         left: space[4],
         right: space[4],
-        bottom: (onTabs ? TAB_BAR_HEIGHT : insets.bottom) + space[3],
+        bottom: (onTabs ? tabBarHeight : insets.bottom) + space[3],
       }}
     >
       <Pressable

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import { color, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, Ltr, Row, Text } from '@/ui';
 import { JibliWordmark } from '@/ui/brand';

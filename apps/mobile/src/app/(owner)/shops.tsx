@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@/ui/icon';
 import { isShopSupported, useOwner } from '@/lib/owner';
 import { color, radius, ROW, space, TAP_TARGET } from '@/theme';
 import { EmptyState, Row, Screen, Text } from '@/ui';

@@ -8,7 +8,82 @@ import type { ExpoConfig } from 'expo/config';
  * here — adding one "just in case" would fail store review and expand the
  * privacy surface for a feature that does not exist yet.
  */
+
+/**
+ * Whether EAS is building the profile that goes to a store.
+ *
+ * EAS sets this on its builders; it is undefined on a laptop running
+ * `expo start`, which is the distinction that matters below.
+ */
+const isStoreBuild = process.env.EAS_BUILD_PROFILE === 'production';
+
+/**
+ * Placeholders that must not survive into a submitted binary.
+ *
+ * Every value here is read when this file is evaluated and **baked into the
+ * binary** — so a build made with the defaults is a build with dead links
+ * inside it, and no `eas update` can reach them afterwards. That is the
+ * mechanism that makes this worth failing a build over rather than noting in a
+ * runbook: the mistake is unrecoverable by the cheap path, and it is silent.
+ *
+ * Each of these has a specific consequence:
+ *
+ *   `jibli.iq` has no DNS. «سياسة الخصوصية» and «الشروط» in حسابي are two rows
+ *   App Review opens, and a privacy policy that does not resolve is a rejection
+ *   on both stores — App Store 5.1.1 and 1.5, and Play refuses the listing.
+ *
+ *   `tile.openstreetmap.org` is a donated server whose usage policy explicitly
+ *   forbids a distributed application from pointing at it. Shipping it is a
+ *   licence problem, not a performance one, and the free tier of any tile
+ *   vendor covers this app several times over.
+ *
+ * Checked only for a store build so that `expo start`, Expo Go and the preview
+ * APK keep working untouched for anyone who just wants to run the app.
+ */
+function requireForStore(name: string, value: string | undefined, placeholder: string): string {
+  const resolved = value ?? placeholder;
+
+  if (isStoreBuild && resolved === placeholder) {
+    throw new Error(
+      `${name} is still the placeholder (${placeholder}).\n` +
+        `It is baked into the binary at build time, so a production build with ` +
+        `this value cannot be fixed by an update — only by another submission.\n` +
+        `Set ${name} in eas.json's production profile before building.`,
+    );
+  }
+
+  return resolved;
+}
+
+const privacyPolicyUrl = requireForStore(
+  'EXPO_PUBLIC_PRIVACY_URL',
+  process.env.EXPO_PUBLIC_PRIVACY_URL,
+  'https://jibli.iq/privacy',
+);
+
+const termsUrl = requireForStore(
+  'EXPO_PUBLIC_TERMS_URL',
+  process.env.EXPO_PUBLIC_TERMS_URL,
+  'https://jibli.iq/terms',
+);
+
 const config: ExpoConfig = {
+  /*
+   * The home-screen name, and the default for every language without an entry
+   * in `locales` below.
+   *
+   * Arabic rather than «Jibli» because that is what an Iraqi customer is
+   * looking for on their own home screen, and because a phone in Arabic
+   * showing a Latin label among Arabic ones reads as a foreign app. English
+   * phones get «Jibli» from `locales/en.json`.
+   *
+   * Deliberately not «جيبلي Jibli» as one string: the home screen truncates at
+   * roughly eleven characters, so it would render «جيبلي Jib…» — and a short
+   * mixed-script label in an RTL context orders differently on iOS and Android,
+   * which is a bug nobody can see in a screenshot. Both scripts belong in the
+   * *store listing* name, which is what search ranks; see
+   * docs/operations/store-submission.md.
+   */
   name: 'جيبلي',
   slug: 'jibli',
   /** The EAS account the builds and updates belong to. */
@@ -18,6 +93,20 @@ const config: ExpoConfig = {
   scheme: 'jibli',
   userInterfaceStyle: 'light',
   icon: './assets/icon.png',
+
+  /*
+   * Localized Info.plist strings — iOS only.
+   *
+   * This is the only way `CFBundleDisplayName` can be two things at once, and
+   * the only reason it exists: «Jibli» on an English phone, «جيبلي» everywhere
+   * else. `@expo/config-plugins` pins this to iOS
+   * (`getResolvedLocalesAsync(..., 'ios')`), so Android keeps `name` above —
+   * see locales/README.md for why that is left alone rather than plugged.
+   */
+  locales: {
+    ar: './locales/ar.json',
+    en: './locales/en.json',
+  },
 
   /**
    * Over-the-air updates.
@@ -102,19 +191,139 @@ const config: ExpoConfig = {
      * forty-five tiles, and a thousand customers saving two addresses each
      * comes to under a hundred thousand requests in total.
      */
-    mapTileUrl: process.env.EXPO_PUBLIC_MAP_TILE_URL ?? null,
+    /*
+     * Null in development, mandatory for a store build.
+     *
+     * Unset, `map-picker-html.ts` falls back to `tile.openstreetmap.org`, which
+     * the OSMF usage policy forbids a distributed app from using — so the
+     * fallback is fine on a laptop and is a licence violation in a submission.
+     * `requireForStore` turns that from something to remember into something
+     * the build refuses to do.
+     */
+    mapTileUrl: isStoreBuild
+      ? requireForStore('EXPO_PUBLIC_MAP_TILE_URL', process.env.EXPO_PUBLIC_MAP_TILE_URL, '')
+      : (process.env.EXPO_PUBLIC_MAP_TILE_URL ?? null),
     mapTileAttribution: process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? null,
-    supportPhone: process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '+9647700000000',
-    privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://jibli.iq/privacy',
-    termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://jibli.iq/terms',
+    supportPhone: requireForStore(
+      'EXPO_PUBLIC_SUPPORT_PHONE',
+      process.env.EXPO_PUBLIC_SUPPORT_PHONE,
+      '+9647700000000',
+    ),
+    /*
+     * The App Store numeric id, for the «حدّث التطبيق» button.
+     *
+     * It does not exist until App Store Connect has issued it, which is after
+     * the first build — so this is genuinely optional rather than lazily
+     * unset, and `UpdateGate` opens a store *search* for the name when it is
+     * missing. A link to `id/undefined` would be worse than a search.
+     * Not guarded by `requireForStore` for the same reason.
+     */
+    iosAppId: process.env.EXPO_PUBLIC_IOS_APP_ID ?? null,
+    /*
+     * Both resolved above rather than here, because a store build must not be
+     * allowed to bake the placeholder — see `requireForStore`.
+     */
+    privacyPolicyUrl,
+    termsUrl,
   },
-  assetBundlePatterns: ['**/*'],
+  /*
+   * The four files the app actually ships, named rather than globbed.
+   *
+   * The old glob swept in everything under `assets/`, which was harmless while
+   * the directory held four icons — and is a trap the moment somebody drops a
+   * comp, a source PSD export or a spare banner in there to look at: it enters
+   * the binary silently and nothing in review points at it. Naming them means
+   * a new bundled asset is a deliberate line in this file.
+   */
+  assetBundlePatterns: [
+    'assets/icon.png',
+    'assets/adaptive-icon.png',
+    'assets/splash.png',
+    'assets/splash-android.png',
+  ],
   web: { favicon: './assets/favicon.png' },
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'iq.jibli.app',
+    /*
+     * What the app collects, declared rather than inferred.
+     *
+     * Required since May 2024. Expo's own pods each ship a
+     * `PrivacyInfo.xcprivacy` for the APIs they call, which is what Apple's
+     * automated check reads for third-party SDKs — but the *app-level* manifest
+     * is ours, and without it there is no statement that Jibli does not track.
+     *
+     * `NSPrivacyTracking: false` is the honest answer and the load-bearing one:
+     * there is no advertising SDK and no third-party analytics in this binary,
+     * which is also why there is no `NSUserTrackingUsageDescription` and no ATT
+     * prompt. Adding either would be claiming a capability the app does not have.
+     *
+     * The collected types match what App Privacy in App Store Connect must say,
+     * and a mismatch between the two is the thing that gets noticed.
+     */
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyCollectedDataTypes: [
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePhoneNumber',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+          ],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeName',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+          ],
+        },
+        {
+          /* The delivery pin, attached to an address the customer saved. */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePreciseLocation',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+          ],
+        },
+        {
+          /* Order history — what was bought, from where. */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePurchaseHistory',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+          ],
+        },
+      ],
+      /*
+       * Required-reason APIs this binary reaches, through its dependencies
+       * rather than through code of ours: `expo-secure-store` and React Native's
+       * own settings layer read UserDefaults. CA92.1 is the "app itself only"
+       * reason, which is what both do — nothing here is shared with a broker.
+       */
+      NSPrivacyAccessedAPITypes: [
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
+          NSPrivacyAccessedAPITypeReasons: ['CA92.1'],
+        },
+      ],
+    },
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
+      /*
+       * The languages the bundle claims, which is what makes `locales` above
+       * take effect: iOS matches the phone's language against this list before
+       * it looks for an `.lproj` directory, and an unlisted language falls
+       * straight back to `name` without ever reading the file.
+       *
+       * It is also what the App Store listing shows under "Languages".
+       */
+      CFBundleLocalizations: ['ar', 'en'],
       /*
        * Answered here so the build does not stop to ask.
        *
@@ -178,11 +387,77 @@ const config: ExpoConfig = {
      * the entitlement is the hardest one to justify to either store.
      */
     permissions: ['POST_NOTIFICATIONS', 'ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION'],
+    /*
+     * Firebase, which is how a push notification reaches an Android phone at all.
+     *
+     * iOS needs nothing here — EAS holds the APNs key and Apple routes on the
+     * bundle id. Android has no such thing: every notification goes through FCM,
+     * and FCM identifies the app by the sender id inside `google-services.json`.
+     * Without that file the build succeeds, `POST_NOTIFICATIONS` is still asked
+     * for, the customer still says yes — and `getExpoPushTokenAsync` fails, so
+     * no notification ever arrives. A permission granted for nothing, which is
+     * worse than never asking.
+     *
+     * Spread conditionally rather than written as a constant path, because the
+     * file is a credential: it is gitignored, it is not on a fresh clone, and a
+     * key pointing at a missing file fails `prebuild` for anyone who only wants
+     * to run the app. On EAS it arrives as the `GOOGLE_SERVICES_JSON` secret
+     * file and this picks it up; locally, drop the file beside app.config.ts.
+     *
+     * Absent, everything except Android push still works — which is the right
+     * failure, and `scripts/preflight.mjs` says so out loud rather than leaving
+     * it to be discovered after a release.
+     */
+    ...(process.env.GOOGLE_SERVICES_JSON
+      ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON }
+      : {}),
   },
   plugins: [
     'expo-router',
     'expo-secure-store',
-    'expo-localization',
+    /*
+     * RTL decided natively, before JavaScript runs.
+     *
+     * This was the single worst defect in the app and it was invisible in
+     * development. `enforceRtl()` in src/theme/index.ts calls
+     * `I18nManager.forceRTL(true)`, which writes a native flag that is only
+     * read when the process starts — so on a *fresh install* the flag is
+     * written by a process that has already laid itself out left-to-right.
+     * Every first launch, for every new customer, drew the whole Arabic app
+     * mirrored: headers reversed, back chevrons pointing the wrong way, the tab
+     * bar in the wrong order. The second launch was fine, which is exactly why
+     * nobody developing it ever saw the problem.
+     *
+     * It is also the first screen App Review sees, on a device that has never
+     * run the app before.
+     *
+     * These two options make the plugin write `ExpoLocalization_forcesRTL` into
+     * Info.plist and strings.xml at build time, so the flag is already true
+     * when the native layer starts and there is no first launch to get wrong.
+     * `enforceRtl()` stays as the belt to this braces — and because the web
+     * preview has no native layer to read these.
+     *
+     * Not testable in Expo Go: it changes native resources, so it needs a
+     * development build or the `preview` APK.
+     */
+    ['expo-localization', { supportsRTL: true, forcesRTL: true }],
+    /*
+     * Notifications, configured rather than defaulted.
+     *
+     * The module has been a dependency and `registerForPush` has been calling
+     * it since checkout learned to ask — but with no plugin block Android
+     * renders the notification icon from the launcher icon, which it flattens
+     * to a white silhouette. The Jibli pin becomes a white blob.
+     *
+     * The icon must be a *monochrome* asset with transparency, which is what
+     * `splash-android.png` already is: the mark in white on nothing. Android
+     * tints it with `color` and the result is the brand mark rather than a
+     * square. One asset doing two jobs, both of which want the same shape.
+     */
+    [
+      'expo-notifications',
+      { icon: './assets/splash-android.png', color: '#FF5400', defaultChannel: 'orders' },
+    ],
     /*
      * Required since SDK 54: fonts are embedded at build time by the plugin
      * rather than loaded from the bundle at runtime. Without it the Cairo
@@ -209,9 +484,37 @@ const config: ExpoConfig = {
      * moved here with it; without it the artwork is cropped to fill instead of
      * fitted, which on a tall phone cuts the wordmark in half.
      */
+    /*
+     * Two images, because the two platforms want different things.
+     *
+     * iOS draws the splash as a full-screen storyboard, so the tall 1284×2778
+     * artwork with the mark centred in brand orange is exactly right there.
+     *
+     * Android 12 replaced that with the system splash API: the image becomes
+     * `windowSplashScreenAnimatedIcon`, the system scales it to `imageWidth`
+     * and *masks it to a circle*. Handing it the tall artwork meant the whole
+     * 1284×2778 canvas was fitted into a ~100dp icon slot — leaving the mark
+     * about a quarter of its intended size, a dot inside a circle cut out of a
+     * mostly-empty orange rectangle, on every Android 12 and newer phone.
+     *
+     * `splash-android.png` is the square that slot wants: the mark alone on
+     * transparency, filling 62% of a 1152 canvas, which keeps it inside the
+     * radius the mask leaves. The orange comes from `backgroundColor` here, so
+     * the circle and the window behind it are the same colour by construction
+     * rather than by two files agreeing on a hex value.
+     */
     [
       'expo-splash-screen',
-      { backgroundColor: '#FF5400', image: './assets/splash.png', resizeMode: 'contain' },
+      {
+        backgroundColor: '#FF5400',
+        image: './assets/splash.png',
+        resizeMode: 'contain',
+        android: {
+          image: './assets/splash-android.png',
+          backgroundColor: '#FF5400',
+          imageWidth: 180,
+        },
+      },
     ],
     /*
      * Every photograph in the app goes through `expo-image` rather than React

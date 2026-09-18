@@ -334,3 +334,100 @@ describe('idempotencyKey()', () => {
     expect(idempotencyKey('order')).toMatch(/^order-/);
   });
 });
+
+describe('request timeouts', () => {
+  /**
+   * `fetch` has no timeout of its own, anywhere. Without the one this client
+   * adds, a connection that opens and is never answered — an ordinary event on
+   * mobile data — left every screen in the app on a spinner indefinitely, with
+   * no error and no way out but force-quitting.
+   */
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A fetch that respects its abort signal and otherwise never answers. */
+  const hangs = () =>
+    vi.fn(
+      (_url: string, init?: { signal?: AbortSignal }) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })),
+          );
+        }),
+    );
+
+  async function settle<T>(pending: Promise<T>): Promise<T> {
+    const done = pending.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    await vi.runAllTimersAsync();
+    const outcome = await done;
+    if ('error' in outcome) throw outcome.error;
+    return outcome.value;
+  }
+
+  it('gives up on a read that never answers, as a NetworkError', async () => {
+    vi.stubGlobal('fetch', hangs());
+
+    const error = await rejection(
+      settle(apiRequest('/api/v1/storefront', { authenticated: false })),
+    );
+
+    // Reported as a network failure rather than a new error class, so the
+    // retry rules and the Arabic message every screen already handles apply.
+    expect(error).toBeInstanceOf(NetworkError);
+  });
+
+  it('gives a write longer than a read before giving up', async () => {
+    const fetchMock = hangs();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const pending = apiRequest('/api/v1/orders', { method: 'POST', body: { id: 1 } }).catch(
+      (error: unknown) => error,
+    );
+
+    // Past the read timeout, a write must still be waiting: it may have reached
+    // the server and be committing, and the answer is worth more than the wait.
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await pending).toBeInstanceOf(NetworkError);
+  });
+
+  it('honours a caller that cancels, without calling it a network failure', async () => {
+    vi.stubGlobal('fetch', hangs());
+    const controller = new AbortController();
+
+    const pending = apiRequest('/api/v1/storefront', {
+      authenticated: false,
+      signal: controller.signal,
+    }).catch((error: unknown) => error);
+
+    controller.abort();
+    await vi.runAllTimersAsync();
+
+    // A screen unmounting is not an error to show anybody, so it must stay an
+    // abort rather than becoming «تعذّر الاتصال بالخادم».
+    const error = await pending;
+    expect(error).not.toBeInstanceOf(NetworkError);
+    expect((error as Error).name).toBe('AbortError');
+  });
+
+  it('does not leave its timer running after a request settles', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: { ok: true }, meta: {} })));
+
+    await apiRequest('/api/v1/storefront', { authenticated: false });
+
+    // A 15-second timer left behind by every request would pile up on a list
+    // screen and keep the app awake for no reason.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

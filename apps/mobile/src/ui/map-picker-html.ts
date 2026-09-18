@@ -121,9 +121,19 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
     var map = L.map('map', { zoomControl: true, attributionControl: true })
       .setView([${lat}, ${lon}], ${hasPin ? 17 : 13});
 
-    L.tileLayer('${TILE_URL}', {
+    /*
+     * Both values serialised rather than quoted by hand.
+     *
+     * They come from build-time environment variables, so this was never a
+     * script-injection route — but a single apostrophe in an attribution
+     * string, which is ordinary ("© MapTiler, © OpenStreetMap's contributors"),
+     * closed the literal and broke the whole script. The failure was silent and
+     * total: no map, no error, just the grey panel forever. JSON.stringify
+     * emits its own quotes and escapes what is inside them.
+     */
+    L.tileLayer(${JSON.stringify(TILE_URL)}, {
       maxZoom: 19,
-      attribution: '${TILE_ATTRIBUTION}'
+      attribution: ${JSON.stringify(TILE_ATTRIBUTION)}
     }).addTo(map);
 
     /*
