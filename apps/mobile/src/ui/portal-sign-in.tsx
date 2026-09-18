@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'reac
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { color, radius, space, TAP_TARGET, text } from '@/theme';
-import { Button, Row, Text } from '@/ui';
+import { Button, Ltr, Row, Text } from '@/ui';
 import { JibliWordmark } from '@/ui/brand';
 
 /**
@@ -27,14 +27,22 @@ export function PortalSignIn({
   title,
   subtitle,
   footnote,
-  usernamePlaceholder = 'ahmed.ali',
+  usernameExample = 'ahmed.ali',
   onSubmit,
 }: {
   title: string;
   subtitle: string;
   /** The line under the button — usually how to recover a lost credential. */
   footnote: string;
-  usernamePlaceholder?: string;
+  /**
+   * A specimen username, shown as a hint under the field.
+   *
+   * Never as the placeholder. A greyed «ahmed.ali» sitting inside an empty box
+   * is indistinguishable from a filled one — a courier called Ahmed Ali read it
+   * as his account already being there, pressed a «دخول» that was disabled
+   * because the field was in fact empty, and had no way to tell why.
+   */
+  usernameExample?: string;
   /**
    * Resolve to `null` when the sign-in is accepted and the caller has navigated
    * away; resolve to an Arabic message to show it under the fields.
@@ -133,11 +141,28 @@ export function PortalSignIn({
           autoCapitalize="none"
           autoCorrect={false}
           textContentType="username"
-          placeholder={usernamePlaceholder}
+          placeholder="اكتب اسم المستخدم"
           placeholderTextColor={color.textMuted}
           accessibilityLabel="اسم المستخدم"
           style={[text.body, field]}
         />
+        {/*
+          * The example, below the box rather than inside it.
+          *
+          * Latin text in a placeholder also renders badly here: the field is
+          * forced `ltr` inside an app laid out `rtl`, and iOS spaces the
+          * characters out — «a h m e d . a l i» — which reads as neither a hint
+          * nor a value. As a caption it is ordinary text in an ordinary
+          * direction, and it is unambiguously guidance.
+          */}
+        <Row gap={space[1]}>
+          <Text variant="caption" tone="muted">
+            مثال:
+          </Text>
+          <Ltr variant="caption" tone="muted">
+            {usernameExample}
+          </Ltr>
+        </Row>
       </View>
 
       <View style={{ gap: space[1] }}>
@@ -155,6 +180,8 @@ export function PortalSignIn({
             autoCapitalize="none"
             autoCorrect={false}
             textContentType="password"
+            placeholder="اكتب كلمة المرور"
+            placeholderTextColor={color.textMuted}
             accessibilityLabel="كلمة المرور"
             onSubmitEditing={() => void submit()}
             style={[text.body, field, { flex: 1 }]}

@@ -30,7 +30,7 @@ export default function OwnerLoginScreen() {
     <PortalSignIn
       title="دخول أصحاب المتاجر"
       subtitle="نفس اسم المستخدم وكلمة المرور اللذين تدخل بهما إلى لوحة التحكم."
-      usernamePlaceholder="market.karrada"
+      usernameExample="market.karrada"
       footnote="نسيت بياناتك؟ تواصل مع دعم جيبلي لإصدارها من جديد."
       onSubmit={async (username, password) => {
         try {
