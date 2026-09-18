@@ -424,6 +424,15 @@ export interface Address {
   landmark: string | null;
   delivery_notes: string | null;
   is_default: boolean;
+  /**
+   * The point a courier is routed to, when the customer put one down.
+   *
+   * `GET /addresses` has always returned these two; the type simply never
+   * declared them, so nothing in the app could tell a pinned address from one
+   * the driver will have to phone about.
+   */
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface Quote {

@@ -38,6 +38,7 @@ import type { MerchantType } from '@jibli/contracts';
 import { useVertical } from '@/lib/vertical';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
+import { PinHomeCard } from '@/ui/pin-home-card';
 
 /**
  * Home (`main.html`).
@@ -195,6 +196,15 @@ export default function HomeScreen() {
        * the corner radius drops here too: a rounded rectangle touching both
        * edges reads as a mistake.
        */}
+      {/*
+        * Offered once, above the merchandising and below the search.
+        *
+        * It hides itself when there is nothing to ask — a guest, an address
+        * that already carries a point, or an offer already waved away — so on
+        * the ordinary launch this renders nothing at all.
+        */}
+      {searching ? null : <PinHomeCard />}
+
       {searching ? null : storefront.isLoading ? (
         // The same 16:9 the real banner uses, so the layout does not jump the
         // moment the carousel replaces it.

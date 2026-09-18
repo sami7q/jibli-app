@@ -50,6 +50,21 @@ const TILE_ATTRIBUTION =
   process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? '&copy; OpenStreetMap';
 
 export function MAP_PICKER_HTML(latitude: number | null, longitude: number | null): string {
+  /*
+   * Whether there is a point to open on, and therefore whether the map may
+   * report its opening position as a chosen one.
+   *
+   * With a pin, reporting it is what lets somebody editing an address — or
+   * opening on their own GPS fix — simply save, without dragging the map a
+   * centimetre and back to make the button light up.
+   *
+   * Without one, the document used to report the Baghdad fallback anyway. The
+   * address form took Tahrir Square as the answer, turned «تحديد موقعي» green
+   * and saved it; `buildNavigationLinks` then had valid coordinates, so it
+   * never fell back to searching the address text and drove the courier to the
+   * middle of the city with confidence. A wrong point is worse than no point,
+   * because no point still has a fallback and a wrong one does not.
+   */
   const hasPin = typeof latitude === 'number' && typeof longitude === 'number';
   const lat = hasPin ? latitude : FALLBACK.latitude;
   const lon = hasPin ? longitude : FALLBACK.longitude;
@@ -136,9 +151,15 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
       send({ type: 'pick', latitude: c.lat, longitude: c.lng });
     });
 
-    // The opening position counts as a pick, so a customer who is already in
-    // the right place can simply save.
-    send({ type: 'pick', latitude: ${lat}, longitude: ${lon} });
+    /*
+     * The opening position counts as a pick, but only when somebody chose it.
+     * See the note on hasPin above for why the fallback must stay silent.
+     */
+    ${
+      hasPin
+        ? `send({ type: 'pick', latitude: ${lat}, longitude: ${lon} });`
+        : '/* nothing chosen yet - wait for the map to be moved */'
+    }
   })();
 </script>
 </body>

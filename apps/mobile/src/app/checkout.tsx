@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, idempotencyKey, NetworkError, type Address } from '@/lib/api';
 import { registerForPush } from '@/lib/push';
-import { useArea } from '@/lib/area';
-import { captureCurrentLocation, LOCATION_MESSAGES_AR, type Coordinates } from '@/lib/location';
 import { useCart, useOrderLines } from '@/lib/cart';
 import { notify } from '@/lib/dialog';
-import { color, radius, space, TAP_TARGET, text } from '@/theme';
+import { color, radius, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
-import { Sheet, SummaryRow } from '@/ui/catalog';
-import { MapPicker } from '@/ui/map-picker';
+import { SummaryRow } from '@/ui/catalog';
+import { AddressSheet } from '@/ui/address-sheet';
 
 /**
  * Checkout: where the order is going, what it costs, and placing it.
@@ -405,209 +403,6 @@ function AddressRow({
  * against current capability, so an area disabled since this screen loaded is
  * refused there rather than trusted here.
  */
-function AddressSheet({
-  visible,
-  onClose,
-  onCreated,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onCreated: (address: Address) => void;
-}) {
-  const { area } = useArea();
-  const [label, setLabel] = useState('المنزل');
-  const [district, setDistrict] = useState('');
-  const [street, setStreet] = useState('');
-  const [landmark, setLandmark] = useState('');
-  /**
-   * A point on the address, captured once with permission.
-   *
-   * Optional on purpose: in a city where addresses are landmarks rather than
-   * street numbers, «قرب صيدلية النور» is what actually gets the driver there,
-   * and a coordinate is an extra rather than a replacement. Everything works
-   * without it.
-   */
-  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
-  const [locating, setLocating] = useState(false);
-
-  const locate = async () => {
-    setLocating(true);
-    const outcome = await captureCurrentLocation();
-    setLocating(false);
-
-    if (outcome.status === 'ok') {
-      setCoordinates(outcome.coordinates);
-      return;
-    }
-    notify('تحديد الموقع', LOCATION_MESSAGES_AR[outcome.status]);
-  };
-
-  /*
-   * The map moved, so the pin moved.
-   *
-   * A point chosen by hand has no accuracy figure and should not borrow one
-   * from a GPS fix that is no longer what is being saved — `null` says «this
-   * is where somebody pointed», which is the honest thing for the driver's
-   * screen to receive.
-   */
-  const pickOnMap = useCallback((next: { latitude: number; longitude: number }) => {
-    setCoordinates({ latitude: next.latitude, longitude: next.longitude, accuracy: null });
-  }, []);
-
-  const create = useMutation({
-    mutationFn: () =>
-      api.createAddress({
-        label,
-        governorate_id: area?.governorateId,
-        city_id: area?.cityId,
-        ...(district ? { district_text: district } : {}),
-        ...(street ? { street } : {}),
-        ...(landmark ? { landmark } : {}),
-        ...(coordinates
-          ? {
-              coordinates: {
-                latitude: coordinates.latitude,
-                longitude: coordinates.longitude,
-              },
-            }
-          : {}),
-        is_default: true,
-      }),
-    onSuccess: onCreated,
-    onError: (error) => {
-      notify(
-        'تعذّر حفظ العنوان',
-        error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
-      );
-    },
-  });
-
-  const canSave = Boolean(area) && district.trim().length > 0;
-
-  return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      title="عنوان جديد"
-      footer={
-        <Button
-          label="حفظ العنوان"
-          block
-          disabled={!canSave || create.isPending}
-          loading={create.isPending}
-          onPress={() => create.mutate()}
-        />
-      }
-    >
-      {area ? (
-        <Row gap={space[2]}>
-          <MaterialCommunityIcons name="map-marker-outline" size={18} color={color.brand} />
-          <Text variant="small" tone="secondary">
-            {area.governorateNameAr} — {area.cityNameAr}
-          </Text>
-        </Row>
-      ) : (
-        <Text variant="small" tone="danger">
-          اختر منطقتك من الشاشة الرئيسية أولاً.
-        </Text>
-      )}
-
-      {/*
-        * The map, before the fields.
-        *
-        * «قرب صيدلية النور» is only unambiguous to somebody who already knows
-        * the street. A point is what turns it into an address a courier can
-        * reach without phoning, and this is where it gets set: drag the map,
-        * the pin stays in the middle, and what is under it is saved with the
-        * order and handed to the driver as a navigation link.
-        */}
-      <MapPicker
-        latitude={coordinates?.latitude ?? null}
-        longitude={coordinates?.longitude ?? null}
-        onPick={pickOnMap}
-      />
-
-      {/*
-        * And the shortcut past it, for somebody standing at the address.
-        *
-        * It moves the map rather than replacing it, so the GPS fix is a
-        * starting point to correct rather than an answer to accept — a phone
-        * indoors is routinely fifty metres out, and fifty metres is the next
-        * building along.
-        */}
-      <Pressable
-        onPress={() => void locate()}
-        disabled={locating}
-        accessibilityRole="button"
-        accessibilityLabel="تحديد موقعي الحالي"
-        style={({ pressed }) => [
-          {
-            minHeight: TAP_TARGET + 6,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderStyle: coordinates ? 'solid' : 'dashed',
-            borderColor: coordinates ? color.success : color.borderStrong,
-            backgroundColor: coordinates ? color.successSoft : color.surfaceCard,
-            paddingHorizontal: space[3],
-            justifyContent: 'center',
-          },
-          pressed ? { opacity: 0.7 } : null,
-        ]}
-      >
-        <Row gap={space[2]}>
-          <MaterialCommunityIcons
-            name={coordinates ? 'map-marker-check' : 'crosshairs-gps'}
-            size={20}
-            color={coordinates ? color.successStrong : color.brand}
-          />
-          <View style={{ flex: 1 }}>
-            <Text variant="smallBold" tone={coordinates ? 'success' : 'brand'}>
-              {locating
-                ? 'جارٍ تحديد الموقع…'
-                : coordinates
-                  ? 'تم تحديد الموقع'
-                  : 'تحديد موقعي الحالي'}
-            </Text>
-            <Text variant="caption" tone="muted">
-              {coordinates
-                ? coordinates.accuracy
-                  ? `دقة تقريبية ${Math.round(coordinates.accuracy)} متر — صحّح على الخريطة إن لزم`
-                  : 'محدَّد على الخريطة — اضغط لاستخدام موقعك الحالي'
-                : 'يضع العلامة على موقعك الحالي'}
-            </Text>
-          </View>
-        </Row>
-      </Pressable>
-
-      <LabelledInput label="الاسم" value={label} onChangeText={setLabel} placeholder="المنزل، العمل…" />
-      <LabelledInput
-        label="المنطقة / الحي"
-        value={district}
-        onChangeText={setDistrict}
-        placeholder="المنصور، حي الجامعة…"
-      />
-      <LabelledInput label="الشارع" value={street} onChangeText={setStreet} placeholder="شارع ١٤ رمضان" />
-      <LabelledInput
-        label="أقرب نقطة دالة"
-        value={landmark}
-        onChangeText={setLandmark}
-        placeholder="قرب صيدلية النور"
-      />
-    </Sheet>
-  );
-}
-
-/**
- * A refused quote, with the line that caused it.
- *
- * Every one of these used to be «تعذّر حساب الطلب» over a «إعادة المحاولة»
- * that would fail identically forever, because most of them are not transient:
- * a dish went out of stock, a price moved, or — the one that put this here — a
- * cart line is missing a required choice, which retrying cannot fix and
- * nothing on the screen named. The server already says which item and which
- * group in `details`; this reads it and offers the only two things that
- * actually resolve it.
- */
 function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const router = useRouter();
   const { cart, remove } = useCart();
@@ -670,41 +465,3 @@ function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void })
   );
 }
 
-function LabelledInput({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (next: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <View style={{ gap: space[1] }}>
-      <Text variant="caption" tone="muted">
-        {label}
-      </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={color.textMuted}
-        accessibilityLabel={label}
-        style={[
-          text.small,
-          {
-            minHeight: TAP_TARGET,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: color.borderSubtle,
-            backgroundColor: color.surfaceCard,
-            paddingHorizontal: space[3],
-            color: color.textPrimary,
-          },
-        ]}
-      />
-    </View>
-  );
-}

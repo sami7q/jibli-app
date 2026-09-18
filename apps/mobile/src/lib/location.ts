@@ -91,6 +91,24 @@ export async function captureCurrentLocation(): Promise<LocationOutcome> {
 }
 
 /**
+ * Whether the customer has already said yes.
+ *
+ * Read, never ask. `captureCurrentLocation` raises the system dialog, and a
+ * prompt that appears because a form opened — rather than because somebody
+ * pressed something — is the one every customer denies. The address sheet uses
+ * this to decide whether it may quietly open the map on where they are standing.
+ */
+export async function hasLocationPermission(): Promise<boolean> {
+  try {
+    const existing = await Location.getForegroundPermissionsAsync();
+    return existing.status === 'granted';
+  } catch {
+    // No location services on this device or platform.
+    return false;
+  }
+}
+
+/**
  * Ask for the permission once, early, and never again.
  *
  * A delivery app that only asks at the address form asks at the worst moment:
