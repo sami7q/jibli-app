@@ -171,6 +171,73 @@ Two mitigations, in the order they are worth doing:
   with everything else, so open the account and start the test first. Confirm
   the current numbers in the Play Console — this rule has been revised before.
 
+## Opening the Apple account
+
+Google and Apple ask for different things, and the order matters: on Apple
+nothing at all can be created — not a bundle id, not a TestFlight build, not an
+APNs key — until the Program membership is active and paid.
+
+**Individual, not organisation.** An organisation enrolment needs a D-U-N-S
+number and takes weeks; an individual enrolment needs an Apple ID and an ID
+document. The trade-off is public and permanent: an individual's **legal name
+becomes the seller name on the App Store**, so the listing will carry a
+person's name rather than «جيبلي». Changing it later means transferring the app
+to an organisation account, which is a migration, not a setting.
+
+1. **Check the country is supported before spending anything.** Apple publishes
+   the list of regions the Developer Program can be joined from, and the card
+   used for the fee must clear internationally. This is the step that stops
+   people, and it stops them after they have filled everything else in.
+2. **Apple ID with two-factor authentication**, on an account whose name
+   matches the identity document. Enrolment refuses a mismatch.
+3. **Enrol.** The Apple Developer app on an iPhone is the shortest path for an
+   individual — it verifies identity against the device — and
+   `developer.apple.com/programs/enroll` is the same process in a browser.
+   The fee is **99 USD a year**, auto-renewing; it is not per app.
+4. **Wait for activation.** Usually a day or two. Apple may ask for a
+   government photo ID; answering promptly is the difference between two days
+   and two weeks.
+
+No Mac is required at any point. EAS builds and signs in the cloud, and
+`eas submit` uploads from Windows.
+
+### Once the membership is active
+
+```sh
+cd apps/mobile
+eas credentials -p ios          # EAS creates the distribution cert, profile and APNs key
+eas build -p ios --profile production
+eas submit -p ios --latest      # asks for the Apple ID and the App Store Connect app id
+```
+
+`iq.jibli.app` is already the bundle identifier and `ITSAppUsesNonExemptEncryption`
+is already answered, so neither stops the first upload. The App Store Connect
+app record has to exist first: **My Apps → +**, bundle id `iq.jibli.app`,
+primary language Arabic, category Food & Drink.
+
+`submit.production` in `eas.json` stays empty until there is an `ascAppId` and
+an `appleTeamId` to put in it. `eas submit` prompts for both and offers to
+write them, which is the moment to let it.
+
+### What will fail review, and is failing now
+
+- **The privacy policy URL does not resolve.** `extra.privacyPolicyUrl` points
+  at `https://jibli.iq/privacy` and `jibli.iq` has no DNS at all — verified
+  again on 2026-09-18. Apple requires a working privacy URL on the listing, and
+  «سياسة الخصوصية» in حسابي opens the same dead link from inside the app, which
+  is a 1.5 as well as a 2.1. Either put DNS on `jibli.iq` and deploy
+  `apps/legal` behind it, or point `EXPO_PUBLIC_PRIVACY_URL` and
+  `EXPO_PUBLIC_TERMS_URL` at the Vercel URL that app gets — but they must
+  resolve before the build that is submitted, because the URL is baked in.
+- **The API sleeps.** Render's free plan idles out after about fifteen minutes
+  and takes a minute to wake. A reviewer opening a cold app sees a blank list
+  or an error, and that is 2.1. Move `jibli-api` off the free plan for the
+  review window at minimum.
+- **The reviewer must be able to sign in.** Give them the number in
+  `OTP_TEST_PHONES` with its fixed code and say so in the review notes. If the
+  OTP provider is switched to OTPIQ before review, that entry has to survive
+  the switch or nobody outside Iraq can get past the first screen.
+
 ## Still a form
 
 Nothing below is code. All of it is filled in by a person, and a wrong answer
