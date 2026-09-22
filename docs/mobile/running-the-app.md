@@ -327,12 +327,19 @@ Three integrations get asked about, so they are written down plainly.
 
 ## 11. Running the API locally, and a test account
 
-The deployed API has no SMS gateway, so a random code goes to a console
-provider and is never seen — which for a while meant nobody could sign into the
-deployed app at all. `OTP_TEST_PHONES` on the Render service now opens exactly
-one number, the demo account below, with `OTP_MOCK_CODE=1234`. **Signing in
-against the deployed API needs nothing running locally**: start the proxy and
-the web preview, enter `771 234 5678`, code `1234`.
+**The deployed API now sends real messages.** OTPIQ is connected, so any Iraqi
+number receives its own code and signs in normally — enter your own number and
+read the SMS. The demo account that used to be the only way in
+(`OTP_TEST_PHONES` with a fixed `OTP_MOCK_CODE`) has been removed: a number that
+signs in without a code stopped being a necessity and became a back door.
+
+`OTP_PROVIDER` and `SMS_GATEWAY_API_KEY` are set in the Render dashboard rather
+than in `render.yaml`, because the schema refuses to boot with one and not the
+other — see the note beside `OTP_PROVIDER` in that file.
+
+Locally it is still the fixed-code mechanism that saves you an SMS per attempt;
+§11's table below and the `OTP_PROVIDER=mock` row further down both still apply
+to a server you are running yourself.
 
 Its first request may take up to a minute. Render's free plan spins the service
 down after fifteen minutes idle, and the proxy now waits out that cold start

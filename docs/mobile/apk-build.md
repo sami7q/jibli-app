@@ -95,11 +95,11 @@ configured for it to work over mobile data.
     fifteen minutes idle, and the first request then waits about a minute. The
     app shows its own loading state rather than failing, but a tester who opens
     the app cold should be told to expect it once.
-  - **Sign-in needs an SMS provider.** `OTP_PROVIDER=console` on the deployed
-    API means no real message is ever sent. The one number in `OTP_TEST_PHONES`
-    signs in with the code in `OTP_MOCK_CODE`; every other number receives a
-    code nobody can read. See `render.yaml` — OTPIQ is tested and needs only an
-    account and five environment variables.
+  - **Sign-in sends a real SMS.** OTPIQ is connected on the deployed API, so a
+    tester enters their own Iraqi number and receives a code. Each attempt
+    costs a message, which is worth saying to a tester who taps «إعادة إرسال»
+    out of habit — the per-number cooldown and hourly cap are what stop that
+    becoming expensive.
   - **Map tiles.** `EXPO_PUBLIC_MAP_TILE_URL` is unset, so the address picker
     falls back to OpenStreetMap's donated tile server. Fine for your own
     testing; its usage policy does not allow it for an app handed to other

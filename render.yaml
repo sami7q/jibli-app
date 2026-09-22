@@ -63,22 +63,19 @@ services:
 
       - key: NODE_ENV
         value: production
-      # Still `staging`, and still deliberately — but for a different reason
-      # than before.
+      # Still `staging`, and the reason it was is now gone.
       #
-      # The old reason is gone: OTP_PROVIDER is a real gateway now, so the
-      # guard that refused `console` in production no longer applies.
+      # Both of the old blockers have cleared: OTP_PROVIDER is a real gateway,
+      # and the fixed-code test number that production forbids has been removed.
+      # What is left is infrastructure the schema checks for and this file
+      # cannot assert from here — real Redis rather than the in-process cache,
+      # TLS on the database connection, a real push provider, and no localhost
+      # in CORS_ALLOWED_ORIGINS.
       #
-      # What holds it here is OTP_TEST_PHONES. The schema forbids fixed-code
-      # test numbers in production, and App Review needs one to sign in at all
-      # — a reviewer outside Iraq cannot receive an Iraqi SMS. So the order is
-      # forced: ship with staging and the test number, pass review, then remove
-      # OTP_TEST_PHONES and OTP_MOCK_CODE and move this to `production` as one
-      # change.
-      #
-      # ⚠️ THIS IS THE LAST MANUAL STEP BEFORE PRODUCTION. Moving it also
-      # requires real Redis, TLS on the database, and no localhost in CORS —
-      # the schema checks all of them and refuses to boot otherwise.
+      # ⚠️ THIS IS THE LAST MANUAL STEP BEFORE PRODUCTION, and it is safe to
+      # attempt: the schema refuses to boot rather than starting in a
+      # half-hardened state, so the failure is a deploy that does not go live
+      # rather than one that goes live wrong. Check the four above, then flip it.
       - key: APP_ENV
         value: staging
 
@@ -178,23 +175,27 @@ services:
       # The env schema refuses to boot with either provider and its required
       # values missing, so a half-finished switch fails loudly at deploy
       # rather than quietly at somebody's first sign-in.
-      # ⚠️ ONE WORD AWAY FROM REAL SMS — AND FROM AN API THAT WILL NOT BOOT.
+      # Set in the dashboard, beside the key it cannot work without.
       #
-      # Change this to `sms_gateway` **only after** SMS_GATEWAY_API_KEY exists
-      # on the `jibli-secrets` group in the Render dashboard. The env schema
-      # refuses to start with `sms_gateway` and no key
-      # (packages/config/src/env.ts, "sms_gateway provider requires
-      # SMS_GATEWAY_URL and SMS_GATEWAY_API_KEY") — so flipping it first takes
-      # the whole API down rather than degrading to no SMS. That is the correct
-      # guard and a bad surprise, in that order.
+      # `sync: false` rather than a value here, and for a specific reason: the
+      # env schema refuses to boot `sms_gateway` without SMS_GATEWAY_API_KEY
+      # (packages/config/src/env.ts — "sms_gateway provider requires
+      # SMS_GATEWAY_URL and SMS_GATEWAY_API_KEY"). That guard is right, and it
+      # means the provider and its secret have to change *together* or the API
+      # does not start at all.
       #
-      # While it reads `console`: a real code is generated and handed to a
-      # provider that records only *that* a message was sent, never the code.
-      # So exactly one number can sign in — the one in OTP_TEST_PHONES, with
-      # OTP_MOCK_CODE. Every other number receives nothing while every request
-      # still answers 200 OK.
+      # A `value:` here could only ever change one of the two, from a file that
+      # cannot hold the other. So the pair lives in one place — the dashboard —
+      # and a blueprint push can no longer take the API down by getting ahead of
+      # a secret. Same reasoning as DATABASE_URL above.
+      #
+      # The two settings, together:
+      #   OTP_PROVIDER        = sms_gateway
+      #   SMS_GATEWAY_API_KEY = sk_live_…   (on the jibli-secrets group)
+      #
+      # Everything else OTPIQ needs is below and is not secret.
       - key: OTP_PROVIDER
-        value: console
+        sync: false
 
       # The wire format OTPIQ expects, staged and waiting. Harmless while
       # OTP_PROVIDER is `console` — nothing reads them — so the only remaining
@@ -232,19 +233,18 @@ services:
       # unsynced. The env schema refuses to boot `sms_gateway` without it, so a
       # half-finished switch fails at deploy rather than at somebody's sign-in.
 
-      # Nobody but the store reviewers.
+      # OTP_TEST_PHONES and OTP_MOCK_CODE used to sit here, opening one number
+      # with a fixed code because `console` could not deliver to any other.
       #
-      # App Review sits outside Iraq and cannot receive an Iraqi SMS, so this
-      # number keeps a fixed code and returns it in the response. Every other
-      # number now goes through the real gateway above.
+      # Gone, because the gateway is real now: every number receives its own
+      # code, so a number that signs in without one is a back door rather than
+      # a necessity. It was also the last thing blocking `APP_ENV=production` —
+      # the schema refuses fixed-code test numbers there.
       #
-      # REMOVE THIS BEFORE `APP_ENV=production`. The env schema refuses the
-      # setting outright in production, so leaving it in is not a silent risk —
-      # it is a boot failure. That is deliberate.
-      - key: OTP_TEST_PHONES
-        value: '+9647712345678'
-      - key: OTP_MOCK_CODE
-        value: '1234'
+      # ⚠️ It was also how App Review signed in. A reviewer sits outside Iraq
+      # and cannot receive an Iraqi SMS, so before submitting, either give them
+      # a real number somebody can read codes from and say so in the review
+      # notes, or put this back for the review window only.
 
       # The API never calls ctx.push — only the worker sends notifications —
       # but the value is read by the same env schema, so it is kept aligned

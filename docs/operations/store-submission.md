@@ -124,9 +124,11 @@ Two things to check on Render afterwards, both of which fail silently:
 - **`OTP_PHONE_ALLOWLIST` must be empty.** While `APP_ENV` is anything but
   `production`, a non-empty allowlist refuses delivery to every number not in
   it — which looks exactly like a broken gateway.
-- **Keep `OTP_TEST_PHONES` until review is over.** It is how App Review signs
-  in without an Iraqi number, and the env schema forbids it in production, so
-  it has to go before `APP_ENV` moves.
+- **`OTP_TEST_PHONES` has been removed, and App Review still has to sign in.**
+  It was the fixed-code number a reviewer used, and with a real gateway
+  connected it became a back door rather than a necessity. That leaves a gap
+  which has to be closed deliberately before submitting — see "The reviewer
+  must be able to sign in" below.
 
 ### `APP_ENV=production` is a separate, later step
 
@@ -299,10 +301,21 @@ write them, which is the moment to let it.
   and takes a minute to wake. A reviewer opening a cold app sees a blank list
   or an error, and that is 2.1. Move `jibli-api` off the free plan for the
   review window at minimum.
-- **The reviewer must be able to sign in.** Give them the number in
-  `OTP_TEST_PHONES` with its fixed code and say so in the review notes. If the
-  OTP provider is switched to OTPIQ before review, that entry has to survive
-  the switch or nobody outside Iraq can get past the first screen.
+- **The reviewer must be able to sign in, and right now they cannot.** App
+  Review sits outside Iraq and cannot receive an Iraqi SMS. The fixed-code
+  number that solved this is gone, so pick one of these before submitting and
+  say which in the review notes:
+
+  1. **A real Iraqi number somebody can read codes from** during the review
+     window — a handset on a desk. Simplest, and nothing in the platform
+     changes.
+  2. **A password on a pre-made account.** Customers can now sign in with
+     `POST /auth/password/login`, which needs no SMS at all, so an account
+     created in advance with a known password lets a reviewer in from
+     anywhere. This is the cleanest answer and it did not exist before.
+  3. **Put `OTP_TEST_PHONES` and `OTP_MOCK_CODE` back for the review window
+     only**, then remove them again. The env schema forbids them once
+     `APP_ENV=production`, so this also pins the order of those two changes.
 
 ## Still a form
 
@@ -317,10 +330,11 @@ here is a common rejection.
   advertising SDK and no third-party analytics, so **App Tracking Transparency
   does not apply** and no `NSUserTrackingUsageDescription` should be added.
 - **Age rating.** No objectionable content; food delivery is 4+.
-- **Demo account.** Review needs one that works from anywhere. Give them a real
-  number they can receive codes on, or `OTP_TEST_PHONES` with its fixed code —
-  and say in the review notes which it is, because a reviewer who cannot sign
-  in rejects on 2.1 without asking.
+- **Demo account.** Review needs one that works from anywhere. Since customers
+  can sign in with a password, the simplest is an account created in advance
+  with a known number and password — no SMS, no timezone problem. Say in the
+  review notes which method it is, because a reviewer who cannot sign in
+  rejects on 2.1 without asking.
 - **Review notes.** State that the service operates in Iraq only, and that
   restaurants and coverage are set per-city, so an empty list outside a covered
   area is the product working.
