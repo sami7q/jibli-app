@@ -17,11 +17,25 @@ export const CONFIG_DEFAULTS = {
   commission_flat_iqd: 500,
   /*
    * Whether a platform role must enrol an authenticator before it can use the
-   * portal. Off for a one-person operation, where the only thing a hard
-   * requirement reliably produces is a locked-out owner; turn it on before the
-   * first hire who is not you.
+   * portal.
+   *
+   * This was `false`, and the reasoning was about a one-person pilot: a hard
+   * requirement locks the only admin out of their own platform. That argument
+   * does not survive contact with what a platform role can actually reach —
+   * customer phone numbers, settlement voids, commission changes — on a
+   * password alone.
+   *
+   * It is also no longer the lockout risk it was. `assertAdminPermission`
+   * enforces this, and the MFA routes deliberately do not go through it, so an
+   * unenrolled admin can always sign in and enrol. The failure mode is one
+   * screen of setup, not a locked door.
+   *
+   * It applies to MFA_MANDATORY_ROLES — SUPER_ADMIN and FINANCE_ADMIN. An
+   * operator who genuinely needs it off can turn it off in settings; the
+   * difference is that doing so is now a decision somebody makes rather than
+   * the default nobody noticed.
    */
-  require_mfa: false,
+  require_mfa: true,
   /*
    * How long after delivery a customer may rate. A rating taken at the
    * doorstep measures the last thirty seconds of a meal nobody has eaten yet.

@@ -63,10 +63,22 @@ services:
 
       - key: NODE_ENV
         value: production
-      # `staging`, not `production`, and deliberately: production refuses to
-      # boot with OTP_PROVIDER=console, which is the correct guard — nobody can
-      # sign into the mobile app without a real SMS gateway. The portals use
-      # passwords and are unaffected.
+      # Still `staging`, and still deliberately — but for a different reason
+      # than before.
+      #
+      # The old reason is gone: OTP_PROVIDER is a real gateway now, so the
+      # guard that refused `console` in production no longer applies.
+      #
+      # What holds it here is OTP_TEST_PHONES. The schema forbids fixed-code
+      # test numbers in production, and App Review needs one to sign in at all
+      # — a reviewer outside Iraq cannot receive an Iraqi SMS. So the order is
+      # forced: ship with staging and the test number, pass review, then remove
+      # OTP_TEST_PHONES and OTP_MOCK_CODE and move this to `production` as one
+      # change.
+      #
+      # ⚠️ THIS IS THE LAST MANUAL STEP BEFORE PRODUCTION. Moving it also
+      # requires real Redis, TLS on the database, and no localhost in CORS —
+      # the schema checks all of them and refuses to boot otherwise.
       - key: APP_ENV
         value: staging
 
@@ -166,28 +178,79 @@ services:
       # The env schema refuses to boot with either provider and its required
       # values missing, so a half-finished switch fails loudly at deploy
       # rather than quietly at somebody's first sign-in.
+      # ⚠️ ONE WORD AWAY FROM REAL SMS — AND FROM AN API THAT WILL NOT BOOT.
+      #
+      # Change this to `sms_gateway` **only after** SMS_GATEWAY_API_KEY exists
+      # on the `jibli-secrets` group in the Render dashboard. The env schema
+      # refuses to start with `sms_gateway` and no key
+      # (packages/config/src/env.ts, "sms_gateway provider requires
+      # SMS_GATEWAY_URL and SMS_GATEWAY_API_KEY") — so flipping it first takes
+      # the whole API down rather than degrading to no SMS. That is the correct
+      # guard and a bad surprise, in that order.
+      #
+      # While it reads `console`: a real code is generated and handed to a
+      # provider that records only *that* a message was sent, never the code.
+      # So exactly one number can sign in — the one in OTP_TEST_PHONES, with
+      # OTP_MOCK_CODE. Every other number receives nothing while every request
+      # still answers 200 OK.
       - key: OTP_PROVIDER
         value: console
-      # The demo account, and nothing else, can sign in here.
+
+      # The wire format OTPIQ expects, staged and waiting. Harmless while
+      # OTP_PROVIDER is `console` — nothing reads them — so the only remaining
+      # step is the secret and the one word above.
       #
-      # `console` generates a real code and hands it to a provider that only
-      # logs that an SMS went out — never the code, by design. So the deployed
-      # app could open every screen and finish nothing: no number could receive
-      # a code, including the one the pilot was meant to be shown from.
+      # Field names are configuration because no two Iraqi aggregators agree on
+      # them; these are the values proven against the live gateway and
+      # documented in docs/operations/store-submission.md.
+      - key: SMS_GATEWAY_URL
+        value: https://api.otpiq.com/api/sms
+      - key: SMS_GATEWAY_AUTH_SCHEME
+        value: bearer
+      - key: SMS_GATEWAY_TO_FIELD
+        value: phoneNumber
+      - key: SMS_GATEWAY_SENDER_FIELD
+        value: senderId
+      # The single most common reason a correctly-configured gateway delivers
+      # nothing: OTPIQ rejects the leading plus.
+      - key: SMS_GATEWAY_NUMBER_FORMAT
+        value: e164_no_plus
+      - key: SMS_GATEWAY_BODY_FIELD
+        value: verificationCode
+      # `code`, not `text`: with provider=auto the message travels as an
+      # approved WhatsApp template with the digits in a slot, never free text.
+      - key: SMS_GATEWAY_BODY_MODE
+        value: code
+      # provider=auto tries WhatsApp, then Telegram, then SMS — about a tenth of
+      # the SMS price for the common case, degrading on its own for a customer
+      # who has neither.
+      - key: SMS_GATEWAY_EXTRA_FIELDS
+        value: '{"smsType":"verification","provider":"auto"}'
+
+      # SMS_GATEWAY_API_KEY is a secret and is deliberately absent from this
+      # file. Set it in the Render dashboard on the `jibli-secrets` env group,
+      # unsynced. The env schema refuses to boot `sms_gateway` without it, so a
+      # half-finished switch fails at deploy rather than at somebody's sign-in.
+
+      # Nobody but the store reviewers.
       #
-      # `OTP_PROVIDER=mock` would fix it by making 0000 work for *any* number,
-      # on a URL anybody can reach. This is the same mechanism for one number:
-      # it gets OTP_MOCK_CODE and the code back in the response, every other
-      # number keeps a random code it cannot read, and the env schema refuses
-      # the setting outright when APP_ENV is production.
+      # App Review sits outside Iraq and cannot receive an Iraqi SMS, so this
+      # number keeps a fixed code and returns it in the response. Every other
+      # number now goes through the real gateway above.
       #
-      # Remove it the day a real SMS gateway is connected.
+      # REMOVE THIS BEFORE `APP_ENV=production`. The env schema refuses the
+      # setting outright in production, so leaving it in is not a silent risk —
+      # it is a boot failure. That is deliberate.
       - key: OTP_TEST_PHONES
         value: '+9647712345678'
       - key: OTP_MOCK_CODE
         value: '1234'
+
+      # The API never calls ctx.push — only the worker sends notifications —
+      # but the value is read by the same env schema, so it is kept aligned
+      # with the worker's rather than left to drift.
       - key: PUSH_PROVIDER
-        value: console
+        value: expo
 
   # ── Worker ─────────────────────────────────────────────────────────────────
   #
@@ -220,8 +283,20 @@ services:
           type: keyvalue
           name: jibli-cache
           property: connectionString
+
+      # The worker is the only process that sends notifications, so this is the
+      # value that decides whether any of them leave the building.
+      #
+      # It read `console`, and the worker ignored it anyway — the provider was
+      # hardcoded. Both halves are fixed: the worker now selects from this, and
+      # `createPushProvider` throws at boot rather than accept `console` under
+      # NODE_ENV=production. A stub that reports success is worse than a crash.
+      #
+      # EXPO_ACCESS_TOKEN is optional and is a secret: set it on the
+      # `jibli-secrets` group if the Expo project has enhanced security on,
+      # where its absence is an unexplained 401 rather than a warning.
       - key: PUSH_PROVIDER
-        value: console
+        value: expo
 
   # ── Key Value ──────────────────────────────────────────────────────────────
   #

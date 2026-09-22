@@ -804,6 +804,28 @@ export interface OrderNotification {
 /** A favourite, in the same shape as a discovery card. */
 export type FavoriteCard = RestaurantCard & { favorited_at: string };
 
+/**
+ * What every way into the app returns.
+ *
+ * One-time code, registration, password, password reset — four doors, one
+ * answer, because what the app does next depends on the account rather than on
+ * how the customer proved they own it. `next_step` is that decision, made
+ * server-side: a name is not a complete profile, so a customer who has just
+ * registered still needs a governorate and a city before they can order.
+ */
+export interface AuthSessionResponse {
+  access_token: string;
+  refresh_token: string;
+  user: {
+    id: string;
+    is_new_user: boolean;
+    profile_completed: boolean;
+    modes: ('CUSTOMER' | 'DRIVER')[];
+    driver_id: string | null;
+  };
+  next_step: 'HOME' | 'COMPLETE_PROFILE';
+}
+
 export const api = {
   /**
    * Categories, banners and how fast to rotate them.
@@ -831,20 +853,72 @@ export const api = {
     ),
 
   verifyOtp: (phone: string, code: string, deviceId?: string) =>
-    apiRequest<{
-      access_token: string;
-      refresh_token: string;
-      user: {
-        id: string;
-        is_new_user: boolean;
-        profile_completed: boolean;
-        modes: ('CUSTOMER' | 'DRIVER')[];
-        driver_id: string | null;
-      };
-      next_step: 'HOME' | 'COMPLETE_PROFILE';
-    }>('/api/v1/auth/otp/verify', {
+    apiRequest<AuthSessionResponse>('/api/v1/auth/otp/verify', {
       method: 'POST',
       body: { phone, code, deviceId },
+      authenticated: false,
+    }),
+
+  /*
+   * Registration and password sign-in.
+   *
+   * A one-time code is still what proves a number — `register` only sends one,
+   * and no account exists until `registerVerify` spends it. The password is a
+   * second key to the same door, so that a returning customer does not wait for
+   * an SMS on a network where it may not arrive.
+   *
+   * The name and password are sent twice, once to each call, deliberately: the
+   * server keeps nothing between them, so there is never an unverified
+   * stranger's password stored against a number they may not own.
+   */
+  register: (fullName: string, phone: string, password: string) =>
+    apiRequest<{ resend_after_seconds: number; expires_in_seconds: number; dev_code?: string }>(
+      '/api/v1/auth/register',
+      {
+        method: 'POST',
+        body: { full_name: fullName, phone, password },
+        authenticated: false,
+      },
+    ),
+
+  registerVerify: (
+    fullName: string,
+    phone: string,
+    password: string,
+    code: string,
+    deviceId?: string,
+  ) =>
+    apiRequest<AuthSessionResponse>('/api/v1/auth/register/verify', {
+      method: 'POST',
+      body: { full_name: fullName, phone, password, code, deviceId },
+      authenticated: false,
+    }),
+
+  phonePasswordSignIn: (phone: string, password: string, deviceId?: string) =>
+    apiRequest<AuthSessionResponse>('/api/v1/auth/password/login', {
+      method: 'POST',
+      body: { phone, password, deviceId },
+      authenticated: false,
+    }),
+
+  /**
+   * Ask for a reset code.
+   *
+   * Answers the same way whether or not the number has an account, so the
+   * screen must say «إن كان الرقم مسجّلاً فقد أرسلنا رمزاً» rather than
+   * «أرسلنا رمزاً» — the difference is the whole point of the endpoint.
+   */
+  forgotPassword: (phone: string) =>
+    apiRequest<{ sent: boolean; expires_in_seconds: number }>('/api/v1/auth/password/forgot', {
+      method: 'POST',
+      body: { phone },
+      authenticated: false,
+    }),
+
+  resetPassword: (phone: string, code: string, password: string, deviceId?: string) =>
+    apiRequest<AuthSessionResponse>('/api/v1/auth/password/reset', {
+      method: 'POST',
+      body: { phone, code, password, deviceId },
       authenticated: false,
     }),
 

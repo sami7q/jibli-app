@@ -1,3 +1,4 @@
+import { Expo, type ExpoPushMessage, type ExpoPushTicket } from 'expo-server-sdk';
 import type { Logger } from '@jibli/logger';
 
 /**
@@ -752,6 +753,16 @@ export interface PushProvider {
   sendMany(messages: PushMessage[]): Promise<PushResult[]>;
 }
 
+/**
+ * Logs that a notification would have been sent, and sends nothing.
+ *
+ * Legitimate in local development and in tests. It is **not** legitimate in
+ * production, and for a long time it was what production ran: the worker
+ * constructed this unconditionally, so every notification the platform produced
+ * was written to `notification_deliveries` as `SENT` and never left the server.
+ * Nothing in the system could tell the difference — which is why
+ * `createPushProvider` below now refuses to return it outside development.
+ */
 export class ConsolePushProvider implements PushProvider {
   readonly name = 'console';
 
@@ -768,6 +779,221 @@ export class ConsolePushProvider implements PushProvider {
   async sendMany(messages: PushMessage[]): Promise<PushResult[]> {
     return Promise.all(messages.map((m) => this.send(m)));
   }
+}
+
+/**
+ * Expo's push service — the one the mobile app is actually built against.
+ *
+ * `apps/mobile/src/lib/push.ts` registers with `getExpoPushTokenAsync`, so the
+ * tokens in `user_devices` are Expo tokens (`ExponentPushToken[...]`). Expo then
+ * fans out to APNs and FCM, which is why iOS needs only an APNs key on EAS and
+ * Android needs FCM credentials there — neither belongs in this process.
+ *
+ * Three things this has to get right, and only the first is obvious:
+ *
+ *   **Order.** `outbox-publisher.ts` maps results back to devices *by index* to
+ *   decide which token to revoke. Expo's API chunks, and a chunk boundary does
+ *   not line up with the caller's array — so results are written back into a
+ *   pre-sized array at the original index rather than concatenated. Getting
+ *   this wrong revokes a working device because a different one was dead.
+ *
+ *   **A ticket is not a delivery.** `status: 'ok'` means Expo accepted the
+ *   message, not that a phone received it. That is the honest meaning of
+ *   `PushResult.ok`, and the caller is told so at its own call site.
+ *
+ *   **Which failures are permanent.** `DeviceNotRegistered` means the app was
+ *   uninstalled and the token is dead forever; everything else is transient and
+ *   must not revoke anything.
+ */
+export class ExpoPushProvider implements PushProvider {
+  readonly name = 'expo';
+
+  private readonly client: Expo;
+
+  constructor(
+    private readonly logger: Logger,
+    config: {
+      /**
+       * Optional. Expo accepts unauthenticated pushes; an access token raises
+       * the rate limit and is required once "enhanced security" is switched on
+       * for the project, at which point its absence is a silent 401.
+       */
+      readonly accessToken?: string | undefined;
+    } = {},
+  ) {
+    this.client = new Expo(
+      config.accessToken ? { accessToken: config.accessToken } : {},
+    );
+  }
+
+  async send(message: PushMessage): Promise<PushResult> {
+    const [result] = await this.sendMany([message]);
+    return result ?? { ok: false, error: 'NO_RESULT' };
+  }
+
+  async sendMany(messages: PushMessage[]): Promise<PushResult[]> {
+    // Pre-sized so every write lands at the caller's index. See the note above.
+    const results: PushResult[] = new Array<PushResult>(messages.length);
+
+    /** Only the messages worth sending, each remembering where it came from. */
+    const sendable: { index: number; payload: ExpoPushMessage }[] = [];
+
+    for (const [index, message] of messages.entries()) {
+      /*
+       * A malformed token is rejected here rather than by Expo.
+       *
+       * Expo answers a bad token with a whole-request error rather than a
+       * per-message ticket, so one stale row could otherwise cost the entire
+       * batch — every other customer in it silently unnotified.
+       *
+       * It is permanent, so it is reported as `tokenInvalid` and the caller
+       * revokes the row.
+       */
+      if (!Expo.isExpoPushToken(message.token)) {
+        results[index] = { ok: false, tokenInvalid: true, error: 'INVALID_TOKEN_FORMAT' };
+        continue;
+      }
+
+      sendable.push({
+        index,
+        payload: {
+          to: message.token,
+          title: message.titleAr,
+          body: message.bodyAr,
+          ...(message.data ? { data: message.data } : {}),
+          ...(message.channelId ? { channelId: message.channelId } : {}),
+          /*
+           * An order update is time-sensitive by definition — «طلبك جاهز» an
+           * hour late is worse than useless. `high` is what asks iOS and
+           * Android to deliver rather than to batch.
+           */
+          priority: 'high',
+          sound: 'default',
+        },
+      });
+    }
+
+    if (sendable.length === 0) return results;
+
+    for (const chunk of this.client.chunkPushNotifications(sendable.map((s) => s.payload))) {
+      /*
+       * Which caller indices this chunk covers.
+       *
+       * `chunkPushNotifications` preserves order but not identity, so the
+       * originals are consumed in the same order they were handed over.
+       */
+      const covered = sendable.splice(0, chunk.length);
+
+      let tickets: ExpoPushTicket[];
+      try {
+        tickets = await this.client.sendPushNotificationsAsync(chunk);
+      } catch (error) {
+        /*
+         * The whole chunk failed — network, 5xx, or a rejected access token.
+         * Transient by assumption, so no token is revoked: a credentials
+         * problem must not be allowed to delete every device on the platform.
+         */
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          { event: 'push.chunk_failed', provider: this.name, count: chunk.length, reason },
+          'Expo push chunk failed',
+        );
+        for (const { index } of covered) {
+          results[index] = { ok: false, error: reason };
+        }
+        continue;
+      }
+
+      for (const [position, ticket] of tickets.entries()) {
+        const target = covered[position];
+        if (!target) continue;
+
+        if (ticket.status === 'ok') {
+          // Accepted by Expo. Not the same as delivered — see the class note.
+          results[target.index] = { ok: true };
+          continue;
+        }
+
+        /*
+         * `DeviceNotRegistered` is the only permanent one: the app was
+         * uninstalled, or the token was rotated and this row is the old one.
+         * `MessageRateExceeded` and `ProviderError` are transient;
+         * `DeveloperError` and `InvalidCredentials` are ours to fix and would
+         * be catastrophic to act on by deleting devices.
+         */
+        const code = ticket.details?.error;
+        const permanent = code === 'DeviceNotRegistered';
+
+        this.logger.warn(
+          { event: 'push.rejected', provider: this.name, code: code ?? 'UNKNOWN', permanent },
+          'Expo rejected a push message',
+        );
+
+        results[target.index] = {
+          ok: false,
+          ...(permanent ? { tokenInvalid: true } : {}),
+          error: code ?? ticket.message,
+        };
+      }
+
+      // A short chunk response would otherwise leave holes in the array.
+      for (const { index } of covered.slice(tickets.length)) {
+        results[index] = { ok: false, error: 'NO_TICKET_RETURNED' };
+      }
+    }
+
+    return results;
+  }
+}
+
+/**
+ * The provider this process should use, chosen from configuration.
+ *
+ * It exists because the worker used to construct `ConsolePushProvider`
+ * directly and never read `PUSH_PROVIDER` at all — so the setting was
+ * decorative, and production silently sent nothing while recording success.
+ * Selection now happens in exactly one place, and that place refuses the
+ * combination that caused it.
+ *
+ * `fcm` is accepted by the config schema and has no implementation. It throws
+ * rather than falling back, because falling back to a stub is the failure mode
+ * this whole function exists to prevent.
+ */
+export function createPushProvider(
+  config: {
+    readonly provider: 'console' | 'expo' | 'fcm';
+    readonly nodeEnv: string;
+    readonly expoAccessToken?: string | undefined;
+  },
+  logger: Logger,
+): PushProvider {
+  if (config.provider === 'console') {
+    /*
+     * Fail at boot, loudly, rather than at a customer's first order, silently.
+     *
+     * The env schema already refuses this when `APP_ENV=production`, but the
+     * deployment that shipped the bug ran `APP_ENV=staging` with
+     * `NODE_ENV=production` — so the guard that mattered was the one nobody
+     * had written. This is that guard.
+     */
+    if (config.nodeEnv === 'production') {
+      throw new Error(
+        'PUSH_PROVIDER=console cannot run under NODE_ENV=production: it logs ' +
+          'notifications and sends nothing, while recording them as SENT. ' +
+          'Set PUSH_PROVIDER=expo.',
+      );
+    }
+    return new ConsolePushProvider(logger);
+  }
+
+  if (config.provider === 'expo') {
+    return new ExpoPushProvider(logger, { accessToken: config.expoAccessToken });
+  }
+
+  throw new Error(
+    `PUSH_PROVIDER=${config.provider} has no implementation. Use 'expo' — the ` +
+      'mobile app registers Expo push tokens, and Expo fans out to APNs and FCM.',
+  );
 }
 
 // ── Arabic notification templates (plan §56) ─────────────────────────────────

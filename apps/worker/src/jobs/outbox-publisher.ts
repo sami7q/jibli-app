@@ -200,6 +200,22 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
       }
     }
 
+    /*
+     * SENT means "the push service accepted it", not "a phone received it".
+     *
+     * Expo answers a send with a *ticket*, which says the message was queued —
+     * delivery is reported separately, minutes later, by a receipt fetched
+     * against the ticket id. So this column is an outbound record, not proof of
+     * arrival, and it should not be read as one in support or in reporting.
+     *
+     * It was worse than imprecise before: the provider was a stub that returned
+     * ok unconditionally, so SENT meant nothing at all.
+     *
+     * TODO: fetch Expo push receipts (`getPushNotificationReceiptsAsync`) on a
+     * delayed job and reconcile this to DELIVERED / FAILED. That is a separate
+     * piece of work — it needs the ticket ids persisted here first — and is
+     * tracked as a follow-up rather than done inline.
+     */
     await ctx.db
       .update(notificationDeliveries)
       .set({

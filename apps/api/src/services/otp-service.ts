@@ -25,11 +25,28 @@ import type { AppContext } from '../lib/context.js';
  *   - OTP values never logged or returned
  */
 
+/**
+ * What a code was issued for.
+ *
+ * A code is a bearer credential for one action, and the three actions are not
+ * interchangeable. Without this, a code a customer requested to *reset a
+ * password* would also complete a *registration* — so anyone who could see one
+ * SMS could take the number instead of unlocking it. Recording the purpose on
+ * the challenge and requiring it at verification keeps each code to the job it
+ * was sent for.
+ *
+ * `LOGIN` is the original OTP sign-in and stays the default, so every existing
+ * caller and every challenge already in the table keeps working unchanged.
+ */
+export type OtpPurpose = 'LOGIN' | 'REGISTER' | 'PASSWORD_RESET';
+
 export interface OtpRequestInput {
   readonly phoneE164: string;
   readonly ip: string | null;
   readonly userAgent: string | null;
   readonly requestId: string;
+  /** Defaults to `LOGIN`, which is what the original sign-in flow sends. */
+  readonly purpose?: OtpPurpose;
 }
 
 export interface OtpRequestResult {
@@ -164,7 +181,7 @@ export async function requestOtp(
     phoneE164: phone,
     // Salted by challenge ID so two challenges for the same code hash differently.
     codeHash: hashShortCode(code, env.OTP_HASH_PEPPER, challengeId),
-    purpose: 'LOGIN',
+    purpose: input.purpose ?? 'LOGIN',
     maxAttempts: env.OTP_MAX_VERIFY_ATTEMPTS,
     expiresAt,
     requestIp: input.ip,
@@ -231,24 +248,28 @@ export interface OtpVerifyResult {
   readonly profileCompleted: boolean;
 }
 
-export async function verifyOtp(
+/**
+ * Prove the caller holds the number, and spend the code.
+ *
+ * Everything `verifyOtp` does *except* deciding what the proof is worth —
+ * extracted because three flows now need the same proof and must do different
+ * things with it: signing in finds or creates an identity, registering creates
+ * one with a name and a password, and a reset changes the password on one that
+ * already exists.
+ *
+ * Duplicating the checks instead would have meant three copies of the attempt
+ * counting, the expiry rule and the single-use consumption — and a fix applied
+ * to one of them.
+ *
+ * Throws on every failure; returning means the code was correct and is now
+ * spent.
+ */
+export async function consumeOtpChallenge(
   ctx: AppContext,
-  input: {
-    phoneE164: string;
-    code: string;
-    requestId: string;
-    /**
-     * Attach the number to this account instead of finding one by phone.
-     *
-     * Set when a customer who signed in with Google is adding the phone an
-     * order needs. Everything before this point is identical — the same
-     * challenge, the same expiry, the same attempt counting — because the
-     * question being answered is the same: does this person hold this number?
-     */
-    linkToUserId?: string;
-  },
-): Promise<OtpVerifyResult> {
+  input: { phoneE164: string; code: string; purpose?: OtpPurpose },
+): Promise<void> {
   const now = new Date();
+  const expectedPurpose: OtpPurpose = input.purpose ?? 'LOGIN';
 
   const [challenge] = await ctx.db
     .select()
@@ -260,6 +281,17 @@ export async function verifyOtp(
   if (!challenge) {
     // No live challenge. Deliberately indistinguishable from a wrong code, so a
     // prober cannot learn whether a number was ever sent one.
+    throw new AppError(ERROR_CODES.OTP_INVALID);
+  }
+
+  /*
+   * The code must have been sent for the thing being attempted.
+   *
+   * Checked before the code itself, so the comparison below never runs against
+   * a challenge from a different flow — a reset code completing a registration
+   * would let anyone who glimpsed one SMS take the number rather than unlock it.
+   */
+  if (challenge.purpose !== expectedPurpose) {
     throw new AppError(ERROR_CODES.OTP_INVALID);
   }
 
@@ -301,6 +333,30 @@ export async function verifyOtp(
     .returning({ id: otpChallenges.id });
 
   if (consumed.length === 0) throw new AppError(ERROR_CODES.OTP_INVALID);
+}
+
+export async function verifyOtp(
+  ctx: AppContext,
+  input: {
+    phoneE164: string;
+    code: string;
+    requestId: string;
+    /**
+     * Attach the number to this account instead of finding one by phone.
+     *
+     * Set when a customer who signed in with Google is adding the phone an
+     * order needs. Everything before this point is identical — the same
+     * challenge, the same expiry, the same attempt counting — because the
+     * question being answered is the same: does this person hold this number?
+     */
+    linkToUserId?: string;
+  },
+): Promise<OtpVerifyResult> {
+  const now = new Date();
+
+  // `LOGIN` by default, which is the only purpose this function serves: a code
+  // sent to register or to reset a password is spent by its own endpoint.
+  await consumeOtpChallenge(ctx, { phoneE164: input.phoneE164, code: input.code });
 
   /*
    * Linking: the account already exists, the number is what is new.

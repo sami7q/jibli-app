@@ -1,7 +1,7 @@
 import { EnvValidationError, loadWorkerEnv } from '@jibli/config';
 import { createLogger } from '@jibli/logger';
 import { closeDatabase, getDatabase } from '@jibli/db';
-import { ConsolePushProvider } from '@jibli/notifications';
+import { createPushProvider } from '@jibli/notifications';
 import { purgeExpiredIdempotencyKeys } from '@jibli/domain';
 import { createWorkerRedis, type WorkerContext } from './context.js';
 import { runOutboxPublisher } from './jobs/outbox-publisher.js';
@@ -11,6 +11,8 @@ import {
 } from './jobs/settlement-generation.js';
 import { runDailyReconciliation, runGeographyIntegrityCheck } from './jobs/reconciliation.js';
 import { purgeExpiredLocks } from './jobs/job-lock.js';
+import { runStalledOrderSweep, STALLED_ORDERS_INTERVAL_MS } from './jobs/stalled-orders.js';
+import { runRetentionSweep } from './jobs/retention.js';
 
 /**
  * Worker process (plan §93, §94).
@@ -60,6 +62,27 @@ const SCHEDULED_JOBS: ScheduledJob[] = [
     intervalMs: 60 * 60 * 1000,
     run: (ctx) => purgeExpiredIdempotencyKeys(ctx.db),
   },
+  {
+    /*
+     * The first job here that watches an order rather than money.
+     *
+     * Driver assignment is manual, so an order can reach READY and stop there
+     * with every party believing somebody else is handling it. Nothing noticed,
+     * because nothing was looking.
+     */
+    name: 'stalled_orders',
+    intervalMs: STALLED_ORDERS_INTERVAL_MS,
+    run: runStalledOrderSweep,
+  },
+  {
+    /*
+     * Daily is often enough for a job measured in days, and the job-lock TTL
+     * matches so a restart loop cannot make it run on every boot.
+     */
+    name: 'retention_sweep',
+    intervalMs: 24 * 60 * 60 * 1000,
+    run: runRetentionSweep,
+  },
 ];
 
 async function main(): Promise<void> {
@@ -90,7 +113,30 @@ async function main(): Promise<void> {
   const redis = createWorkerRedis(env, logger);
   await redis.connect();
 
-  const ctx: WorkerContext = { env, db, redis, logger, push: new ConsolePushProvider(logger) };
+  /*
+   * Chosen from configuration, not hardcoded.
+   *
+   * This line read `new ConsolePushProvider(logger)` and ignored
+   * `env.PUSH_PROVIDER` entirely — so the setting existed, was set to
+   * `console` in production, and did nothing but log. Every notification the
+   * platform produced was recorded as SENT and never left the process.
+   *
+   * `createPushProvider` also refuses `console` under NODE_ENV=production, so
+   * the same mistake now stops the worker at boot instead of being discovered
+   * from a customer complaint.
+   */
+  const push = createPushProvider(
+    {
+      provider: env.PUSH_PROVIDER,
+      nodeEnv: env.NODE_ENV,
+      expoAccessToken: env.EXPO_ACCESS_TOKEN,
+    },
+    logger,
+  );
+
+  logger.info({ event: 'push.provider', provider: push.name }, 'Push provider selected');
+
+  const ctx: WorkerContext = { env, db, redis, logger, push };
 
   let running = true;
   const timers: NodeJS.Timeout[] = [];

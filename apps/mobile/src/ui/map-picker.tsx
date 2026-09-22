@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { MAP_PICKER_HTML, type MapPickerMessage } from './map-picker-html';
-import { color, radius } from '@/theme';
+import { Text } from '@/ui';
+import { color, radius, space } from '@/theme';
 
 /**
  * A real map to put a pin on, on a device.
@@ -34,6 +35,16 @@ export interface MapPickerProps {
 
 export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPickerProps) {
   const [ready, setReady] = useState(false);
+  /**
+   * Whether the document failed to load at all.
+   *
+   * There was no error path here. `onLoadEnd` fires whether the load succeeded
+   * or not, so an unreachable CDN or tile server cleared the spinner and left a
+   * grey rectangle with no explanation — and the customer, who is mid-checkout
+   * and has been asked to place a pin, has no way to know the map is broken
+   * rather than slow. They wait, then give up on the order.
+   */
+  const [failed, setFailed] = useState(false);
   const webview = useRef<WebView>(null);
 
   const html = useMemo(
@@ -108,10 +119,41 @@ export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPick
          * the system browser's string and nothing says Jibli.
          */
         userAgent="Jibli/1.0 (+https://jibli.iq; delivery app; map picker)"
+        /*
+         * Both, because they are different failures.
+         *
+         * `onError` is the transport giving up — no DNS, no route, TLS refused,
+         * which on an Iraqi mobile connection is the common one. `onHttpError`
+         * is a server answering with a status: a tile vendor rejecting the key,
+         * or a CDN returning 403. Neither reached the customer before.
+         */
+        onError={() => setFailed(true)}
+        onHttpError={() => setFailed(true)}
         style={{ flex: 1, backgroundColor: 'transparent' }}
       />
 
-      {!ready ? (
+      {failed ? (
+        <View
+          style={{
+            ...StyleSheetAbsoluteFill,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: color.warningSoft,
+            paddingHorizontal: space[4],
+            gap: space[2],
+          }}
+          // Same treatment as the offline banner: it is news that arrived on
+          // its own, so it is announced rather than waiting to be focused.
+          accessibilityLiveRegion="polite"
+        >
+          <Text variant="caption" align="center" style={{ color: color.warningStrong }}>
+            تعذّر تحميل الخريطة
+          </Text>
+          <Text variant="caption" align="center" style={{ color: color.warningStrong }}>
+            اكتب العنوان يدوياً — سيصل المندوب باستخدام الوصف والمَعلَم.
+          </Text>
+        </View>
+      ) : !ready ? (
         <View
           style={{
             ...StyleSheetAbsoluteFill,

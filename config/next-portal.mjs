@@ -19,6 +19,46 @@ import { fileURLToPath } from 'node:url';
  */
 const workspaceRoot = fileURLToPath(new URL('..', import.meta.url));
 
+/**
+ * Refuse to build a portal that does not know where its API is.
+ *
+ * `src/lib/api.ts` falls back to `http://localhost:4000` when
+ * `NEXT_PUBLIC_API_URL` is unset. That is right on a developer's machine and
+ * catastrophic anywhere else: a portal deployed without the variable builds
+ * cleanly, serves cleanly, and every screen in it fails — because the browser
+ * is asking *its own* localhost for the API. There is no error that says so;
+ * the network tab shows a connection refused and the UI shows empty states.
+ *
+ * `NEXT_PUBLIC_*` is inlined at build time, so a missing variable cannot be
+ * repaired by restarting the deployment with it set — the wrong value is
+ * already compiled into the bundle. That is what makes this worth failing a
+ * build over rather than checking at runtime.
+ *
+ * Only for a production build. `next dev` and `next build` locally are exactly
+ * the case the fallback exists for.
+ */
+function assertApiOriginConfigured() {
+  const isProductionBuild =
+    process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-development-server';
+
+  if (!isProductionBuild) return;
+
+  // A same-origin proxy is a valid answer: there is no separate origin to name.
+  if (process.env.NEXT_PUBLIC_API_PROXY === '1') return;
+  if (process.env.NEXT_PUBLIC_API_URL) return;
+
+  throw new Error(
+    'NEXT_PUBLIC_API_URL is not set for this production build.\n' +
+      'The portal would fall back to http://localhost:4000, which in a browser ' +
+      'means the visitor’s own machine — every request fails and every screen ' +
+      'renders empty.\n' +
+      'Set NEXT_PUBLIC_API_URL in the Vercel project’s environment variables, ' +
+      'or set NEXT_PUBLIC_API_PROXY=1 if the API is served from this origin.',
+  );
+}
+
+assertApiOriginConfigured();
+
 /** @type {import('next').NextConfig} */
 export const portalNextConfig = {
   reactStrictMode: true,

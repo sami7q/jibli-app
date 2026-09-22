@@ -293,6 +293,29 @@ const workerSchema = z.object({
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(100),
   SETTLEMENT_CRON: z.string().default('0 2 * * *'),
   RECONCILIATION_CRON: z.string().default('30 2 * * *'),
+
+  /*
+   * Data retention, in days (plan §164).
+   *
+   * Nothing ever deleted a row from these three tables, so every phone number
+   * that has ever attempted a sign-in was kept indefinitely — including one
+   * belonging to a customer who had asked to be deleted. Both stores' data
+   * safety forms ask how long data is kept, and the honest answer was "forever,
+   * because nobody wrote the job".
+   *
+   * Configuration rather than constants because §164 says these "must be
+   * reviewed with Iraqi legal/accounting advice", and advice arriving should
+   * not require a release. The defaults are the operator's current position:
+   * conservative, and shortenable later without losing anything that was kept
+   * under them.
+   *
+   * A floor of 1 day, not 0: a misconfigured zero would delete the audit trail
+   * as fast as it is written, which is the one failure that erases its own
+   * evidence.
+   */
+  RETENTION_AUDIT_LOG_DAYS: z.coerce.number().int().min(1).default(365),
+  RETENTION_LOGIN_ATTEMPT_DAYS: z.coerce.number().int().min(1).default(90),
+  RETENTION_OTP_CHALLENGE_DAYS: z.coerce.number().int().min(1).default(7),
 });
 
 export const apiEnvSchema = baseSchema

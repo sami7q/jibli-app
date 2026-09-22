@@ -34,6 +34,7 @@ import { OfflineBanner, startNetworkWatch } from '@/lib/network';
 import { ActiveOrderBar, OrderWatchProvider } from '@/lib/order-watch';
 import { GlobalCartBar } from '@/lib/cart-dock';
 import { ErrorBoundary } from '@/lib/error-boundary';
+import { startMonitoring } from '@/lib/monitoring';
 import { DialogHost } from '@/ui/dialog-host';
 import { ICON_FONT, ICON_FONT_FAMILY } from '@/ui/icon';
 import { color, enforceRtl, palette } from '@/theme';
@@ -57,6 +58,17 @@ import { color, enforceRtl, palette } from '@/theme';
 
 // Must run before the first render, so it runs at module scope.
 enforceRtl();
+
+/*
+ * Before anything can throw.
+ *
+ * At module scope for the same reason `enforceRtl` is: a crash during the very
+ * first render — a bad font, a provider throwing on boot — is exactly the one
+ * worth hearing about, and a reporter started inside a component would miss it.
+ *
+ * Does nothing without EXPO_PUBLIC_SENTRY_DSN. See src/lib/monitoring.ts.
+ */
+startMonitoring();
 
 // Held until the app can actually paint; see `Gate` below.
 void SplashScreen.preventAutoHideAsync();

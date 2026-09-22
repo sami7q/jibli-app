@@ -15,28 +15,46 @@ import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@/ui/icon';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
+import { holdPendingCredentials } from '@/lib/pending-credentials';
+import { PasswordField } from '@/ui/password-field';
 import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
 import { useSession } from '@/lib/session';
 
 /**
- * Phone entry — the first screen of the customer journey (plan §10).
+ * The way in — sign in, or create an account (plan §10).
  *
  * The +964 prefix is shown as fixed chrome so the customer types only their
  * national number, which is what they know. Arabic-Indic digits are normalised
  * as they type, so a customer on an Arabic keypad is never told their correct
  * number is invalid (plan §2).
  *
- * The comp also draws «أو تابع باستخدام» with Google and Apple buttons. They
- * are deliberately not here: there is no social identity provider behind them,
- * and offering one would pull in App Store guideline 4.8 — a third-party login
- * obliges the app to offer Sign in with Apple beside it. Phone OTP is the only
- * way in, which keeps 4.8 out of scope entirely.
+ * **Two tabs and three ways in.** The screen was one field and one button: a
+ * number, and a code by SMS. That is still the strongest proof of a number and
+ * it is still here — but it costs a message for every sign-in and it fails
+ * whenever delivery does, which on Iraqi networks loses orders. So a password
+ * is a second key to the same door:
+ *
+ *   **تسجيل الدخول** — number and password, instant, no SMS.
+ *   **حساب جديد** — name, number, password; the code proves the number before
+ *   the account exists, which is what stops somebody registering a number they
+ *   do not hold and locking its owner out of their own.
+ *   **رمز عبر SMS** — the original flow, kept as the way in for a customer who
+ *   has no password yet, and as the one that never depends on remembering one.
+ *
+ * The comp also draws Apple beside Google. Neither is here by default: there is
+ * no social provider configured, and offering one would pull in App Store
+ * guideline 4.8 — a third-party login obliges Sign in with Apple beside it.
  */
+type Tab = 'signin' | 'signup';
+
 export default function PhoneScreen() {
   const router = useRouter();
+  const [tab, setTab] = useState<Tab>('signin');
   const [rawInput, setRawInput] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [devAvailable, setDevAvailable] = useState(true);
@@ -45,13 +63,48 @@ export default function PhoneScreen() {
   // Validate against the same rules the server uses, so the button state and
   // the server's answer agree.
   const parsed = tryToE164Iraq(rawInput);
-  const canSubmit = parsed.ok && !isSubmitting;
+
+  /*
+   * What each tab needs before its button lights up.
+   *
+   * The password length is *not* checked here beyond being non-empty. The
+   * policy lives on the server and its refusal names every problem at once, in
+   * Arabic; a client-side length rule would either disagree with it or have to
+   * be kept in step with it, and the failure mode of disagreeing is a button
+   * that stays grey with nothing saying why.
+   */
+  const canSubmit =
+    !isSubmitting &&
+    parsed.ok &&
+    password.length > 0 &&
+    (tab === 'signin' || fullName.trim().length >= 2);
 
   const handleChange = (value: string) => {
     // Fold Arabic-Indic digits immediately and keep only digits, so the field
     // shows exactly what will be sent.
     setRawInput(normalizeDigits(value).replace(/\D/g, '').slice(0, 11));
     if (error) setError(null);
+  };
+
+  /** Switching tabs keeps the number — it is the same person either way. */
+  const switchTab = (next: Tab) => {
+    setTab(next);
+    setError(null);
+  };
+
+  /**
+   * Turn a thrown error into something the customer can read.
+   *
+   * The server's Arabic message is authoritative wherever there is one: it
+   * knows whether this was a cooldown, a weak password with three specific
+   * problems, or a number already registered (plan §76).
+   */
+  const describe = (caught: unknown, fallback: string): string => {
+    if (caught instanceof ApiError) return caught.messageAr;
+    if (caught instanceof NetworkError) {
+      return 'تعذّر الاتصال بالإنترنت. تحقق من الاتصال وحاول مرة أخرى.';
+    }
+    return fallback;
   };
 
   /**
@@ -126,6 +179,65 @@ export default function PhoneScreen() {
     }
   };
 
+  /** Number and password — no SMS, no wait. */
+  const handlePasswordSignIn = async () => {
+    if (!parsed.ok) return;
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const result = await api.phonePasswordSignIn(parsed.value, password);
+      await signIn({
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+        userId: result.user.id,
+      });
+      router.replace(result.next_step === 'COMPLETE_PROFILE' ? '/(auth)/profile' : '/(tabs)');
+    } catch (caught) {
+      setError(describe(caught, 'تعذّر تسجيل الدخول، الرجاء المحاولة مرة أخرى'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /**
+   * Begin a registration: the server checks the number is free and sends a code.
+   *
+   * No account exists yet, and the password is not sent anywhere it would be
+   * kept. It is held in memory on this device until the code is entered — see
+   * `lib/pending-credentials.ts` for why that is not a route param.
+   */
+  const handleRegister = async () => {
+    if (!parsed.ok) return;
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const result = await api.register(fullName.trim(), parsed.value, password);
+
+      holdPendingCredentials({
+        purpose: 'REGISTER',
+        phone: parsed.value,
+        password,
+        fullName: fullName.trim(),
+      });
+
+      router.push({
+        pathname: '/(auth)/otp',
+        params: {
+          phone: parsed.value,
+          mode: 'register',
+          ...(result.dev_code ? { devCode: result.dev_code } : {}),
+        },
+      });
+    } catch (caught) {
+      setError(describe(caught, 'تعذّر إنشاء الحساب، الرجاء المحاولة مرة أخرى'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /** The original flow, now one of three rather than the only one. */
   const handleSubmit = async () => {
     if (!parsed.ok) return;
     setSubmitting(true);
@@ -185,8 +297,69 @@ export default function PhoneScreen() {
         <Text style={styles.title}>
           مرحباً بك في <Text style={styles.brand}>جيبلي</Text>
         </Text>
-        <Text style={styles.subtitle}>أدخل رقم هاتفك للمتابعة</Text>
+        <Text style={styles.subtitle}>
+          {tab === 'signin' ? 'سجّل الدخول للمتابعة' : 'أنشئ حسابك في دقيقة'}
+        </Text>
       </View>
+
+      {/*
+       * One control, two states — not two buttons that happen to look related.
+       *
+       * `accessibilityRole="tab"` and `selected` are what make this readable to
+       * a screen reader as a choice between two things rather than as two
+       * buttons of which one is mysteriously highlighted.
+       */}
+      <View style={styles.tabs} accessibilityRole="tablist">
+        {(
+          [
+            ['signin', 'تسجيل الدخول'],
+            ['signup', 'حساب جديد'],
+          ] as const
+        ).map(([key, label]) => (
+          <Pressable
+            key={key}
+            onPress={() => switchTab(key)}
+            disabled={isSubmitting}
+            accessibilityRole="tab"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: tab === key }}
+            style={[styles.tab, tab === key && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/*
+       * The name, on signup only.
+       *
+       * Asked here rather than left to the profile screen because it is the one
+       * field of a profile that a *registration* obviously needs — an order
+       * arrives at a door and somebody has to be asked for. The governorate and
+       * city still come later; a form that asks for everything at once is the
+       * form people leave.
+       */}
+      {tab === 'signup' ? (
+        <View style={styles.inputRow}>
+          <MaterialCommunityIcons name="account-outline" size={20} color={color.textMuted} />
+          <TextInput
+            style={[styles.input, styles.textInput]}
+            value={fullName}
+            onChangeText={(value) => {
+              setFullName(value);
+              if (error) setError(null);
+            }}
+            placeholder="الاسم"
+            placeholderTextColor={palette.ink[400]}
+            autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
+            maxLength={80}
+            accessibilityLabel="الاسم الكامل"
+            editable={!isSubmitting}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.inputRow}>
         {/*
@@ -222,6 +395,28 @@ export default function PhoneScreen() {
         />
       </View>
 
+      <PasswordField
+        value={password}
+        onChangeText={(value) => {
+          setPassword(value);
+          if (error) setError(null);
+        }}
+        placeholder="كلمة السر"
+        editable={!isSubmitting}
+        /*
+         * `new-password` on signup so the keychain offers to *save* rather than
+         * to fill, and suggests a strong one. `current-password` on sign-in so
+         * it offers the saved one. Getting these the wrong way round is why
+         * some apps never autofill.
+         */
+        autoComplete={tab === 'signup' ? 'new-password' : 'current-password'}
+        textContentType={tab === 'signup' ? 'newPassword' : 'password'}
+        returnKeyType="go"
+        onSubmitEditing={() => {
+          if (canSubmit) void (tab === 'signin' ? handlePasswordSignIn() : handleRegister());
+        }}
+      />
+
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}
@@ -230,18 +425,60 @@ export default function PhoneScreen() {
 
       <Pressable
         style={[styles.button, !canSubmit && styles.buttonDisabled]}
-        onPress={handleSubmit}
+        onPress={tab === 'signin' ? handlePasswordSignIn : handleRegister}
         disabled={!canSubmit}
         accessibilityRole="button"
-        accessibilityLabel="إرسال رمز التحقق"
+        accessibilityLabel={tab === 'signin' ? 'دخول' : 'إنشاء حساب'}
         accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
       >
         {isSubmitting ? (
           <ActivityIndicator color={palette.white} />
         ) : (
-          <Text style={styles.buttonText}>إرسال رمز التحقق</Text>
+          <Text style={styles.buttonText}>{tab === 'signin' ? 'دخول' : 'إنشاء حساب'}</Text>
         )}
       </Pressable>
+
+      {/*
+       * The two ways out of a forgotten password, side by side.
+       *
+       * A code by SMS is not only the fallback for somebody who never set a
+       * password — it is the *only* way to reset one, because the number is
+       * what proves the account. Offering both here means a customer who
+       * cannot get in has somewhere to go without leaving the screen.
+       */}
+      {tab === 'signin' ? (
+        <View style={styles.recovery}>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(auth)/forgot-password',
+                ...(parsed.ok ? { params: { phone: parsed.value } } : {}),
+              })
+            }
+            disabled={isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel="نسيت كلمة السر"
+            hitSlop={space[2]}
+            style={styles.recoveryTap}
+          >
+            <Text style={styles.recoveryLink}>نسيت كلمة السر؟</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleSubmit}
+            disabled={!parsed.ok || isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel="الدخول برمز عبر رسالة"
+            accessibilityState={{ disabled: !parsed.ok || isSubmitting }}
+            hitSlop={space[2]}
+            style={styles.recoveryTap}
+          >
+            <Text style={[styles.recoveryLink, !parsed.ok && styles.recoveryLinkDisabled]}>
+              الدخول برمز عبر SMS
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/*
        * The development shortcut.
@@ -390,6 +627,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /*
+   * A segmented control, drawn as one object with a moving fill rather than as
+   * two buttons. The tray carries the border; the active tab carries the brand.
+   */
+  tabs: {
+    flexDirection: ROW,
+    backgroundColor: palette.ink[50],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.borderSubtle,
+    padding: space[1],
+    gap: space[1],
+  },
+  tab: {
+    flex: 1,
+    minHeight: TAP_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+  },
+  tabActive: { backgroundColor: BRAND[500] },
+  tabText: { ...text.bodyBold, color: color.textSecondary },
+  tabTextActive: { color: palette.white },
+
+  /** Words, unlike a phone number, follow the layout direction. */
+  textInput: { writingDirection: 'auto', textAlign: 'right' },
+
+  recovery: {
+    flexDirection: ROW,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recoveryTap: { minHeight: TAP_TARGET, justifyContent: 'center' },
+  recoveryLink: { ...text.small, color: BRAND[600], fontWeight: '700' },
+  recoveryLinkDisabled: { color: palette.ink[400] },
+
   header: { gap: space[2], alignItems: 'center', marginBottom: space[4] },
   title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
   brand: { color: BRAND[500] },

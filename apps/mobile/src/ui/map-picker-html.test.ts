@@ -1,5 +1,21 @@
-import { describe, expect, it } from 'vitest';
-import { MAP_PICKER_HTML } from './map-picker-html';
+import { describe, expect, it, vi } from 'vitest';
+
+/*
+ * A tile provider, set before the module is loaded.
+ *
+ * `map-picker-html.ts` reads `EXPO_PUBLIC_MAP_TILE_URL` at module scope,
+ * because the value is baked in at build time — so the only way to exercise
+ * the map document is to have one configured before the import. Without it the
+ * module now returns the "الخريطة غير متاحة" document instead, which is the
+ * point of the last test in this file.
+ *
+ * The dynamic import is the pattern `lib/api.test.ts` already uses for the
+ * same reason: a module whose behaviour is decided at load.
+ */
+process.env.EXPO_PUBLIC_MAP_TILE_URL = 'https://tiles.example/{z}/{x}/{y}.png';
+process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION = '&copy; Example';
+
+const { MAP_PICKER_HTML } = await import('./map-picker-html');
 
 /**
  * What the map reports, and when.
@@ -63,5 +79,36 @@ describe('the map picker only reports a point somebody chose', () => {
   it('opens close in on a real pin and wide when guessing', () => {
     expect(MAP_PICKER_HTML(33.2778, 44.3661)).toContain('], 17)');
     expect(MAP_PICKER_HTML(null, null)).toContain('], 13)');
+  });
+});
+
+describe('the unlicensed-tiles fallback is gone', () => {
+  it('never points at the OpenStreetMap donated tile server', () => {
+    /*
+     * The licence bug this pins.
+     *
+     * `TILE_URL` used to default to `tile.openstreetmap.org` when
+     * `EXPO_PUBLIC_MAP_TILE_URL` was unset — and unset is the default, so every
+     * build that nobody had configured shipped a violation of the OSMF Tile
+     * Usage Policy, working perfectly, until somebody at the Foundation
+     * noticed. There is no fallback now.
+     */
+    const html = MAP_PICKER_HTML(33.2778, 44.3661);
+    expect(html).not.toContain('tile.openstreetmap.org');
+    expect(html).toContain('tiles.example');
+  });
+
+  it('draws an honest message instead of a map when no provider is configured', async () => {
+    delete process.env.EXPO_PUBLIC_MAP_TILE_URL;
+    // A second load, so the module re-reads the environment without one.
+    vi.resetModules();
+    const fresh = await import('./map-picker-html');
+
+    const html = fresh.MAP_PICKER_HTML(33.2778, 44.3661);
+
+    // No Leaflet, no tiles, no silent grey panel — a sentence the customer can act on.
+    expect(html).not.toContain('leaflet');
+    expect(html).toContain('الخريطة غير متاحة حالياً');
+    expect(html).toContain('كتابة العنوان يدوياً');
   });
 });

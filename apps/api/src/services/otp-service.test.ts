@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadApiEnv } from '@jibli/config';
 import { hashShortCode } from '@jibli/auth';
 import type { AppContext } from '../lib/context.js';
-import { requestOtp } from './otp-service.js';
+import { consumeOtpChallenge, requestOtp } from './otp-service.js';
 
 /**
  * The one number that can sign into a deployment with no SMS gateway.
@@ -26,6 +26,8 @@ interface Captured {
   providerNames: string[];
   /** Redis keys that were incremented or written, in order. */
   counters: string[];
+  /** What the stored challenge said the code was issued for. */
+  purpose: string;
 }
 
 /**
@@ -49,6 +51,7 @@ function makeContext(
     smsBodies: [],
     providerNames: [],
     counters: [],
+    purpose: '',
   };
 
   const env = loadApiEnv({
@@ -66,9 +69,10 @@ function makeContext(
   const db = {
     update: () => ({ set: () => ({ where: async () => undefined }) }),
     insert: () => ({
-      values: async (row: { id: string; codeHash: string }) => {
+      values: async (row: { id: string; codeHash: string; purpose: string }) => {
         captured.challengeId = row.id;
         captured.codeHash = row.codeHash;
+        captured.purpose = row.purpose;
       },
     }),
   };
@@ -205,5 +209,164 @@ describe('requestOtp() with OTP_TEST_PHONES', () => {
     const result = await request(ctx, TEST_PHONE);
 
     expect(result.devCode).toBeUndefined();
+  });
+});
+
+/**
+ * That a code is spendable only on the thing it was sent for.
+ *
+ * Customers can now register and reset a password with a code, not only sign
+ * in — three flows, one delivery channel, and the codes are indistinguishable
+ * to anyone holding the SMS. Without a purpose on the challenge, a code a
+ * customer requested to *unlock* their account would also complete a
+ * *registration* against their number, which turns "somebody glimpsed my
+ * messages" from an account takeover risk into a number takeover.
+ */
+
+/** A context whose challenge lookup returns exactly this row. */
+function contextWithChallenge(challenge: Record<string, unknown>): AppContext {
+  const env = loadApiEnv({
+    APP_ENV: 'staging',
+    DATABASE_URL: 'postgres://user:pass@localhost:5432/jibli',
+    REDIS_URL: 'redis://localhost:6379',
+    JWT_ACCESS_SECRET: 'a'.repeat(48),
+    JWT_REFRESH_SECRET: 'b'.repeat(48),
+    OTP_HASH_PEPPER: PEPPER,
+    OTP_PROVIDER: 'console',
+  });
+
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          orderBy: () => ({ limit: async () => [challenge] }),
+          limit: async () => [challenge],
+        }),
+      }),
+    }),
+    update: () => ({
+      set: () => ({
+        where: () => ({ returning: async () => [{ id: challenge.id }] }),
+      }),
+    }),
+  };
+
+  const logger = {
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+    debug: () => undefined,
+    child: () => logger,
+  };
+
+  return { env, db, logger, redis: {} } as unknown as AppContext;
+}
+
+function liveChallenge(purpose: string, code = '4321') {
+  const id = '0195e2a1-0000-7000-8000-00000000000a';
+  return {
+    id,
+    phoneE164: OTHER_PHONE,
+    codeHash: hashShortCode(code, PEPPER, id),
+    purpose,
+    attemptCount: 0,
+    maxAttempts: 5,
+    expiresAt: new Date(Date.now() + 5 * 60_000),
+    consumedAt: null,
+  };
+}
+
+describe('consumeOtpChallenge() purpose separation', () => {
+  it('accepts a code spent on the purpose it was issued for', async () => {
+    const ctx = contextWithChallenge(liveChallenge('PASSWORD_RESET'));
+
+    await expect(
+      consumeOtpChallenge(ctx, {
+        phoneE164: OTHER_PHONE,
+        code: '4321',
+        purpose: 'PASSWORD_RESET',
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('refuses a reset code used to register', async () => {
+    // The attack this closes: a code the owner requested to unlock their own
+    // account must not be usable to claim the number instead.
+    const ctx = contextWithChallenge(liveChallenge('PASSWORD_RESET'));
+
+    await expect(
+      consumeOtpChallenge(ctx, { phoneE164: OTHER_PHONE, code: '4321', purpose: 'REGISTER' }),
+    ).rejects.toMatchObject({ code: 'OTP_INVALID' });
+  });
+
+  it('refuses a sign-in code used to reset a password', async () => {
+    const ctx = contextWithChallenge(liveChallenge('LOGIN'));
+
+    await expect(
+      consumeOtpChallenge(ctx, {
+        phoneE164: OTHER_PHONE,
+        code: '4321',
+        purpose: 'PASSWORD_RESET',
+      }),
+    ).rejects.toMatchObject({ code: 'OTP_INVALID' });
+  });
+
+  it('says only OTP_INVALID, never which purpose the code was for', async () => {
+    /*
+     * A distinct error would confirm that a reset was requested for the
+     * number, which is exactly what somebody probing would like to learn.
+     */
+    const ctx = contextWithChallenge(liveChallenge('PASSWORD_RESET'));
+
+    const error = await consumeOtpChallenge(ctx, {
+      phoneE164: OTHER_PHONE,
+      code: '4321',
+      purpose: 'REGISTER',
+    }).catch((caught: unknown) => caught);
+
+    expect((error as { code: string }).code).toBe('OTP_INVALID');
+    expect(JSON.stringify(error)).not.toContain('PASSWORD_RESET');
+  });
+
+  it('treats a challenge with no purpose as a sign-in, so old rows still work', async () => {
+    // Every challenge written before this existed carries 'LOGIN' from the
+    // column default. The original flow must be untouched by the new rule.
+    const ctx = contextWithChallenge(liveChallenge('LOGIN'));
+
+    await expect(
+      consumeOtpChallenge(ctx, { phoneE164: OTHER_PHONE, code: '4321' }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('still rejects a wrong code for the right purpose', async () => {
+    const ctx = contextWithChallenge(liveChallenge('REGISTER'));
+
+    await expect(
+      consumeOtpChallenge(ctx, { phoneE164: OTHER_PHONE, code: '9999', purpose: 'REGISTER' }),
+    ).rejects.toMatchObject({ code: 'OTP_INVALID' });
+  });
+});
+
+describe('requestOtp() records what the code is for', () => {
+  it.each(['REGISTER', 'PASSWORD_RESET'] as const)('stores purpose %s', async (purpose) => {
+    const { ctx, captured } = makeContext();
+
+    await requestOtp(ctx, {
+      phoneE164: OTHER_PHONE,
+      ip: null,
+      userAgent: null,
+      requestId: 'r1',
+      purpose,
+    });
+
+    expect(captured.purpose).toBe(purpose);
+  });
+
+  it('defaults to LOGIN, so the original sign-in is unchanged', async () => {
+    const { ctx, captured } = makeContext();
+
+    await request(ctx, OTHER_PHONE);
+
+    expect(captured.purpose).toBe('LOGIN');
   });
 });

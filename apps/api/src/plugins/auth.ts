@@ -15,6 +15,7 @@ import {
   users,
 } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
+import { getConfig } from '../services/config-service.js';
 
 /**
  * Authentication (plan §77).
@@ -49,6 +50,9 @@ async function resolvePrincipal(
       profileCompletedAt: users.profileCompletedAt,
       phoneVerifiedAt: users.phoneVerifiedAt,
       deletedAt: users.deletedAt,
+      // Whether an authenticator exists on the account — not whether this
+      // session has passed a challenge, which is `claims.mfaAt`.
+      mfaEnabledAt: users.mfaEnabledAt,
     })
     .from(users)
     .where(eq(users.id, claims.sub))
@@ -89,16 +93,36 @@ async function resolvePrincipal(
     .where(eq(drivers.userId, user.id))
     .limit(1);
 
+  const platformRoles = platformRoleRows.map((r) => r.role as PlatformRole);
+
+  /*
+   * Read per request, and only when it can matter.
+   *
+   * `require_mfa` is a platform setting an operator can turn on, and the rest
+   * of this function already re-reads authority on every request so a change
+   * takes effect immediately (plan §86). Baking it into the token would mean an
+   * admin who was signed in when it was switched on keeps a session it does not
+   * apply to.
+   *
+   * Skipped entirely for a customer, a driver or a restaurant member, which is
+   * almost every request: the setting governs platform roles only, and this is
+   * the hot path for the whole API.
+   */
+  const mfaRequiredByPolicy =
+    platformRoles.length > 0 ? await getConfig(ctx, 'require_mfa', false) : false;
+
   return {
     userId: user.id,
     sessionId: session.id,
-    platformRoles: platformRoleRows.map((r) => r.role as PlatformRole),
+    platformRoles,
     restaurantRoles,
     // A suspended driver keeps their customer identity but loses Driver Mode.
     driverId: driver && driver.status === 'ACTIVE' ? driver.id : null,
     profileCompleted: user.profileCompletedAt !== null,
     phoneVerified: user.phoneVerifiedAt !== null,
     mfaAt: claims.mfaAt ? new Date(claims.mfaAt) : null,
+    mfaEnrolled: user.mfaEnabledAt !== null,
+    mfaRequiredByPolicy,
   };
 }
 

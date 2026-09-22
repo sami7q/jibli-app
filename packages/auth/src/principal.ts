@@ -2,6 +2,7 @@ import {
   AppError,
   ERROR_CODES,
   adminPermissionsFor,
+  MFA_MANDATORY_ROLES,
   requiresReauthentication,
   restaurantPermissionsFor,
   type AdminPermission,
@@ -35,6 +36,24 @@ export interface Principal {
   readonly phoneVerified: boolean;
   /** When the principal last passed an MFA challenge, if ever. */
   readonly mfaAt: Date | null;
+  /**
+   * Whether an authenticator is enrolled on this account at all.
+   *
+   * Distinct from `mfaAt`, which is about *this session*: an admin who enrolled
+   * a year ago and has not been challenged today has `mfaEnrolled: true` and
+   * `mfaAt: null`. The first decides whether they may act as an admin; the
+   * second whether they may perform a sensitive action right now.
+   */
+  readonly mfaEnrolled: boolean;
+  /**
+   * Whether the platform is currently demanding enrolment of the roles that
+   * require it.
+   *
+   * Read from `require_mfa` per request rather than baked into the token, so
+   * turning the requirement on takes effect immediately for sessions that are
+   * already open — the same rule the rest of this file follows for roles.
+   */
+  readonly mfaRequiredByPolicy: boolean;
 }
 
 /** How recently MFA must have happened to authorise a sensitive action. */
@@ -59,12 +78,44 @@ export function hasAdminPermission(principal: Principal, permission: AdminPermis
   return adminPermissionsFor(principal.platformRoles).has(permission);
 }
 
+/**
+ * Whether this principal holds a role the plan makes MFA mandatory for, and has
+ * not enrolled one.
+ *
+ * `MFA_MANDATORY_ROLES` existed and was read in exactly one place — to decide
+ * whether to *offer* enrolment at login — so a SUPER_ADMIN could decline and
+ * carry on with a password alone, reaching customer phone numbers, settlement
+ * voids and commission changes. The list said "mandatory" and nothing made it so.
+ */
+export function needsMfaEnrolment(principal: Principal): boolean {
+  if (!principal.mfaRequiredByPolicy) return false;
+  if (principal.mfaEnrolled) return false;
+  return principal.platformRoles.some((role) => MFA_MANDATORY_ROLES.includes(role));
+}
+
 export function assertAdminPermission(principal: Principal, permission: AdminPermission): void {
   if (!hasAdminPermission(principal, permission)) {
     throw new AppError(ERROR_CODES.FORBIDDEN, {
       details: { requiredPermission: permission },
     });
   }
+
+  /*
+   * Enrolment is enforced here rather than at login, because login is not where
+   * it can be enforced: the server issues a session and returns
+   * `mfa_enrolment_required` for the portal to act on — which is a request, not
+   * a control. A client that ignores it had a fully privileged session.
+   *
+   * This is the choke point every admin action already passes through, so an
+   * unenrolled mandatory role can authenticate and manage its own MFA, and can
+   * do nothing else. The routes under /auth/mfa deliberately do not call this.
+   */
+  if (needsMfaEnrolment(principal)) {
+    throw new AppError(ERROR_CODES.MFA_REQUIRED, {
+      details: { reason: 'MFA_ENROLMENT_REQUIRED', requiredPermission: permission },
+    });
+  }
+
   // Sensitive actions additionally demand a fresh MFA challenge (plan §88).
   if (requiresReauthentication(permission) && !hasFreshMfa(principal)) {
     throw new AppError(ERROR_CODES.REAUTHENTICATION_REQUIRED, {

@@ -12,14 +12,14 @@ import {
 } from '@jibli/auth';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
 import { loginIdentifierSchema } from '@jibli/validation';
-import {
-  loginAttempts,
-  restaurantMembers,
-  users,
-  userPlatformRoles,
-  uuidv7,
-} from '@jibli/db';
+import { restaurantMembers, users, userPlatformRoles } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../lib/context.js';
+import {
+  DUMMY_ARGON2_HASH,
+  LOCKOUT_MINUTES,
+  MAX_FAILED_LOGINS,
+  recordLoginAttempt,
+} from '../services/credential-service.js';
 import { issueSession, loadCapabilities, refreshSession, revokeSessionByRefreshToken, revokeSessionChain } from '../services/session-service.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { getConfig } from '../services/config-service.js';
@@ -74,9 +74,10 @@ const loginSchema = z.object({
  * The window is deliberately short: the goal is to make an online guessing
  * attack uneconomic, not to give anyone a way to lock a competitor out of
  * their own portal for a day by typing the wrong password six times.
+ *
+ * Shared with the customer password sign-in — see
+ * `services/credential-service.ts`, which is where both now read it from.
  */
-const MAX_FAILED_LOGINS = 6;
-const LOCKOUT_MINUTES = 15;
 
 /**
  * Set the refresh cookie.
@@ -162,7 +163,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
 
       /** Record the attempt and build the uniform error; the caller throws it. */
       const reject = async (reason: string, userId: string | null = null): Promise<AppError> => {
-        await recordAttempt(ctx, {
+        await recordLoginAttempt(ctx, {
           userId,
           identifier: body.username,
           succeeded: false,
@@ -205,7 +206,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
        * lockout cannot be used as an oracle for whether the password was right.
        */
       if (user?.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-        await recordAttempt(ctx, {
+        await recordLoginAttempt(ctx, {
           userId: user.id,
           identifier: body.username,
           succeeded: false,
@@ -248,7 +249,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
       }
 
       if (user.status !== 'ACTIVE') {
-        await recordAttempt(ctx, {
+        await recordLoginAttempt(ctx, {
           userId: user.id,
           identifier: body.username,
           succeeded: false,
@@ -308,7 +309,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
             userAgent: agent,
           });
         } catch (error) {
-          await recordAttempt(ctx, {
+          await recordLoginAttempt(ctx, {
             userId: user.id,
             identifier: body.username,
             succeeded: false,
@@ -337,7 +338,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         .set({ lastLoginAt: new Date(), failedLoginCount: 0, lockedUntil: null })
         .where(eq(users.id, user.id));
 
-      await recordAttempt(ctx, {
+      await recordLoginAttempt(ctx, {
         userId: user.id,
         identifier: body.username,
         succeeded: true,
@@ -640,44 +641,10 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
   });
 }
 
-/**
- * Write one row to the sign-in log.
- *
- * Never throws: telemetry must not be able to turn a successful login into a
- * 500, nor a failed one into a different error than the uniform message.
+/*
+ * `recordLoginAttempt` and `DUMMY_ARGON2_HASH` used to be defined here. They
+ * moved to `services/credential-service.ts` when customers gained a password
+ * sign-in of their own: two copies of a timing-uniformity hash, or of the log
+ * an incident is investigated from, is two things to keep in step and one to
+ * forget.
  */
-async function recordAttempt(
-  ctx: AppContext,
-  params: {
-    userId: string | null;
-    identifier: string;
-    succeeded: boolean;
-    failureReason: string | null;
-    ip: string | null;
-    userAgent: string | null;
-  },
-): Promise<void> {
-  try {
-    await ctx.db.insert(loginAttempts).values({
-      id: uuidv7(),
-      userId: params.userId,
-      identifier: params.identifier,
-      succeeded: params.succeeded,
-      failureReason: params.failureReason,
-      ip: params.ip,
-      userAgent: params.userAgent,
-    });
-  } catch (error) {
-    ctx.logger.warn({ event: 'login_attempt.record_failed', err: error }, 'could not log attempt');
-  }
-}
-
-/**
- * A real Argon2id hash of a value nobody knows.
- *
- * Verified against when the account does not exist, so that path costs the same
- * as a genuine check. Without it, "unknown number" returns in microseconds and
- * "wrong password" in ~50ms, which is enough to enumerate staff numbers.
- */
-const DUMMY_ARGON2_HASH =
-  '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHRzb21lc2FsdA$Vc0QqGZVXKD8mQJc0wYqzRUHtTXhF4pFfJFYPnxvHXk';

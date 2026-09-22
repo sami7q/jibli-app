@@ -112,7 +112,16 @@ export type AdminNotificationKind =
   | 'SUPPORT_MESSAGE'
   | 'SETTLEMENT_OVERDUE'
   | 'ORDER_CANCELLED'
-  | 'REVIEW_POSTED';
+  | 'REVIEW_POSTED'
+  /**
+   * Ready, and waiting for a driver nobody has assigned.
+   *
+   * Driver assignment is manual — the restaurant picks one — so an order can
+   * reach READY and stop there indefinitely with every party believing somebody
+   * else is handling it. See migration 0018 and
+   * `apps/worker/src/jobs/stalled-orders.ts`.
+   */
+  | 'ORDER_STALLED';
 
 export type AdminNotificationSeverity = 'INFO' | 'ATTENTION' | 'URGENT';
 

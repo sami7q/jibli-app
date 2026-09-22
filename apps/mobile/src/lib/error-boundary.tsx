@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { View } from 'react-native';
+import { captureError } from '@/lib/monitoring';
 import { color, space } from '@/theme';
 import { Button, Text } from '@/ui';
 
@@ -31,11 +32,19 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     /*
-     * Console, for now. When crash reporting is added this is the single place
-     * it hooks into — which is half the reason the boundary exists before
-     * there is anything to report to.
+     * The hook this boundary was written to have.
+     *
+     * `console.error` alone went nowhere in a release build, so a render error
+     * that unmounted a screen on a customer's phone left no trace anywhere —
+     * the app showed this fallback and the team learned nothing. The console
+     * line stays because it is what a developer sees in Metro; the capture is
+     * what reaches anybody afterwards.
+     *
+     * `componentStack` is the part a stack trace alone does not give: which
+     * component tree was rendering when it threw.
      */
     console.error('Unhandled render error', error, info.componentStack);
+    captureError(error, { componentStack: info.componentStack });
   }
 
   private readonly reset = (): void => this.setState({ error: null });

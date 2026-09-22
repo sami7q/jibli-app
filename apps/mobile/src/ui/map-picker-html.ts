@@ -43,11 +43,26 @@ const FALLBACK = { latitude: 33.3128, longitude: 44.3615 };
  * baked into the binary — which is what makes swapping MapTiler or Stadia in
  * a rebuild rather than a release of new code.
  */
-const TILE_URL =
-  process.env.EXPO_PUBLIC_MAP_TILE_URL ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_URL = process.env.EXPO_PUBLIC_MAP_TILE_URL ?? null;
 
-const TILE_ATTRIBUTION =
-  process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? '&copy; OpenStreetMap';
+const TILE_ATTRIBUTION = process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? null;
+
+/**
+ * Whether a tile provider has been configured at all.
+ *
+ * There is deliberately **no fallback**. It used to default to
+ * `tile.openstreetmap.org`, and the OSMF Tile Usage Policy is explicit that the
+ * server is a donated resource which a distributed application may not point
+ * at — so every build without this variable set was shipping a licence
+ * violation, silently, in the one configuration nobody tests because it is the
+ * default.
+ *
+ * Unset, the document below draws an honest message instead of a map. That is
+ * worse for a developer and better for everyone else: an unconfigured build
+ * announces itself the first time anybody opens the address sheet, rather than
+ * working perfectly until somebody at the OSM Foundation notices.
+ */
+export const HAS_TILE_PROVIDER = TILE_URL !== null;
 
 export function MAP_PICKER_HTML(latitude: number | null, longitude: number | null): string {
   /*
@@ -68,6 +83,42 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
   const hasPin = typeof latitude === 'number' && typeof longitude === 'number';
   const lat = hasPin ? latitude : FALLBACK.latitude;
   const lon = hasPin ? longitude : FALLBACK.longitude;
+
+  /*
+   * No provider, no map — and it says so.
+   *
+   * Loading Leaflet against a tile server we are not licensed to use would
+   * look correct and be a licence violation. A build that reaches this has a
+   * missing environment variable, and the fastest way for that to be fixed is
+   * for it to be visible rather than inferred from a traffic complaint.
+   *
+   * The customer is not stranded: the address sheet accepts a typed address
+   * and every screen downstream already handles an address with no point.
+   */
+  if (!HAS_TILE_PROVIDER) {
+    return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #eef0f3; }
+  #box {
+    height: 100%; display: flex; flex-direction: column; gap: 8px;
+    align-items: center; justify-content: center; padding: 16px;
+    font: 13px "Segoe UI", system-ui, sans-serif; color: #4b5563; text-align: center;
+  }
+  #box strong { color: #374151; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="box">
+  <strong>الخريطة غير متاحة حالياً</strong>
+  <span>يمكنك كتابة العنوان يدوياً، وسيصل المندوب باستخدام الوصف والمَعلَم.</span>
+</div>
+</body>
+</html>`;
+  }
 
   return `<!doctype html>
 <html lang="ar" dir="rtl">

@@ -60,6 +60,33 @@ export interface PasswordPolicyResult {
 /** Admin accounts reach further into money and roles, so they are held higher. */
 export const PASSWORD_MIN_LENGTH = 12;
 export const ADMIN_PASSWORD_MIN_LENGTH = 14;
+
+/**
+ * Customers, who are typing on a phone.
+ *
+ * Lower than the staff minimum, and deliberately. Twelve characters with a
+ * digit, entered on an Arabic phone keyboard that has to be switched to Latin
+ * for the digit, is the length at which people write the password down or
+ * abandon the form — and a customer who abandons signup is not a more secure
+ * customer, they are somebody ordering by phone call instead.
+ *
+ * Eight is defensible here specifically, because of what surrounds it:
+ *
+ *   The account holds a name, a phone number, addresses and order history.
+ *   There is no stored payment instrument — Jibli is cash on delivery — so a
+ *   stolen password does not reach money.
+ *
+ *   Five wrong attempts locks the account, and the login endpoint is rate
+ *   limited besides. An eight-character password with letters and a digit is
+ *   not reachable by guessing through a five-attempt gate.
+ *
+ *   Phone OTP still exists as a second way in, and is the *only* way to reset
+ *   the password — so the number remains the root of the account either way.
+ *
+ * Every other rule in the policy still applies: letters, a digit, no trivial
+ * sequence, no common pattern.
+ */
+export const CUSTOMER_PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 256;
 
 /**

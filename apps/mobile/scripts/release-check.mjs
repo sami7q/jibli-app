@@ -119,9 +119,11 @@ if (process.env.EXPO_PUBLIC_MAP_TILE_URL) {
   }
 } else {
   bad(
-    'no tile provider — would fall back to tile.openstreetmap.org',
-    'The OSMF usage policy forbids a distributed app from using it. MapTiler/Stadia free tiers cover this many times over.',
+    'no tile provider — the address picker will draw no map at all',
+    'Set EXPO_PUBLIC_MAP_TILE_URL. MapTiler/Stadia free tiers cover this many times over.',
   );
+  note('There is no longer a fallback: it used to default to tile.openstreetmap.org,');
+  note('which the OSMF usage policy forbids a distributed app from using.');
 }
 
 // ── 4. The icon font subset ──────────────────────────────────────────────────

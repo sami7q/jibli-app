@@ -510,8 +510,21 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
         action: 'ACCOUNT_DELETED',
         entityType: 'user',
         entityId: principal.userId,
-        // The phone is recorded so a customer who contacts support about a
-        // past order can be matched; nothing else identifying is kept.
+        /*
+         * The phone survives the deletion, and the privacy policy says so.
+         *
+         * It is the only way to match a customer who contacts support about an
+         * order placed before they deleted their account — the order itself
+         * keeps a snapshot, but nothing links it back to a person once the user
+         * row is anonymised. Nothing else identifying is kept: no name, no
+         * address, no coordinates.
+         *
+         * Disclosed explicitly under «كم تبقى بياناتي عندكم؟» in
+         * `apps/legal/src/app/privacy/page.tsx`, because telling somebody their
+         * data is deleted while keeping their number is the kind of gap a data
+         * safety form is meant to close. This row is itself subject to
+         * RETENTION_AUDIT_LOG_DAYS and is swept by the worker.
+         */
         beforeJson: { phone_e164: before?.phone ?? null, had_name: Boolean(before?.fullName) },
         afterJson: { status: 'DEACTIVATED', username: tombstone },
         reason: 'SELF_SERVICE_DELETION',

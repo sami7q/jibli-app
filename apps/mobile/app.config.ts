@@ -220,6 +220,20 @@ const config: ExpoConfig = {
      */
     iosAppId: process.env.EXPO_PUBLIC_IOS_APP_ID ?? null,
     /*
+     * Where crash reports go, if anywhere.
+     *
+     * Deliberately *not* passed through `requireForStore`: a DSN is not a
+     * correctness requirement the way a privacy policy is, and refusing to
+     * build without one would block a release over telemetry. Absent, the SDK
+     * is never initialised — see `src/lib/monitoring.ts`.
+     *
+     * A Sentry DSN is not a secret in the usual sense; it ships in every
+     * client, and its only capability is to receive events. It still lives in
+     * the environment rather than here so that a project can be changed without
+     * a code change.
+     */
+    sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? null,
+    /*
      * Both resolved above rather than here, because a store build must not be
      * allowed to bake the placeholder — see `requireForStore`.
      */
@@ -529,6 +543,23 @@ const config: ExpoConfig = {
      * an image lands on a slow connection, which is most of them.
      */
     'expo-image',
+    /*
+     * Crash reporting, because the alternative was launching blind.
+     *
+     * `error-boundary.tsx` wrote `console.error` and nothing else — which in a
+     * release build goes nowhere at all. A crash affecting a slice of Android
+     * users would have surfaced first as a one-star review.
+     *
+     * That gap mattered more here than it usually does: `expo-updates` is
+     * configured, so the ability to ship a fix in minutes was already excellent.
+     * What was missing was any way to know *what* to fix.
+     *
+     * The plugin uploads source maps at build time so a stack trace points at
+     * `checkout.tsx:117` rather than at a minified bundle offset. Without a DSN
+     * (see `src/lib/monitoring.ts`) the SDK stays inert, so a build with no
+     * Sentry project configured behaves exactly as it did before.
+     */
+    '@sentry/react-native',
   ],
   experiments: {
     typedRoutes: true,
