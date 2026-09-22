@@ -222,11 +222,26 @@ services:
       # approved WhatsApp template with the digits in a slot, never free text.
       - key: SMS_GATEWAY_BODY_MODE
         value: code
-      # provider=auto tries WhatsApp, then Telegram, then SMS — about a tenth of
-      # the SMS price for the common case, degrading on its own for a customer
-      # who has neither.
+      # WhatsApp, and only WhatsApp.
+      #
+      # `auto` would try WhatsApp, then Telegram, then SMS. This account sends
+      # over WhatsApp, so the fallbacks are not a safety net — an SMS leg needs
+      # a registered sender id this account does not have, and a send that falls
+      # through to it fails at the vendor rather than arriving.
+      #
+      # ⚠️ The consequence, stated plainly: **a customer who does not use
+      # WhatsApp receives nothing at all** and cannot sign in. Penetration in
+      # Iraq is high enough that this is a reasonable default, not a safe one.
+      # If an SMS sender id is registered with OTPIQ later, change this to
+      # `whatsapp-sms` or `auto` — the same code path handles all of them, and
+      # nothing else here has to move.
+      #
+      # `smsType=verification` with BODY_MODE=code below is what makes WhatsApp
+      # possible at all: the message travels as an approved template with the
+      # digits in a slot. WhatsApp will not carry free text from a business, so
+      # the `custom` mode — our own Arabic wording — is SMS-only by construction.
       - key: SMS_GATEWAY_EXTRA_FIELDS
-        value: '{"smsType":"verification","provider":"auto"}'
+        value: '{"smsType":"verification","provider":"whatsapp"}'
 
       # SMS_GATEWAY_API_KEY is a secret and is deliberately absent from this
       # file. Set it in the Render dashboard on the `jibli-secrets` env group,

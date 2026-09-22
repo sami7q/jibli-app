@@ -114,6 +114,22 @@ SMS_GATEWAY_EXTRA_FIELDS={"smsType":"verification","provider":"auto"}
 on WhatsApp still receives an SMS; nobody is cut off, and the common case is
 the cheap one.
 
+> **What production actually runs: `provider=whatsapp`.** This account sends
+> over WhatsApp and has no registered SMS sender id, so the fallback legs of
+> `auto` would fail at the vendor rather than arrive — a fallback that cannot
+> fire is worse than none, because it reads like a safety net in the config.
+>
+> The cost is real and worth restating: **a customer with no WhatsApp receives
+> nothing and cannot sign in.** Register an SMS sender id with OTPIQ and this
+> becomes `whatsapp-sms`, which is the same code path.
+
+The channel values OTPIQ accepts: `sms`, `whatsapp`, `telegram`, `auto`,
+`whatsapp-sms`, `whatsapp-telegram-sms`. Try one without deploying:
+
+```sh
+pnpm sms:test 07XXXXXXXXX --via whatsapp
+```
+
 The API still generates the code, hashes it, stores it, expires it and counts
 attempts exactly as before. `BODY_MODE=code` only changes what travels: the
 digits are read back out of the rendered message and sent alone.
