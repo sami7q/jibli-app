@@ -19,9 +19,10 @@ import { ApiError, apiRequest } from '@/lib/api';
 /**
  * Restaurant Portal sign-in (plan §77, §88).
  *
- * Password first, then a TOTP code when the account has MFA enrolled. The
- * server decides whether to ask for the second factor; this page never assumes,
- * because assuming would leak which accounts have MFA.
+ * A username and a password, and nothing else. Partner accounts do not use a
+ * second factor: nothing in this portal enrols one, and the code step it used
+ * to carry could only ever be reached by a platform account that belongs in
+ * the admin panel instead — which is what it is now told.
  *
  * No token is stored here. The refresh token arrives as an HttpOnly cookie the
  * page cannot read, and the access token lives in memory inside `useSession`,
@@ -63,8 +64,6 @@ function LoginForm() {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [mfaCode, setMfaCode] = useState('');
-  const [stage, setStage] = useState<'CREDENTIALS' | 'MFA'>('CREDENTIALS');
   const [revealPassword, setRevealPassword] = useState(false);
   /*
    * «تذكرني», on by default because that is what the portal did before the box
@@ -90,9 +89,6 @@ function LoginForm() {
    */
   const [slow, setSlow] = useState(false);
 
-  const [quickLoginReady, setQuickLoginReady] = useState(false);
-
-  const mfaInput = useRef<HTMLInputElement>(null);
   const usernameInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -109,7 +105,6 @@ function LoginForm() {
    */
   useEffect(() => {
     if (!quickLoginSupported()) return;
-    setQuickLoginReady(true);
 
     void recallCredentials('silent').then((saved) => {
       if (!saved) return;
@@ -117,12 +112,6 @@ function LoginForm() {
       setPassword(saved.password);
     });
   }, []);
-
-  // Move focus to the code field the moment the second stage appears, so a
-  // keyboard user is not left hunting for it.
-  useEffect(() => {
-    if (stage === 'MFA') mfaInput.current?.focus();
-  }, [stage]);
 
   // Count the lockout down visibly rather than silently refusing.
   useEffect(() => {
@@ -143,10 +132,8 @@ function LoginForm() {
   /**
    * One sign-in attempt against an explicit pair.
    *
-   * Takes the credentials rather than reading them from state so the quick
-   * sign-in can use what the browser just handed back: a `setState` in the same
-   * tick has not landed yet, and submitting the old state would post an empty
-   * password.
+   * Takes the credentials explicitly rather than reading them from state, so
+   * a caller never posts a pair whose `setState` has not landed yet.
    */
   const attempt = async (credentials: { username: string; password: string }) => {
     if (submitting || lockedFor > 0) return;
@@ -168,13 +155,11 @@ function LoginForm() {
           username: credentials.username.trim(),
           password: credentials.password,
           remember_me: rememberMe,
-          ...(stage === 'MFA' ? { mfa_code: mfaCode.trim() } : {}),
         },
       });
 
       if (response.mfa_required) {
-        setStage('MFA');
-        setFailures(0);
+        setError('هذا الحساب محميّ بالتحقق بخطوتين وهو حساب فريق المنصة. استخدم لوحة الإدارة.');
         return;
       }
 
@@ -253,10 +238,6 @@ function LoginForm() {
           if (next >= BACKOFF_AFTER_ATTEMPTS) setLockedFor(BACKOFF_SECONDS);
         }
       }
-
-      // A rejected code returns to the code field, not the password the user
-      // has already entered correctly.
-      if (stage === 'MFA') setMfaCode('');
     } finally {
       clearTimeout(slowHint);
       setSlow(false);
@@ -269,156 +250,103 @@ function LoginForm() {
     await attempt({ username, password });
   };
 
-  /**
-   * Sign in with the saved password, showing the account picker.
-   *
-   * `optional` rather than `silent`: this is a button someone pressed, so an
-   * account chooser is an answer, not an interruption.
-   */
-  const signInWithSavedPassword = async () => {
-    const saved = await recallCredentials('optional');
-
-    if (!saved) {
-      setError(
-        'لا توجد كلمة مرور محفوظة لهذا الموقع في هذا المتصفح. سجّل الدخول مرة واحدة ووافق على حفظ كلمة المرور، ثم سيعمل هذا الزر.',
-      );
-      return;
-    }
-
-    setUsername(saved.username);
-    setPassword(saved.password);
-    await attempt(saved);
-  };
-
-  const disabled =
-    submitting ||
-    lockedFor > 0 ||
-    (stage === 'CREDENTIALS' ? !username.trim() || !password : mfaCode.trim().length < 6);
+  const disabled = submitting || lockedFor > 0 || !username.trim() || !password;
 
   return (
     <LoginFrame>
       <form onSubmit={submit} noValidate>
         <h1>بوابة شركاء جيبلي</h1>
-        <p className="auth__subtitle">
-          {stage === 'CREDENTIALS'
-            ? 'سجّل الدخول بحساب الشريك'
-            : 'أدخل رمز التحقق من تطبيق المصادقة'}
-        </p>
+        <p className="auth__subtitle">سجّل الدخول بحساب الشريك</p>
 
-        {stage === 'CREDENTIALS' ? (
-          <>
-            <div className="field">
-              <label htmlFor="login-username">اسم المستخدم</label>
-              <input
-                id="login-username"
-                ref={usernameInput}
-                type="text"
-                dir="ltr"
-                autoComplete="username"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                value={username}
-                // Lowercased as typed: the server compares case-insensitively,
-                // and showing the normalised form avoids "but I typed it right".
-                onChange={(event) => setUsername(event.target.value.toLowerCase().trim())}
-                placeholder="mataam-baghdad"
-                required
-              />
-            </div>
+        <div className="field">
+          <label htmlFor="login-username">اسم المستخدم</label>
+          <input
+            id="login-username"
+            ref={usernameInput}
+            type="text"
+            dir="ltr"
+            autoComplete="username"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            value={username}
+            // Lowercased as typed: the server compares case-insensitively,
+            // and showing the normalised form avoids "but I typed it right".
+            onChange={(event) => setUsername(event.target.value.toLowerCase().trim())}
+            placeholder="mataam-baghdad"
+            required
+          />
+        </div>
 
-            <div className="field">
-              <label htmlFor="login-password">كلمة المرور</label>
-              <div className="field__with-action">
-                <input
-                  id="login-password"
-                  type={revealPassword ? 'text' : 'password'}
-                  dir="ltr"
-                  autoComplete="current-password"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  onKeyUp={trackCapsLock}
-                  onKeyDown={trackCapsLock}
-                  required
-                />
-                {/*
+        <div className="field">
+          <label htmlFor="login-password">كلمة المرور</label>
+          <div className="field__with-action">
+            <input
+              id="login-password"
+              type={revealPassword ? 'text' : 'password'}
+              dir="ltr"
+              autoComplete="current-password"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              onKeyUp={trackCapsLock}
+              onKeyDown={trackCapsLock}
+              required
+            />
+            {/*
                   Revealing the password reduces lockouts from typos on a long
                   passphrase. It is off by default and never persisted.
                 */}
-                <button
-                  type="button"
-                  className="field__action"
-                  onClick={() => setRevealPassword((value) => !value)}
-                  aria-pressed={revealPassword}
-                  aria-label={revealPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                >
-                  {revealPassword ? 'إخفاء' : 'إظهار'}
-                </button>
-              </div>
-
-              {capsLock ? (
-                <span
-                  className="field__hint"
-                  role="status"
-                  style={{ color: 'var(--jibli-warning-700)' }}
-                >
-                  تنبيه: مفتاح Caps Lock مُفعّل
-                </span>
-              ) : null}
-            </div>
-
-            <label
-              htmlFor="login-remember"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-                cursor: 'pointer',
-                fontSize: 'var(--text-sm)',
-              }}
+            <button
+              type="button"
+              className="field__action"
+              onClick={() => setRevealPassword((value) => !value)}
+              aria-pressed={revealPassword}
+              aria-label={revealPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
             >
-              <input
-                id="login-remember"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(event) => setRememberMe(event.target.checked)}
-                style={{ width: 18, height: 18, accentColor: 'var(--jibli-orange-500)' }}
-              />
-              <span>
-                تذكّرني على هذا الجهاز
-                <span className="field__hint" style={{ display: 'block' }}>
-                  {rememberMe
-                    ? 'تبقى الجلسة مفتوحة ولا تحتاج تسجيل الدخول في كل مرة.'
-                    : 'ستُغلق الجلسة عند إغلاق المتصفح — الأنسب لجهاز مشترك.'}
-                </span>
-              </span>
-            </label>
-          </>
-        ) : (
-          <div className="field">
-            <label htmlFor="login-mfa">رمز التحقق</label>
-            <input
-              id="login-mfa"
-              ref={mfaInput}
-              dir="ltr"
-              inputMode="numeric"
-              // Lets a phone offer the code from its authenticator app.
-              autoComplete="one-time-code"
-              maxLength={10}
-              value={mfaCode}
-              onChange={(event) => setMfaCode(event.target.value.replace(/\s/g, ''))}
-              placeholder="123456"
-              required
-            />
-            <span className="field__hint">
-              ستة أرقام من تطبيق المصادقة، أو أحد رموز الاسترداد إن فقدت الجهاز.
-            </span>
+              {revealPassword ? 'إخفاء' : 'إظهار'}
+            </button>
           </div>
-        )}
 
+          {capsLock ? (
+            <span
+              className="field__hint"
+              role="status"
+              style={{ color: 'var(--jibli-warning-700)' }}
+            >
+              تنبيه: مفتاح Caps Lock مُفعّل
+            </span>
+          ) : null}
+        </div>
+
+        <label
+          htmlFor="login-remember"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            cursor: 'pointer',
+            fontSize: 'var(--text-sm)',
+          }}
+        >
+          <input
+            id="login-remember"
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(event) => setRememberMe(event.target.checked)}
+            style={{ width: 18, height: 18, accentColor: 'var(--jibli-orange-500)' }}
+          />
+          <span>
+            تذكّرني على هذا الجهاز
+            <span className="field__hint" style={{ display: 'block' }}>
+              {rememberMe
+                ? 'تبقى الجلسة مفتوحة ولا تحتاج تسجيل الدخول في كل مرة.'
+                : 'ستُغلق الجلسة عند إغلاق المتصفح — الأنسب لجهاز مشترك.'}
+            </span>
+          </span>
+        </label>
         {error ? (
           <p className="alert-bar alert-bar--danger" role="alert">
             {error}
@@ -442,40 +370,8 @@ function LoginForm() {
             ? 'جاري التحقق…'
             : lockedFor > 0
               ? `انتظر ${lockedFor} ثانية`
-              : stage === 'CREDENTIALS'
-                ? 'تسجيل الدخول'
-                : 'تأكيد'}
+              : 'تسجيل الدخول'}
         </button>
-
-        {/*
-          The shortcut. It carries no password of its own — it asks the browser
-          for the one it saved for this origin, which is why it can exist on a
-          deployed admin portal at all.
-        */}
-        {stage === 'CREDENTIALS' && quickLoginReady ? (
-          <button
-            type="button"
-            className="btn btn--ghost btn--block"
-            disabled={submitting || lockedFor > 0}
-            onClick={() => void signInWithSavedPassword()}
-          >
-            دخول سريع بكلمة المرور المحفوظة
-          </button>
-        ) : null}
-
-        {stage === 'MFA' ? (
-          <button
-            type="button"
-            className="btn btn--ghost btn--block"
-            onClick={() => {
-              setStage('CREDENTIALS');
-              setMfaCode('');
-              setError(null);
-            }}
-          >
-            رجوع
-          </button>
-        ) : null}
 
         <p className="auth__note">
           إن لم يكن لديك حساب، اطلب من مالك الحساب إضافتك من صفحة الموظفين.

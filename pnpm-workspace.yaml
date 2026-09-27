@@ -2,8 +2,30 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# Postinstall scripts are opt-in. esbuild's shells out to `node` in a way that
-# fails on Windows cmd.exe, and nothing here needs it to run at install time.
+# pnpm settings live here, not in package.json. pnpm 10 stopped reading the
+# `pnpm` field of package.json — it printed a warning and ignored it — so the
+# overrides and the build-script list that used to sit there applied nowhere,
+# on this machine or on EAS, while reading as if they were in force.
+
+# Install scripts are opt-in, one package at a time.
+#
+# @sentry/cli downloads its platform binary in postinstall. Blocked, the binary
+# never exists, and the Android release build dies in Gradle's Sentry upload
+# step with «A problem occurred starting process … sentry-cli» — a failure that
+# names a file, not the setting that caused it.
+onlyBuiltDependencies:
+  - '@sentry/cli'
+
+# esbuild's script shells out to `node` in a way that fails on Windows cmd.exe,
+# and @node-rs/argon2 ships prebuilt binaries; neither needs to run.
 ignoredBuiltDependencies:
   - esbuild
   - '@node-rs/argon2'
+
+# Pinned for the React Native 0.86 / Expo SDK 57 set. These must match the
+# `overrides` block at the top of pnpm-lock.yaml, or a frozen install refuses.
+overrides:
+  react-native-worklets: 0.10.1
+  react-native-reanimated: 4.5.1
+  '@react-native/metro-config': 0.86.3
+  decode-uri-component: '>=0.5.0'

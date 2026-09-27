@@ -12,7 +12,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://jibli-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://jibli-api.onrender.com",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "production": {
@@ -22,7 +23,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://jibli-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://jibli-api.onrender.com",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
   },

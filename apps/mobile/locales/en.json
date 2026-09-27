@@ -1,5 +1,10 @@
 {
-  "CFBundleDisplayName": "Jibli",
-  "CFBundleName": "Jibli",
-  "NSLocationWhenInUseUsageDescription": "Used once, when you tap «Use my location» while saving a delivery address, so the courier has a point to find. You can always type the address instead."
+  "ios": {
+    "CFBundleDisplayName": "Jibli",
+    "CFBundleName": "Jibli",
+    "NSLocationWhenInUseUsageDescription": "Used once, when you tap «Use my location» while saving a delivery address, so the courier has a point to find. You can always type the address instead."
+  },
+  "android": {
+    "app_name": "Jibli"
+  }
 }

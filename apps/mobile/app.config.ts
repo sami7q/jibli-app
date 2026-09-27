@@ -95,13 +95,12 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
 
   /*
-   * Localized Info.plist strings — iOS only.
+   * The app's name in the phone's language: «Jibli» on an English phone,
+   * «جيبلي» everywhere else, on both platforms.
    *
-   * This is the only way `CFBundleDisplayName` can be two things at once, and
-   * the only reason it exists: «Jibli» on an English phone, «جيبلي» everywhere
-   * else. `@expo/config-plugins` pins this to iOS
-   * (`getResolvedLocalesAsync(..., 'ios')`), so Android keeps `name` above —
-   * see locales/README.md for why that is left alone rather than plugged.
+   * Every key in these files must be nested under "ios" or "android". A
+   * top-level key goes to both, and iOS keys landing in Android resources is
+   * what failed the first release builds in lint — see locales/README.md.
    */
   locales: {
     ar: './locales/ar.json',

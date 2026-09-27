@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNull, like, notInArray } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, like, notInArray, type SQL } from 'drizzle-orm';
 import { loadDotEnv } from '@jibli/config';
 import { createDatabase } from '../client.js';
 import { shouldUseSsl } from '../ssl.js';
@@ -33,6 +33,15 @@ import { DEMO_PARTNER_PREFIX } from '../seed/demo-marketplace.js';
  *
  *   DATABASE_URL=… pnpm db:remove-demo            # report
  *   DATABASE_URL=… pnpm db:remove-demo --confirm  # do it
+ *
+ * `--all` widens the target from the demo partners to every partner on the
+ * platform — the clean slate before a launch, when every restaurant in the
+ * database was created for testing. Same rules otherwise: dry by default,
+ * a partner with orders behind it is archived rather than deleted, and the
+ * geography, configuration and platform accounts stay.
+ *
+ *   DATABASE_URL=… pnpm db:remove-demo --all             # report
+ *   DATABASE_URL=… pnpm db:remove-demo --all --confirm   # do it
  */
 
 interface Verdict {
@@ -66,6 +75,7 @@ async function main(): Promise<void> {
   }
 
   const confirmed = process.argv.includes('--confirm');
+  const everyPartner = process.argv.includes('--all');
 
   /*
    * Name the target before doing anything to it.
@@ -76,8 +86,12 @@ async function main(): Promise<void> {
    * identical from the command line. Host and database name only: enough to
    * tell them apart, and never the credentials.
    */
-  console.log(`Target: ${describeTarget(connectionString)}
-`);
+  console.log(`Target: ${describeTarget(connectionString)}`);
+  console.log(
+    everyPartner
+      ? 'Scope:  EVERY partner on the platform (--all)\n'
+      : `Scope:  demo partners only (partner_code ${DEMO_PARTNER_PREFIX}…)\n`,
+  );
 
   const { db, sql: client } = createDatabase({
     connectionString,
@@ -86,6 +100,11 @@ async function main(): Promise<void> {
   });
 
   try {
+    // Already-archived partners are left alone: they are history, not clutter.
+    const scope: SQL | undefined = everyPartner
+      ? isNull(restaurants.deletedAt)
+      : like(restaurants.partnerCode, `${DEMO_PARTNER_PREFIX}%`);
+
     const demo = await db
       .select({
         id: restaurants.id,
@@ -94,10 +113,10 @@ async function main(): Promise<void> {
         merchantType: restaurants.merchantType,
       })
       .from(restaurants)
-      .where(like(restaurants.partnerCode, `${DEMO_PARTNER_PREFIX}%`));
+      .where(scope);
 
     if (demo.length === 0) {
-      console.log('No demo partners found. Nothing to do.');
+      console.log(everyPartner ? 'No partners found. Nothing to do.' : 'No demo partners found. Nothing to do.');
       return;
     }
 
@@ -118,7 +137,7 @@ async function main(): Promise<void> {
       verdicts.push({ ...row, orderCount, action: orderCount === 0 ? 'DELETE' : 'ARCHIVE' });
     }
 
-    console.log(`Demo partners found: ${verdicts.length}\n`);
+    console.log(`${everyPartner ? 'Partners' : 'Demo partners'} found: ${verdicts.length}\n`);
     for (const v of verdicts) {
       const note = v.action === 'DELETE' ? 'delete' : `archive — ${v.orderCount} order(s) behind it`;
       console.log(`  ${v.partnerCode.padEnd(10)} ${v.merchantType.padEnd(10)} ${v.displayName}  → ${note}`);

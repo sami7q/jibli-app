@@ -1,26 +1,38 @@
-# Localized Info.plist strings — iOS only
+# Localized app metadata — per platform
 
-Expo feeds these to `ios.locales`, which writes one `<lang>.lproj/InfoPlist.strings`
-per file. iOS then picks the file matching the phone's language and falls back to
-`CFBundleDisplayName` in `app.config.ts` for a language with no file here.
+Each file is one language. Keys **must** sit under `"ios"` or `"android"`:
 
-What that buys, and what it does not:
+```json
+{
+  "ios": { "CFBundleDisplayName": "Jibli", "NSLocationWhenInUseUsageDescription": "…" },
+  "android": { "app_name": "Jibli" }
+}
+```
 
-**It localizes the home-screen name.** A phone set to English shows «Jibli»;
-everything else shows «جيبلي». That is the whole reason this directory exists —
-`name` in `app.config.ts` is a single string and cannot be two things at once.
+**Never put a key at the top level.** `@expo/config-plugins` applies top-level
+keys to *both* platforms. This directory used to hold flat iOS keys on the
+belief that Expo only read it for iOS — true once, not on SDK 57 — and Android
+received `CFBundleDisplayName`, `CFBundleName` and
+`NSLocationWhenInUseUsageDescription` as `res/values-b+<lang>/strings.xml`.
+None of them exists in Android's default `strings.xml`, so release lint
+(`lintVitalRelease`) failed the build with six `ExtraTranslation` errors.
 
-**It does not touch Android.** `@expo/config-plugins` calls
-`getResolvedLocalesAsync(projectRoot, locales, 'ios')` with the platform pinned,
-so Android takes `name` and nothing else. Localizing the Android label needs a
-config plugin writing `res/values-en/strings.xml`, which is a dependency to
-maintain across SDK upgrades in exchange for a label most Iraqi users will never
-see. Android stays «جيبلي» on purpose.
+The rule Android enforces: a string translated into a language must also exist
+in the default locale. `app_name` does (Expo writes it from `name` in
+`app.config.ts`), which is why it is the only Android key here.
 
-**It is not the App Store listing name.** That is set per-locale in App Store
-Connect and Play Console, it is what store search actually ranks, and it holds
-both scripts at once — see `docs/operations/store-submission.md`.
+What each platform gets:
 
-The permission string is repeated here because a purpose string shown in the
-phone's language is the point of the prompt; the Arabic copy in `app.config.ts`
-remains the default for every locale without a file.
+- **iOS** — one `<lang>.lproj/InfoPlist.strings` per file: the home-screen name
+  and the location permission text in the phone's language.
+- **Android** — the launcher label: «Jibli» on an English phone, «جيبلي»
+  everywhere else. The permission text is not localizable on Android; the OS
+  writes its own prompt.
+
+Neither is the store listing name. That is set per locale in App Store Connect
+and Play Console — see `docs/operations/store-submission.md`.
+
+To check a change without a build, generate the Android project and compare
+keys: every `<string name>` in `values-*/strings.xml` must appear in
+`values/strings.xml`. `npx expo prebuild --platform android --no-install`, then
+delete `android/` — it is generated, not committed.
