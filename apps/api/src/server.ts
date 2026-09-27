@@ -219,6 +219,19 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
       // Operational visibility, not a health signal: zero connections is
       // normal at 4am and must never fail the probe.
       realtime_connections: realtimeRef.current?.connectionCount() ?? 0,
+      /*
+       * Where a sign-in code actually goes. Visibility, not a health signal.
+       *
+       * `console` answers every OTP request with success and delivers
+       * nothing, so from the phone a deployment on it looks exactly like a
+       * working gateway whose message never arrived. The provider is set in
+       * the Render dashboard, not in render.yaml, so without this the only
+       * way to tell the two apart was to go and read the dashboard.
+       */
+      otp: {
+        provider: ctx.sms.name,
+        allowlist_only: parseCsv(ctx.env.OTP_PHONE_ALLOWLIST).length > 0,
+      },
     });
   });
 

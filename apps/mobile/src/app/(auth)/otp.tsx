@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Platform,
   Pressable,
   StyleSheet,
@@ -59,15 +61,22 @@ export default function OtpScreen() {
   const flow: 'login' | 'register' | 'reset' = mode ?? 'login';
 
   /*
-   * Which box takes the next digit.
+   * One field, drawn as four boxes.
    *
-   * Four identical empty boxes say nothing about where typing lands, and on a
-   * phone there is no caret to give it away — the web preview only looked
-   * right because the browser drew its own focus ring, which no device does.
+   * This was four TextInputs, one per digit, and every visible problem with
+   * the screen came from that. A TextInput draws its own text: Cairo's Arabic
+   * metrics reserve room for marks above and below the line, so a Latin digit
+   * in a 70pt-tall field sat high and small, and iOS drew its own blue caret
+   * on top. The paste and backspace handling existed only to paper over the
+   * split — and iOS offers a one-time code to a single field, not to a row.
+   *
+   * So typing goes into one invisible input laid over the row, and the boxes
+   * are plain Views that render `code`. What the customer sees is now ours:
+   * the digit is centred by layout rather than by font metrics, and the caret
+   * is drawn in the brand colour.
    */
-  const [focused, setFocused] = useState<number | null>(0);
-
-  const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  const [code, setCode] = useState('');
+  const [focused, setFocused] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [resendIn, setResendIn] = useState(45);
@@ -81,7 +90,8 @@ export default function OtpScreen() {
    */
   const [devHint, setDevHint] = useState<string | null>(devCode ?? null);
 
-  const inputs = useRef<(TextInput | null)[]>([]);
+  const input = useRef<TextInput | null>(null);
+  const caret = useBlink(focused && code.length < OTP_LENGTH);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -89,58 +99,27 @@ export default function OtpScreen() {
     return () => clearInterval(timer);
   }, [resendIn]);
 
-  const code = digits.join('');
-
-  const handleDigit = (index: number, value: string) => {
+  const handleChange = (value: string) => {
     // Arabic-Indic digits must verify identically to ASCII (plan §2).
-    const typed = normalizeDigits(value).replace(/\D/g, '');
+    const typed = normalizeDigits(value).replace(/\D/g, '').slice(0, OTP_LENGTH);
     if (error) setError(null);
-
-    /*
-     * More than one digit means it arrived whole: the SMS autofill strip, a
-     * paste, or a password manager. Spreading it across the boxes is the only
-     * way that gesture works at all — taking the last character, as this did,
-     * turned a correct four-digit code into a single digit in one box and left
-     * the customer to retype what their phone had already offered them.
-     */
-    const next = [...digits];
-    if (typed.length > 1) {
-      for (let offset = 0; offset < OTP_LENGTH - index; offset += 1) {
-        next[index + offset] = typed[offset] ?? '';
-      }
-    } else {
-      next[index] = typed;
-    }
-    setDigits(next);
-
-    const filled = next.filter(Boolean).length;
-    if (filled < OTP_LENGTH) {
-      // Land on the first box still waiting, not simply the next one along.
-      const target = next.findIndex((entry) => !entry);
-      if (typed) inputs.current[target === -1 ? index : target]?.focus();
-      return;
-    }
+    setCode(typed);
 
     /*
      * Complete: verify it, and do not ask for a tap.
      *
-     * This existed and never ran. The guard was
-     * `assembled.length === OTP_LENGTH && !assembled.includes('')`, and
-     * `String.prototype.includes('')` is true of *every* string — so the
-     * second clause was always false and the first was never reached. The code
-     * read as if it auto-submitted; the customer typed four digits, waited,
-     * and then pressed «متابعة» like the comment said they would not have to.
+     * A pasted or autofilled code arrives whole and lands here in one change,
+     * exactly as four taps would — there is no longer a per-box path for it to
+     * be spread across, or lost in.
      */
-    const assembled = next.join('');
-    inputs.current[OTP_LENGTH - 1]?.blur();
-    void submit(assembled);
+    if (typed.length === OTP_LENGTH) {
+      input.current?.blur();
+      void submit(typed);
+    }
   };
 
-  const handleKeyPress = (index: number, key: string) => {
-    // Backspace on an empty box moves focus back, which is what users expect.
-    if (key === 'Backspace' && !digits[index] && index > 0) {
-      inputs.current[index - 1]?.focus();
-    }
+  const focusInput = () => {
+    if (!isSubmitting) input.current?.focus();
   };
 
   const submit = async (value: string) => {
@@ -205,8 +184,8 @@ export default function OtpScreen() {
       // mandatory and the client does not get to skip it (plan §11).
       router.replace(result.next_step === 'COMPLETE_PROFILE' ? '/(auth)/profile' : '/(tabs)');
     } catch (caught) {
-      setDigits(Array(OTP_LENGTH).fill(''));
-      inputs.current[0]?.focus();
+      setCode('');
+      input.current?.focus();
 
       if (caught instanceof ApiError) {
         setError(caught.messageAr);
@@ -280,7 +259,8 @@ export default function OtpScreen() {
         <Text style={styles.step}>الخطوة ١ من ٢</Text>
 
         <Text style={styles.title}>أدخل رمز التحقق</Text>
-        <Text style={styles.subtitle}>أرسلناه إلى رقمك عبر واتساب أو رسالة نصية</Text>
+        {/* WhatsApp only: production sends `provider=whatsapp` (render.yaml). */}
+        <Text style={styles.subtitle}>أرسلناه إلى رقمك عبر واتساب</Text>
 
         {/*
          * The number, and a way back to it.
@@ -307,36 +287,58 @@ export default function OtpScreen() {
           <Text style={styles.phoneChange}>تغيير</Text>
         </Pressable>
 
-        <View style={styles.codeRow}>
-          {digits.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={(element) => {
-                inputs.current[index] = element;
-              }}
-              style={[
-                styles.codeBox,
-                digit ? styles.codeBoxFilled : null,
-                focused === index ? styles.codeBoxFocused : null,
-                error ? styles.codeBoxError : null,
-              ]}
-              value={digit}
-              onChangeText={(value) => handleDigit(index, value)}
-              onFocus={() => setFocused(index)}
-              onBlur={() => setFocused((current) => (current === index ? null : current))}
-              onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
-              keyboardType="number-pad"
-              maxLength={1}
-              textAlign="center"
-              autoFocus={index === 0}
-              editable={!isSubmitting}
-              accessibilityLabel={`الرقم ${index + 1} من ${OTP_LENGTH}`}
-              // One-time-code autofill on both platforms.
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
-            />
-          ))}
-        </View>
+        <Pressable onPress={focusInput} accessible={false} style={styles.codeRow}>
+          {Array.from({ length: OTP_LENGTH }, (_, index) => {
+            const digit = code[index] ?? '';
+            // The box the next digit goes into; the last one once all are in.
+            const active =
+              focused && !isSubmitting && index === Math.min(code.length, OTP_LENGTH - 1);
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.codeBox,
+                  digit ? styles.codeBoxFilled : null,
+                  active ? styles.codeBoxFocused : null,
+                  error ? styles.codeBoxError : null,
+                ]}
+              >
+                {digit ? (
+                  <Text style={styles.codeDigit} allowFontScaling={false}>
+                    {digit}
+                  </Text>
+                ) : active ? (
+                  <Animated.View style={[styles.caret, { opacity: caret }]} />
+                ) : null}
+              </View>
+            );
+          })}
+
+          {/*
+           * The real input: over the boxes, invisible.
+           *
+           * Laid over the row rather than off-screen, so a tap anywhere on the
+           * boxes lands in it natively — which is also what keeps the system's
+           * one-time-code suggestion attached to it.
+           */}
+          <TextInput
+            ref={input}
+            value={code}
+            onChangeText={handleChange}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            keyboardType="number-pad"
+            maxLength={OTP_LENGTH}
+            autoFocus
+            caretHidden
+            editable={!isSubmitting}
+            accessibilityLabel={`رمز التحقق، ${OTP_LENGTH} أرقام`}
+            // One-time-code autofill on both platforms.
+            textContentType="oneTimeCode"
+            autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
+            style={styles.hiddenInput}
+          />
+        </Pressable>
 
         {error ? (
           <Text style={styles.error} accessibilityRole="alert">
@@ -379,7 +381,7 @@ export default function OtpScreen() {
           <Pressable
             onPress={() => {
               const filled = devHint.slice(0, OTP_LENGTH);
-              setDigits(filled.split(''));
+              setCode(filled);
               void submit(filled);
             }}
             disabled={isSubmitting}
@@ -421,6 +423,25 @@ export default function OtpScreen() {
       </View>
     </View>
   );
+}
+
+/**
+ * A caret's blink, as an opacity. Held solid while `on` is false, so nothing
+ * animates behind a keyboard that is not open.
+ */
+function useBlink(on: boolean): Animated.Value {
+  const opacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    opacity.setValue(1);
+    if (!on) return;
+    const useNativeDriver = Platform.OS !== 'web';
+    const step = (toValue: number) =>
+      Animated.timing(opacity, { toValue, duration: 450, easing: Easing.linear, useNativeDriver });
+    const loop = Animated.loop(Animated.sequence([step(0), step(1)]));
+    loop.start();
+    return () => loop.stop();
+  }, [on, opacity]);
+  return opacity;
 }
 
 /*
@@ -516,42 +537,68 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   codeBox: {
-    /*
-     * A little narrower and shorter than before, which reads as more
-     * deliberate rather than less: at 64×76 the four boxes ran nearly edge to
-     * edge on a small phone and a single digit floated in the middle of a
-     * large empty rectangle. 58×70 is close to square-and-a-bit, the
-     * proportion a digit actually fills.
-     */
-    width: 58,
+    width: 60,
     height: 70,
     borderWidth: 1.5,
     borderColor: color.borderSubtle,
     borderRadius: radius.lg,
     backgroundColor: color.surfacePage,
-    ...text.h1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /*
+   * The digit, in the platform's own face rather than Cairo.
+   *
+   * Cairo is an Arabic face whose Latin figures sit small against its tall
+   * line box — at 24pt in a 70pt field they read as an afterthought, and
+   * orange-on-peach took away what contrast was left. SF and Roboto have
+   * figures drawn to be checked one by one against a message in another app,
+   * which is exactly the job here; `tabular-nums` gives all ten the same
+   * width so four digits sit identically in four boxes.
+   */
+  codeDigit: {
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
     color: color.textPrimary,
     textAlign: 'center',
+    includeFontPadding: false,
     // The digits are the one thing on this screen that must not be reordered.
     writingDirection: 'ltr',
-    ...SUPPRESS_WEB_OUTLINE,
   },
   // Filled and focused are deliberately different: one says "this digit is
   // entered", the other "this is where the next one goes".
   codeBoxFilled: {
-    borderColor: BRAND[500],
-    backgroundColor: BRAND[50],
-    color: BRAND[700],
+    borderColor: BRAND[300],
+    backgroundColor: color.surfaceCard,
   },
-  /*
-   * No shadow here, deliberately: `shadow` is a ViewStyle and these are
-   * TextInputs. The focus ring is carried by the border and the lighter fill
-   * against the sunken boxes around it, which reads as clearly on a phone.
-   */
   codeBoxFocused: {
     borderColor: BRAND[600],
     borderWidth: 2,
     backgroundColor: color.surfaceCard,
+    ...shadow.sm,
+  },
+  caret: {
+    width: 2,
+    height: 34,
+    borderRadius: 1,
+    backgroundColor: BRAND[600],
+  },
+  /*
+   * Present and focusable, but never seen. Not opacity 0: some Android builds
+   * refuse focus to a fully transparent view.
+   */
+  hiddenInput: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0.011,
+    color: 'transparent',
+    fontSize: 1,
+    ...SUPPRESS_WEB_OUTLINE,
   },
   codeBoxError: { borderColor: color.danger, backgroundColor: color.dangerSoft },
 
