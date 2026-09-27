@@ -112,6 +112,15 @@ export function AddressSheet({
    * would wipe the city the customer had just gone to choose.
    */
   const [formSession, setFormSession] = useState(0);
+  /**
+   * The session the form fields were last seeded for.
+   *
+   * The map opens on whatever `coordinates` holds when it mounts, and reports
+   * that point as chosen. On the render that starts a session `coordinates`
+   * still holds the *previous* session's pin — so a map mounted then could
+   * hand the last address's location to a brand-new one. It waits for this.
+   */
+  const [seededSession, setSeededSession] = useState(-1);
 
   const [governorate, setGovernorate] = useState<GeographyOption | null>(null);
 
@@ -254,6 +263,7 @@ export function AddressSheet({
         ? { latitude: target.latitude, longitude: target.longitude, accuracy: null }
         : null,
     );
+    setSeededSession(formSession);
   }, [formSession]);
 
   /** Read the city under a point, and the neighbourhood if there is one. */
@@ -625,11 +635,17 @@ export function AddressSheet({
             * saved with the order and handed to the courier as a navigation
             * link.
             */}
-          <MapPicker
-            latitude={coordinates?.latitude ?? null}
-            longitude={coordinates?.longitude ?? null}
-            onPick={pickOnMap}
-          />
+          {seededSession === formSession ? (
+            <MapPicker
+              // A fresh map per form: it opens on this session's pin, never the last one's.
+              key={formSession}
+              latitude={coordinates?.latitude ?? null}
+              longitude={coordinates?.longitude ?? null}
+              onPick={pickOnMap}
+            />
+          ) : (
+            <View style={{ height: 280 }} />
+          )}
 
           <Pressable
             onPress={() => void locate(true)}

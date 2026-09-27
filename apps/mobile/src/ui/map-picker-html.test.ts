@@ -77,38 +77,47 @@ describe('the map picker only reports a point somebody chose', () => {
   });
 
   it('opens close in on a real pin and wide when guessing', () => {
-    expect(MAP_PICKER_HTML(33.2778, 44.3661)).toContain('], 17)');
-    expect(MAP_PICKER_HTML(null, null)).toContain('], 13)');
+    expect(MAP_PICKER_HTML(33.2778, 44.3661)).toContain('zoom: 17');
+    expect(MAP_PICKER_HTML(null, null)).toContain('zoom: 12');
   });
 });
 
-describe('the unlicensed-tiles fallback is gone', () => {
+describe('where the tiles come from', () => {
   it('never points at the OpenStreetMap donated tile server', () => {
-    /*
-     * The licence bug this pins.
-     *
-     * `TILE_URL` used to default to `tile.openstreetmap.org` when
-     * `EXPO_PUBLIC_MAP_TILE_URL` was unset — and unset is the default, so every
-     * build that nobody had configured shipped a violation of the OSMF Tile
-     * Usage Policy, working perfectly, until somebody at the Foundation
-     * noticed. There is no fallback now.
-     */
-    const html = MAP_PICKER_HTML(33.2778, 44.3661);
-    expect(html).not.toContain('tile.openstreetmap.org');
-    expect(html).toContain('tiles.example');
+    // The OSMF Tile Usage Policy forbids a distributed app from using it.
+    expect(MAP_PICKER_HTML(33.2778, 44.3661)).not.toContain('tile.openstreetmap.org');
+    expect(MAP_PICKER_HTML(null, null)).not.toContain('tile.openstreetmap.org');
   });
 
-  it('draws an honest message instead of a map when no provider is configured', async () => {
+  it('uses a configured raster vendor when there is one', () => {
+    const html = MAP_PICKER_HTML(33.2778, 44.3661);
+    expect(html).toContain('tiles.example');
+    expect(html).not.toContain('tiles.openfreemap.org');
+  });
+
+  it('draws a real, keyless map when nothing is configured', async () => {
+    /*
+     * The regression this pins: with no vendor configured, which is every
+     * build nobody had set up, the picker drew «الخريطة غير متاحة» instead of
+     * a map. The default is now OpenFreeMap — no key, commercial use allowed.
+     */
     delete process.env.EXPO_PUBLIC_MAP_TILE_URL;
-    // A second load, so the module re-reads the environment without one.
     vi.resetModules();
     const fresh = await import('./map-picker-html');
 
     const html = fresh.MAP_PICKER_HTML(33.2778, 44.3661);
+    expect(html).toContain('tiles.openfreemap.org/styles/liberty');
+    expect(html).not.toContain('الخريطة غير متاحة');
+    // Arabic labels need the shaping plugin, or they draw unjoined.
+    expect(html).toContain('mapbox-gl-rtl-text');
+  });
+});
 
-    // No Leaflet, no tiles, no silent grey panel — a sentence the customer can act on.
-    expect(html).not.toContain('leaflet');
-    expect(html).toContain('الخريطة غير متاحة حالياً');
-    expect(html).toContain('كتابة العنوان يدوياً');
+describe('moving the map from outside', () => {
+  it('only ever injects numbers', async () => {
+    const { centerMapScript } = await import('./map-picker-html');
+    expect(centerMapScript(33.3, 44.4)).toContain('jibliCenter(33.3, 44.4)');
+    expect(centerMapScript(Number.NaN, 44.4)).toBe('true;');
+    expect(centerMapScript('1);alert(1' as unknown as number, 44.4)).toBe('true;');
   });
 });

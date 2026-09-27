@@ -60,6 +60,13 @@ const STATUS_COPY: Record<
     icon: 'alert-circle-outline',
     tone: 'danger',
   },
+  // A declined application. The reviewer's reason is shown under this.
+  DEACTIVATED: {
+    title: 'لم يُقبل طلبك',
+    body: 'راجعنا طلبك ولم نتمكن من قبوله الآن. للاستفسار تواصل مع الدعم.',
+    icon: 'close-circle-outline',
+    tone: 'danger',
+  },
 };
 
 export default function DriverApplyScreen() {
@@ -120,6 +127,7 @@ export default function DriverApplyScreen() {
         ) : application.data ? (
           <ApplicationStatus
             status={application.data.status}
+            reason={application.data.suspended_reason}
             vehicleLabel={
               VEHICLES.find((entry) => entry.value === application.data?.vehicle_type)?.label ?? '—'
             }
@@ -236,10 +244,12 @@ export default function DriverApplyScreen() {
 
 function ApplicationStatus({
   status,
+  reason,
   vehicleLabel,
   onOpenDriverMode,
 }: {
   status: string;
+  reason: string | null;
   vehicleLabel: string;
   onOpenDriverMode: () => void;
 }) {
@@ -279,6 +289,11 @@ function ApplicationStatus({
         <Text variant="small" tone="secondary" align="center">
           {copy.body}
         </Text>
+        {reason && status !== 'ACTIVE' && status !== 'PENDING_ACTIVATION' ? (
+          <Text variant="smallBold" tone="secondary" align="center">
+            {`السبب: ${reason}`}
+          </Text>
+        ) : null}
       </View>
 
       <Row

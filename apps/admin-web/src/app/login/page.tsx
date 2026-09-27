@@ -81,8 +81,6 @@ function LoginForm() {
    */
   const [slow, setSlow] = useState(false);
 
-  const [quickLoginReady, setQuickLoginReady] = useState(false);
-
   const mfaInput = useRef<HTMLInputElement>(null);
   const usernameInput = useRef<HTMLInputElement>(null);
 
@@ -100,7 +98,6 @@ function LoginForm() {
    */
   useEffect(() => {
     if (!quickLoginSupported()) return;
-    setQuickLoginReady(true);
 
     void recallCredentials('silent').then((saved) => {
       if (!saved) return;
@@ -134,10 +131,8 @@ function LoginForm() {
   /**
    * One sign-in attempt against an explicit pair.
    *
-   * Takes the credentials rather than reading them from state so the quick
-   * sign-in can use what the browser just handed back: a `setState` in the same
-   * tick has not landed yet, and submitting the old state would post an empty
-   * password.
+   * Takes the credentials explicitly rather than reading them from state, so
+   * a caller never posts a pair whose `setState` has not landed yet.
    */
   const attempt = async (credentials: { username: string; password: string }) => {
     if (submitting || lockedFor > 0) return;
@@ -269,27 +264,6 @@ function LoginForm() {
     await attempt({ username, password });
   };
 
-  /**
-   * Sign in with the saved password, showing the account picker.
-   *
-   * `optional` rather than `silent`: this is a button someone pressed, so an
-   * account chooser is an answer, not an interruption.
-   */
-  const signInWithSavedPassword = async () => {
-    const saved = await recallCredentials('optional');
-
-    if (!saved) {
-      setError(
-        'لا توجد كلمة مرور محفوظة لهذا الموقع في هذا المتصفح. سجّل الدخول مرة واحدة ووافق على حفظ كلمة المرور، ثم سيعمل هذا الزر.',
-      );
-      return;
-    }
-
-    setUsername(saved.username);
-    setPassword(saved.password);
-    await attempt(saved);
-  };
-
   const disabled =
     submitting ||
     lockedFor > 0 ||
@@ -415,22 +389,6 @@ function LoginForm() {
                 ? 'تسجيل الدخول'
                 : 'تأكيد'}
         </button>
-
-        {/*
-          The shortcut. It carries no password of its own — it asks the browser
-          for the one it saved for this origin, which is why it can exist on a
-          deployed admin portal at all.
-        */}
-        {stage === 'CREDENTIALS' && quickLoginReady ? (
-          <button
-            type="button"
-            className="btn btn--ghost btn--block"
-            disabled={submitting || lockedFor > 0}
-            onClick={() => void signInWithSavedPassword()}
-          >
-            دخول سريع بكلمة المرور المحفوظة
-          </button>
-        ) : null}
 
         {stage === 'MFA' ? (
           <button

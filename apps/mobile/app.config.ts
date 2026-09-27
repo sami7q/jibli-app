@@ -180,29 +180,13 @@ const config: ExpoConfig = {
      * support number does not need a release.
      */
     /*
-     * Where the map's tiles come from.
+     * An optional keyed raster vendor for the map (MapTiler, Stadia…).
      *
-     * Read here only so the value is visible in one place with the rest of the
-     * app's configuration; `map-picker-html.ts` reads the same variables. The
-     * default is OpenStreetMap's donated server, which its usage policy allows
-     * for development and not for a distributed app — so a launch build sets
-     * these to a provider with a key. MapTiler, Stadia and Thunderforest all
-     * have free tiers far above what this needs: a picking session is about
-     * forty-five tiles, and a thousand customers saving two addresses each
-     * comes to under a hundred thousand requests in total.
+     * Optional in every build: unset, `map-picker-html.ts` draws OpenFreeMap
+     * vector tiles, which need no key and permit commercial use. It is read
+     * here only so the value sits with the rest of the app's configuration.
      */
-    /*
-     * Null in development, mandatory for a store build.
-     *
-     * Unset, `map-picker-html.ts` falls back to `tile.openstreetmap.org`, which
-     * the OSMF usage policy forbids a distributed app from using — so the
-     * fallback is fine on a laptop and is a licence violation in a submission.
-     * `requireForStore` turns that from something to remember into something
-     * the build refuses to do.
-     */
-    mapTileUrl: isStoreBuild
-      ? requireForStore('EXPO_PUBLIC_MAP_TILE_URL', process.env.EXPO_PUBLIC_MAP_TILE_URL, '')
-      : (process.env.EXPO_PUBLIC_MAP_TILE_URL ?? null),
+    mapTileUrl: process.env.EXPO_PUBLIC_MAP_TILE_URL ?? null,
     mapTileAttribution: process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? null,
     supportPhone: requireForStore(
       'EXPO_PUBLIC_SUPPORT_PHONE',

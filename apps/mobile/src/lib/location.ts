@@ -35,7 +35,15 @@ export type LocationOutcome =
   | { readonly status: 'ok'; readonly coordinates: Coordinates }
   | { readonly status: 'denied' }
   | { readonly status: 'disabled' }
+  /** A real fix, somewhere Jibli does not deliver — abroad, or a faked GPS. */
+  | { readonly status: 'outside' }
   | { readonly status: 'unavailable' };
+
+/** Long enough for a cold GPS indoors; short enough that nobody gives up first. */
+const FIX_TIMEOUT_MS = 12_000;
+
+/** A remembered fix younger than this is where the customer still is. */
+const LAST_KNOWN_MAX_AGE_MS = 2 * 60_000;
 
 /**
  * Iraq's bounding box, roughly.
@@ -71,14 +79,41 @@ export async function captureCurrentLocation(): Promise<LocationOutcome> {
     const permission = await Location.requestForegroundPermissionsAsync();
     if (permission.status !== 'granted') return { status: 'denied' };
 
-    const position = await Location.getCurrentPositionAsync({
-      // Balanced rather than highest: a delivery pin does not need a metre,
-      // and the high-accuracy mode can take fifteen seconds on a cold GPS.
-      accuracy: Location.Accuracy.Balanced,
-    });
+    /*
+     * The phone's remembered fix first, when it is recent: it is instant,
+     * where a fresh one can take ten seconds indoors — and ten seconds of
+     * «جارٍ تحديد الموقع…» is when people start typing the address instead.
+     * The map lets them correct it by a street either way.
+     */
+    const recent = await Location.getLastKnownPositionAsync({
+      maxAge: LAST_KNOWN_MAX_AGE_MS,
+      requiredAccuracy: 200,
+    }).catch(() => null);
+
+    /*
+     * Bounded. `getCurrentPositionAsync` has no timeout of its own and can
+     * wait indefinitely for a satellite that never comes, which left the
+     * button spinning with no way to tell the customer anything.
+     */
+    const position =
+      recent ??
+      (await Promise.race([
+        Location.getCurrentPositionAsync({
+          // Balanced rather than highest: a delivery pin does not need a
+          // metre, and high accuracy can take fifteen seconds on a cold GPS.
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), FIX_TIMEOUT_MS)),
+      ]));
+    if (!position) return { status: 'unavailable' };
 
     const { latitude, longitude, accuracy } = position.coords;
-    if (!withinIraq({ latitude, longitude })) return { status: 'unavailable' };
+    /*
+     * Outside Iraq is its own answer, not «unavailable». The fix worked; it
+     * is just not somewhere a courier can go — and telling someone abroad
+     * «we could not find you» sends them to their settings for nothing.
+     */
+    if (!withinIraq({ latitude, longitude })) return { status: 'outside' };
 
     return {
       status: 'ok',
@@ -227,5 +262,6 @@ export async function describePlace(coordinates: {
 export const LOCATION_MESSAGES_AR: Record<Exclude<LocationOutcome['status'], 'ok'>, string> = {
   denied: 'لم تُمنح صلاحية الموقع. يمكنك كتابة العنوان يدوياً.',
   disabled: 'خدمة الموقع مغلقة في جهازك. فعّلها أو اكتب العنوان يدوياً.',
-  unavailable: 'تعذّر تحديد موقعك الآن. اكتب العنوان يدوياً.',
+  outside: 'موقعك الحالي خارج مناطق التوصيل. حرّك الخريطة إلى عنوان التوصيل.',
+  unavailable: 'تعذّر تحديد موقعك الآن. حرّك الخريطة إلى منزلك، أو حاول مرة أخرى.',
 };

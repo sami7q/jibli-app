@@ -1,56 +1,81 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { MAP_PICKER_HTML, type MapPickerMessage } from './map-picker-html';
+import { centerMapScript, MAP_PICKER_HTML, type MapPickerMessage } from './map-picker-html';
 import { Text } from '@/ui';
 import { color, radius, space } from '@/theme';
 
 /**
  * A real map to put a pin on, on a device.
  *
- * ADR-0005 said no in-app map, and the reasoning was sound at the time: a map
- * SDK means a Google or Mapbox key, a billing account and a geocoder, none of
- * which makes a delivery arrive faster in a city where addresses are
- * landmarks. What it did not weigh is that a landmark address plus *no* point
- * leaves a courier guessing, and «قرب صيدلية النور» is only unambiguous to
- * somebody who already knows the street.
- *
- * So: Leaflet and OpenStreetMap tiles inside a WebView. No key, no billing
- * account, no SDK in the binary — a hundred lines of HTML and a tile server
- * that has served the world's maps for twenty years. The web preview renders
- * the same document directly (`map-picker.web.tsx`), so what a reviewer sees
- * in a browser is the map the phone draws.
+ * A vector map inside a WebView (`map-picker-html.ts`): no key, no billing
+ * account, no SDK in the binary. The web preview renders the same document
+ * (`map-picker.web.tsx`), so what a reviewer sees in a browser is the map the
+ * phone draws.
  *
  * It picks a point and reports it back. It does not geocode, search, or route;
  * the driver's own maps app does the routing, and it is better at it.
  */
 
 export interface MapPickerProps {
-  /** Where to open. Falls back to the centre of Baghdad. */
+  /** Where the pin is. Falls back to the centre of Baghdad. */
   readonly latitude?: number | null;
   readonly longitude?: number | null;
   readonly onPick: (coordinates: { latitude: number; longitude: number }) => void;
   readonly height?: number;
 }
 
-export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPickerProps) {
+/** About a metre: closer than this, a new position is the map's own echo. */
+const SAME_POINT_DEGREES = 1e-5;
+
+export function isSamePoint(
+  a: { latitude: number; longitude: number } | null,
+  b: { latitude: number; longitude: number },
+): boolean {
+  return (
+    a !== null &&
+    Math.abs(a.latitude - b.latitude) < SAME_POINT_DEGREES &&
+    Math.abs(a.longitude - b.longitude) < SAME_POINT_DEGREES
+  );
+}
+
+export function MapPicker({ latitude, longitude, onPick, height = 280 }: MapPickerProps) {
   const [ready, setReady] = useState(false);
   /**
-   * Whether the document failed to load at all.
-   *
-   * There was no error path here. `onLoadEnd` fires whether the load succeeded
-   * or not, so an unreachable CDN or tile server cleared the spinner and left a
-   * grey rectangle with no explanation — and the customer, who is mid-checkout
-   * and has been asked to place a pin, has no way to know the map is broken
-   * rather than slow. They wait, then give up on the order.
+   * Whether the map failed to draw at all — an unreachable CDN or tile server,
+   * or no WebGL. Without this the customer, mid-checkout, sees a grey rectangle
+   * and cannot tell broken from slow.
    */
   const [failed, setFailed] = useState(false);
   const webview = useRef<WebView>(null);
 
-  const html = useMemo(
-    () => MAP_PICKER_HTML(latitude ?? null, longitude ?? null),
-    [latitude, longitude],
+  /*
+   * The document is built once, on the position the picker opened with.
+   *
+   * It used to be rebuilt from `latitude`/`longitude` on every render — and
+   * those change every time the map settles, because the sheet stores what
+   * the map reports. So every drag reloaded the entire map from the network
+   * at the spot the finger let go. Later positions are sent in instead.
+   */
+  const [html] = useState(() => MAP_PICKER_HTML(latitude ?? null, longitude ?? null));
+
+  /** Where the map itself last said it was, so its own echo is not sent back. */
+  const lastReported = useRef<{ latitude: number; longitude: number } | null>(
+    latitude != null && longitude != null ? { latitude, longitude } : null,
   );
+
+  /*
+   * A position from outside — the GPS fix arriving, or «استخدم موقعي الحالي» —
+   * moves the map in place. Only when the map is ready: a position that
+   * arrives earlier is applied by the `ready` branch below.
+   */
+  useEffect(() => {
+    if (!ready || latitude == null || longitude == null) return;
+    const next = { latitude, longitude };
+    if (isSamePoint(lastReported.current, next)) return;
+    lastReported.current = next;
+    webview.current?.injectJavaScript(centerMapScript(latitude, longitude));
+  }, [ready, latitude, longitude]);
 
   return (
     <View
@@ -66,66 +91,55 @@ export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPick
       <WebView
         ref={webview}
         /*
-         * `about:blank` and nothing else.
-         *
-         * A document loaded from `source={{ html }}` has no origin, so the old
-         * `['*']` was not "allow the map's own host" — it was "this WebView may
-         * navigate anywhere". The document pulls Leaflet from a CDN and tiles
-         * from a third-party vendor, so a redirect from either, or a crafted
-         * tile response, could steer it somewhere else entirely — inside the
-         * app's own WebView, in front of a customer who is mid-checkout.
-         *
-         * Subresource integrity already guarantees the *script* is the one we
-         * expect. This is the other half: nothing gets to replace the page.
+         * `about:blank` and nothing else. A document loaded from
+         * `source={{ html }}` has no origin, so a wildcard here would mean
+         * "this WebView may navigate anywhere" — in front of a customer who is
+         * mid-checkout.
          */
         originWhitelist={['about:blank']}
         /*
-         * The map picks a point. It never navigates, so any attempt to is a
-         * redirect nobody asked for.
-         *
-         * Returning false does not break the map: tiles, CSS and the Leaflet
-         * bundle are subresource loads, which this does not see. It only
-         * governs top-level navigation.
+         * The map never navigates, so any attempt to is a redirect nobody
+         * asked for. Tiles, fonts and scripts are subresource loads, which
+         * this does not see.
          */
         onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
-        /*
-         * Android's WebView honours `window.open` by default and hands the new
-         * window to the system browser. Nothing here opens one, so the only
-         * caller would be something that should not be running.
-         */
         setSupportMultipleWindows={false}
         source={{ html }}
-        onLoadEnd={() => setReady(true)}
         onMessage={(event) => {
+          let payload: MapPickerMessage;
           try {
-            const payload = JSON.parse(event.nativeEvent.data) as MapPickerMessage;
-            if (payload.type === 'pick') {
-              onPick({ latitude: payload.latitude, longitude: payload.longitude });
-            }
+            payload = JSON.parse(event.nativeEvent.data) as MapPickerMessage;
           } catch {
-            /* A message this component did not send. */
+            return; // A message this component did not send.
+          }
+          if (payload.type === 'ready') setReady(true);
+          else if (payload.type === 'failed') setFailed(true);
+          else if (payload.type === 'pick') {
+            const point = { latitude: payload.latitude, longitude: payload.longitude };
+            lastReported.current = point;
+            onPick(point);
           }
         }}
         // The map is the gesture surface; letting the sheet scroll under a
         // finger that is dragging the map is how a pin ends up in the wrong
         // street.
         scrollEnabled={false}
+        nestedScrollEnabled
+        bounces={false}
+        overScrollMode="never"
         javaScriptEnabled
         domStorageEnabled={false}
+        // Tiles and fonts are reused across openings of the sheet.
+        cacheEnabled
         /*
          * Every tile policy worth reading asks an application to identify
-         * itself, so that an operator with a problem has somebody to contact
-         * before they block a whole address range. A WebView otherwise sends
-         * the system browser's string and nothing says Jibli.
+         * itself, so an operator with a problem has somebody to contact before
+         * they block a whole address range.
          */
         userAgent="Jibli/1.0 (+https://jibli.iq; delivery app; map picker)"
         /*
-         * Both, because they are different failures.
-         *
-         * `onError` is the transport giving up — no DNS, no route, TLS refused,
-         * which on an Iraqi mobile connection is the common one. `onHttpError`
-         * is a server answering with a status: a tile vendor rejecting the key,
-         * or a CDN returning 403. Neither reached the customer before.
+         * `onError` is the transport giving up — no DNS, no route, TLS refused.
+         * `onHttpError` is a server answering with a status.
          */
         onError={() => setFailed(true)}
         onHttpError={() => setFailed(true)}
@@ -142,19 +156,20 @@ export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPick
             paddingHorizontal: space[4],
             gap: space[2],
           }}
-          // Same treatment as the offline banner: it is news that arrived on
-          // its own, so it is announced rather than waiting to be focused.
+          // News that arrived on its own, so it is announced rather than
+          // waiting to be focused.
           accessibilityLiveRegion="polite"
         >
           <Text variant="caption" align="center" style={{ color: color.warningStrong }}>
             تعذّر تحميل الخريطة
           </Text>
           <Text variant="caption" align="center" style={{ color: color.warningStrong }}>
-            اكتب العنوان يدوياً — سيصل المندوب باستخدام الوصف والمَعلَم.
+            تحقق من الاتصال، أو اكتب وصف المكان — سيصل المندوب باستخدام الوصف والمَعلَم.
           </Text>
         </View>
       ) : !ready ? (
         <View
+          pointerEvents="none"
           style={{
             ...StyleSheetAbsoluteFill,
             alignItems: 'center',
@@ -169,7 +184,7 @@ export function MapPicker({ latitude, longitude, onPick, height = 260 }: MapPick
   );
 }
 
-/** Spelled out rather than imported: one object, used once. */
+/** Spelled out rather than imported: one object, used twice. */
 const StyleSheetAbsoluteFill = {
   position: 'absolute' as const,
   top: 0,

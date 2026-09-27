@@ -12,7 +12,7 @@ import {
   VEHICLE_TYPES,
   success,
 } from '@jibli/contracts';
-import { assertAdminPermission } from '@jibli/auth';
+import { assertAdminPermission, hasAdminPermission } from '@jibli/auth';
 import {
   displayNameSchema,
   iraqiPhoneSchema,
@@ -657,6 +657,189 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       return reply.send(
         success({ suspended: body.suspended }, { request_id: request.requestId }),
       );
+    },
+  );
+
+  // ── Driver applications ───────────────────────────────────────────────────
+
+  /**
+   * The queue of people waiting to become couriers.
+   *
+   * Every `PENDING_ACTIVATION` driver, whichever door they came in by: the
+   * customer app's «الانضمام كمندوب», or an operator's «إضافة مندوب». Both
+   * used to wait for something that never happened — nothing in the system
+   * activated a driver from Admin — so an application was saved, shown to the
+   * applicant as «قيد المراجعة», and seen by nobody.
+   *
+   * **The phone is unmasked here**, for whoever may approve. The applicant was
+   * told «سنتواصل معك على رقم هاتفك»; a reviewer who cannot read the number
+   * cannot keep that promise, and calling is the review.
+   */
+  app.get(
+    '/api/v1/admin/driver-applications',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'driver.read.global');
+      const canReview = hasAdminPermission(principal, 'driver.create');
+
+      const rows = await ctx.db
+        .select({
+          driverId: drivers.id,
+          fullName: users.fullName,
+          phoneE164: users.phoneE164,
+          vehicleType: drivers.defaultVehicleType,
+          plateNumber: drivers.plateNumber,
+          appliedAt: drivers.createdAt,
+          cityNameAr: cities.nameAr,
+          restaurantName: restaurants.displayName,
+        })
+        .from(drivers)
+        .innerJoin(users, eq(drivers.userId, users.id))
+        .leftJoin(cities, eq(users.profileCityId, cities.id))
+        .leftJoin(restaurantDrivers, eq(restaurantDrivers.driverId, drivers.id))
+        .leftJoin(restaurants, eq(restaurantDrivers.restaurantId, restaurants.id))
+        .where(eq(drivers.status, 'PENDING_ACTIVATION'))
+        // Oldest first: a queue is served in the order people joined it.
+        .orderBy(drivers.createdAt)
+        .limit(200);
+
+      return reply.send(
+        success(
+          rows.map((row) => ({
+            id: row.driverId,
+            full_name: row.fullName,
+            phone: row.phoneE164 ? (canReview ? row.phoneE164 : maskPhone(row.phoneE164)) : null,
+            phone_masked: !canReview,
+            vehicle_type: row.vehicleType,
+            plate_number: row.plateNumber,
+            city_name_ar: row.cityNameAr,
+            restaurant_name: row.restaurantName,
+            applied_at: row.appliedAt.toISOString(),
+          })),
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
+  /**
+   * Accept an application: the courier can go online from the next request.
+   *
+   * Its own command rather than «unsuspend», which is what an operator had to
+   * reach for before — asking for a reason to say yes, and never recording
+   * `activated_at`. Only `PENDING_ACTIVATION` is accepted here, so this cannot
+   * quietly lift a suspension.
+   */
+  app.post(
+    '/api/v1/admin/driver-applications/:driverId/approve',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'driver.create');
+      const { driverId } = z.object({ driverId: uuidSchema }).parse(request.params);
+
+      await ctx.db.transaction(async (tx) => {
+        const [driver] = await tx
+          .select({ status: drivers.status })
+          .from(drivers)
+          .where(eq(drivers.id, driverId))
+          .for('update')
+          .limit(1);
+
+        if (!driver) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'driver' } });
+        if (driver.status !== 'PENDING_ACTIVATION') {
+          throw new AppError(ERROR_CODES.CONFLICT, {
+            details: { reason: 'NOT_PENDING', status: driver.status },
+            messageAr: 'تمت مراجعة هذا الطلب مسبقاً.',
+          });
+        }
+
+        await tx
+          .update(drivers)
+          .set({
+            status: 'ACTIVE',
+            // Offline until they open Driver Mode themselves.
+            availability: 'OFFLINE',
+            activatedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(drivers.id, driverId));
+
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: AUDIT_ACTIONS.DRIVER_ACTIVATE,
+          entityType: 'driver',
+          entityId: driverId,
+          before: { status: driver.status },
+          after: { status: 'ACTIVE' },
+          ip: clientIp(request),
+          userAgent: userAgent(request),
+          requestId: request.requestId,
+        });
+      });
+
+      return reply.send(success({ status: 'ACTIVE' }, { request_id: request.requestId }));
+    },
+  );
+
+  /**
+   * Decline an application, with the reason the applicant will be shown.
+   *
+   * `DEACTIVATED` rather than a deleted row: applying again is idempotent on
+   * the existing row, so the applicant sees the decision instead of a fresh
+   * «قيد المراجعة» that nobody will ever look at.
+   */
+  app.post(
+    '/api/v1/admin/driver-applications/:driverId/reject',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'driver.create');
+      const { driverId } = z.object({ driverId: uuidSchema }).parse(request.params);
+      const body = z.object({ reason: reasonSchema }).parse(request.body);
+
+      await ctx.db.transaction(async (tx) => {
+        const [driver] = await tx
+          .select({ status: drivers.status })
+          .from(drivers)
+          .where(eq(drivers.id, driverId))
+          .for('update')
+          .limit(1);
+
+        if (!driver) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'driver' } });
+        if (driver.status !== 'PENDING_ACTIVATION') {
+          throw new AppError(ERROR_CODES.CONFLICT, {
+            details: { reason: 'NOT_PENDING', status: driver.status },
+            messageAr: 'تمت مراجعة هذا الطلب مسبقاً.',
+          });
+        }
+
+        await tx
+          .update(drivers)
+          .set({
+            status: 'DEACTIVATED',
+            availability: 'OFFLINE',
+            suspendedReason: body.reason,
+            updatedAt: new Date(),
+          })
+          .where(eq(drivers.id, driverId));
+
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: AUDIT_ACTIONS.DRIVER_SUSPEND,
+          entityType: 'driver',
+          entityId: driverId,
+          before: { status: driver.status },
+          after: { status: 'DEACTIVATED' },
+          reason: body.reason,
+          ip: clientIp(request),
+          userAgent: userAgent(request),
+          requestId: request.requestId,
+        });
+      });
+
+      return reply.send(success({ status: 'DEACTIVATED' }, { request_id: request.requestId }));
     },
   );
 

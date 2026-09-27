@@ -377,6 +377,21 @@ export interface AdminDriver {
   last_seen_at: string | null;
 }
 
+/** Somebody waiting to become a courier (`PENDING_ACTIVATION`). */
+export interface AdminDriverApplication {
+  id: string;
+  full_name: string | null;
+  /** Full E.164 for a reviewer who may approve; masked otherwise. */
+  phone: string | null;
+  phone_masked: boolean;
+  vehicle_type: string;
+  plate_number: string | null;
+  city_name_ar: string | null;
+  /** Set when a restaurant or an operator added them to a roster. */
+  restaurant_name: string | null;
+  applied_at: string;
+}
+
 export interface AdminSettlement {
   id: string;
   restaurant_id: string;
@@ -950,6 +965,24 @@ export const admin = {
       method: 'POST',
       accessToken: token,
       body: { suspended, reason },
+    }),
+
+  driverApplications: (token: string) =>
+    apiRequest<AdminDriverApplication[]>('/api/v1/admin/driver-applications', {
+      accessToken: token,
+    }),
+
+  approveDriverApplication: (token: string, id: string) =>
+    apiRequest<{ status: string }>(`/api/v1/admin/driver-applications/${id}/approve`, {
+      method: 'POST',
+      accessToken: token,
+    }),
+
+  rejectDriverApplication: (token: string, id: string, reason: string) =>
+    apiRequest<{ status: string }>(`/api/v1/admin/driver-applications/${id}/reject`, {
+      method: 'POST',
+      accessToken: token,
+      body: { reason },
     }),
 
   // ── Finance ─────────────────────────────────────────────────────────────

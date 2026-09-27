@@ -25,7 +25,7 @@ import {
 } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
-import { admin, type AdminDriver } from '@/lib/admin-endpoints';
+import { admin, type AdminDriver, type AdminDriverApplication } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
@@ -114,6 +114,8 @@ export default function DriversPage() {
         ) : null
       }
     >
+      <DriverApplications token={token} canReview={session.can('driver.create')} />
+
       {totalCustody > 0 ? (
         <div className="alert-bar alert-bar--warning">
           <Icon name="cash" className="nav__icon" aria-hidden />
@@ -236,15 +238,17 @@ export default function DriversPage() {
               {
                 key: 'actions',
                 header: '',
-                render: (row) => (
-                  <button
-                    type="button"
-                    className={`btn btn--sm ${row.status === 'ACTIVE' ? 'btn--danger' : 'btn--outline'}`}
-                    onClick={() => setSuspending(row)}
-                  >
-                    {row.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}
-                  </button>
-                ),
+                render: (row) =>
+                  // A pending driver is accepted in the queue above, not unsuspended here.
+                  row.status === 'PENDING_ACTIVATION' ? null : (
+                    <button
+                      type="button"
+                      className={`btn btn--sm ${row.status === 'ACTIVE' ? 'btn--danger' : 'btn--outline'}`}
+                      onClick={() => setSuspending(row)}
+                    >
+                      {row.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}
+                    </button>
+                  ),
               },
             ]}
           />
@@ -324,11 +328,10 @@ export default function DriversPage() {
  * profile to that same person rather than creating a second account — one
  * identity per phone, everywhere.
  *
- * The account is deliberately not usable when this dialog closes. It is created
- * PENDING_ACTIVATION and the driver activates it themselves by signing in with
- * an OTP on the handset the deliveries will arrive on. That is said on the form
- * rather than discovered afterwards, because "I added him and he is not
- * showing as active" is otherwise the next question.
+ * The account is created PENDING_ACTIVATION and joins the applications queue at
+ * the top of this page, where it is accepted like any other. The form used to
+ * promise that the driver would activate it by signing in — nothing did, so
+ * every courier added here waited forever. It says what actually happens now.
  */
 function AddDriverDialog({
   token,
@@ -431,8 +434,8 @@ function AddDriverDialog({
         </div>
 
         <p className="auth__note" style={{ margin: 0 }}>
-          يُنشأ الحساب بحالة «بانتظار التفعيل». يفعّله المندوب بنفسه بتسجيل الدخول في تطبيق جيبلي
-          برقمه، ولا يستلم أي طلب قبل ذلك.
+          يُنشأ الحساب بحالة «بانتظار التفعيل» ويظهر في «طلبات الانضمام كمندوب» أعلى هذه الصفحة.
+          اقبله من هناك، ثم يسجّل المندوب الدخول في تطبيق جيبلي برقمه ويبدأ الاستلام.
         </p>
 
         {create.error ? (
@@ -456,5 +459,153 @@ function AddDriverDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * People waiting to become couriers, at the top of the page they belong to.
+ *
+ * An application from the app («الانضمام كمندوب») used to be saved and then
+ * seen by nobody: it sat in the list below as one «بانتظار التفعيل» row among
+ * the whole roster, with a masked number and no way to say yes except
+ * «unsuspend», which asked for a reason. This is the queue, oldest first, with
+ * the number to call and one button each way.
+ */
+function DriverApplications({ token, canReview }: { token: string; canReview: boolean }) {
+  const queryClient = useQueryClient();
+  const [rejecting, setRejecting] = useState<AdminDriverApplication | null>(null);
+
+  const applications = useQuery({
+    queryKey: ['admin-driver-applications'],
+    queryFn: () => admin.driverApplications(token),
+    enabled: token !== '',
+  });
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['admin-driver-applications'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin-drivers'] });
+  };
+
+  const approve = useMutation({
+    mutationFn: (id: string) => admin.approveDriverApplication(token, id),
+    onSuccess: refresh,
+  });
+
+  const reject = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      admin.rejectDriverApplication(token, id, reason),
+    onSuccess: () => {
+      setRejecting(null);
+      refresh();
+    },
+  });
+
+  const rows = applications.data ?? [];
+  // Nothing waiting: say nothing. The roster below is the page.
+  if (applications.isSuccess && rows.length === 0) return null;
+
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+        <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>طلبات الانضمام كمندوب</h2>
+        {rows.length > 0 ? <Badge tone="warning">{rows.length}</Badge> : null}
+      </div>
+
+      {applications.isError ? (
+        <ErrorState
+          message={
+            applications.error instanceof ApiError
+              ? applications.error.messageAr
+              : 'تعذّر تحميل طلبات المندوبين'
+          }
+          onRetry={() => void applications.refetch()}
+        />
+      ) : applications.isLoading ? (
+        <Skeleton height={120} />
+      ) : (
+        <>
+          {approve.error ? (
+            <p className="alert-bar alert-bar--danger" role="alert">
+              {approve.error instanceof ApiError ? approve.error.messageAr : 'تعذّر قبول الطلب'}
+            </p>
+          ) : null}
+          <DataTable<AdminDriverApplication>
+            caption="طلبات الانضمام كمندوب بانتظار المراجعة"
+            rows={rows}
+            keyOf={(row) => row.id}
+            emptyMessage="لا توجد طلبات"
+            columns={[
+              { key: 'name', header: 'الاسم', render: (row) => <strong>{row.full_name ?? '—'}</strong> },
+              {
+                key: 'phone',
+                header: 'الهاتف',
+                render: (row) =>
+                  row.phone && !row.phone_masked ? (
+                    <a className="ltr-inline" href={`tel:${row.phone}`}>
+                      {row.phone}
+                    </a>
+                  ) : (
+                    <span className="ltr-inline">{row.phone ?? '—'}</span>
+                  ),
+              },
+              { key: 'city', header: 'المدينة', render: (row) => row.city_name_ar ?? '—' },
+              {
+                key: 'vehicle',
+                header: 'المركبة',
+                render: (row) =>
+                  `${VEHICLE_LABELS[row.vehicle_type] ?? row.vehicle_type}${row.plate_number ? ` · ${row.plate_number}` : ''}`,
+              },
+              {
+                key: 'source',
+                header: 'المصدر',
+                render: (row) => row.restaurant_name ?? 'تقديم من التطبيق',
+              },
+              { key: 'age', header: 'منذ', render: (row) => relativeAr(row.applied_at) },
+              {
+                key: 'actions',
+                header: '',
+                render: (row) =>
+                  canReview ? (
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        disabled={approve.isPending}
+                        onClick={() => approve.mutate(row.id)}
+                      >
+                        {approve.isPending && approve.variables === row.id ? 'جاري القبول…' : 'قبول'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--danger btn--sm"
+                        onClick={() => setRejecting(row)}
+                      >
+                        رفض
+                      </button>
+                    </div>
+                  ) : null,
+              },
+            ]}
+          />
+        </>
+      )}
+
+      {rejecting ? (
+        <ConfirmDialog
+          title={`رفض طلب ${rejecting.full_name ?? 'المتقدّم'}`}
+          confirmLabel="رفض الطلب"
+          requireReason
+          isSubmitting={reject.isPending}
+          error={reject.error instanceof ApiError ? reject.error.messageAr : null}
+          body={
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              يرى المتقدّم «لم يُقبل طلبك» مع هذا السبب في التطبيق.
+            </p>
+          }
+          onConfirm={(reason) => reject.mutate({ id: rejecting.id, reason })}
+          onCancel={() => setRejecting(null)}
+        />
+      ) : null}
+    </Card>
   );
 }

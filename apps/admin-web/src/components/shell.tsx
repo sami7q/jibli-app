@@ -2,12 +2,14 @@
 
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 import { ADMIN_NAV, dateWithWeekdayAr, JibliLogo } from '@jibli/ui-web';
 import { Icon, type IconName } from './icon';
 import { SessionMenu } from './session-menu';
 import { NotificationBell } from './notification-bell';
 import { useAdminSession } from '@/hooks/use-session';
+import { admin } from '@/lib/admin-endpoints';
 
 /**
  * Admin shell (plan §130).
@@ -36,11 +38,6 @@ export function AdminShell({
   liveOrders?: number;
   actions?: React.ReactNode;
 }) {
-  const badges: Record<string, number> = {
-    '/applications': pendingApplications,
-    '/orders/live': liveOrders,
-  };
-
   /*
    * The bell reads the session itself rather than taking a token prop. Every
    * screen renders this shell, and threading a token through nineteen pages to
@@ -49,6 +46,25 @@ export function AdminShell({
    */
   const session = useAdminSession();
   const bellToken = session.status === 'authenticated' ? session.accessToken : '';
+
+  /*
+   * People waiting to become couriers, counted on every page. An application
+   * from the app used to arrive with no signal anywhere in the panel, so the
+   * only way to learn of one was to go and look.
+   */
+  const driverApplications = useQuery({
+    queryKey: ['admin-driver-applications'],
+    queryFn: () => admin.driverApplications(bellToken),
+    enabled: bellToken !== '' && session.status === 'authenticated' && session.can('driver.read.global'),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  const badges: Record<string, number> = {
+    '/applications': pendingApplications,
+    '/orders/live': liveOrders,
+    '/drivers': driverApplications.data?.length ?? 0,
+  };
 
   return (
     <div className="shell">

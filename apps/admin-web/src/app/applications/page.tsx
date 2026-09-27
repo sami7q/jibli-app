@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { relativeAr } from '@jibli/ui-web';
 import { AdminShell } from '@/components/shell';
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { adminApi, ApiError, type RestaurantApplication } from '@/lib/api';
+import { admin } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 
@@ -39,6 +41,18 @@ export default function ApplicationsPage() {
     enabled: session.status === 'authenticated',
   });
 
+  /*
+   * Courier applications live on the drivers page, next to the roster they
+   * join. This page is where an operator looks for «طلبات الانضمام», so it
+   * points there rather than leaving them to guess.
+   */
+  const driverApplications = useQuery({
+    queryKey: ['admin-driver-applications'],
+    queryFn: () => admin.driverApplications(token),
+    enabled: session.status === 'authenticated',
+  });
+  const pendingDrivers = driverApplications.data?.length ?? 0;
+
   const reject = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       adminApi.rejectApplication(token, id, reason),
@@ -59,6 +73,16 @@ export default function ApplicationsPage() {
       userRoleAr={session.roleAr}
       pendingApplications={applications.data?.length ?? 0}
     >
+      {pendingDrivers > 0 ? (
+        <div className="alert-bar alert-bar--warning">
+          <Icon name="drivers" className="nav__icon" aria-hidden />
+          <span>
+            {pendingDrivers === 1 ? 'طلب انضمام كمندوب' : `${pendingDrivers} طلبات انضمام كمندوبين`}{' '}
+            بانتظار المراجعة — <Link href="/drivers">راجِعها في صفحة المندوبين</Link>
+          </span>
+        </div>
+      ) : null}
+
       <Card>
         {applications.isError ? (
           <ErrorState
