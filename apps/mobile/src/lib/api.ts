@@ -826,6 +826,71 @@ export interface AuthSessionResponse {
   next_step: 'HOME' | 'COMPLETE_PROFILE';
 }
 
+/** Where a courier stands right now — `GET /driver/me`. */
+export interface DriverMe {
+  driver_id: string;
+  status: string;
+  /** OFFLINE, AVAILABLE, BUSY, ON_DELIVERY or BREAK. */
+  availability: string;
+  vehicle_type: string;
+  active_assignment_id: string | null;
+  active_assignment_status: string | null;
+}
+
+/** Restaurant cash a courier is holding — never a Jibli balance. */
+export interface DriverCash {
+  collected_iqd: number;
+  handed_over_iqd: number;
+  adjustments_iqd: number;
+  current_custody_iqd: number;
+}
+
+/** One order on a shop's live board — `GET /restaurant-portal/orders/live`. */
+export interface OwnerLiveOrder {
+  id: string;
+  public_order_number: string;
+  status: OrderStatus;
+  age_minutes: number;
+  placed_at: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_notes: string | null;
+  payment_method: string;
+  items_subtotal_iqd: number;
+  delivery_fee_iqd: number;
+  customer_total_iqd: number;
+  /** Optimistic-concurrency token: every command sends back the one it saw. */
+  version: number;
+  delivery_address: Record<string, unknown>;
+  driver: { name: string; assignment_status: string } | null;
+  items: {
+    id: string;
+    name_ar: string;
+    quantity: number;
+    line_total_iqd: number;
+    notes: string | null;
+    modifiers: { name_ar: string; price_iqd: number }[];
+  }[];
+}
+
+/** A courier the shop could hand an order to. */
+export interface OwnerEligibleDriver {
+  id: string;
+  name: string;
+  phone: string;
+  availability: string;
+  active_assignments: number;
+  assignable: boolean;
+}
+
+export type OwnerRejectReason =
+  | 'ITEM_UNAVAILABLE'
+  | 'TOO_BUSY'
+  | 'CLOSING'
+  | 'ADDRESS_ISSUE'
+  | 'CUSTOMER_UNREACHABLE'
+  | 'OTHER';
+
 export const api = {
   /**
    * Categories, banners and how fast to rotate them.
@@ -1167,6 +1232,21 @@ export const api = {
     apiRequest<DriverDeliveryTask>(`/api/v1/driver/deliveries/${assignmentId}`),
 
   /** My application, or null. Reachable while still pending, unlike `/driver/me`. */
+  driverMe: () => apiRequest<DriverMe>('/api/v1/driver/me'),
+
+  /** Online or offline — whether the shop sees this courier as assignable. */
+  setDriverAvailability: (availability: 'AVAILABLE' | 'OFFLINE') =>
+    apiRequest<{ availability: string }>('/api/v1/driver/me/availability', {
+      method: 'PATCH',
+      body: { availability },
+    }),
+
+  /** Presence only: no coordinates are sent or stored (plan §51). */
+  driverHeartbeat: () =>
+    apiRequest<{ ok: boolean }>('/api/v1/driver/heartbeat', { method: 'POST' }),
+
+  driverCash: () => apiRequest<DriverCash>('/api/v1/driver/cash'),
+
   driverApplication: () =>
     apiRequest<{
       driver_id: string;
@@ -1222,6 +1302,50 @@ export const api = {
   //
   // Every write carries `restaurantId`, which the server treats as a selector
   // among shops the session already proves membership of — see RequestOptions.
+
+  /** The live board: new, in the kitchen, ready, on the road, just finished. */
+  ownerLiveOrders: (restaurantId: string) =>
+    apiRequest<OwnerLiveOrder[]>('/api/v1/restaurant-portal/orders/live', { restaurantId }),
+
+  /**
+   * One command on one order. `version` is the order as this phone last saw
+   * it: if a second device moved it first, the server refuses rather than
+   * overwriting, and the board reloads.
+   */
+  ownerOrderCommand: (
+    restaurantId: string,
+    orderId: string,
+    command: 'accept' | 'start-preparing' | 'mark-ready',
+    version: number,
+  ) =>
+    apiRequest<{ status: string }>(`/api/v1/restaurant-portal/orders/${orderId}/${command}`, {
+      method: 'POST',
+      restaurantId,
+      body: { expected_version: version },
+    }),
+
+  ownerRejectOrder: (
+    restaurantId: string,
+    orderId: string,
+    reason: OwnerRejectReason,
+    version: number,
+  ) =>
+    apiRequest<{ status: string }>(`/api/v1/restaurant-portal/orders/${orderId}/reject`, {
+      method: 'POST',
+      restaurantId,
+      body: { reason, expected_version: version },
+    }),
+
+  ownerEligibleDrivers: (restaurantId: string) =>
+    apiRequest<OwnerEligibleDriver[]>('/api/v1/restaurant-portal/drivers/eligible', {
+      restaurantId,
+    }),
+
+  ownerAssignDriver: (restaurantId: string, orderId: string, driverId: string) =>
+    apiRequest<{ assignment_id: string }>(
+      `/api/v1/restaurant-portal/orders/${orderId}/assign-driver`,
+      { method: 'POST', restaurantId, body: { driver_id: driverId } },
+    ),
 
   /** The shops this account belongs to, with the role held in each. */
   ownerShops: () =>

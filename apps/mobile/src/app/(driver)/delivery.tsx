@@ -1,16 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import * as Clipboard from 'expo-clipboard';
 import { formatIqdArabic, iqd } from '@jibli/money';
@@ -22,6 +23,7 @@ import {
   idempotencyKey,
   NetworkError,
   type DriverDeliveryTask,
+  type DriverMe,
 } from '@/lib/api';
 import { notify } from '@/lib/dialog';
 import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
@@ -423,6 +425,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: color.borderSubtle,
   },
+  statusCard: {
+    margin: space[4],
+    marginBottom: 0,
+    padding: space[4],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: space[3],
+  },
+  statusCardOn: { backgroundColor: color.successSoft, borderColor: color.success },
+  statusCardOff: { backgroundColor: color.surfaceCard, borderColor: color.borderSubtle },
+  statusRow: { flexDirection: ROW, alignItems: 'center', gap: space[3] },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+  statusDotOn: { backgroundColor: color.success },
+  statusDotOff: { backgroundColor: palette.ink[300] },
+  statusTitle: { ...text.bodyBold, color: color.textPrimary, textAlign: 'right' },
+  statusBody: { ...text.caption, color: color.textMuted, textAlign: 'right' },
+  statsRow: { flexDirection: ROW, gap: space[3] },
+  statBox: {
+    flex: 1,
+    backgroundColor: color.surfaceCard,
+    borderRadius: radius.md,
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    alignItems: 'center',
+    gap: 2,
+  },
+  statValue: { ...text.h3, color: color.textPrimary },
+  statLabel: { ...text.caption, color: color.textMuted },
   modeSwitch: {
     flexDirection: ROW,
     alignItems: 'center',
@@ -624,7 +654,64 @@ export default function DeliveryScreen() {
   const reload = () => {
     void queryClient.invalidateQueries({ queryKey: ['driver', 'deliveries'] });
     void queryClient.invalidateQueries({ queryKey: ['driver', 'delivery'] });
+    void queryClient.invalidateQueries({ queryKey: ['driver', 'me'] });
+    void queryClient.invalidateQueries({ queryKey: ['driver', 'cash'] });
   };
+
+  const me = useQuery({
+    queryKey: ['driver', 'me'],
+    queryFn: () => api.driverMe(),
+    refetchInterval: 30_000,
+  });
+  const cash = useQuery({ queryKey: ['driver', 'cash'], queryFn: () => api.driverCash() });
+  const history = useQuery({
+    queryKey: ['driver', 'deliveries', 'history'],
+    queryFn: () => api.driverDeliveries('history'),
+    staleTime: 60_000,
+  });
+
+  /** Deliveries finished since midnight on this phone's clock. */
+  const deliveredToday = useMemo(() => {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    return (history.data ?? []).filter(
+      (row) => row.status === 'DELIVERED' && new Date(row.assigned_at) >= midnight,
+    ).length;
+  }, [history.data]);
+
+  const availability = me.data?.availability ?? 'OFFLINE';
+  const online = availability !== 'OFFLINE';
+  /** Carrying an order: going offline now would strand it, so the switch waits. */
+  const busy = rows.length > 0;
+
+  const toggle = useMutation({
+    mutationFn: (next: 'AVAILABLE' | 'OFFLINE') => api.setDriverAvailability(next),
+    onMutate: (next) => {
+      // The switch moves under the finger, not a round trip later.
+      queryClient.setQueryData<DriverMe>(['driver', 'me'], (current) =>
+        current ? { ...current, availability: next } : current,
+      );
+    },
+    onError: (caught) => {
+      notify(
+        'تعذّر تغيير الحالة',
+        caught instanceof ApiError ? caught.messageAr : 'تحقق من الاتصال وحاول مرة أخرى.',
+      );
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['driver', 'me'] }),
+  });
+
+  /*
+   * Presence while online. A courier who left the app open and walked away
+   * still reads as reachable to the shop; the heartbeat is how «last seen»
+   * stays honest. Presence only — no location is sent.
+   */
+  useEffect(() => {
+    if (!online) return;
+    void api.driverHeartbeat().catch(() => undefined);
+    const timer = setInterval(() => void api.driverHeartbeat().catch(() => undefined), 60_000);
+    return () => clearInterval(timer);
+  }, [online]);
 
   const loading = active.isLoading || (Boolean(assignmentId) && task.isLoading);
   const failure = active.error ?? task.error;
@@ -648,6 +735,52 @@ export default function DeliveryScreen() {
           <MaterialCommunityIcons name="swap-horizontal" size={16} color={BRAND[600]} />
           <Text style={styles.modeSwitchText}>الوضع العادي</Text>
         </Pressable>
+      </View>
+
+      {/*
+       * The one question a courier asks on opening this screen: am I
+       * receiving orders? Availability existed on the server and in the
+       * shop's driver list, and the courier could neither see nor change it —
+       * yet a shop cannot hand an order to somebody who is offline.
+       */}
+      <View style={[styles.statusCard, online ? styles.statusCardOn : styles.statusCardOff]}>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusDot, online ? styles.statusDotOn : styles.statusDotOff]} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.statusTitle}>
+              {busy ? 'في مهمة توصيل' : online ? 'متصل — تستقبل الطلبات' : 'غير متصل'}
+            </Text>
+            <Text style={styles.statusBody}>
+              {busy
+                ? 'أكمل التوصيل الحالي، ثم يمكنك إيقاف الاستقبال.'
+                : online
+                  ? 'تظهر للمطاعم كمندوب متاح.'
+                  : 'لن تُسند إليك طلبات حتى تفعّل الاستقبال.'}
+            </Text>
+          </View>
+          <Switch
+            value={online}
+            disabled={busy || toggle.isPending || me.isLoading}
+            onValueChange={(next) => toggle.mutate(next ? 'AVAILABLE' : 'OFFLINE')}
+            trackColor={{ false: palette.ink[200], true: color.success }}
+            thumbColor={palette.white}
+            ios_backgroundColor={palette.ink[200]}
+            accessibilityLabel={online ? 'إيقاف استقبال الطلبات' : 'تفعيل استقبال الطلبات'}
+          />
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{history.isLoading ? '…' : deliveredToday}</Text>
+            <Text style={styles.statLabel}>توصيلات اليوم</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>
+              {cash.data ? formatIqdArabic(iqd(cash.data.current_custody_iqd)) : '…'}
+            </Text>
+            <Text style={styles.statLabel}>نقد بحوزتك للمطاعم</Text>
+          </View>
+        </View>
       </View>
 
       {loading ? (
@@ -680,10 +813,16 @@ export default function DeliveryScreen() {
          * empty screen wondering whether the app is broken.
          */
         <View style={styles.centered}>
-          <MaterialCommunityIcons name="moped-outline" size={48} color={palette.ink[300]} />
-          <Text style={styles.emptyTitle}>لا توجد مهمة توصيل الآن</Text>
+          <MaterialCommunityIcons
+            name={online ? 'moped' : 'moped-outline'}
+            size={48}
+            color={online ? color.success : palette.ink[300]}
+          />
+          <Text style={styles.emptyTitle}>{online ? 'بانتظار طلب…' : 'أنت غير متصل'}</Text>
           <Text style={styles.emptyBody}>
-            ستظهر المهمة هنا فور إسنادها إليك. أبقِ التطبيق مفتوحاً.
+            {online
+              ? 'ستظهر المهمة هنا فور إسنادها إليك. أبقِ التطبيق مفتوحاً.'
+              : 'فعّل الاستقبال من الأعلى لتظهر للمطاعم وتصلك مهام التوصيل.'}
           </Text>
           <Pressable
             style={[styles.button, styles.buttonGhost]}

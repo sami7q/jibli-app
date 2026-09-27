@@ -34,6 +34,22 @@ export default function OwnerHomeScreen() {
     staleTime: 60_000,
   });
 
+  /*
+   * Orders waiting for an answer, counted here so the lobby says it. Polled
+   * like the board itself: a new order is the one thing on this screen that
+   * cannot wait for the owner to think of looking.
+   */
+  const orders = useQuery({
+    queryKey: ['owner-orders', shop?.id],
+    queryFn: () => api.ownerLiveOrders(shop?.id as string),
+    enabled: Boolean(shop?.id) && owner.can('order.read'),
+    refetchInterval: 15_000,
+  });
+  const waiting = (orders.data ?? []).filter((order) => order.status === 'PENDING_RESTAURANT').length;
+  const inProgress = (orders.data ?? []).filter((order) =>
+    ['ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(order.status),
+  ).length;
+
   const counts = useMemo(() => {
     const categories = catalog.data?.categories ?? [];
     const products = categories.flatMap((entry) => entry.items);
@@ -167,6 +183,55 @@ export default function OwnerHomeScreen() {
             </Pressable>
           ) : null}
         </View>
+
+        {/*
+          Orders first. The menu changes once a week; an order waits on a
+          customer now — so it is the first thing in the lobby, and red when
+          somebody is waiting.
+        */}
+        {owner.can('order.read') ? (
+          <Pressable
+            onPress={() => router.push('/(owner)/orders')}
+            accessibilityRole="button"
+            accessibilityLabel={`الطلبات: ${waiting} جديدة`}
+            style={({ pressed }) => [
+              {
+                flexDirection: ROW,
+                alignItems: 'center',
+                gap: space[3],
+                padding: space[4],
+                borderRadius: radius.lg,
+                borderWidth: waiting > 0 ? 2 : 1,
+                borderColor: waiting > 0 ? color.danger : color.borderSubtle,
+                backgroundColor: waiting > 0 ? color.dangerSoft : color.surfaceCard,
+              },
+              pressed ? { opacity: 0.85 } : null,
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={waiting > 0 ? 'bell-ring-outline' : 'clipboard-list-outline'}
+              size={28}
+              color={waiting > 0 ? color.dangerStrong : color.brand}
+            />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="bodyBold" tone={waiting > 0 ? 'danger' : 'primary'}>
+                {waiting > 0
+                  ? waiting === 1
+                    ? 'طلب جديد بانتظار موافقتك'
+                    : `${waiting} طلبات جديدة بانتظار موافقتك`
+                  : 'الطلبات'}
+              </Text>
+              <Text variant="caption" tone="muted">
+                {orders.isLoading
+                  ? '…'
+                  : inProgress > 0
+                    ? `${inProgress} قيد التنفيذ — اقبل، حضّر، وأسند للمندوب`
+                    : 'اقبل الطلبات وتابع حالتها من هنا'}
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-left" size={22} color={color.textMuted} />
+          </Pressable>
+        ) : null}
 
         {catalog.isError ? (
           <ErrorState
