@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import { configNested } from './app-config';
 import { useRouter } from 'expo-router';
 import { apiRequest } from './api';
 
@@ -124,9 +125,7 @@ export async function registerForPush(): Promise<PushOutcome> {
 
     if (!granted) return { status: 'denied' };
 
-    const projectId =
-      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
-        ?.projectId ?? Constants.easConfig?.projectId;
+    const projectId = configNested('eas', 'projectId') ?? Constants.easConfig?.projectId;
 
     if (!projectId) {
       // A development build before EAS is configured. Not a failure.

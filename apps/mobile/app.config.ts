@@ -185,8 +185,15 @@ const config: ExpoConfig = {
      * vector tiles, which need no key and permit commercial use. It is read
      * here only so the value sits with the rest of the app's configuration.
      */
-    mapTileUrl: process.env.EXPO_PUBLIC_MAP_TILE_URL ?? null,
-    mapTileAttribution: process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION ?? null,
+    /*
+     * Unset values are left `undefined`, never `null`: the release build
+     * embedded a `null` here as `{}`, which is truthy, and that is what
+     * crashed the first APK on launch. `undefined` is simply dropped. Read
+     * these through `src/lib/app-config.ts`, which refuses anything but a
+     * string either way.
+     */
+    mapTileUrl: process.env.EXPO_PUBLIC_MAP_TILE_URL,
+    mapTileAttribution: process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION,
     supportPhone: requireForStore(
       'EXPO_PUBLIC_SUPPORT_PHONE',
       process.env.EXPO_PUBLIC_SUPPORT_PHONE,
@@ -201,7 +208,7 @@ const config: ExpoConfig = {
      * missing. A link to `id/undefined` would be worse than a search.
      * Not guarded by `requireForStore` for the same reason.
      */
-    iosAppId: process.env.EXPO_PUBLIC_IOS_APP_ID ?? null,
+    iosAppId: process.env.EXPO_PUBLIC_IOS_APP_ID,
     /*
      * Where crash reports go, if anywhere.
      *
@@ -215,7 +222,7 @@ const config: ExpoConfig = {
      * the environment rather than here so that a project can be changed without
      * a code change.
      */
-    sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? null,
+    sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
     /*
      * Both resolved above rather than here, because a store build must not be
      * allowed to bake the placeholder — see `requireForStore`.

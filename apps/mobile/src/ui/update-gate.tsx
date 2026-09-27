@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
-import Constants from 'expo-constants';
+import { configString } from '@/lib/app-config';
 import { onVersionUnsupported } from '@/lib/api';
 import { color, space } from '@/theme';
 import { Button, Text } from '@/ui';
@@ -44,7 +44,7 @@ export function UpdateGate() {
    * `EXPO_PUBLIC_IOS_APP_ID` is unset and the button opens a search for the
    * name instead of a broken link to id `undefined`.
    */
-  const iosAppId = (Constants.expoConfig?.extra as { iosAppId?: string } | undefined)?.iosAppId;
+  const iosAppId = configString('iosAppId');
   const androidPackage = 'iq.jibli.app';
 
   const openStore = () => {

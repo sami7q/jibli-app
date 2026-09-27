@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
+import { configString } from './app-config';
 
 /**
  * Crash reporting.
@@ -30,7 +31,14 @@ import Constants from 'expo-constants';
  * rearranging these imports.
  */
 
-const dsn = (Constants.expoConfig?.extra as { sentryDsn?: string | null } | undefined)?.sentryDsn;
+/*
+ * A DSN is an https URL or it is nothing. This line was `extra.sentryDsn`, and
+ * the release APK embedded `{}` for the unset value — truthy — so the installed
+ * app initialised Sentry with an object for an address on its first line and
+ * closed on the splash. See `app-config.ts`.
+ */
+const configured = configString('sentryDsn');
+const dsn = configured?.startsWith('https://') ? configured : null;
 
 /** Whether reports are actually going anywhere. Read by `captureError`. */
 export const isMonitoringEnabled = Boolean(dsn);
@@ -38,6 +46,18 @@ export const isMonitoringEnabled = Boolean(dsn);
 export function startMonitoring(): void {
   if (!dsn) return;
 
+  /*
+   * Crash reporting must never be the crash. A bad DSN or a native init
+   * failure costs the reports, not the app.
+   */
+  try {
+    initSentry(dsn);
+  } catch {
+    /* The app runs unreported rather than not at all. */
+  }
+}
+
+function initSentry(dsn: string): void {
   Sentry.init({
     dsn,
     /*

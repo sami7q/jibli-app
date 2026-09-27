@@ -13,7 +13,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://jibli-api.onrender.com",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,armeabi-v7a"
       }
     },
     "production": {

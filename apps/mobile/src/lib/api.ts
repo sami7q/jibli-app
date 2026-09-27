@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { configString } from './app-config';
 import { ERROR_MESSAGES_AR, type ErrorCode, type OrderStatus } from '@jibli/contracts';
 import { clearSession, loadSession, updateTokens } from './secure-session';
 
@@ -47,8 +48,7 @@ const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ??
   (isBrowser && isDevelopment
     ? WEB_DEV_PROXY
-    : ((Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
-      'http://localhost:4000'));
+    : (configString('apiUrl') ?? 'http://localhost:4000'));
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 

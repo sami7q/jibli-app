@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Constants from 'expo-constants';
+import { configString } from '@/lib/app-config';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@/ui/icon';
 import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
@@ -734,7 +734,6 @@ const styles = StyleSheet.create({
 
 /** Opens one of the legal URLs from the Expo config. */
 function openLegal(key: 'termsUrl' | 'privacyPolicyUrl'): void {
-  const extra = Constants.expoConfig?.extra as Record<string, string | undefined> | undefined;
-  const url = extra?.[key];
+  const url = configString(key);
   if (url) void Linking.openURL(url).catch(() => undefined);
 }

@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import { configNested } from './app-config';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
@@ -32,8 +32,11 @@ interface GoogleConfig {
 }
 
 function config(): GoogleConfig {
-  const extra = Constants.expoConfig?.extra as { google?: GoogleConfig } | undefined;
-  return extra?.google ?? {};
+  return {
+    iosClientId: configNested('google', 'iosClientId') ?? undefined,
+    androidClientId: configNested('google', 'androidClientId') ?? undefined,
+    webClientId: configNested('google', 'webClientId') ?? undefined,
+  };
 }
 
 /** The client id for the platform this is running on. */

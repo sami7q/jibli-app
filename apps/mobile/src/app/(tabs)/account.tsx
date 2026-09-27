@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Linking, View } from 'react-native';
 import Constants from 'expo-constants';
+import { configString } from '@/lib/app-config';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
@@ -118,8 +119,11 @@ export default function AccountScreen() {
   }, [home]);
 
   const me = state.status === 'ready' || state.status === 'needs-profile' ? state.me : null;
-  const extra = Constants.expoConfig?.extra as
-    { supportPhone?: string; privacyPolicyUrl?: string; termsUrl?: string } | undefined;
+  const extra = {
+    supportPhone: configString('supportPhone'),
+    privacyPolicyUrl: configString('privacyPolicyUrl'),
+    termsUrl: configString('termsUrl'),
+  };
 
   const open = (url: string) => {
     void Linking.openURL(url).catch(() =>
