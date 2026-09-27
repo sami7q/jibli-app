@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dateTimeAr } from '@jibli/ui-web';
+import { dateTimeAr, NumberField } from '@jibli/ui-web';
 import { AdminShell } from '@/components/shell';
 import { Badge, Card, ErrorState, MfaChallenge, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
@@ -222,11 +222,11 @@ function EditConfigDialog({
               <option value="false">معطّل</option>
             </select>
           ) : typeof entry.value === 'number' ? (
-            <input
+            <NumberField
+              decimal
               id="config-value"
-              type="number"
               value={Number(value)}
-              onChange={(event) => setValue(Number(event.target.value))}
+              onChange={(value) => setValue(value)}
             />
           ) : (
             <input

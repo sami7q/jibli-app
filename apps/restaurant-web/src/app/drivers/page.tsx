@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { VEHICLE_TYPES, type VehicleType } from '@jibli/contracts';
-import { DRIVER_AVAILABILITY_LABELS, VEHICLE_TYPE_LABELS, money } from '@jibli/ui-web';
+import { DRIVER_AVAILABILITY_LABELS, VEHICLE_TYPE_LABELS, money, NumberField } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError, newIdempotencyKey } from '@/lib/api';
@@ -628,14 +628,12 @@ function HandoverDialog({
 
         <div className="field">
           <label htmlFor="ho-amount">المبلغ المستلم (دينار)</label>
-          <input
+          <NumberField
             id="ho-amount"
-            type="number"
             min={0}
             max={row.current_custody_iqd}
-            step={250}
             value={amount}
-            onChange={(event) => setAmount(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setAmount(value)}
             aria-invalid={invalid}
           />
           {invalid ? (

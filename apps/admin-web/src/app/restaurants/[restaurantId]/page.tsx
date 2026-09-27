@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RESTAURANT_ROLE_LABELS, dateAr } from '@jibli/ui-web';
+import { RESTAURANT_ROLE_LABELS, dateAr, NumberField } from '@jibli/ui-web';
 import type { RestaurantRole } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import { PortalCredentials } from '@/components/portal-credentials';
@@ -408,14 +408,12 @@ function CommissionDialog({
 
         <div className="field">
           <label htmlFor="commission-amount">العمولة الجديدة (د.ع لكل طلب)</label>
-          <input
+          <NumberField
             id="commission-amount"
-            type="number"
             min={0}
             max={100000}
-            step={250}
             value={amountIqd}
-            onChange={(event) => setAmountIqd(Math.round(Number(event.target.value)))}
+            onChange={(value) => setAmountIqd(value)}
           />
           <span className="field__hint">
             استثناء لهذا المطعم وحده. العمولة الموحّدة لكل المطاعم تُضبط من{' '}

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Linking, View } from 'react-native';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError } from '@/lib/api';
@@ -28,12 +28,49 @@ import { ListRow, RTL_TEXT, Sheet } from '@/ui/catalog';
  */
 export default function AccountScreen() {
   const router = useRouter();
-  const { state, signOut } = useSession();
+  const { state, signOut, refresh } = useSession();
   const isGuest = useIsGuest();
-  /** Whether this account already carries the courier mode. */
+
+  /*
+   * The courier application, read fresh whenever this screen is opened.
+   *
+   * The session's `modes` are resolved at sign-in, so an application accepted
+   * in Admin afterwards did not show here until the app was restarted — the
+   * new courier kept seeing «الانضمام كمندوب» for an account that already
+   * could deliver. This one small read is what notices the approval.
+   */
+  const application = useQuery({
+    queryKey: ['driver-application'],
+    queryFn: () => api.driverApplication(),
+    enabled: !isGuest && (state.status === 'ready' || state.status === 'needs-profile'),
+  });
+  const refetchApplication = application.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      if (!isGuest) void refetchApplication();
+    }, [isGuest, refetchApplication]),
+  );
+
+  /** Whether this account can switch into the courier mode. */
   const isDriver =
-    (state.status === 'ready' || state.status === 'needs-profile') &&
-    state.me.modes.includes('DRIVER');
+    ((state.status === 'ready' || state.status === 'needs-profile') &&
+      state.me.modes.includes('DRIVER')) ||
+    application.data?.status === 'ACTIVE';
+  /** Applied and waiting, or declined — anything but «not applied yet». */
+  const applicationStatus = application.data?.status ?? null;
+
+  /*
+   * Into driver mode. When the approval arrived after sign-in, the session
+   * does not carry the mode yet, so it is refreshed first — once, on a tap,
+   * rather than on every visit to this screen.
+   */
+  const openDriverMode = async () => {
+    const sessionHasMode =
+      (state.status === 'ready' || state.status === 'needs-profile') &&
+      state.me.modes.includes('DRIVER');
+    if (!sessionHasMode) await refresh();
+    router.push('/(driver)/delivery');
+  };
   /**
    * Whether this account holds a role in any shop.
    *
@@ -242,36 +279,39 @@ export default function AccountScreen() {
        * screen a prospective driver has — they arrive as a customer.
        */}
       <Group title="العمل مع جيبلي">
-        <ListRow
-          label="الانضمام كمندوب توصيل"
-          sublabel="وصّل الطلبات واكسب معنا"
-          icon={<MaterialCommunityIcons name="motorbike" size={20} color={color.brand} />}
-          /*
-           * Shown to a guest too. Somebody who wants to deliver arrives as a
-           * browsing customer, and hiding the row until they sign in means they
-           * never find out the door exists. The screen itself asks for the
-           * account, which is the right place: it can explain why.
-           */
-          onPress={() => router.push('/(driver)/apply')}
-        />
-
         {/*
-         * The way in for somebody who already delivers.
-         *
-         * A driver whose restaurant created their account and handed them a
-         * username has nothing to apply for — and «الانضمام كمندوب» is the
-         * wrong row for them. It shows the delivery screen when this account
-         * already carries the mode, and the sign-in when it does not, because
-         * a courier borrowing a customer's phone is the ordinary case.
+         * One account, two modes. A courier signs in with their phone number
+         * like everybody else — no username, no password — and once their
+         * application is accepted this row becomes the switch into Driver
+         * Mode. Until then it is the way to apply, or to see where the
+         * application stands.
          */}
-        <ListRow
-          label={isDriver ? 'وضع المندوب' : 'دخول المندوبين'}
-          sublabel={
-            isDriver ? 'طلبات التوصيل المعيّنة لك' : 'لديك اسم مستخدم من المطعم؟ ادخل من هنا'
-          }
-          icon={<MaterialCommunityIcons name="moped" size={20} color={color.brand} />}
-          onPress={() => router.push(isDriver ? '/(driver)/delivery' : '/(auth)/driver-login')}
-        />
+        {isDriver ? (
+          <ListRow
+            label="التبديل إلى وضع المندوب"
+            sublabel="طلبات التوصيل المعيّنة لك والخريطة"
+            icon={<MaterialCommunityIcons name="moped" size={20} color={color.brand} />}
+            onPress={() => void openDriverMode()}
+          />
+        ) : (
+          <ListRow
+            label={applicationStatus ? 'طلب الانضمام كمندوب' : 'الانضمام كمندوب توصيل'}
+            sublabel={
+              applicationStatus === 'PENDING_ACTIVATION'
+                ? 'قيد المراجعة — سنتواصل معك'
+                : applicationStatus
+                  ? 'اضغط لمعرفة حالة طلبك'
+                  : 'وصّل الطلبات واكسب معنا'
+            }
+            icon={<MaterialCommunityIcons name="motorbike" size={20} color={color.brand} />}
+            /*
+             * Shown to a guest too. Somebody who wants to deliver arrives as a
+             * browsing customer; the screen itself asks for the account, which
+             * is the right place to explain why.
+             */
+            onPress={() => router.push('/(driver)/apply')}
+          />
+        )}
 
         {/*
          * The shop owner's door, shown to everyone.

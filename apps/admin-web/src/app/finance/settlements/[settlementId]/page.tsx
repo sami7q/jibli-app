@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PAYMENT_RECORD_METHODS } from '@jibli/contracts';
-import { SETTLEMENT_STATUS_LABELS, dateAr, dateTimeAr } from '@jibli/ui-web';
+import { SETTLEMENT_STATUS_LABELS, dateAr, dateTimeAr, NumberField } from '@jibli/ui-web';
 import type { SettlementStatus } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import {
@@ -462,14 +462,12 @@ function PaymentDialog({
 
         <div className="field">
           <label htmlFor="payment-amount">المبلغ (د.ع)</label>
-          <input
+          <NumberField
             id="payment-amount"
-            type="number"
             min={1}
             max={remaining}
-            step={1000}
             value={amount}
-            onChange={(event) => setAmount(Number(event.target.value))}
+            onChange={(value) => setAmount(value)}
           />
           {exceedsRemaining ? (
             <span className="field__error">المبلغ يتجاوز المتبقي على الكشف</span>
@@ -588,13 +586,11 @@ function AdjustmentDialog({
 
         <div className="field">
           <label htmlFor="adjust-amount">المبلغ (د.ع)</label>
-          <input
+          <NumberField
             id="adjust-amount"
-            type="number"
             min={1}
-            step={1000}
             value={amount}
-            onChange={(event) => setAmount(Number(event.target.value))}
+            onChange={(value) => setAmount(value)}
           />
         </div>
 

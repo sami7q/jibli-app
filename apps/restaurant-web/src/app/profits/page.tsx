@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@jibli/contracts';
-import { EXPENSE_CATEGORY_LABELS, money } from '@jibli/ui-web';
+import { EXPENSE_CATEGORY_LABELS, money, NumberField } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
@@ -393,13 +393,11 @@ function ExpenseDialog({
 
         <div className="field">
           <label htmlFor="exp-amount">المبلغ (دينار)</label>
-          <input
+          <NumberField
             id="exp-amount"
-            type="number"
             min={0}
-            step={250}
             value={amount}
-            onChange={(event) => setAmount(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setAmount(value)}
             aria-invalid={amountInvalid}
           />
           {amountInvalid ? (

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogoUpload, money } from '@jibli/ui-web';
+import { LogoUpload, money, NumberField } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError, assetUrl } from '@/lib/api';
@@ -655,13 +655,11 @@ function ItemDialog({
 
         <div className="field">
           <label htmlFor="item-price">سعر البيع (دينار)</label>
-          <input
+          <NumberField
             id="item-price"
-            type="number"
             min={0}
-            step={250}
             value={price}
-            onChange={(event) => setPrice(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setPrice(value)}
             aria-invalid={priceInvalid}
           />
           {priceInvalid ? (
@@ -673,13 +671,11 @@ function ItemDialog({
           <>
             <div className="field">
               <label htmlFor="item-cost">سعر التكلفة (اختياري)</label>
-              <input
+              <NumberField
                 id="item-cost"
-                type="number"
                 min={0}
-                step={250}
                 value={cost}
-                onChange={(event) => setCost(Math.trunc(Number(event.target.value)))}
+                onChange={(value) => setCost(value)}
               />
               <span className="field__hint">
                 يُستخدم لحساب هامش الربح في تقرير الأرباح فقط، ولا يظهر للعملاء أبداً.

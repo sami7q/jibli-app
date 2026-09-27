@@ -6,5 +6,6 @@ export * from './logo-upload.js';
 export * from './chart-scale.js';
 export * from './quick-login.js';
 export * from './session-retry.js';
+export * from './number-field.js';
 // Shared with the edge middleware so the client validates `next` identically.
 export { safeReturnPath } from './middleware.js';

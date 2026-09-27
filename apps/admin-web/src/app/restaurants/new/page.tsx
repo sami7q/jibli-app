@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { LogoUpload } from '@jibli/ui-web';
+import { LogoUpload, NumberField } from '@jibli/ui-web';
 import {
   MERCHANT_TYPES,
   MERCHANT_TYPE_LABELS,
@@ -596,25 +596,21 @@ export default function NewRestaurantPage() {
 
                 <div className="field">
                   <label htmlFor="minimum">الحد الأدنى للطلب (د.ع)</label>
-                  <input
+                  <NumberField
                     id="minimum"
-                    type="number"
                     min={0}
-                    step={500}
                     value={form.minimum_order_iqd}
-                    onChange={(event) => set('minimum_order_iqd', Number(event.target.value))}
+                    onChange={(value) => set('minimum_order_iqd', value)}
                   />
                 </div>
 
                 <div className="field">
                   <label htmlFor="delivery_fee">رسوم التوصيل (د.ع)</label>
-                  <input
+                  <NumberField
                     id="delivery_fee"
-                    type="number"
                     min={0}
-                    step={500}
                     value={form.delivery_fee_iqd}
-                    onChange={(event) => set('delivery_fee_iqd', Number(event.target.value))}
+                    onChange={(value) => set('delivery_fee_iqd', value)}
                   />
                 </div>
               </div>

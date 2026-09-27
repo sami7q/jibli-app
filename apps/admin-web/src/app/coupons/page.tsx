@@ -14,6 +14,7 @@ import {
   COUPON_STATE_LABELS,
   COUPON_TYPE_LABELS,
   money,
+  NumberField,
 } from '@jibli/ui-web';
 import { AdminShell } from '@/components/shell';
 import { Card, ConfirmDialog, ErrorState, ForbiddenState, Skeleton } from '@/components/ui';
@@ -350,13 +351,11 @@ function CreateCouponDialog({
           <label htmlFor="cpn-value">
             {type === 'PERCENTAGE' ? 'النسبة (نقطة أساس — 1000 = 10%)' : 'المبلغ (دينار)'}
           </label>
-          <input
+          <NumberField
             id="cpn-value"
-            type="number"
             min={1}
-            step={type === 'PERCENTAGE' ? 100 : 250}
             value={value}
-            onChange={(event) => setValue(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setValue(value)}
             aria-invalid={!valueValid}
           />
           {type === 'PERCENTAGE' ? (
@@ -367,13 +366,11 @@ function CreateCouponDialog({
         {type === 'PERCENTAGE' ? (
           <div className="field">
             <label htmlFor="cpn-max">الحد الأقصى للخصم (اختياري)</label>
-            <input
+            <NumberField
               id="cpn-max"
-              type="number"
               min={0}
-              step={250}
               value={maxDiscount}
-              onChange={(event) => setMaxDiscount(Math.trunc(Number(event.target.value)))}
+              onChange={(value) => setMaxDiscount(value)}
             />
             <span className="field__hint">صفر يعني بلا حد أقصى.</span>
           </div>
@@ -381,13 +378,11 @@ function CreateCouponDialog({
 
         <div className="field">
           <label htmlFor="cpn-min">الحد الأدنى لقيمة الطلب</label>
-          <input
+          <NumberField
             id="cpn-min"
-            type="number"
             min={0}
-            step={250}
             value={minimumOrder}
-            onChange={(event) => setMinimumOrder(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setMinimumOrder(value)}
           />
         </div>
 
@@ -414,14 +409,12 @@ function CreateCouponDialog({
         {funding === 'SHARED' ? (
           <div className="field">
             <label htmlFor="cpn-share">حصة المطعم (نقطة أساس)</label>
-            <input
+            <NumberField
               id="cpn-share"
-              type="number"
               min={0}
               max={10000}
-              step={500}
               value={shareBps}
-              onChange={(event) => setShareBps(Math.trunc(Number(event.target.value)))}
+              onChange={(value) => setShareBps(value)}
             />
             <span className="field__hint">
               {bpsPercent(shareBps)} على المطعم و {bpsPercent(10_000 - shareBps)} على جيبلي.
@@ -432,24 +425,22 @@ function CreateCouponDialog({
         <div className="split">
           <div className="field">
             <label htmlFor="cpn-total">حد الاستخدام الكلي</label>
-            <input
+            <NumberField
               id="cpn-total"
-              type="number"
               min={0}
               value={totalLimit}
-              onChange={(event) => setTotalLimit(Math.trunc(Number(event.target.value)))}
+              onChange={(value) => setTotalLimit(value)}
             />
             <span className="field__hint">صفر يعني بلا حد.</span>
           </div>
 
           <div className="field">
             <label htmlFor="cpn-per-user">حد الاستخدام لكل عميل</label>
-            <input
+            <NumberField
               id="cpn-per-user"
-              type="number"
               min={1}
               value={perUserLimit}
-              onChange={(event) => setPerUserLimit(Math.trunc(Number(event.target.value)))}
+              onChange={(value) => setPerUserLimit(value)}
             />
           </div>
         </div>

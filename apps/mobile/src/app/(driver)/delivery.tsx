@@ -423,7 +423,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: color.borderSubtle,
   },
-  headerSide: { width: 32, alignItems: 'center' },
+  modeSwitch: {
+    flexDirection: ROW,
+    alignItems: 'center',
+    gap: space[1],
+    paddingVertical: space[1],
+    paddingHorizontal: space[3],
+    borderRadius: radius.full,
+    backgroundColor: BRAND[50],
+    borderWidth: 1,
+    borderColor: BRAND[200],
+  },
+  modeSwitchText: { ...text.smallBold, color: BRAND[600] },
 
   buttonDanger: { backgroundColor: color.dangerStrong },
   reasonInput: {
@@ -621,18 +632,22 @@ export default function DeliveryScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <Text style={styles.headerTitle}>وضع المندوب</Text>
+        {/*
+         * The way back, named. One account carries both modes, and a bare
+         * arrow did not say that leaving this screen is switching back to
+         * ordering — it read as «back», to nowhere in particular.
+         */}
         <Pressable
-          onPress={() => router.replace('/(tabs)/account')}
+          onPress={() => router.replace('/(tabs)')}
           accessibilityRole="button"
-          accessibilityLabel="رجوع"
+          accessibilityLabel="التبديل إلى الوضع العادي"
           hitSlop={space[2]}
-          style={styles.headerSide}
+          style={({ pressed }) => [styles.modeSwitch, pressed ? { opacity: 0.7 } : null]}
         >
-          <MaterialCommunityIcons name="chevron-right" size={24} color={color.textPrimary} />
+          <MaterialCommunityIcons name="swap-horizontal" size={16} color={BRAND[600]} />
+          <Text style={styles.modeSwitchText}>الوضع العادي</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>مهمة التوصيل</Text>
-        {/* Balances the back button so the title stays centred. */}
-        <View style={styles.headerSide} />
       </View>
 
       {loading ? (

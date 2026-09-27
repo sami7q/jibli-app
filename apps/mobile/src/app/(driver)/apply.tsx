@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError } from '@/lib/api';
-import { useIsGuest } from '@/lib/session';
+import { useIsGuest, useSession } from '@/lib/session';
 import { notify } from '@/lib/dialog';
 import { BRAND, TAP_TARGET, color, radius, space, text } from '@/theme';
 import { Button, EmptyState, Row, Screen, Skeleton, Text } from '@/ui';
@@ -72,6 +72,7 @@ const STATUS_COPY: Record<
 export default function DriverApplyScreen() {
   const router = useRouter();
   const isGuest = useIsGuest();
+  const { refresh } = useSession();
 
   const [vehicle, setVehicle] = useState<Vehicle>('MOTORCYCLE');
   const [plate, setPlate] = useState('');
@@ -81,6 +82,14 @@ export default function DriverApplyScreen() {
     queryFn: () => api.driverApplication(),
     enabled: !isGuest,
   });
+
+  // Fresh on every visit: the decision is made in Admin while this screen waits.
+  const refetchApplication = application.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      if (!isGuest) void refetchApplication();
+    }, [isGuest, refetchApplication]),
+  );
 
   const apply = useMutation({
     mutationFn: () =>
@@ -131,7 +140,11 @@ export default function DriverApplyScreen() {
             vehicleLabel={
               VEHICLES.find((entry) => entry.value === application.data?.vehicle_type)?.label ?? '—'
             }
-            onOpenDriverMode={() => router.replace('/(driver)/delivery')}
+            onOpenDriverMode={async () => {
+              // Accepted after sign-in: the session learns the mode first.
+              await refresh();
+              router.replace('/(driver)/delivery');
+            }}
           />
         ) : (
           <>

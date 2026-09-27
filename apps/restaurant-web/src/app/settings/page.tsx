@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BUSY_MODES, BUSY_MODE_EXTRA_MINUTES, type BusyMode } from '@jibli/contracts';
-import { LogoUpload, money } from '@jibli/ui-web';
+import { LogoUpload, money, NumberField } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
@@ -316,41 +316,36 @@ function ProfileCard({
       <div className="split">
         <div className="field">
           <label htmlFor="set-min">الحد الأدنى للطلب (دينار)</label>
-          <input
+          <NumberField
             id="set-min"
-            type="number"
             min={0}
-            step={250}
             value={minimumOrder}
             disabled={!canWrite}
-            onChange={(event) => setMinimumOrder(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setMinimumOrder(value)}
           />
         </div>
 
         <div className="field">
           <label htmlFor="set-fee">أجرة التوصيل (دينار)</label>
-          <input
+          <NumberField
             id="set-fee"
-            type="number"
             min={0}
-            step={250}
             value={deliveryFee}
             disabled={!canWrite}
-            onChange={(event) => setDeliveryFee(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setDeliveryFee(value)}
           />
           <span className="field__hint">لا تدخل في أساس احتساب عمولة جيبلي.</span>
         </div>
 
         <div className="field">
           <label htmlFor="set-prep">وقت التحضير الأساسي (دقيقة)</label>
-          <input
+          <NumberField
             id="set-prep"
-            type="number"
             min={5}
             max={240}
             value={prepMinutes}
             disabled={!canWrite}
-            onChange={(event) => setPrepMinutes(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setPrepMinutes(value)}
             aria-invalid={prepInvalid}
           />
           {prepInvalid ? <span className="field__error">بين ٥ و ٢٤٠ دقيقة</span> : null}
@@ -358,14 +353,12 @@ function ProfileCard({
 
         <div className="field">
           <label htmlFor="set-radius">نطاق التوصيل (متر)</label>
-          <input
+          <NumberField
             id="set-radius"
-            type="number"
             min={0}
-            step={500}
             value={radius}
             disabled={!canWrite}
-            onChange={(event) => setRadius(Math.trunc(Number(event.target.value)))}
+            onChange={(value) => setRadius(value)}
             aria-invalid={radiusInvalid}
           />
           <span className="field__hint">صفر يعني بلا حد. غير ذلك بين ٥٠٠ و ٥٠٬٠٠٠ متر.</span>
