@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet"><style>body{margin:0;background:#E9E6E1;font-family:'IBM Plex Sans Arabic',sans-serif}a{color:#E8611A}a:hover{color:#B84A10}*{box-sizing:border-box}</style></helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px">
+<div dir="rtl" style="width:390px;height:844px;border-radius:48px;background:#1C1A18;border:10px solid #1C1A18;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 30px 60px -20px rgba(0,0,0,.35)">
+  <div style="position:absolute;width:280px;height:280px;border-radius:50%;background:#E8611A;opacity:.3;filter:blur(70px);top:-100px;left:-90px"></div>
+  <div style="flex:none;padding:0 22px;position:relative">
+    <div style="height:44px;display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600;color:#fff;direction:ltr"><span>12:37</span><span style="font-size:12px;white-space:nowrap">5G ▮▮▮</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px">
+      <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);padding:7px 14px;border-radius:99px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#7EE0A8;flex:none"></span>
+        <div style="display:flex;flex-direction:column;line-height:1.25"><span style="font-size:10.5px;color:#A9A298">التوصيل إلى</span><span style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap">المنصور، بغداد ▾</span></div>
+      </div>
+      <div style="font-size:30px;font-weight:700;color:#F26B1D;letter-spacing:-.5px">jibli</div>
+    </div>
+    <div style="margin:26px 0 20px">
+      <span style="font-size:14px;color:#A9A298">مساء الخير، علي</span>
+      <h1 style="margin:2px 0 0;font-size:34px;line-height:1.2;font-weight:700;color:#fff">شنو تريد اليوم؟</h1>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:0 14px 14px;position:relative">
+    <sc-for list="{{ sections }}" as="s" hint-placeholder-count="3">
+      <div style="flex:1;min-height:0;border-radius:30px;background:{{ s.color }};padding:20px;display:flex;align-items:stretch;gap:14px;position:relative;overflow:hidden;cursor:pointer;transition:transform .2s" style-active="transform:scale(.98)">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;position:relative">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:13px;color:rgba(255,255,255,.85);font-weight:500">جيبلي</span>
+              <sc-if value="{{ s.isNew }}"><span style="font-size:10.5px;font-weight:700;color:{{ s.color }};background:#fff;padding:2px 8px;border-radius:99px;white-space:nowrap">جديد</span></sc-if>
+            </div>
+            <span style="font-size:30px;font-weight:700;color:#fff;line-height:1.05;white-space:nowrap">{{ s.name }}</span>
+            <span style="font-size:13px;color:#fff;opacity:.92;white-space:nowrap">{{ s.tags }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:40px;height:40px;border-radius:50%;background:#fff;color:{{ s.color }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex:none">←</span>
+            <span style="font-size:12px;color:#fff;font-weight:600;background:rgba(0,0,0,.18);padding:5px 11px;border-radius:99px;white-space:nowrap">⏱ {{ s.eta }}</span>
+          </div>
+        </div>
+        <div style="width:118px;flex:none;border-radius:22px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.18) 0 6px,rgba(255,255,255,.07) 6px 12px);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.9);direction:ltr;position:relative">{{ s.ph }}</div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return { sections: [
+      { num: '1', name: 'طعام', tags: 'مطاعم · وجبات · حلويات', eta: '20 دقيقة', color: '#E8611A', ph: 'food photo' },
+      { num: '2', name: 'ماركت', tags: 'خضار · ألبان · منظفات', eta: '30 دقيقة', color: '#1A8F5A', ph: 'grocery photo' },
+      { num: '3', name: 'كوزمتك', tags: 'مكياج · عطور · عناية', eta: '45 دقيقة', color: '#C93F74', ph: 'beauty photo', isNew: true },
+    ] };
+  }
+}
+</script>
+</body>
+</html>

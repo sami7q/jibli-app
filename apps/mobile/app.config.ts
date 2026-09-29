@@ -392,6 +392,21 @@ const config: ExpoConfig = {
      */
     permissions: ['POST_NOTIFICATIONS', 'ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION'],
     /*
+     * What libraries add that this app never uses, removed from the merged
+     * manifest. Read off the release APK: SYSTEM_ALERT_WINDOW is «display over
+     * other apps», which Play treats as sensitive and asks to justify; the
+     * storage pair and the biometric pair come from modules whose file and
+     * biometric features nothing here calls. A permission the app does not
+     * need is a question in review with no good answer.
+     */
+    blockedPermissions: [
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.USE_BIOMETRIC',
+      'android.permission.USE_FINGERPRINT',
+    ],
+    /*
      * Firebase, which is how a push notification reaches an Android phone at all.
      *
      * iOS needs nothing here — EAS holds the APNs key and Apple routes on the
