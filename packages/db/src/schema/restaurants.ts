@@ -260,6 +260,8 @@ export const restaurantApplications = pgTable(
     latitude: doublePrecision('latitude'),
     longitude: doublePrecision('longitude'),
     cuisineTags: jsonb('cuisine_tags').$type<string[]>().notNull().default([]),
+    /** The kind of shop being applied for (migration 0021); approval copies it. */
+    merchantType: text('merchant_type').$type<MerchantType>().notNull().default('RESTAURANT'),
     documentsJson: jsonb('documents_json').$type<Record<string, unknown>>(),
 
     /**

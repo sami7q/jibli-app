@@ -209,6 +209,12 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
         city_id: uuidSchema,
         q: searchQuerySchema,
         limit: z.coerce.number().int().min(1).max(60).default(30),
+        /*
+         * The section being searched. Optional so a client written before
+         * the sections keeps searching everything; the app sends it, so a
+         * search in cosmetics finds lipstick rather than a shawarma.
+         */
+        merchant_type: z.enum(MERCHANT_TYPES).optional(),
       })
       .parse(request.query);
 
@@ -249,6 +255,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
           eq(restaurantBranches.isActive, true),
           eq(restaurants.onboardingStatus, 'APPROVED'),
           eq(restaurants.operationalStatus, 'ACTIVE'),
+          query.merchant_type ? eq(restaurants.merchantType, query.merchant_type) : undefined,
           eq(cities.isEnabled, true),
           eq(cities.orderingEnabled, true),
           eq(governorates.isEnabled, true),

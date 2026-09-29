@@ -109,7 +109,7 @@ export const RESTAURANT_NAV = [
   { href: '/menu', labelAr: 'المنيو', icon: 'menu', catalogLabel: true },
   { href: '/inventory', labelAr: 'المخزون', icon: 'inventory' },
   { href: '/profits', labelAr: 'الأرباح', icon: 'profits' },
-  { href: '/commissions', labelAr: 'العمولات', icon: 'commissions' },
+  { href: '/commissions', labelAr: 'المستحق لجيبلي', icon: 'commissions' },
   { href: '/settlements', labelAr: 'التسويات', icon: 'settlements' },
   { href: '/drivers', labelAr: 'السائقون', icon: 'drivers' },
   { href: '/staff', labelAr: 'الموظفون', icon: 'staff' },

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { CUISINES } from '@jibli/contracts';
+import { categoriesFor, MERCHANT_TYPES, type MerchantType } from '@jibli/contracts';
 import { normalizeDigits, tryToE164Iraq } from '@jibli/validation';
 import { JibliLogo } from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
@@ -28,6 +28,12 @@ interface CoverageGovernorate {
 
 export default function ApplyPage() {
   const [form, setForm] = useState({
+    /*
+     * What kind of shop, asked first because it changes the words on the rest
+     * of the form and the list of categories. A cosmetics shop that applied
+     * through a restaurant-only form landed in the food tab.
+     */
+    merchant_type: 'RESTAURANT' as MerchantType,
     display_name: '',
     applicant_name: '',
     applicant_phone: '',
@@ -51,6 +57,7 @@ export default function ApplyPage() {
       apiRequest<{ received: boolean; note_ar: string }>('/api/v1/applications', {
         method: 'POST',
         body: {
+          merchant_type: form.merchant_type,
           display_name: form.display_name.trim(),
           applicant_name: form.applicant_name.trim(),
           applicant_phone: form.applicant_phone,
@@ -123,14 +130,44 @@ export default function ApplyPage() {
           </p>
         ) : null}
 
+        <fieldset className="chips">
+          <legend className="chips__legend">نوع المتجر</legend>
+          <div className="chips__list" role="radiogroup" aria-label="نوع المتجر">
+            {MERCHANT_TYPES.map((value) => {
+              const active = form.merchant_type === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={`chip${active ? ' chip--on' : ''}`}
+                  onClick={() =>
+                    // The categories belong to the kind; keeping food tags on a
+                    // cosmetics application would be refused by the server.
+                    setForm((current) =>
+                      current.merchant_type === value
+                        ? current
+                        : { ...current, merchant_type: value, cuisine_tags: [] },
+                    )
+                  }
+                >
+                  <span aria-hidden>{KIND[value].emoji}</span>
+                  {KIND[value].label}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
         <div className="apply__grid">
           <div className="field">
-            <label htmlFor="display_name">اسم المطعم</label>
+            <label htmlFor="display_name">{KIND[form.merchant_type].nameLabel}</label>
             <input
               id="display_name"
               value={form.display_name}
               onChange={(event) => set('display_name', event.target.value)}
-              placeholder="مطعم البيت العراقي"
+              placeholder={KIND[form.merchant_type].namePlaceholder}
               required
             />
           </div>
@@ -207,7 +244,7 @@ export default function ApplyPage() {
         </div>
 
         <div className="field">
-          <label htmlFor="address">عنوان المطعم</label>
+          <label htmlFor="address">عنوان المتجر</label>
           <textarea
             id="address"
             rows={2}
@@ -220,13 +257,13 @@ export default function ApplyPage() {
 
         <fieldset className="chips">
           <legend className="chips__legend">
-            نوع المأكولات
+            {KIND[form.merchant_type].categoriesLabel}
             <span className="chips__count">
               {form.cuisine_tags.length > 0 ? `${form.cuisine_tags.length} من ٤` : 'اختياري'}
             </span>
           </legend>
           <div className="chips__list">
-            {CUISINES.map((cuisine) => {
+            {categoriesFor(form.merchant_type).map((cuisine) => {
               const selected = form.cuisine_tags.includes(cuisine.key);
               return (
                 <button
@@ -281,3 +318,37 @@ export default function ApplyPage() {
     </main>
   );
 }
+
+/** The words and categories the form changes with the kind of shop. */
+const KIND: Record<
+  MerchantType,
+  {
+    readonly label: string;
+    readonly emoji: string;
+    readonly nameLabel: string;
+    readonly namePlaceholder: string;
+    readonly categoriesLabel: string;
+  }
+> = {
+  RESTAURANT: {
+    label: 'مطعم',
+    emoji: '🍽️',
+    nameLabel: 'اسم المطعم',
+    namePlaceholder: 'مطعم البيت العراقي',
+    categoriesLabel: 'نوع المأكولات',
+  },
+  MARKET: {
+    label: 'ماركت',
+    emoji: '🛒',
+    nameLabel: 'اسم الماركت',
+    namePlaceholder: 'ماركت الرشيد',
+    categoriesLabel: 'الأقسام التي تبيعها',
+  },
+  COSMETICS: {
+    label: 'متجر تجميل',
+    emoji: '💄',
+    nameLabel: 'اسم متجر التجميل',
+    namePlaceholder: 'كوزمتك الورد',
+    categoriesLabel: 'الأقسام التي تبيعها',
+  },
+};

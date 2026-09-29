@@ -264,6 +264,9 @@ export interface HistoryOrder {
 export interface OpenCommissions {
   order_count: number;
   commission_total_iqd: number;
+  /** Absent on an API deployed before the service fee was collected. */
+  service_fee_total_iqd?: number;
+  platform_due_iqd?: number;
   commission_base_total_iqd: number;
   gross_sales_iqd: number;
   restaurant_net_iqd: number;
@@ -280,6 +283,7 @@ export interface OpenCommissions {
     commission_flat_iqd: number;
     commission_display: string;
     commission_amount_iqd: number;
+    service_fee_iqd?: number;
     customer_total_iqd: number;
     delivery_fee_iqd: number;
     restaurant_net_iqd: number;

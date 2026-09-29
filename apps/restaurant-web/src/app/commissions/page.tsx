@@ -59,9 +59,9 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
   return (
     <>
       <Card
-        title="العمولات الجارية"
+        title="المستحق لجيبلي"
         icon="commissions"
-        subtitle="طلبات مكتملة لم تُدرج بعد في أي كشف"
+        subtitle="يتراكم مع كل طلب مكتمل، ويصبح صفراً عند استلام الإدارة للمبلغ"
         actions={
           <Link className="btn btn--ghost btn--sm" href="/settlements">
             الكشوف الصادرة
@@ -74,8 +74,18 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
 
         <div className="split" style={{ marginBlockStart: 'var(--space-4)' }}>
           <div className="figure">
-            <span className="figure__label">العمولة المتراكمة</span>
+            <span className="figure__label">المبلغ المتراكم لجيبلي</span>
+            <span className="figure__value">
+              {money(data.platform_due_iqd ?? data.commission_total_iqd)}
+            </span>
+          </div>
+          <div className="figure">
+            <span className="figure__label">منها العمولة</span>
             <span className="figure__value">{money(data.commission_total_iqd)}</span>
+          </div>
+          <div className="figure">
+            <span className="figure__label">منها رسوم الخدمة</span>
+            <span className="figure__value">{money(data.service_fee_total_iqd ?? 0)}</span>
           </div>
           <div className="figure">
             <span className="figure__label">عدد الطلبات</span>
@@ -110,7 +120,7 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
       >
         {data.orders.length === 0 ? (
           <div className="empty">
-            <p style={{ margin: 0, fontWeight: 600 }}>لا توجد عمولات متراكمة</p>
+            <p style={{ margin: 0, fontWeight: 600 }}>لا يوجد مبلغ متراكم لجيبلي</p>
             <p style={{ margin: 0, fontSize: 'var(--text-sm)' }}>
               كل الطلبات المكتملة مُدرجة في كشوف صادرة.
             </p>
@@ -136,6 +146,9 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
                       العمولة
                     </th>
                     <th scope="col" className="numeric">
+                      رسوم الخدمة
+                    </th>
+                    <th scope="col" className="numeric">
                       صافيك
                     </th>
                   </tr>
@@ -156,6 +169,9 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
                       <td className="numeric">{money(order.commission_base_iqd)}</td>
                       <td className="numeric" style={{ color: 'var(--jibli-danger-700)' }}>
                         {money(order.commission_amount_iqd)}
+                      </td>
+                      <td className="numeric" style={{ color: 'var(--jibli-danger-700)' }}>
+                        {money(order.service_fee_iqd ?? 0)}
                       </td>
                       <td className="numeric">
                         <strong>{money(order.restaurant_net_iqd)}</strong>
@@ -193,9 +209,9 @@ function CommissionsScreen({ auth }: { auth: PortalAuth }) {
             color: 'var(--text-muted)',
           }}
         >
-          العمولة قيمة ثابتة عن كل طلب، لا تزيد بزيادة قيمة الطلب. وهي لا تتجاوز أساس العمولة —
-          قيمة الأصناف بعد الخصومات التي يموّلها المطعم، دون أجرة التوصيل. القيمة المطبّقة على
-          كل طلب هي المسجّلة وقته ولا تتغيّر بعد ذلك.
+          العمولة قيمة ثابتة عن كل طلب، لا تزيد بزيادة قيمة الطلب. وهي لا تتجاوز أساس العمولة — قيمة
+          الأصناف بعد الخصومات التي يموّلها المطعم، دون أجرة التوصيل. القيمة المطبّقة على كل طلب هي
+          المسجّلة وقته ولا تتغيّر بعد ذلك.
         </p>
       </Card>
     </>

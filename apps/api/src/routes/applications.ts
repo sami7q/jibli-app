@@ -1,7 +1,14 @@
 import { and, desc, eq, gte, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { AppError, CUISINE_KEYS, ERROR_CODES, success } from '@jibli/contracts';
+import {
+  ALL_CATEGORY_KEYS,
+  AppError,
+  categoriesFor,
+  ERROR_CODES,
+  MERCHANT_TYPES,
+  success,
+} from '@jibli/contracts';
 import { displayNameSchema, iraqiPhoneSchema, toE164Iraq, uuidSchema } from '@jibli/validation';
 import { cities, governorates, restaurantApplications, uuidv7 } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
@@ -22,16 +29,38 @@ import { notifyAdmins } from '../services/admin-notification-service.js';
  * what it will tell an anonymous caller.
  */
 
-const applySchema = z.object({
-  display_name: displayNameSchema(2, 120),
-  applicant_name: displayNameSchema(3, 80),
-  applicant_phone: iraqiPhoneSchema,
-  governorate_id: uuidSchema,
-  city_id: uuidSchema,
-  address_text: z.string().trim().min(5).max(300),
-  cuisine_tags: z.array(z.enum(CUISINE_KEYS as [string, ...string[]])).max(4).default([]),
-  note: z.string().trim().max(500).optional(),
-});
+export const applySchema = z
+  .object({
+    display_name: displayNameSchema(2, 120),
+    applicant_name: displayNameSchema(3, 80),
+    applicant_phone: iraqiPhoneSchema,
+    governorate_id: uuidSchema,
+    city_id: uuidSchema,
+    address_text: z.string().trim().min(5).max(300),
+    /**
+     * Restaurant, market or cosmetics. Defaulted so a form written before
+     * markets existed keeps meaning a restaurant.
+     */
+    merchant_type: z.enum(MERCHANT_TYPES).default('RESTAURANT'),
+    cuisine_tags: z
+      .array(z.enum(ALL_CATEGORY_KEYS as [string, ...string[]]))
+      .max(4)
+      .default([]),
+    note: z.string().trim().max(500).optional(),
+  })
+  .superRefine((body, issue) => {
+    // Each kind of shop is tagged from its own list, as in the Admin create form.
+    const allowed = new Set(categoriesFor(body.merchant_type).map((entry) => entry.key));
+    body.cuisine_tags.forEach((tag, index) => {
+      if (!allowed.has(tag)) {
+        issue.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['cuisine_tags', index],
+          message: `${tag} is not a category for ${body.merchant_type}`,
+        });
+      }
+    });
+  });
 
 /** A second application within this window is the same one, sent again. */
 const DUPLICATE_WINDOW_HOURS = 24;
@@ -79,9 +108,7 @@ export function registerPublicApplicationRoutes(app: FastifyInstance, ctx: AppCo
       byGovernorate.set(row.governorateId, entry);
     }
 
-    return reply.send(
-      success([...byGovernorate.values()], { request_id: request.requestId }),
-    );
+    return reply.send(success([...byGovernorate.values()], { request_id: request.requestId }));
   });
 
   app.post(
@@ -159,12 +186,14 @@ export function registerPublicApplicationRoutes(app: FastifyInstance, ctx: AppCo
           { event: 'application.duplicate_suppressed', applicationId: recent.id },
           'Repeat application within the window; not creating another row',
         );
-        return reply.status(202).send(
-          success(
-            { received: true, note_ar: ACKNOWLEDGEMENT },
-            { request_id: request.requestId },
-          ),
-        );
+        return reply
+          .status(202)
+          .send(
+            success(
+              { received: true, note_ar: ACKNOWLEDGEMENT },
+              { request_id: request.requestId },
+            ),
+          );
       }
 
       const applicationId = uuidv7();
@@ -179,6 +208,7 @@ export function registerPublicApplicationRoutes(app: FastifyInstance, ctx: AppCo
         cityId: body.city_id,
         addressText: body.address_text,
         cuisineTags: body.cuisine_tags,
+        merchantType: body.merchant_type,
         status: 'UNDER_REVIEW',
       });
 
@@ -214,9 +244,11 @@ export function registerPublicApplicationRoutes(app: FastifyInstance, ctx: AppCo
         entityId: applicationId,
       });
 
-      return reply.status(202).send(
-        success({ received: true, note_ar: ACKNOWLEDGEMENT }, { request_id: request.requestId }),
-      );
+      return reply
+        .status(202)
+        .send(
+          success({ received: true, note_ar: ACKNOWLEDGEMENT }, { request_id: request.requestId }),
+        );
     },
   );
 }

@@ -178,9 +178,7 @@ function LoginForm() {
        * placeholder instead of the form on the one screen every session
        * starts at.
        */
-      const destination = safeReturnPath(
-        new URLSearchParams(window.location.search).get('next'),
-      );
+      const destination = safeReturnPath(new URLSearchParams(window.location.search).get('next'));
 
       /*
        * A password someone else issued is a password someone else knows, so
@@ -215,7 +213,6 @@ function LoginForm() {
         router.replace('/settings/mfa?required=1');
         return;
       }
-
 
       // Replace, not push: the login page must not sit in the back stack of an
       // authenticated session.
@@ -296,7 +293,7 @@ function LoginForm() {
                 // Lowercased as typed: the server compares case-insensitively,
                 // and showing the normalised form avoids "but I typed it right".
                 onChange={(event) => setUsername(event.target.value.toLowerCase().trim())}
-                placeholder="sami.admin"
+                placeholder="اسم المستخدم"
                 required
               />
             </div>
@@ -334,7 +331,11 @@ function LoginForm() {
               </div>
 
               {capsLock ? (
-                <span className="field__hint" role="status" style={{ color: 'var(--jibli-warning-700)' }}>
+                <span
+                  className="field__hint"
+                  role="status"
+                  style={{ color: 'var(--jibli-warning-700)' }}
+                >
                   تنبيه: مفتاح Caps Lock مُفعّل
                 </span>
               ) : null}

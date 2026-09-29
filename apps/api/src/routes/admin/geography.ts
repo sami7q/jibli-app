@@ -4,12 +4,20 @@ import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, EVENT_TYPES, success } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
 import { reasonSchema, uuidSchema } from '@jibli/validation';
+import { AUDIT_ACTIONS, enqueueOutboxEvent, writeAudit } from '@jibli/domain';
 import {
-  AUDIT_ACTIONS,
-  enqueueOutboxEvent,
-  writeAudit,
-} from '@jibli/domain';
-import { auditLogs, cities, governorates, providers, restaurantApplications, restaurantBranches, restaurantCommissionConfigs, restaurantMembers, restaurants, users, uuidv7 } from '@jibli/db';
+  auditLogs,
+  cities,
+  governorates,
+  providers,
+  restaurantApplications,
+  restaurantBranches,
+  restaurantCommissionConfigs,
+  restaurantMembers,
+  restaurants,
+  users,
+  uuidv7,
+} from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import { getConfig } from '../../services/config-service.js';
@@ -90,9 +98,7 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
     { preHandler: app.authenticate },
     async (request, reply) => {
       assertAdminPermission(requirePrincipal(request), 'geography.read');
-      const query = z
-        .object({ governorate_id: uuidSchema.optional() })
-        .parse(request.query);
+      const query = z.object({ governorate_id: uuidSchema.optional() }).parse(request.query);
 
       const rows = await listCitiesForAdmin(ctx, query.governorate_id);
 
@@ -382,6 +388,7 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
             applicant_name: row.application.applicantName,
             applicant_note: row.application.applicantNote,
             cuisine_tags: row.application.cuisineTags,
+            merchant_type: row.application.merchantType,
             governorate_name_ar: row.governorateNameAr,
             city_name_ar: row.cityNameAr,
             address_text: row.application.addressText,
@@ -470,7 +477,6 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
         const restaurantId = uuidv7();
         const branchId = uuidv7();
 
-
         await tx.insert(providers).values({
           id: providerId,
           providerType: 'RESTAURANT',
@@ -487,6 +493,8 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
           // and staff activate it (plan §122).
           operationalStatus: 'PENDING',
           cuisineTags: application.cuisineTags,
+          // The tab it appears in is the one it applied for.
+          merchantType: application.merchantType,
           approvedAt: now,
           approvedBy: principal.userId,
         });
@@ -608,12 +616,14 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
         return { restaurantId, branchId };
       });
 
-      return reply.status(201).send(
-        success(
-          { restaurant_id: result.restaurantId, branch_id: result.branchId },
-          { request_id: request.requestId },
-        ),
-      );
+      return reply
+        .status(201)
+        .send(
+          success(
+            { restaurant_id: result.restaurantId, branch_id: result.branchId },
+            { request_id: request.requestId },
+          ),
+        );
     },
   );
 

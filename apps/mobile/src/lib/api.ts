@@ -889,12 +889,7 @@ export interface OwnerEligibleDriver {
 }
 
 export type OwnerRejectReason =
-  | 'ITEM_UNAVAILABLE'
-  | 'TOO_BUSY'
-  | 'CLOSING'
-  | 'ADDRESS_ISSUE'
-  | 'CUSTOMER_UNREACHABLE'
-  | 'OTHER';
+  'ITEM_UNAVAILABLE' | 'TOO_BUSY' | 'CLOSING' | 'ADDRESS_ISSUE' | 'CUSTOMER_UNREACHABLE' | 'OTHER';
 
 export const api = {
   /**
@@ -1132,9 +1127,11 @@ export const api = {
    * «دجاج» wants chicken, not a list of places that might have some. Open
    * kitchens come first.
    */
-  searchDishes: (cityId: string, term: string) =>
+  /** Products in one section — a search in cosmetics never returns a meal. */
+  searchDishes: (cityId: string, term: string, merchantType?: MerchantType) =>
     apiRequest<DishResult[]>(
-      `/api/v1/menu/search?city_id=${cityId}&q=${encodeURIComponent(term)}`,
+      `/api/v1/menu/search?city_id=${cityId}&q=${encodeURIComponent(term)}` +
+        (merchantType ? `&merchant_type=${merchantType}` : ''),
       { authenticated: false },
     ),
 

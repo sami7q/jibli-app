@@ -1,18 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { MERCHANT_TYPE_LABELS, type MerchantType } from '@jibli/contracts';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { relativeAr } from '@jibli/ui-web';
 import { AdminShell } from '@/components/shell';
-import {
-  Badge,
-  Card,
-  ConfirmDialog,
-  DataTable,
-  ErrorState,
-  Skeleton,
-} from '@/components/ui';
+import { Badge, Card, ConfirmDialog, DataTable, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { adminApi, ApiError, type RestaurantApplication } from '@/lib/api';
 import { admin } from '@/lib/admin-endpoints';
@@ -104,8 +98,17 @@ export default function ApplicationsPage() {
             columns={[
               {
                 key: 'name',
-                header: 'المطعم',
-                render: (row) => <strong>{row.display_name}</strong>,
+                header: 'المتجر',
+                render: (row) => (
+                  <span
+                    style={{ display: 'inline-flex', gap: 'var(--space-2)', alignItems: 'center' }}
+                  >
+                    <strong>{row.display_name}</strong>
+                    <Badge tone={KIND_TONE[row.merchant_type ?? 'RESTAURANT']}>
+                      {MERCHANT_TYPE_LABELS[row.merchant_type ?? 'RESTAURANT'].nameAr}
+                    </Badge>
+                  </span>
+                ),
               },
               {
                 key: 'location',
@@ -233,7 +236,12 @@ function ApproveDialog({
   const canSubmit = !needsOverride || (overrideCoverage && reason.trim().length >= 5);
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="approve-title">
+    <div
+      className="dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="approve-title"
+    >
       <div className="dialog">
         <h2 id="approve-title">اعتماد {application.display_name}</h2>
 
@@ -248,8 +256,8 @@ function ApproveDialog({
               <Icon name="alert" className="nav__icon" aria-hidden /> المدينة غير مفعّلة للانضمام
             </strong>
             <p style={{ margin: 0 }}>
-              أُغلقت المدينة بعد تقديم الطلب. يمكنك الاعتماد رغم ذلك، لكن المطعم لن يستقبل طلبات
-              حتى تُفعَّل الطلبات في المدينة — الاعتماد والتفعيل طبقتان مستقلتان.
+              أُغلقت المدينة بعد تقديم الطلب. يمكنك الاعتماد رغم ذلك، لكن المطعم لن يستقبل طلبات حتى
+              تُفعَّل الطلبات في المدينة — الاعتماد والتفعيل طبقتان مستقلتان.
             </p>
             <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
               <input
@@ -299,7 +307,9 @@ function ApproveDialog({
             disabled={!canSubmit || approve.isPending}
             onClick={() => approve.mutate()}
           >
-            {approve.isPending ? 'جاري الاعتماد…' : 'اعتماد المطعم'}
+            {approve.isPending
+              ? 'جاري الاعتماد…'
+              : `اعتماد ${MERCHANT_TYPE_LABELS[application.merchant_type ?? 'RESTAURANT'].nameAr}`}
           </button>
           <button type="button" className="btn btn--outline" onClick={onCancel}>
             إلغاء
@@ -313,3 +323,10 @@ function ApproveDialog({
     </div>
   );
 }
+
+/** The same badge colours the merchant directory uses. */
+const KIND_TONE: Record<MerchantType, 'neutral' | 'success' | 'rose'> = {
+  RESTAURANT: 'neutral',
+  MARKET: 'success',
+  COSMETICS: 'rose',
+};

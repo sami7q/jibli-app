@@ -191,6 +191,7 @@ export function registerRestaurantHistoryRoutes(app: FastifyInstance, ctx: AppCo
         .select({
           orderCount: sql<number>`COUNT(*)`,
           commissionTotal: sql<number>`COALESCE(SUM(${orders.commissionAmountIqd}), 0)`,
+          serviceFeeTotal: sql<number>`COALESCE(SUM(${orders.platformServiceFeeIqd}), 0)`,
           baseTotal: sql<number>`COALESCE(SUM(${orders.commissionBaseIqd}), 0)`,
           salesTotal: sql<number>`COALESCE(SUM(${orders.customerTotalIqd}), 0)`,
           netTotal: sql<number>`COALESCE(SUM(${orders.restaurantNetSnapshotIqd}), 0)`,
@@ -208,6 +209,7 @@ export function registerRestaurantHistoryRoutes(app: FastifyInstance, ctx: AppCo
           commissionBaseIqd: orders.commissionBaseIqd,
           commissionFlatIqd: orders.commissionFlatIqdSnapshot,
           commissionAmountIqd: orders.commissionAmountIqd,
+          serviceFeeIqd: orders.platformServiceFeeIqd,
           customerTotalIqd: orders.customerTotalIqd,
           deliveryFeeIqd: orders.deliveryFeeIqd,
           restaurantNetIqd: orders.restaurantNetSnapshotIqd,
@@ -231,6 +233,14 @@ export function registerRestaurantHistoryRoutes(app: FastifyInstance, ctx: AppCo
           {
             order_count: Number(totals?.orderCount ?? 0),
             commission_total_iqd: Number(totals?.commissionTotal ?? 0),
+            /*
+             * The service fee the customer paid in cash to this shop's courier
+             * belongs to Jibli, and is collected with the commission.
+             */
+            service_fee_total_iqd: Number(totals?.serviceFeeTotal ?? 0),
+            /** What Jibli will collect from this shop: commission + service fee. */
+            platform_due_iqd:
+              Number(totals?.commissionTotal ?? 0) + Number(totals?.serviceFeeTotal ?? 0),
             commission_base_total_iqd: Number(totals?.baseTotal ?? 0),
             gross_sales_iqd: Number(totals?.salesTotal ?? 0),
             restaurant_net_iqd: Number(totals?.netTotal ?? 0),
@@ -251,12 +261,13 @@ export function registerRestaurantHistoryRoutes(app: FastifyInstance, ctx: AppCo
               commission_flat_iqd: row.commissionFlatIqd,
               commission_display: commissionFeeDisplay(row.commissionFlatIqd),
               commission_amount_iqd: row.commissionAmountIqd,
+              service_fee_iqd: row.serviceFeeIqd,
               customer_total_iqd: row.customerTotalIqd,
               delivery_fee_iqd: row.deliveryFeeIqd,
               restaurant_net_iqd: row.restaurantNetIqd,
             })),
             note_ar:
-              'هذا مبلغ تقديري لما سيظهر في الكشف القادم، ويشمل الطلبات المكتملة التي لم تُدرج بعد في أي كشف. المبلغ النهائي هو ما يصدر في الكشف.',
+              'هذا ما تجمّع لجيبلي من طلباتك المكتملة: العمولة ورسوم الخدمة التي دفعها العملاء لمندوبك. عند استلام الإدارة للمبلغ يصبح صفراً ويظهر التحصيل في «الكشوف» بالتاريخ والوقت.',
           },
           { request_id: request.requestId },
         ),

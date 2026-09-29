@@ -128,8 +128,8 @@ export default function HomeScreen() {
   }, []);
 
   const dishes = useQuery({
-    queryKey: ['dish-search', area?.cityId, debounced],
-    queryFn: () => api.searchDishes(area?.cityId as string, debounced),
+    queryKey: ['dish-search', area?.cityId, debounced, vertical],
+    queryFn: () => api.searchDishes(area?.cityId as string, debounced, vertical),
     enabled: Boolean(area?.cityId) && debounced.length >= 2,
   });
 
@@ -143,6 +143,18 @@ export default function HomeScreen() {
   );
 
   const searching = term.length >= 2;
+
+  /*
+   * Shops in this section whose name matches what is typed — suggestions from
+   * the list the screen already holds, so they appear as fast as the letters.
+   */
+  const matchingShops = useMemo(() => {
+    if (!searching) return [];
+    const needle = normalizeForMatch(term);
+    return (restaurants.data ?? []).filter((shop) =>
+      normalizeForMatch(shop.display_name).includes(needle),
+    );
+  }, [restaurants.data, searching, term]);
 
   const categories = storefront.data?.categories ?? [];
 
@@ -286,20 +298,46 @@ export default function HomeScreen() {
               message={dishes.error instanceof ApiError ? dishes.error.messageAr : 'تعذّر البحث'}
               onRetry={() => void dishes.refetch()}
             />
-          ) : (dishes.data ?? []).length === 0 ? (
+          ) : (dishes.data ?? []).length === 0 && matchingShops.length === 0 ? (
             <EmptyState
               title="لا نتائج"
-              body={`لم نجد وجبة أو مطعماً باسم «${term}» في ${area?.cityNameAr ?? 'منطقتك'}.`}
+              body={`لم نجد منتجاً أو متجراً باسم «${term}» في ${section.shopsNounDefinite} في ${area?.cityNameAr ?? 'منطقتك'}.`}
               action={{ label: 'مسح البحث', onPress: () => setSearch('') }}
             />
           ) : (
-            (dishes.data ?? []).map((dish) => (
-              <DishRow
-                key={dish.id}
-                dish={dish}
-                onOpen={() => router.push(`/restaurant/${dish.restaurant.id}`)}
-              />
-            ))
+            <>
+              {/*
+                Shops first: a search that names a shop is looking for the
+                shop, and in this section only — the same list the home screen
+                shows, narrowed by the words typed.
+              */}
+              {matchingShops.length > 0 ? (
+                <View style={{ gap: space[3] }}>
+                  <Text variant="smallBold" tone="secondary">
+                    {section.shopsNounDefinite}
+                  </Text>
+                  {matchingShops.slice(0, 5).map((shop) => (
+                    <RestaurantSummaryCard
+                      key={shop.id}
+                      restaurant={shop}
+                      onPress={() => router.push(`/restaurant/${shop.id}`)}
+                    />
+                  ))}
+                </View>
+              ) : null}
+              {(dishes.data ?? []).length > 0 ? (
+                <Text variant="smallBold" tone="secondary">
+                  المنتجات
+                </Text>
+              ) : null}
+              {(dishes.data ?? []).map((dish) => (
+                <DishRow
+                  key={dish.id}
+                  dish={dish}
+                  onOpen={() => router.push(`/restaurant/${dish.restaurant.id}`)}
+                />
+              ))}
+            </>
           )
         ) : isResolving ? (
           <Skeleton height={248} style={{ borderRadius: radius.xl }} />
@@ -1121,4 +1159,9 @@ function RestaurantSummaryCard({
       onPress={onPress}
     />
   );
+}
+
+/** Fold the alef and taa-marbuta variants so «العراقى» finds «العراقي». */
+function normalizeForMatch(value: string): string {
+  return value.trim().toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
 }

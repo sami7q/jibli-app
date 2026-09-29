@@ -52,9 +52,8 @@ export default function OtpScreen() {
    *
    * `login` when absent, so every existing link into this screen is unchanged.
    */
-  const { phone, devCode, mode } = useLocalSearchParams<{
+  const { phone, mode } = useLocalSearchParams<{
     phone: string;
-    devCode?: string;
     mode?: 'register' | 'reset';
   }>();
 
@@ -80,15 +79,6 @@ export default function OtpScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [resendIn, setResendIn] = useState(45);
-  /**
-   * The code, when the server sent it.
-   *
-   * Only a server running with APP_ENV=local does that; staging and production
-   * never put an OTP in a response or a log. So this block cannot appear to a
-   * real customer — it exists because without it, signing into a locally-run
-   * API means reading the server console on every attempt.
-   */
-  const [devHint, setDevHint] = useState<string | null>(devCode ?? null);
 
   const input = useRef<TextInput | null>(null);
   const caret = useBlink(focused && code.length < OTP_LENGTH);
@@ -137,10 +127,10 @@ export default function OtpScreen() {
        * restarted mid-flow and there is nothing to complete: the customer is
        * sent back to start rather than shown a code box that cannot succeed.
        */
-      const held = flow === 'login' ? null : readPendingCredentials(
-        flow === 'register' ? 'REGISTER' : 'RESET',
-        phone,
-      );
+      const held =
+        flow === 'login'
+          ? null
+          : readPendingCredentials(flow === 'register' ? 'REGISTER' : 'RESET', phone);
 
       if (flow !== 'login' && !held) {
         setError('انتهت الجلسة. ابدأ من جديد.');
@@ -214,10 +204,10 @@ export default function OtpScreen() {
        * perfectly valid *sign-in* code that the register step then refuses —
        * a dead end whose only symptom is "the code you just received is wrong".
        */
-      const held = flow === 'login' ? null : readPendingCredentials(
-        flow === 'register' ? 'REGISTER' : 'RESET',
-        phone,
-      );
+      const held =
+        flow === 'login'
+          ? null
+          : readPendingCredentials(flow === 'register' ? 'REGISTER' : 'RESET', phone);
 
       const result =
         flow === 'register' && held
@@ -227,11 +217,10 @@ export default function OtpScreen() {
                 .forgotPassword(phone)
                 // That endpoint answers the same way for every number and so
                 // reports no cooldown; the local one is what the button uses.
-                .then(() => ({ resend_after_seconds: 45, dev_code: undefined }))
+                .then(() => ({ resend_after_seconds: 45 }))
             : await api.requestOtp(phone);
 
       setResendIn(result.resend_after_seconds);
-      setDevHint(result.dev_code ?? null);
       setError(null);
     } catch (caught) {
       if (caught instanceof ApiError) {
@@ -367,32 +356,6 @@ export default function OtpScreen() {
             <Text style={styles.resendText}>لم يصلك الرمز؟ أعد الإرسال</Text>
           </Pressable>
         )}
-
-        {/*
-         * One tap, signed in.
-         *
-         * Only appears when the *server* sent the code, which it does solely
-         * for the mock provider or a local run — so this cannot appear to a
-         * customer. It fills the boxes and submits in the same gesture,
-         * because "fill it and then press confirm" is two taps to prove
-         * nothing.
-         */}
-        {devHint ? (
-          <Pressable
-            onPress={() => {
-              const filled = devHint.slice(0, OTP_LENGTH);
-              setCode(filled);
-              void submit(filled);
-            }}
-            disabled={isSubmitting}
-            accessibilityRole="button"
-            accessibilityLabel={`تسجيل الدخول برمز التطوير ${devHint}`}
-            style={({ pressed }) => [styles.devHint, pressed ? { opacity: 0.8 } : null]}
-          >
-            <Text style={styles.devHintTitle}>دخول سريع — وضع التطوير</Text>
-            <Text style={styles.devHintText}>اضغط هنا لتسجيل الدخول بالرمز {devHint}</Text>
-          </Pressable>
-        ) : null}
       </View>
 
       {/*
@@ -620,22 +583,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[4],
   },
   resendText: { ...text.bodyBold, color: BRAND[600], textAlign: 'center' },
-
-  devHint: {
-    backgroundColor: color.warningSoft,
-    borderWidth: 1,
-    borderColor: palette.warning[500],
-    borderRadius: radius.lg,
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-    minHeight: TAP_TARGET + 8,
-    justifyContent: 'center',
-    alignSelf: 'stretch',
-    marginTop: space[2],
-    gap: 2,
-  },
-  devHintTitle: { ...text.bodyBold, color: palette.warning[700], textAlign: 'center' },
-  devHintText: { ...text.small, color: palette.warning[700], textAlign: 'center' },
 
   actionBar: {
     backgroundColor: color.surfaceCard,

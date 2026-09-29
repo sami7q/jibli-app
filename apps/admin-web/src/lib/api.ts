@@ -141,6 +141,8 @@ export interface RestaurantApplication {
   governorate_name_ar: string;
   city_name_ar: string;
   address_text: string;
+  /** What it applied as. Absent on an API deployed before migration 0021. */
+  merchant_type?: 'RESTAURANT' | 'MARKET' | 'COSMETICS';
   status: string;
   created_at: string;
   coverage_warning: boolean;
@@ -164,7 +166,9 @@ export interface AuditEntry {
   request_id: string | null;
 }
 
-export type CapabilityPatch = Partial<Record<`${GeographyCapability}_enabled` | 'is_enabled', boolean>> & {
+export type CapabilityPatch = Partial<
+  Record<`${GeographyCapability}_enabled` | 'is_enabled', boolean>
+> & {
   reason?: string;
 };
 
@@ -184,7 +188,11 @@ export const adminApi = {
   /** Posts a data URL and returns the stored asset. Shared shape with the restaurant portal. */
   uploadImage: (
     token: string,
-    body: { data: string; purpose?: 'RESTAURANT_LOGO' | 'RESTAURANT_COVER'; restaurant_id?: string },
+    body: {
+      data: string;
+      purpose?: 'RESTAURANT_LOGO' | 'RESTAURANT_COVER';
+      restaurant_id?: string;
+    },
   ) =>
     apiRequest<{ asset_id: string; url: string; content_type: string; byte_size: number }>(
       '/api/v1/uploads',
