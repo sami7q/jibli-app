@@ -4,24 +4,33 @@ import { generatePortalPassword, hashPassword } from '@jibli/auth';
 import { createDatabase } from '../client.js';
 import { shouldUseSsl } from '../ssl.js';
 import { cities } from '../schema/index.js';
-import { DEMO_COSMETICS, upsertDemoShop, type ShopSeedCounts } from '../seed/demo-marketplace.js';
+import {
+  DEMO_COSMETICS,
+  DEMO_MARKETS,
+  upsertDemoShop,
+  type ShopSeedCounts,
+} from '../seed/demo-marketplace.js';
 
 /**
- * Add the sample cosmetics shops to one database, and nothing else.
+ * Add the sample cosmetics shops, and the Haditha market, to one database.
  *
  * The full demo seed refuses production, rightly — it would put twelve fake
  * restaurants in front of real customers. This adds only the cosmetics shops
- * (two in Baghdad, one in Haditha) so the new section has something in it,
+ * (two in Baghdad, one in Haditha) and a market in Haditha, so the non-food
+ * sections have something in them,
  * through the same `upsertDemoShop` the seed uses. They keep the `DEMO-`
  * partner code, so `pnpm db:remove-demo` takes them out again.
  *
  * Each owner gets a fresh random portal password, printed once at the end.
  * Running it again refreshes the shops and issues new passwords.
  *
- *     DATABASE_URL=<target> pnpm --filter @jibli/db add-cosmetics -- --confirm
+ *     DATABASE_URL=<target> pnpm --filter @jibli/db add-shops -- --confirm
  */
 
 const DEFAULT_CITY = 'IQ-BG-BAGHDAD';
+
+/** Every cosmetics shop, plus the markets pinned outside the seed's own city. */
+const SHOPS = [...DEMO_COSMETICS, ...DEMO_MARKETS.filter((shop) => shop.cityCode)];
 
 function describeTarget(connectionString: string): string {
   try {
@@ -43,7 +52,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`Target: ${describeTarget(connectionString)}`);
-  console.log(`Shops:  ${DEMO_COSMETICS.map((shop) => shop.name).join('، ')}\n`);
+  console.log(`Shops:  ${SHOPS.map((shop) => shop.name).join('، ')}\n`);
 
   if (!process.argv.includes('--confirm')) {
     console.log('Dry run. Re-run with --confirm to write.');
@@ -70,7 +79,7 @@ async function main(): Promise<void> {
   const issued: { shop: string; city: string; username: string; password: string }[] = [];
 
   try {
-    for (const shop of DEMO_COSMETICS) {
+    for (const shop of SHOPS) {
       const code = shop.cityCode ?? DEFAULT_CITY;
       const [city] = await db
         .select({

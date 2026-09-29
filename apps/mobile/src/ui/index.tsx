@@ -109,7 +109,15 @@ export function Text({
       style={[
         text[variant],
         { color: tones[tone] },
-        align ? { textAlign: align === 'start' ? TEXT_START : ('center' as const) } : null,
+        /*
+         * Right unless told otherwise. `auto` resolves on iOS from the layout
+         * direction rather than the words, so wherever the RTL flag has not
+         * taken (Expo Go until a reload, a fresh install's first launch) every
+         * Arabic line with no alignment slid to the left edge — «التوصيل إلى»
+         * in the home header sat beside the bell while the city under it sat
+         * on the right. An explicit `align` or style `textAlign` still wins.
+         */
+        { textAlign: align === 'center' ? ('center' as const) : TEXT_START },
         style,
       ]}
       /*
@@ -682,13 +690,7 @@ export function EmptyState({
  * Arabic with a reason, and replacing it with "something went wrong" throws
  * away the only part that helps (plan §112).
  */
-export function ErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry?: () => void;
-}) {
+export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <View style={{ alignItems: 'center', gap: space[3], paddingVertical: space[8] }}>
       <View

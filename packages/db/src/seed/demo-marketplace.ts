@@ -172,7 +172,7 @@ function always(): Record<number, readonly [string, string]> {
  * ordering, delivery, commission and portal behind it are the restaurants'
  * unchanged — which is the point of the whole discriminator.
  */
-const DEMO_MARKETS: readonly DemoRestaurant[] = [
+export const DEMO_MARKETS: readonly DemoRestaurant[] = [
   {
     partnerCode: 'DEMO-2001',
     merchantType: 'MARKET',
@@ -531,6 +531,64 @@ const DEMO_MARKETS: readonly DemoRestaurant[] = [
           { name: 'عسل طبيعي ٥٠٠ غم', priceIqd: 15_000 },
           { name: 'مربى تين ٤٠٠ غم', priceIqd: 4000 },
           { name: 'دبس تمر ٧٠٠ غم', priceIqd: 5000 },
+        ],
+      },
+    ],
+  },
+  /*
+   * A market in Haditha, beside the cosmetics shop there, so a customer in
+   * Anbar sees both non-food sections stocked rather than one.
+   */
+  {
+    partnerCode: 'DEMO-2007',
+    merchantType: 'MARKET',
+    cityCode: 'IQ-AN-HADITHA',
+    name: 'ماركت الفرات',
+    description: 'مواد غذائية وخضار ومنظفات، توصيل داخل حديثة.',
+    cuisines: ['grocery', 'mk_produce', 'mk_dairy', 'mk_household'],
+    minimumOrderIqd: 5000,
+    deliveryFeeIqd: 1000,
+    prepMinutes: 10,
+    rating: 4.5,
+    ratingCount: 64,
+    address: 'الشارع العام، مركز حديثة',
+    district: 'مركز حديثة',
+    phone: '+9647701110016',
+    ownerUsername: 'demo.haditha.market',
+    ownerName: 'عمر الفراتي',
+    hours: daily('08:00', '24:00'),
+    menu: [
+      {
+        name: 'ألبان وأجبان',
+        items: [
+          { name: 'حليب طازج ١ لتر', priceIqd: 2000 },
+          { name: 'لبن رائب ٥٠٠ غم', priceIqd: 1500 },
+          { name: 'جبن أبيض ٤٠٠ غم', priceIqd: 4500 },
+          { name: 'بيض ٣٠ حبة', priceIqd: 7000 },
+        ],
+      },
+      {
+        name: 'خضار وفواكه',
+        items: [
+          { name: 'طماطم ١ كغم', priceIqd: 1500 },
+          { name: 'بطاطا ٢ كغم', priceIqd: 2500 },
+          { name: 'خيار ١ كغم', priceIqd: 1250 },
+          { name: 'برتقال ١ كغم', priceIqd: 3000 },
+        ],
+      },
+      {
+        name: 'مواد غذائية',
+        items: [
+          { name: 'رز ٥ كغم', priceIqd: 11_000 },
+          { name: 'سكر ٢ كغم', priceIqd: 2500 },
+          { name: 'زيت ١.٨ لتر', priceIqd: 6500 },
+        ],
+      },
+      {
+        name: 'منظفات',
+        items: [
+          { name: 'مسحوق غسيل ٣ كغم', priceIqd: 8000 },
+          { name: 'صابون أطباق ٧٥٠ مل', priceIqd: 2500 },
         ],
       },
     ],
