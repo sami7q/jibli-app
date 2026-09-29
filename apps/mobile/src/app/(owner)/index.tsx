@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError } from '@/lib/api';
 import { catalogNoun, useOwner } from '@/lib/owner';
+import { sectionOf } from '@/lib/sections';
 import { useSession } from '@/lib/session';
 import { color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
@@ -113,7 +114,7 @@ export default function OwnerHomeScreen() {
           title={onlyRestaurants ? 'إدارة المطاعم على المتصفّح' : 'لا يوجد متجر على هذا الحساب'}
           body={
             onlyRestaurants
-              ? 'قوائم المطاعم فيها خيارات وإضافات وأسعار لكل خيار، وتحريرها أدقّ على لوحة التحكم. إدارة المنتجات من التطبيق متاحة لمتاجر الماركت.'
+              ? 'قوائم المطاعم فيها خيارات وإضافات وأسعار لكل خيار، وتحريرها أدقّ على لوحة التحكم. إدارة المنتجات من التطبيق متاحة لمتاجر الماركت والتجميل.'
               : 'هذا الحساب لا يملك متجراً. تواصل مع دعم جيبلي إن كان يفترض أن يملك واحداً.'
           }
         />
@@ -143,14 +144,14 @@ export default function OwnerHomeScreen() {
           <Row justify="space-between" align="flex-start">
             <View style={{ flex: 1, gap: 2 }}>
               <Text variant="caption" tone="inverse" style={{ opacity: 0.85 }}>
-                {shop.merchant_type === 'MARKET' ? 'جيبلي ماركت' : 'جيبلي أكل'}
+                {sectionOf(shop.merchant_type).label}
               </Text>
               <Text variant="h3" tone="inverse" numberOfLines={2}>
                 {shop.display_name}
               </Text>
             </View>
             <MaterialCommunityIcons
-              name={shop.merchant_type === 'MARKET' ? 'storefront' : 'silverware-fork-knife'}
+              name={sectionOf(shop.merchant_type).shopIcon}
               size={30}
               color="rgba(255,255,255,0.9)"
             />

@@ -13,13 +13,13 @@ export interface AdminRestaurant {
   id: string;
   display_name: string;
   /**
-   * RESTAURANT or MARKET.
+   * RESTAURANT, MARKET or COSMETICS.
    *
    * Optional so the page still renders against an API deployed before the
    * column existed; the directory falls back to RESTAURANT rather than showing
    * an empty badge on every row.
    */
-  merchant_type?: 'RESTAURANT' | 'MARKET';
+  merchant_type?: MerchantType;
   /** Keys from CUISINES. Free text on rows created before the vocabulary existed. */
   cuisine_tags: string[];
   partner_code: string;

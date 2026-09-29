@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { CUISINES, CUISINE_KEYS, cuisineByKey, cuisineLabelAr, isKnownCuisine } from './cuisines.js';
+import {
+  ALL_CATEGORY_KEYS,
+  CATEGORY_VOCABULARY,
+  COSMETICS_AISLES,
+  CUISINES,
+  CUISINE_KEYS,
+  categoriesFor,
+  cuisineByKey,
+  cuisineLabelAr,
+  isKnownCuisine,
+} from './cuisines.js';
+import { MERCHANT_TYPES } from './enums.js';
 
 /**
  * The keys in this list are written into `restaurants.cuisine_tags` and will be
@@ -67,5 +78,34 @@ describe('cuisineLabelAr()', () => {
 describe('cuisineByKey()', () => {
   it('returns undefined for a key that is not in the list', () => {
     expect(cuisineByKey('sushi_and_tacos')).toBeUndefined();
+  });
+});
+
+describe('the vocabulary per section', () => {
+  it('has a list for every merchant type', () => {
+    for (const type of MERCHANT_TYPES) {
+      expect(categoriesFor(type).length, type).toBeGreaterThan(0);
+    }
+  });
+
+  it('never shares a key between two sections', () => {
+    // A key in two lists would put one shop in two storefronts' filters.
+    expect(new Set(ALL_CATEGORY_KEYS).size).toBe(ALL_CATEGORY_KEYS.length);
+  });
+
+  it('prefixes aisle keys by section, so a stored tag says where it belongs', () => {
+    for (const entry of CATEGORY_VOCABULARY.MARKET) expect(entry.key).toMatch(/^mk_[a-z_]+$/);
+    for (const entry of CATEGORY_VOCABULARY.COSMETICS) expect(entry.key).toMatch(/^cs_[a-z_]+$/);
+  });
+
+  it('keeps the food list what the restaurant application form validates against', () => {
+    expect(categoriesFor('RESTAURANT')).toBe(CUISINES);
+    expect(CUISINE_KEYS.some((key) => key.startsWith('cs_'))).toBe(false);
+  });
+
+  it('labels a cosmetics tag in Arabic on a merchant card', () => {
+    expect(cuisineLabelAr('cs_makeup')).toBe('مكياج');
+    expect(cuisineByKey('cs_perfume')?.emoji).toBe('🌸');
+    expect(COSMETICS_AISLES.length).toBeGreaterThanOrEqual(5);
   });
 });

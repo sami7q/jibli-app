@@ -105,13 +105,15 @@ export default function CategoriesPage() {
       subtitle={
         storefront === 'MARKET'
           ? 'أقسام الماركت التي يتصفّح بها العميل، بترتيب ظهورها في التطبيق'
-          : 'الأصناف التي يتصفّح بها العميل، بترتيب ظهورها في التطبيق'
+          : storefront === 'COSMETICS'
+            ? 'أقسام التجميل التي يتصفّح بها العميل، بترتيب ظهورها في التطبيق'
+            : 'الأصناف التي يتصفّح بها العميل، بترتيب ظهورها في التطبيق'
       }
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
         <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
-          {storefront === 'MARKET' ? 'قسم جديد' : 'تصنيف جديد'}
+          {storefront === 'RESTAURANT' ? 'تصنيف جديد' : 'قسم جديد'}
         </button>
       }
     >

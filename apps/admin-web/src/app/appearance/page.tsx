@@ -118,7 +118,9 @@ export default function AppearancePage() {
       subtitle={
         storefront === 'MARKET'
           ? 'بنرات واجهة الماركتات وترتيب أقسامها كما يراها العميل'
-          : 'بنرات واجهة المطاعم وترتيب تصنيفاتها كما يراها العميل'
+          : storefront === 'COSMETICS'
+            ? 'بنرات واجهة التجميل وترتيب أقسامها كما يراها العميل'
+            : 'بنرات واجهة المطاعم وترتيب تصنيفاتها كما يراها العميل'
       }
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}

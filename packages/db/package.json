@@ -18,6 +18,7 @@
     "migrate": "tsx src/migrate.ts",
     "migrate:status": "tsx src/scripts/migration-status.ts",
     "remove-demo": "tsx src/scripts/remove-demo-data.ts",
+    "add-cosmetics": "tsx src/scripts/add-cosmetics-shops.ts",
     "verify": "tsx src/schema-drift.ts",
     "seed": "tsx src/seed/run.ts",
     "reset": "tsx src/scripts/reset.ts",

@@ -10,7 +10,10 @@ import type { OwnerShop } from './api';
  */
 
 /** What Owner Mode is built for, by `restaurants.merchant_type`. */
-export const SUPPORTED_MERCHANT_TYPES: readonly OwnerShop['merchant_type'][] = ['MARKET'];
+export const SUPPORTED_MERCHANT_TYPES: readonly OwnerShop['merchant_type'][] = [
+  'MARKET',
+  'COSMETICS',
+];
 
 /**
  * Whether Owner Mode has anything to offer this shop.

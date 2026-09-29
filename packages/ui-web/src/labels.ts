@@ -141,10 +141,11 @@ export const ADMIN_NAV = [
    * switch, which is why the group can no longer be named after one of them.
    */
   {
-    group: 'المطاعم والماركتات',
+    group: 'المتاجر والأقسام',
     items: [
       { href: '/restaurants', labelAr: 'المطاعم', icon: 'restaurants' },
       { href: '/markets', labelAr: 'الماركتات', icon: 'markets' },
+      { href: '/cosmetics', labelAr: 'متاجر التجميل', icon: 'cosmetics' },
       { href: '/applications', labelAr: 'طلبات الانضمام', icon: 'applications' },
       { href: '/categories', labelAr: 'التصنيفات', icon: 'categories' },
       { href: '/appearance', labelAr: 'شكل التطبيق', icon: 'live' },

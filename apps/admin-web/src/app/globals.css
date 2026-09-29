@@ -553,6 +553,10 @@ html {
   background: var(--jibli-success-50);
   color: var(--jibli-success-700);
 }
+.badge--rose {
+  background: var(--jibli-rose-50);
+  color: var(--jibli-rose-700);
+}
 .badge--neutral {
   background: var(--jibli-ink-100);
   color: var(--text-secondary);

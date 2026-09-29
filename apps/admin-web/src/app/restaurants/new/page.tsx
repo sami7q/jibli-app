@@ -9,7 +9,7 @@ import {
   MERCHANT_TYPES,
   MERCHANT_TYPE_LABELS,
   type MerchantType,
-  CUISINES,
+  categoriesFor,
 } from '@jibli/contracts';
 import { normalizeDigits, tryToE164Iraq } from '@jibli/validation';
 import { AdminShell } from '@/components/shell';
@@ -84,8 +84,9 @@ export default function NewRestaurantPage() {
    */
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get('type');
-    if (requested === 'MARKET' || requested === 'RESTAURANT') {
-      setForm((current) => ({ ...current, merchant_type: requested }));
+    const known = MERCHANT_TYPES.find((value) => value === requested);
+    if (known) {
+      setForm((current) => ({ ...current, merchant_type: known }));
     }
   }, []);
 
@@ -314,7 +315,15 @@ export default function NewRestaurantPage() {
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        onClick={() => set('merchant_type', value)}
+                        onClick={() =>
+                          // The tags belong to the kind: a food cuisine kept
+                          // on a cosmetics shop would be refused by the API.
+                          setForm((current) =>
+                            current.merchant_type === value
+                              ? current
+                              : { ...current, merchant_type: value, cuisine_tags: [] },
+                          )
+                        }
                         className={`btn btn--sm ${active ? 'btn--primary' : 'btn--ghost'}`}
                         style={{ flex: 1 }}
                       >
@@ -324,23 +333,19 @@ export default function NewRestaurantPage() {
                   })}
                 </div>
                 <span className="field__hint">
-                  {form.merchant_type === 'MARKET'
-                    ? 'يظهر في تبويب «جيبلي ماركت» داخل التطبيق.'
-                    : 'يظهر في تبويب «جيبلي أكل» داخل التطبيق.'}
+                  {`يظهر في قسم «${KIND_COPY[form.merchant_type].section}» داخل التطبيق.`}
                 </span>
               </div>
 
               <div className="field">
                 <label htmlFor="display_name">
-                  {form.merchant_type === 'MARKET' ? 'اسم الماركت' : 'اسم المطعم'}
+                  {KIND_COPY[form.merchant_type].nameLabel}
                 </label>
                 <input
                   id="display_name"
                   value={form.display_name}
                   onChange={(event) => set('display_name', event.target.value)}
-                  placeholder={
-                    form.merchant_type === 'MARKET' ? 'ماركت الرشيد' : 'مطعم البيت العراقي'
-                  }
+                  placeholder={KIND_COPY[form.merchant_type].namePlaceholder}
                 />
                 <span className="field__hint">الاسم الذي يظهر للعملاء في التطبيق.</span>
               </div>
@@ -361,7 +366,7 @@ export default function NewRestaurantPage() {
                 </legend>
 
                 <div className="chips__list">
-                  {CUISINES.map((cuisine) => {
+                  {categoriesFor(form.merchant_type).map((cuisine) => {
                     const selected = form.cuisine_tags.includes(cuisine.key);
                     const full = form.cuisine_tags.length >= 4 && !selected;
                     return (
@@ -635,10 +640,11 @@ export default function NewRestaurantPage() {
                 )}
               </div>
               <div className="preview__text">
-                <strong>{form.display_name.trim() || 'اسم المطعم'}</strong>
+                <strong>{form.display_name.trim() || KIND_COPY[form.merchant_type].nameLabel}</strong>
                 <span>
                   {form.cuisine_tags.length > 0
-                    ? CUISINES.filter((cuisine) => form.cuisine_tags.includes(cuisine.key))
+                    ? categoriesFor(form.merchant_type)
+                        .filter((cuisine) => form.cuisine_tags.includes(cuisine.key))
                         .map((cuisine) => cuisine.labelAr)
                         .join('، ')
                     : (selectedCity?.name_ar ?? 'المدينة')}
@@ -716,3 +722,25 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     </button>
   );
 }
+
+/** The words the form changes with the kind of partner being created. */
+const KIND_COPY: Record<
+  MerchantType,
+  { readonly section: string; readonly nameLabel: string; readonly namePlaceholder: string }
+> = {
+  RESTAURANT: {
+    section: 'جيبلي أكل',
+    nameLabel: 'اسم المطعم',
+    namePlaceholder: 'مطعم البيت العراقي',
+  },
+  MARKET: {
+    section: 'جيبلي ماركت',
+    nameLabel: 'اسم الماركت',
+    namePlaceholder: 'ماركت الرشيد',
+  },
+  COSMETICS: {
+    section: 'جيبلي كوزمتك',
+    nameLabel: 'اسم متجر التجميل',
+    namePlaceholder: 'كوزمتك الورد',
+  },
+};

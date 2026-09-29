@@ -75,6 +75,16 @@ const COPY = {
     loadError: 'تعذّر تحميل قائمة الماركتات',
     empty: 'لا توجد ماركتات مطابقة',
   },
+  COSMETICS: {
+    title: 'متاجر التجميل',
+    add: 'إضافة متجر تجميل',
+    searchLabel: 'البحث عن متجر تجميل',
+    searchPlaceholder: 'اسم المتجر أو رقم الشريك…',
+    nameHeader: 'المتجر',
+    caption: 'قائمة متاجر التجميل وحالتها',
+    loadError: 'تعذّر تحميل قائمة متاجر التجميل',
+    empty: 'لا توجد متاجر تجميل مطابقة',
+  },
   /** Both, which is what the restaurant directory shows unless told otherwise. */
   BOTH: {
     title: 'المطاعم',
@@ -87,6 +97,13 @@ const COPY = {
     empty: 'لا توجد نتائج مطابقة',
   },
 } as const;
+
+/** Each section's badge, in its own colour where the palette has one. */
+const KIND_TONE: Record<MerchantType, 'neutral' | 'success' | 'rose'> = {
+  RESTAURANT: 'neutral',
+  MARKET: 'success',
+  COSMETICS: 'rose',
+};
 
 const STATUS_LABELS: Record<OperationalStatus, string> = {
   PENDING: 'قيد الإعداد',
@@ -183,7 +200,7 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
           className="btn btn--primary"
           // The create form reads this and opens on the right kind, so the
           // button on the markets screen cannot land on a restaurant form.
-          href={only === 'MARKET' ? '/restaurants/new?type=MARKET' : '/restaurants/new'}
+          href={only && only !== 'RESTAURANT' ? `/restaurants/new?type=${only}` : '/restaurants/new'}
         >
           {copy.add}
         </Link>
@@ -290,7 +307,7 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
             rows={restaurants.data ?? []}
             keyOf={(row) => row.id}
             emptyMessage={
-              merchantType === 'MARKET' ? COPY.MARKET.empty : copy.empty
+              merchantType ? COPY[merchantType].empty : copy.empty
             }
             columns={[
               {
@@ -364,7 +381,7 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
                  * columns away is answered by scrolling instead of looking.
                  */
                 render: (row: AdminRestaurant) => (
-                  <Badge tone={row.merchant_type === 'MARKET' ? 'success' : 'neutral'}>
+                  <Badge tone={KIND_TONE[(row.merchant_type ?? 'RESTAURANT') as MerchantType]}>
                     {
                       MERCHANT_TYPE_LABELS[(row.merchant_type ?? 'RESTAURANT') as MerchantType]
                         .nameAr

@@ -203,7 +203,7 @@ export interface PortalSettings {
     display_name: string;
     description_ar: string | null;
     partner_code: string;
-    merchant_type: 'RESTAURANT' | 'MARKET';
+    merchant_type: 'RESTAURANT' | 'MARKET' | 'COSMETICS';
     operational_status: string;
     cuisine_tags: string[];
     minimum_order_iqd: number;

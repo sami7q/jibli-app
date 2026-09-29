@@ -32,7 +32,7 @@ export interface PortalRestaurant {
   readonly id: string;
   readonly display_name: string;
   readonly partner_code: string;
-  /** RESTAURANT or MARKET — decides the words this portal uses for a catalog. */
+  /** RESTAURANT, MARKET or COSMETICS — decides the words this portal uses for a catalog. */
   readonly merchant_type: MerchantType;
   readonly operational_status: string;
   readonly roles: RestaurantRole[];

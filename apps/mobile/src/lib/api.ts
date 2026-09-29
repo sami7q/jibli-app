@@ -1,6 +1,11 @@
 import Constants from 'expo-constants';
 import { configString } from './app-config';
-import { ERROR_MESSAGES_AR, type ErrorCode, type OrderStatus } from '@jibli/contracts';
+import {
+  ERROR_MESSAGES_AR,
+  type ErrorCode,
+  type MerchantType,
+  type OrderStatus,
+} from '@jibli/contracts';
 import { clearSession, loadSession, updateTokens } from './secure-session';
 
 /**
@@ -751,7 +756,7 @@ export interface OwnerShop {
   readonly id: string;
   readonly display_name: string;
   readonly partner_code: string;
-  readonly merchant_type: 'RESTAURANT' | 'MARKET';
+  readonly merchant_type: MerchantType;
   readonly operational_status: string;
   readonly roles: string[];
   readonly permissions: string[];
@@ -906,7 +911,7 @@ export const api = {
    * app, so this always names one. Omitting it on the server means the food
    * half, which is what callers written before markets existed meant.
    */
-  storefront: (merchantType: 'RESTAURANT' | 'MARKET' = 'RESTAURANT') =>
+  storefront: (merchantType: MerchantType = 'RESTAURANT') =>
     apiRequest<Storefront>(`/api/v1/storefront?merchant_type=${merchantType}`, {
       authenticated: false,
     }),
@@ -1082,7 +1087,7 @@ export const api = {
    * treats as no filter at all, so nothing written before markets existed had
    * to change.
    */
-  restaurants: (cityId: string, search?: string, merchantType?: 'RESTAURANT' | 'MARKET') =>
+  restaurants: (cityId: string, search?: string, merchantType?: MerchantType) =>
     apiRequest<RestaurantCard[]>(
       `/api/v1/restaurants?city_id=${cityId}` +
         (search ? `&q=${encodeURIComponent(search)}` : '') +

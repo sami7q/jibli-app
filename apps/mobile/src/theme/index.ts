@@ -57,6 +57,7 @@ type Ramp = Readonly<Record<keyof typeof palette.orange, string>>;
 const RAMP_FOR_SECTION: Readonly<Record<MerchantType, Ramp>> = {
   RESTAURANT: palette.orange,
   MARKET: palette.green,
+  COSMETICS: palette.rose,
 };
 
 /** Orange until told otherwise — it is the brand, and the chooser is orange-led. */

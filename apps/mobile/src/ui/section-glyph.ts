@@ -1,4 +1,5 @@
 import { currentSection } from '@/theme';
+import { sectionOf } from '@/lib/sections';
 import type { IconName } from '@/ui/icon';
 
 /*
@@ -22,5 +23,5 @@ type GlyphName = IconName;
  * to be open when this file was first imported.
  */
 export function missingImageGlyph(): GlyphName {
-  return currentSection() === 'MARKET' ? 'basket-outline' : 'silverware-fork-knife';
+  return sectionOf(currentSection()).icon;
 }

@@ -82,6 +82,28 @@ export const palette = {
     800: '#065938',
     900: '#04462c',
   },
+  /*
+   * Jibli Cosmetics' ramp, the third section, built to the same ten stops as
+   * orange and green so every component that is right in one section is right
+   * in this one too.
+   *
+   * Rose because it is what beauty shelves are already coloured, and because
+   * it sits far enough from both the orange and the green to be told apart at
+   * a glance on the chooser, where all three are shown together. 500 is deep
+   * enough to carry white text on a price pill.
+   */
+  rose: {
+    50: '#fff1f5',
+    100: '#ffe4ec',
+    200: '#fecddb',
+    300: '#fda4bd',
+    400: '#f86b95',
+    500: '#e53c73', // primary — Jibli Cosmetics
+    600: '#c9265c',
+    700: '#a61c4a',
+    800: '#85183e',
+    900: '#6a1533',
+  },
   ink: {
     50: '#f8f9fa',
     100: '#f1f3f5',
@@ -359,6 +381,7 @@ export function cssVariables(): CssVariable[] {
   const paletteNotes: Record<string, string> = {
     '--jibli-orange-500': 'primary — the logo orange',
     '--jibli-green-500': 'primary — Jibli Market',
+    '--jibli-rose-500': 'primary — Jibli Cosmetics',
     '--jibli-ink-900': 'Admin sidebar, headings',
     '--jibli-violet-500': 'the fifth headline tile, so the row reads as five',
   };

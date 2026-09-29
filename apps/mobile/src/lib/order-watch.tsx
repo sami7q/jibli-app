@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Platform, Pressable, View } from 'react-native';
+import { AppState, Pressable, View } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
@@ -15,6 +15,7 @@ import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
 import { playChime } from './chime';
 import { useSession } from './session';
+import { PUSH_SUPPORTED } from './push';
 import { useCart } from './cart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, radius, shadow, space, useTabBarHeight } from '@/theme';
@@ -147,7 +148,9 @@ export function announcementFor(status: OrderStatus): string {
  * the same sentence.
  */
 async function notifyOnDevice(body: string): Promise<void> {
-  if (Platform.OS === 'web') return;
+  // Web has no notification system, and in Expo Go importing the module only
+  // prints warnings about the push it no longer carries.
+  if (!PUSH_SUPPORTED) return;
   try {
     const notifications = await import('expo-notifications');
     await notifications.scheduleNotificationAsync({
@@ -359,7 +362,14 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
  * order covering the way to place a new one is worse than not showing it at
  * all, and the tab bar still says «طلباتي».
  */
-const SCREENS_WITH_THEIR_OWN_DOCK = new Set(['(auth)', '(driver)', 'choose', 'cart', 'checkout', 'restaurant']);
+const SCREENS_WITH_THEIR_OWN_DOCK = new Set([
+  '(auth)',
+  '(driver)',
+  'choose',
+  'cart',
+  'checkout',
+  'restaurant',
+]);
 
 export function ActiveOrderBar() {
   const { active, announcement } = useOrderWatch();
@@ -486,11 +496,7 @@ export function ActiveOrderBar() {
           </View>
 
           <View style={{ flex: 1, gap: 2 }}>
-            <Text
-              variant="smallBold"
-              tone={announcing ? 'inverse' : 'primary'}
-              numberOfLines={1}
-            >
+            <Text variant="smallBold" tone={announcing ? 'inverse' : 'primary'} numberOfLines={1}>
               {showing.headline}
             </Text>
             {subtitle ? (
@@ -508,11 +514,11 @@ export function ActiveOrderBar() {
         </Row>
 
         {/*
-          * A hairline, not a progress bar with a label.
-          *
-          * The words above already say where the order is; this only answers
-          * "roughly how much is left", which is the question a glance asks.
-          */}
+         * A hairline, not a progress bar with a label.
+         *
+         * The words above already say where the order is; this only answers
+         * "roughly how much is left", which is the question a glance asks.
+         */}
         <View
           style={{
             height: 3,

@@ -102,7 +102,7 @@ interface DemoModifierGroup {
   readonly options: readonly { name: string; priceIqd: number }[];
 }
 
-interface DemoRestaurant {
+export interface DemoRestaurant {
   readonly partnerCode: string;
   readonly name: string;
   /**
@@ -110,6 +110,11 @@ interface DemoRestaurant {
    * every entry written before markets existed means.
    */
   readonly merchantType?: MerchantType;
+  /**
+   * The city the shop trades in, when it is not the one being seeded — by
+   * code, e.g. `IQ-AN-HADITHA`. Omitted means the seed's own city.
+   */
+  readonly cityCode?: string;
   readonly description: string;
   readonly cuisines: readonly string[];
   readonly minimumOrderIqd: number;
@@ -526,6 +531,151 @@ const DEMO_MARKETS: readonly DemoRestaurant[] = [
           { name: 'عسل طبيعي ٥٠٠ غم', priceIqd: 15_000 },
           { name: 'مربى تين ٤٠٠ غم', priceIqd: 4000 },
           { name: 'دبس تمر ٧٠٠ غم', priceIqd: 5000 },
+        ],
+      },
+    ],
+  },
+];
+
+/*
+ * The cosmetics section's shops, for the same reason the market is seeded: a
+ * third tab with nothing in it proves nothing. Aisles rather than courses,
+ * products with a size in the name, and the same ordering machinery behind
+ * them as the market's.
+ */
+export const DEMO_COSMETICS: readonly DemoRestaurant[] = [
+  {
+    partnerCode: 'DEMO-3001',
+    merchantType: 'COSMETICS',
+    name: 'كوزمتك الورد',
+    description: 'مكياج وعناية بالبشرة والشعر من ماركات أصلية، توصيل لباب البيت.',
+    cuisines: ['cs_makeup', 'cs_skincare', 'cs_haircare'],
+    minimumOrderIqd: 10_000,
+    deliveryFeeIqd: 2000,
+    prepMinutes: 10,
+    rating: 4.7,
+    ratingCount: 94,
+    address: 'شارع ١٤ رمضان، المنصور',
+    district: 'المنصور',
+    phone: '+9647701110013',
+    ownerUsername: 'demo.cosmetics',
+    ownerName: 'رنا الوردي',
+    hours: daily('10:00', '23:00'),
+    menu: [
+      {
+        name: 'مكياج',
+        items: [
+          { name: 'أحمر شفاه مات', description: 'ثابت لساعات طويلة', priceIqd: 12_000 },
+          { name: 'كريم أساس ٣٠ مل', description: 'تغطية متوسطة', priceIqd: 25_000 },
+          { name: 'ماسكارا مقاومة للماء', priceIqd: 15_000 },
+          { name: 'باليت ظلال عيون ١٢ لون', priceIqd: 30_000 },
+          { name: 'كحل أسود', priceIqd: 6000 },
+        ],
+      },
+      {
+        name: 'العناية بالبشرة',
+        description: 'لكل أنواع البشرة',
+        items: [
+          { name: 'غسول وجه ٢٠٠ مل', priceIqd: 14_000 },
+          { name: 'مرطب يومي ٥٠ مل', description: 'بعامل حماية SPF 30', priceIqd: 22_000 },
+          { name: 'سيروم فيتامين C ٣٠ مل', priceIqd: 28_000 },
+          { name: 'واقي شمس ٥٠ مل', priceIqd: 18_000, unavailable: true },
+        ],
+      },
+      {
+        name: 'العناية بالشعر',
+        items: [
+          { name: 'شامبو ٤٠٠ مل', priceIqd: 9000 },
+          { name: 'بلسم ٤٠٠ مل', priceIqd: 9000 },
+          { name: 'زيت أرغان للشعر ١٠٠ مل', priceIqd: 16_000 },
+        ],
+      },
+    ],
+  },
+  {
+    partnerCode: 'DEMO-3002',
+    merchantType: 'COSMETICS',
+    name: 'عطور ليالي',
+    description: 'عطور شرقية وفرنسية ومستلزمات العناية الشخصية.',
+    cuisines: ['cs_perfume', 'cs_personal', 'cs_nails'],
+    minimumOrderIqd: 15_000,
+    deliveryFeeIqd: 0,
+    prepMinutes: 15,
+    rating: 4.4,
+    ratingCount: 51,
+    address: 'شارع الكرادة داخل',
+    district: 'الكرادة',
+    phone: '+9647701110014',
+    ownerUsername: 'demo.perfume',
+    ownerName: 'حيدر العطار',
+    hours: always(),
+    menu: [
+      {
+        name: 'عطور',
+        items: [
+          { name: 'عطر عود ١٠٠ مل', description: 'شرقي فاخر', priceIqd: 45_000 },
+          { name: 'عطر زهري ٥٠ مل', priceIqd: 35_000 },
+          { name: 'معطر جسم ٢٥٠ مل', priceIqd: 10_000 },
+        ],
+      },
+      {
+        name: 'أظافر',
+        items: [
+          { name: 'طلاء أظافر', priceIqd: 5000 },
+          { name: 'مزيل طلاء ١٠٠ مل', priceIqd: 3000 },
+        ],
+      },
+      {
+        name: 'عناية شخصية',
+        items: [
+          { name: 'مزيل عرق ١٥٠ مل', priceIqd: 7000 },
+          { name: 'معجون أسنان ١٠٠ مل', priceIqd: 4000 },
+          { name: 'صابون سائل ٥٠٠ مل', priceIqd: 5000 },
+        ],
+      },
+    ],
+  },
+  {
+    partnerCode: 'DEMO-3003',
+    merchantType: 'COSMETICS',
+    cityCode: 'IQ-AN-HADITHA',
+    name: 'بيوتي حديثة',
+    description: 'مكياج وعناية وعطور بأسعار مناسبة، توصيل داخل حديثة.',
+    cuisines: ['cs_makeup', 'cs_skincare', 'cs_perfume'],
+    minimumOrderIqd: 7000,
+    deliveryFeeIqd: 1500,
+    prepMinutes: 10,
+    rating: 4.6,
+    ratingCount: 38,
+    address: 'الشارع العام، مركز حديثة',
+    district: 'مركز حديثة',
+    phone: '+9647701110015',
+    ownerUsername: 'demo.haditha.beauty',
+    ownerName: 'سارة الحديثي',
+    hours: daily('09:00', '23:00'),
+    menu: [
+      {
+        name: 'مكياج',
+        items: [
+          { name: 'أحمر شفاه سائل', priceIqd: 9000 },
+          { name: 'بودرة مضغوطة', priceIqd: 14_000 },
+          { name: 'ماسكارا', priceIqd: 11_000 },
+          { name: 'قلم تحديد عيون', priceIqd: 5000 },
+        ],
+      },
+      {
+        name: 'العناية بالبشرة',
+        items: [
+          { name: 'كريم مرطب ١٠٠ مل', priceIqd: 12_000 },
+          { name: 'غسول وجه للبشرة الدهنية', priceIqd: 10_000 },
+          { name: 'ماسك طين ١٢٠ غم', priceIqd: 8000 },
+        ],
+      },
+      {
+        name: 'عطور',
+        items: [
+          { name: 'عطر مسك ٥٠ مل', priceIqd: 20_000 },
+          { name: 'بخاخ جسم ٢٠٠ مل', priceIqd: 8000 },
         ],
       },
     ],
@@ -976,6 +1126,428 @@ export interface DemoSeedResult {
   readonly cityNameAr: string;
 }
 
+/** The part of a city a shop's branch needs. */
+export interface ShopCity {
+  readonly id: string;
+  readonly governorateId: string;
+  readonly nameAr: string;
+}
+
+export type ShopSeedCounts = {
+  -readonly [K in Exclude<keyof DemoSeedResult, 'cityNameAr'>]: number;
+};
+
+export async function findCity(db: Database, cityCode: string): Promise<ShopCity | undefined> {
+  const [city] = await db
+    .select({ id: cities.id, governorateId: cities.governorateId, nameAr: cities.nameAr })
+    .from(cities)
+    .where(eq(cities.code, cityCode))
+    .limit(1);
+  return city;
+}
+
+/**
+ * Create or refresh one shop — the restaurant row, its branch, hours,
+ * commission, owner account and catalog — in one transaction.
+ *
+ * Exported so a one-off script can add specific shops to a database without
+ * running the whole demo seed; `seedDemoMarketplace` is this in a loop.
+ */
+export async function upsertDemoShop(
+  db: Database,
+  demo: DemoRestaurant,
+  city: ShopCity,
+  passwordHash: string,
+  result: ShopSeedCounts,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ id: restaurants.id, providerId: restaurants.providerId })
+      .from(restaurants)
+      .where(eq(restaurants.partnerCode, demo.partnerCode))
+      .limit(1);
+
+    const now = new Date();
+    let restaurantId: string;
+    const hueShift = DEMO_HUE_SHIFTS[demo.partnerCode] ?? 0;
+
+    if (existing) {
+      restaurantId = existing.id;
+      await tx
+        .update(restaurants)
+        .set({
+          displayName: demo.name,
+          descriptionAr: demo.description,
+          cuisineTags: [...demo.cuisines],
+          coverAssetId: await upsertImageAsset(
+            tx,
+            restaurantCover(demo.partnerCode, hueShift),
+            existing.id,
+          ),
+          logoAssetId: await upsertImageAsset(
+            tx,
+            restaurantLogo(demo.partnerCode, hueShift),
+            existing.id,
+          ),
+          minimumOrderIqd: demo.minimumOrderIqd,
+          ratingAverage: demo.rating,
+          ratingCount: demo.ratingCount,
+          // Also on update: a database seeded before this column existed has
+          // the market filed as a restaurant, and a re-seed should fix that
+          // rather than leave it in the wrong tab.
+          merchantType: demo.merchantType ?? 'RESTAURANT',
+          onboardingStatus: 'APPROVED',
+          operationalStatus: 'ACTIVE',
+          approvedAt: now,
+          suspendedAt: null,
+          suspendedReason: null,
+          deletedAt: null,
+          updatedAt: now,
+        })
+        .where(eq(restaurants.id, restaurantId));
+      result.restaurantsUpdated += 1;
+      result.images += 2;
+    } else {
+      const providerId = uuidv7();
+      await tx
+        .insert(providers)
+        .values({ id: providerId, providerType: 'RESTAURANT', status: 'ACTIVE' });
+
+      restaurantId = uuidv7();
+      await tx.insert(restaurants).values({
+        id: restaurantId,
+        providerId,
+        displayName: demo.name,
+        legalName: demo.name,
+        partnerCode: demo.partnerCode,
+        descriptionAr: demo.description,
+        cuisineTags: [...demo.cuisines],
+        merchantType: demo.merchantType ?? 'RESTAURANT',
+        onboardingStatus: 'APPROVED',
+        operationalStatus: 'ACTIVE',
+        minimumOrderIqd: demo.minimumOrderIqd,
+        ratingAverage: demo.rating,
+        ratingCount: demo.ratingCount,
+        approvedAt: now,
+      });
+      result.restaurantsInserted += 1;
+
+      // After the insert, because the asset row references the restaurant.
+      await tx
+        .update(restaurants)
+        .set({
+          coverAssetId: await upsertImageAsset(
+            tx,
+            restaurantCover(demo.partnerCode, hueShift),
+            restaurantId,
+          ),
+          logoAssetId: await upsertImageAsset(
+            tx,
+            restaurantLogo(demo.partnerCode, hueShift),
+            restaurantId,
+          ),
+        })
+        .where(eq(restaurants.id, restaurantId));
+      result.images += 2;
+    }
+
+    // ── Branch ──────────────────────────────────────────────────────────
+    const [existingBranch] = await tx
+      .select({ id: restaurantBranches.id })
+      .from(restaurantBranches)
+      .where(eq(restaurantBranches.restaurantId, restaurantId))
+      .limit(1);
+
+    const branchValues = {
+      name: 'الفرع الرئيسي',
+      governorateId: city.governorateId,
+      cityId: city.id,
+      addressText: demo.address,
+      districtText: demo.district,
+      phone: demo.phone,
+      isActive: true,
+      acceptsOrders: true,
+      busyMode: 'NORMAL' as const,
+      busyModeExpiresAt: null,
+      basePreparationMinutes: demo.prepMinutes,
+      deliveryFeeIqd: demo.deliveryFeeIqd,
+      deletedAt: null,
+      updatedAt: now,
+    };
+
+    let branchId: string;
+    if (existingBranch) {
+      branchId = existingBranch.id;
+      await tx
+        .update(restaurantBranches)
+        .set(branchValues)
+        .where(eq(restaurantBranches.id, branchId));
+    } else {
+      branchId = uuidv7();
+      await tx.insert(restaurantBranches).values({ id: branchId, restaurantId, ...branchValues });
+    }
+    result.branches += 1;
+
+    // ── Working hours ───────────────────────────────────────────────────
+    // Replaced wholesale rather than merged: the weekly schedule is one
+    // object, and a partial update leaves a day from a previous run behind.
+    await tx.delete(branchWorkingHours).where(eq(branchWorkingHours.branchId, branchId));
+    for (const [day, range] of Object.entries(demo.hours)) {
+      await tx.insert(branchWorkingHours).values({
+        id: uuidv7(),
+        branchId,
+        dayOfWeek: Number(day),
+        opensAtMinute: range ? at(range[0]) : 0,
+        closesAtMinute: range ? at(range[1]) : 0,
+        isClosed: range === null,
+      });
+    }
+
+    /*
+     * The commission this restaurant pays, without which it cannot be
+     * ordered from at all.
+     *
+     * `resolveCommissionFee` refuses to guess: a restaurant with no active
+     * config raises COMMISSION_CONFIG_MISSING and the quote fails. That is
+     * right — money is not inferred — but it meant the whole demo
+     * marketplace was browsable and unorderable, and nothing caught it until
+     * an order was actually attempted.
+     *
+     * Dated a day in the past so it is already active whatever the clock
+     * says when the seed runs.
+     */
+    const [activeCommission] = await tx
+      .select({ id: restaurantCommissionConfigs.id })
+      .from(restaurantCommissionConfigs)
+      .where(eq(restaurantCommissionConfigs.restaurantId, restaurantId))
+      .limit(1);
+
+    if (!activeCommission) {
+      await tx.insert(restaurantCommissionConfigs).values({
+        id: uuidv7(),
+        restaurantId,
+        commissionFlatIqd: DEMO_COMMISSION_FLAT_IQD,
+        settlementPolicy: 'HALF_MONTH',
+        paymentTermDays: 7,
+        effectiveFrom: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        note: 'Demo marketplace default',
+      });
+    }
+
+    // ── Owner account for the restaurant portal ─────────────────────────
+    const [existingOwner] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, demo.ownerUsername))
+      .limit(1);
+
+    let ownerId: string;
+    if (existingOwner) {
+      ownerId = existingOwner.id;
+      await tx
+        .update(users)
+        .set({ fullName: demo.ownerName, passwordHash, status: 'ACTIVE', updatedAt: now })
+        .where(eq(users.id, ownerId));
+    } else {
+      ownerId = uuidv7();
+      await tx.insert(users).values({
+        id: ownerId,
+        username: demo.ownerUsername,
+        fullName: demo.ownerName,
+        passwordHash,
+        // Demo accounts skip the forced password change so a tester is not
+        // stopped by a flow that is not what they came to look at.
+        mustChangePassword: false,
+        status: 'ACTIVE',
+      });
+    }
+
+    const [membership] = await tx
+      .select({ id: restaurantMembers.id })
+      .from(restaurantMembers)
+      .where(
+        and(
+          eq(restaurantMembers.restaurantId, restaurantId),
+          eq(restaurantMembers.userId, ownerId),
+        ),
+      )
+      .limit(1);
+
+    if (!membership) {
+      await tx.insert(restaurantMembers).values({
+        id: uuidv7(),
+        restaurantId,
+        userId: ownerId,
+        role: 'OWNER',
+        isActive: true,
+      });
+    }
+    result.owners += 1;
+
+    // ── Modifier groups ─────────────────────────────────────────────────
+    const groupIdByName = new Map<string, string>();
+
+    for (const [index, group] of (demo.modifierGroups ?? []).entries()) {
+      const [existingGroup] = await tx
+        .select({ id: modifierGroups.id })
+        .from(modifierGroups)
+        .where(
+          and(eq(modifierGroups.restaurantId, restaurantId), eq(modifierGroups.nameAr, group.name)),
+        )
+        .limit(1);
+
+      const groupId = existingGroup?.id ?? uuidv7();
+      if (existingGroup) {
+        await tx
+          .update(modifierGroups)
+          .set({
+            minSelect: group.minSelect,
+            maxSelect: group.maxSelect,
+            isRequired: group.required,
+            sortOrder: index,
+            isActive: true,
+          })
+          .where(eq(modifierGroups.id, groupId));
+      } else {
+        await tx.insert(modifierGroups).values({
+          id: groupId,
+          restaurantId,
+          nameAr: group.name,
+          minSelect: group.minSelect,
+          maxSelect: group.maxSelect,
+          isRequired: group.required,
+          sortOrder: index,
+          isActive: true,
+        });
+      }
+
+      await tx.delete(modifiers).where(eq(modifiers.groupId, groupId));
+      for (const [optionIndex, option] of group.options.entries()) {
+        await tx.insert(modifiers).values({
+          id: uuidv7(),
+          groupId,
+          nameAr: option.name,
+          priceIqd: option.priceIqd,
+          isAvailable: true,
+          sortOrder: optionIndex,
+        });
+      }
+
+      groupIdByName.set(group.name, groupId);
+      result.modifierGroups += 1;
+    }
+
+    // ── Menu ────────────────────────────────────────────────────────────
+    for (const [categoryIndex, category] of demo.menu.entries()) {
+      const [existingCategory] = await tx
+        .select({ id: menuCategories.id })
+        .from(menuCategories)
+        .where(
+          and(
+            eq(menuCategories.restaurantId, restaurantId),
+            eq(menuCategories.nameAr, category.name),
+            isNull(menuCategories.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      const categoryId = existingCategory?.id ?? uuidv7();
+      if (existingCategory) {
+        await tx
+          .update(menuCategories)
+          .set({
+            descriptionAr: category.description ?? null,
+            sortOrder: categoryIndex,
+            isActive: true,
+            updatedAt: now,
+          })
+          .where(eq(menuCategories.id, categoryId));
+      } else {
+        await tx.insert(menuCategories).values({
+          id: categoryId,
+          restaurantId,
+          nameAr: category.name,
+          descriptionAr: category.description ?? null,
+          sortOrder: categoryIndex,
+          isActive: true,
+        });
+      }
+      result.categories += 1;
+
+      for (const [itemIndex, item] of category.items.entries()) {
+        const [existingItem] = await tx
+          .select({ id: menuItems.id })
+          .from(menuItems)
+          .where(
+            and(
+              eq(menuItems.restaurantId, restaurantId),
+              eq(menuItems.nameAr, item.name),
+              isNull(menuItems.deletedAt),
+            ),
+          )
+          .limit(1);
+
+        const itemValues = {
+          categoryId,
+          descriptionAr: item.description ?? null,
+          basePriceIqd: item.priceIqd,
+          isActive: true,
+          isAvailable: item.unavailable !== true,
+          unavailableByInventory: false,
+          sortOrder: itemIndex,
+          isPopular: item.popular === true,
+          updatedAt: now,
+        };
+
+        const itemId = existingItem?.id ?? uuidv7();
+        if (existingItem) {
+          await tx.update(menuItems).set(itemValues).where(eq(menuItems.id, itemId));
+        } else {
+          await tx
+            .insert(menuItems)
+            .values({ id: itemId, restaurantId, nameAr: item.name, ...itemValues });
+        }
+        result.items += 1;
+
+        // Attach option groups. Replaced wholesale for the same reason the
+        // hours are: the set is the unit, not each row.
+        await tx.delete(itemModifierGroups).where(eq(itemModifierGroups.itemId, itemId));
+        for (const [linkIndex, groupName] of (item.options ?? []).entries()) {
+          const groupId = groupIdByName.get(groupName);
+          if (!groupId) {
+            throw new Error(
+              `${demo.name}: item "${item.name}" references unknown option group "${groupName}"`,
+            );
+          }
+          await tx.insert(itemModifierGroups).values({
+            id: uuidv7(),
+            itemId,
+            groupId,
+            sortOrder: linkIndex,
+          });
+        }
+      }
+    }
+
+    /*
+     * A catalog change bumps the menu version, or a cart held on a phone
+     * cannot tell that its prices are stale (plan §116). Read then write
+     * rather than an in-place increment: this whole restaurant is inside one
+     * transaction, so nothing else can be writing the row.
+     */
+    const [current] = await tx
+      .select({ menuVersion: restaurants.menuVersion })
+      .from(restaurants)
+      .where(eq(restaurants.id, restaurantId))
+      .limit(1);
+
+    await tx
+      .update(restaurants)
+      .set({ menuVersion: (current?.menuVersion ?? 1) + 1, updatedAt: now })
+      .where(eq(restaurants.id, restaurantId));
+  });
+}
+
 /**
  * Create (or refresh) the demo marketplace in one city.
  *
@@ -1005,398 +1577,16 @@ export async function seedDemoMarketplace(db: Database, cityCode: string): Promi
     banners: 0,
   };
 
-  // The market runs through the same loop as the restaurants, because it is
-  // the same shape — that is the whole argument for the discriminator.
-  for (const demo of [...DEMO_RESTAURANTS, ...DEMO_MARKETS]) {
-    await db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select({ id: restaurants.id, providerId: restaurants.providerId })
-        .from(restaurants)
-        .where(eq(restaurants.partnerCode, demo.partnerCode))
-        .limit(1);
-
-      const now = new Date();
-      let restaurantId: string;
-      const hueShift = DEMO_HUE_SHIFTS[demo.partnerCode] ?? 0;
-
-      if (existing) {
-        restaurantId = existing.id;
-        await tx
-          .update(restaurants)
-          .set({
-            displayName: demo.name,
-            descriptionAr: demo.description,
-            cuisineTags: [...demo.cuisines],
-            coverAssetId: await upsertImageAsset(
-              tx,
-              restaurantCover(demo.partnerCode, hueShift),
-              existing.id,
-            ),
-            logoAssetId: await upsertImageAsset(
-              tx,
-              restaurantLogo(demo.partnerCode, hueShift),
-              existing.id,
-            ),
-            minimumOrderIqd: demo.minimumOrderIqd,
-            ratingAverage: demo.rating,
-            ratingCount: demo.ratingCount,
-            // Also on update: a database seeded before this column existed has
-            // the market filed as a restaurant, and a re-seed should fix that
-            // rather than leave it in the wrong tab.
-            merchantType: demo.merchantType ?? 'RESTAURANT',
-            onboardingStatus: 'APPROVED',
-            operationalStatus: 'ACTIVE',
-            approvedAt: now,
-            suspendedAt: null,
-            suspendedReason: null,
-            deletedAt: null,
-            updatedAt: now,
-          })
-          .where(eq(restaurants.id, restaurantId));
-        result.restaurantsUpdated += 1;
-        result.images += 2;
-      } else {
-        const providerId = uuidv7();
-        await tx
-          .insert(providers)
-          .values({ id: providerId, providerType: 'RESTAURANT', status: 'ACTIVE' });
-
-        restaurantId = uuidv7();
-        await tx.insert(restaurants).values({
-          id: restaurantId,
-          providerId,
-          displayName: demo.name,
-          legalName: demo.name,
-          partnerCode: demo.partnerCode,
-          descriptionAr: demo.description,
-          cuisineTags: [...demo.cuisines],
-          merchantType: demo.merchantType ?? 'RESTAURANT',
-          onboardingStatus: 'APPROVED',
-          operationalStatus: 'ACTIVE',
-          minimumOrderIqd: demo.minimumOrderIqd,
-          ratingAverage: demo.rating,
-          ratingCount: demo.ratingCount,
-          approvedAt: now,
-        });
-        result.restaurantsInserted += 1;
-
-        // After the insert, because the asset row references the restaurant.
-        await tx
-          .update(restaurants)
-          .set({
-            coverAssetId: await upsertImageAsset(
-              tx,
-              restaurantCover(demo.partnerCode, hueShift),
-              restaurantId,
-            ),
-            logoAssetId: await upsertImageAsset(
-              tx,
-              restaurantLogo(demo.partnerCode, hueShift),
-              restaurantId,
-            ),
-          })
-          .where(eq(restaurants.id, restaurantId));
-        result.images += 2;
-      }
-
-      // ── Branch ──────────────────────────────────────────────────────────
-      const [existingBranch] = await tx
-        .select({ id: restaurantBranches.id })
-        .from(restaurantBranches)
-        .where(eq(restaurantBranches.restaurantId, restaurantId))
-        .limit(1);
-
-      const branchValues = {
-        name: 'الفرع الرئيسي',
-        governorateId: city.governorateId,
-        cityId: city.id,
-        addressText: demo.address,
-        districtText: demo.district,
-        phone: demo.phone,
-        isActive: true,
-        acceptsOrders: true,
-        busyMode: 'NORMAL' as const,
-        busyModeExpiresAt: null,
-        basePreparationMinutes: demo.prepMinutes,
-        deliveryFeeIqd: demo.deliveryFeeIqd,
-        deletedAt: null,
-        updatedAt: now,
-      };
-
-      let branchId: string;
-      if (existingBranch) {
-        branchId = existingBranch.id;
-        await tx
-          .update(restaurantBranches)
-          .set(branchValues)
-          .where(eq(restaurantBranches.id, branchId));
-      } else {
-        branchId = uuidv7();
-        await tx.insert(restaurantBranches).values({ id: branchId, restaurantId, ...branchValues });
-      }
-      result.branches += 1;
-
-      // ── Working hours ───────────────────────────────────────────────────
-      // Replaced wholesale rather than merged: the weekly schedule is one
-      // object, and a partial update leaves a day from a previous run behind.
-      await tx.delete(branchWorkingHours).where(eq(branchWorkingHours.branchId, branchId));
-      for (const [day, range] of Object.entries(demo.hours)) {
-        await tx.insert(branchWorkingHours).values({
-          id: uuidv7(),
-          branchId,
-          dayOfWeek: Number(day),
-          opensAtMinute: range ? at(range[0]) : 0,
-          closesAtMinute: range ? at(range[1]) : 0,
-          isClosed: range === null,
-        });
-      }
-
-      /*
-       * The commission this restaurant pays, without which it cannot be
-       * ordered from at all.
-       *
-       * `resolveCommissionFee` refuses to guess: a restaurant with no active
-       * config raises COMMISSION_CONFIG_MISSING and the quote fails. That is
-       * right — money is not inferred — but it meant the whole demo
-       * marketplace was browsable and unorderable, and nothing caught it until
-       * an order was actually attempted.
-       *
-       * Dated a day in the past so it is already active whatever the clock
-       * says when the seed runs.
-       */
-      const [activeCommission] = await tx
-        .select({ id: restaurantCommissionConfigs.id })
-        .from(restaurantCommissionConfigs)
-        .where(eq(restaurantCommissionConfigs.restaurantId, restaurantId))
-        .limit(1);
-
-      if (!activeCommission) {
-        await tx.insert(restaurantCommissionConfigs).values({
-          id: uuidv7(),
-          restaurantId,
-          commissionFlatIqd: DEMO_COMMISSION_FLAT_IQD,
-          settlementPolicy: 'HALF_MONTH',
-          paymentTermDays: 7,
-          effectiveFrom: new Date(Date.now() - 24 * 60 * 60 * 1000),
-          note: 'Demo marketplace default',
-        });
-      }
-
-      // ── Owner account for the restaurant portal ─────────────────────────
-      const [existingOwner] = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.username, demo.ownerUsername))
-        .limit(1);
-
-      let ownerId: string;
-      if (existingOwner) {
-        ownerId = existingOwner.id;
-        await tx
-          .update(users)
-          .set({ fullName: demo.ownerName, passwordHash, status: 'ACTIVE', updatedAt: now })
-          .where(eq(users.id, ownerId));
-      } else {
-        ownerId = uuidv7();
-        await tx.insert(users).values({
-          id: ownerId,
-          username: demo.ownerUsername,
-          fullName: demo.ownerName,
-          passwordHash,
-          // Demo accounts skip the forced password change so a tester is not
-          // stopped by a flow that is not what they came to look at.
-          mustChangePassword: false,
-          status: 'ACTIVE',
-        });
-      }
-
-      const [membership] = await tx
-        .select({ id: restaurantMembers.id })
-        .from(restaurantMembers)
-        .where(
-          and(
-            eq(restaurantMembers.restaurantId, restaurantId),
-            eq(restaurantMembers.userId, ownerId),
-          ),
-        )
-        .limit(1);
-
-      if (!membership) {
-        await tx.insert(restaurantMembers).values({
-          id: uuidv7(),
-          restaurantId,
-          userId: ownerId,
-          role: 'OWNER',
-          isActive: true,
-        });
-      }
-      result.owners += 1;
-
-      // ── Modifier groups ─────────────────────────────────────────────────
-      const groupIdByName = new Map<string, string>();
-
-      for (const [index, group] of (demo.modifierGroups ?? []).entries()) {
-        const [existingGroup] = await tx
-          .select({ id: modifierGroups.id })
-          .from(modifierGroups)
-          .where(
-            and(
-              eq(modifierGroups.restaurantId, restaurantId),
-              eq(modifierGroups.nameAr, group.name),
-            ),
-          )
-          .limit(1);
-
-        const groupId = existingGroup?.id ?? uuidv7();
-        if (existingGroup) {
-          await tx
-            .update(modifierGroups)
-            .set({
-              minSelect: group.minSelect,
-              maxSelect: group.maxSelect,
-              isRequired: group.required,
-              sortOrder: index,
-              isActive: true,
-            })
-            .where(eq(modifierGroups.id, groupId));
-        } else {
-          await tx.insert(modifierGroups).values({
-            id: groupId,
-            restaurantId,
-            nameAr: group.name,
-            minSelect: group.minSelect,
-            maxSelect: group.maxSelect,
-            isRequired: group.required,
-            sortOrder: index,
-            isActive: true,
-          });
-        }
-
-        await tx.delete(modifiers).where(eq(modifiers.groupId, groupId));
-        for (const [optionIndex, option] of group.options.entries()) {
-          await tx.insert(modifiers).values({
-            id: uuidv7(),
-            groupId,
-            nameAr: option.name,
-            priceIqd: option.priceIqd,
-            isAvailable: true,
-            sortOrder: optionIndex,
-          });
-        }
-
-        groupIdByName.set(group.name, groupId);
-        result.modifierGroups += 1;
-      }
-
-      // ── Menu ────────────────────────────────────────────────────────────
-      for (const [categoryIndex, category] of demo.menu.entries()) {
-        const [existingCategory] = await tx
-          .select({ id: menuCategories.id })
-          .from(menuCategories)
-          .where(
-            and(
-              eq(menuCategories.restaurantId, restaurantId),
-              eq(menuCategories.nameAr, category.name),
-              isNull(menuCategories.deletedAt),
-            ),
-          )
-          .limit(1);
-
-        const categoryId = existingCategory?.id ?? uuidv7();
-        if (existingCategory) {
-          await tx
-            .update(menuCategories)
-            .set({
-              descriptionAr: category.description ?? null,
-              sortOrder: categoryIndex,
-              isActive: true,
-              updatedAt: now,
-            })
-            .where(eq(menuCategories.id, categoryId));
-        } else {
-          await tx.insert(menuCategories).values({
-            id: categoryId,
-            restaurantId,
-            nameAr: category.name,
-            descriptionAr: category.description ?? null,
-            sortOrder: categoryIndex,
-            isActive: true,
-          });
-        }
-        result.categories += 1;
-
-        for (const [itemIndex, item] of category.items.entries()) {
-          const [existingItem] = await tx
-            .select({ id: menuItems.id })
-            .from(menuItems)
-            .where(
-              and(
-                eq(menuItems.restaurantId, restaurantId),
-                eq(menuItems.nameAr, item.name),
-                isNull(menuItems.deletedAt),
-              ),
-            )
-            .limit(1);
-
-          const itemValues = {
-            categoryId,
-            descriptionAr: item.description ?? null,
-            basePriceIqd: item.priceIqd,
-            isActive: true,
-            isAvailable: item.unavailable !== true,
-            unavailableByInventory: false,
-            sortOrder: itemIndex,
-            isPopular: item.popular === true,
-            updatedAt: now,
-          };
-
-          const itemId = existingItem?.id ?? uuidv7();
-          if (existingItem) {
-            await tx.update(menuItems).set(itemValues).where(eq(menuItems.id, itemId));
-          } else {
-            await tx
-              .insert(menuItems)
-              .values({ id: itemId, restaurantId, nameAr: item.name, ...itemValues });
-          }
-          result.items += 1;
-
-          // Attach option groups. Replaced wholesale for the same reason the
-          // hours are: the set is the unit, not each row.
-          await tx.delete(itemModifierGroups).where(eq(itemModifierGroups.itemId, itemId));
-          for (const [linkIndex, groupName] of (item.options ?? []).entries()) {
-            const groupId = groupIdByName.get(groupName);
-            if (!groupId) {
-              throw new Error(
-                `${demo.name}: item "${item.name}" references unknown option group "${groupName}"`,
-              );
-            }
-            await tx.insert(itemModifierGroups).values({
-              id: uuidv7(),
-              itemId,
-              groupId,
-              sortOrder: linkIndex,
-            });
-          }
-        }
-      }
-
-      /*
-       * A catalog change bumps the menu version, or a cart held on a phone
-       * cannot tell that its prices are stale (plan §116). Read then write
-       * rather than an in-place increment: this whole restaurant is inside one
-       * transaction, so nothing else can be writing the row.
-       */
-      const [current] = await tx
-        .select({ menuVersion: restaurants.menuVersion })
-        .from(restaurants)
-        .where(eq(restaurants.id, restaurantId))
-        .limit(1);
-
-      await tx
-        .update(restaurants)
-        .set({ menuVersion: (current?.menuVersion ?? 1) + 1, updatedAt: now })
-        .where(eq(restaurants.id, restaurantId));
-    });
+  // The market and cosmetics run through the same function as the restaurants,
+  // because they are the same shape — that is the whole argument for the
+  // discriminator.
+  for (const demo of [...DEMO_RESTAURANTS, ...DEMO_MARKETS, ...DEMO_COSMETICS]) {
+    // A shop pinned to another city (the cosmetics shop in Haditha) goes there
+    // when that city exists, and is skipped rather than misfiled when it does not.
+    const target =
+      demo.cityCode && demo.cityCode !== cityCode ? await findCity(db, demo.cityCode) : city;
+    if (!target) continue;
+    await upsertDemoShop(db, demo, target, passwordHash, result);
   }
 
   /*

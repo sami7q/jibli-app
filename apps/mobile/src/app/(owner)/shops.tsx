@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@/ui/icon';
 import { isShopSupported, useOwner } from '@/lib/owner';
+import { sectionOf } from '@/lib/sections';
 import { color, radius, ROW, space, TAP_TARGET } from '@/theme';
 import { EmptyState, Row, Screen, Text } from '@/ui';
 import { OwnerHeader } from './index';
@@ -64,7 +65,7 @@ export default function OwnerShopsScreen() {
               ]}
             >
               <MaterialCommunityIcons
-                name={entry.merchant_type === 'MARKET' ? 'storefront' : 'silverware-fork-knife'}
+                name={sectionOf(entry.merchant_type).shopIcon}
                 size={24}
                 color={current ? color.brand : color.textSecondary}
               />
@@ -75,7 +76,7 @@ export default function OwnerShopsScreen() {
                 </Text>
                 <Row gap={space[2]}>
                   <Text variant="caption" tone="muted">
-                    {entry.merchant_type === 'MARKET' ? 'ماركت' : 'مطعم'}
+                    {sectionOf(entry.merchant_type).shopNoun}
                   </Text>
                   {!supported ? (
                     <Text variant="caption" tone="muted">

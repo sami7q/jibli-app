@@ -13,7 +13,7 @@ import { MERCHANT_TYPES, MERCHANT_TYPE_LABELS, type MerchantType } from '@jibli/
  * small; the thing it fixes is that one of the two storefronts was
  * unmerchandisable.
  *
- * Two buttons rather than a select: there are exactly two, both fit on a line,
+ * Buttons rather than a select: there are three, they all fit on a line,
  * and a closed dropdown hides the fact that a choice exists at all — which is
  * the failure this is here to end.
  */
@@ -60,6 +60,7 @@ export function StorefrontTabs({
 const STOREFRONT_LABELS: Record<MerchantType, string> = {
   RESTAURANT: 'المطاعم',
   MARKET: 'الماركتات',
+  COSMETICS: 'التجميل',
 };
 
 /** The words a merchandising screen changes with the storefront it is showing. */
@@ -84,5 +85,11 @@ export const STOREFRONT_COPY: Record<
     noneYetAr: 'لا ماركتات بعد',
     defaultEmoji: '🛒',
     nameAr: MERCHANT_TYPE_LABELS.MARKET.nameAr,
+  },
+  COSMETICS: {
+    countedAr: 'متجر تجميل',
+    noneYetAr: 'لا متاجر تجميل بعد',
+    defaultEmoji: '💄',
+    nameAr: MERCHANT_TYPE_LABELS.COSMETICS.nameAr,
   },
 };

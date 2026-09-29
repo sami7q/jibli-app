@@ -1,5 +1,6 @@
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 import { accent, currentSection } from '@/theme';
+import { sectionOf } from '@/lib/sections';
 
 /**
  * What an item with no photograph looks like.
@@ -39,19 +40,21 @@ export function DishPlaceholder({
 
   const variant = hash % 3;
   const tilt = ((hash % 7) - 3) * 2;
-  const market = currentSection() === 'MARKET';
+  const section = currentSection();
 
   return (
     <Svg
       width={size}
       height={size}
       viewBox="0 0 100 100"
-      accessibilityLabel={market ? 'صورة المنتج' : 'صورة الطبق'}
+      accessibilityLabel={sectionOf(section).itemImageLabel}
     >
       <Rect x="0" y="0" width="100" height="100" fill={accent[50]} />
 
-      {market ? (
+      {section === 'MARKET' ? (
         <MarketGoods variant={variant} tilt={tilt} />
+      ) : section === 'COSMETICS' ? (
+        <BeautyGoods variant={variant} tilt={tilt} />
       ) : (
         <PlatedDish variant={variant} tilt={tilt} />
       )}
@@ -171,6 +174,57 @@ function MarketGoods({ variant, tilt }: { variant: number; tilt: number }) {
         stroke={accent[200]}
         strokeWidth="3"
         strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+/**
+ * A beauty product, seen from the front.
+ *
+ * The market's packaging is a tin, a sack and a bottle; a cosmetics shelf is a
+ * lipstick, a jar of cream and a perfume flask. Drawn to the same rules as
+ * `MarketGoods` — front-on, standing on a shelf line, in the section's own
+ * ramp — so the three sections' placeholders read as one family.
+ */
+function BeautyGoods({ variant, tilt }: { variant: number; tilt: number }) {
+  return (
+    <>
+      <Rect x="32" y="76" width="36" height="3" rx="1.5" fill={accent[200]} />
+
+      <G transform={`rotate(${tilt * 0.4} 50 54)`}>
+        {variant === 0 ? (
+          <>
+            {/* A lipstick: the case, the collar, the angled bullet. */}
+            <Rect x="41" y="50" width="18" height="24" rx="2" fill={accent[200]} />
+            <Rect x="43" y="44" width="14" height="7" rx="1" fill={accent[300]} />
+            <Path d="M45 44 v-12 l10 -5 v17 z" fill={accent[400]} />
+          </>
+        ) : variant === 1 ? (
+          <>
+            {/* A jar of cream with a wide lid. */}
+            <Rect x="33" y="50" width="34" height="24" rx="5" fill={accent[200]} />
+            <Rect x="31" y="42" width="38" height="10" rx="3" fill={accent[300]} />
+            <Rect x="40" y="58" width="20" height="9" rx="2" fill={accent[100]} />
+          </>
+        ) : (
+          <>
+            {/* A perfume flask: a stopper, a neck, a faceted body. */}
+            <Circle cx="50" cy="30" r="5" fill={accent[300]} />
+            <Rect x="46" y="34" width="8" height="8" fill={accent[300]} />
+            <Rect x="36" y="42" width="28" height="32" rx="6" fill={accent[200]} />
+            <Rect x="42" y="52" width="16" height="12" rx="2" fill={accent[100]} />
+          </>
+        )}
+      </G>
+
+      {/*
+       * A sparkle, low-contrast and to one side — the cosmetics section's
+       * answer to the fork and the basket.
+       */}
+      <Path
+        d="M23 36 l2.5 7 l7 2.5 l-7 2.5 l-2.5 7 l-2.5 -7 l-7 -2.5 l7 -2.5 z"
+        fill={accent[200]}
       />
     </>
   );

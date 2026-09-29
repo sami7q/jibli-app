@@ -62,10 +62,12 @@ export type ProviderType = (typeof PROVIDER_TYPES)[number];
  * §16, most of which do not exist yet. This answers a question the customer
  * app asks on every load: which of the two tabs does this merchant belong to.
  *
- * Two values, because the home screen has two tabs. A third would mean a third
- * tab, and that is a product decision rather than a schema one.
+ * One value per section of the customer app: food, the market, and cosmetics.
+ * A new value means a new section on the chooser, which is a product decision
+ * rather than a schema one — and once made, it is this list plus the labels
+ * below, because every section runs through the same ordering machinery.
  */
-export const MERCHANT_TYPES = ['RESTAURANT', 'MARKET'] as const;
+export const MERCHANT_TYPES = ['RESTAURANT', 'MARKET', 'COSMETICS'] as const;
 export type MerchantType = (typeof MERCHANT_TYPES)[number];
 
 /**
@@ -95,6 +97,12 @@ export const MERCHANT_TYPE_LABELS: Record<
   },
   MARKET: {
     nameAr: 'ماركت',
+    catalogAr: 'المنتجات',
+    itemAr: 'منتج',
+    itemDefiniteAr: 'المنتج',
+  },
+  COSMETICS: {
+    nameAr: 'متجر تجميل',
     catalogAr: 'المنتجات',
     itemAr: 'منتج',
     itemDefiniteAr: 'المنتج',

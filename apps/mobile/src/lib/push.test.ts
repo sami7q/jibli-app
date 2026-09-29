@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
+import { readOrderPush } from './push-payload';
 
 /**
  * The shape of a push payload, asserted against the sender.
  *
  * This file exists because the two halves had silently disagreed. The worker
  * sends `{ orderId, eventType }` (`apps/worker/src/jobs/outbox-publisher.ts`)
- * and the app read `data.kind` — a key nothing has ever sent. Reading a missing
+ * and the app read `data.kind` â€” a key nothing has ever sent. Reading a missing
  * key is not an error, it is `undefined`, so every order notification was
  * classified as "not an order": no sound, no high priority, on exactly the
  * messages both were written for. Nothing failed; it just quietly did the wrong
@@ -15,33 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
  * the kind that stays broken. These tests are that check.
  */
 
-vi.mock('react-native', () => ({
-  Platform: { OS: 'android', select: (spec: Record<string, unknown>) => spec.android },
-}));
-
-vi.mock('expo-notifications', () => ({
-  setNotificationHandler: vi.fn(),
-  setNotificationChannelAsync: vi.fn(),
-  getPermissionsAsync: vi.fn(),
-  requestPermissionsAsync: vi.fn(),
-  getExpoPushTokenAsync: vi.fn(),
-  addNotificationResponseReceivedListener: vi.fn(),
-  useLastNotificationResponse: vi.fn(),
-  AndroidImportance: { HIGH: 4 },
-  AndroidNotificationVisibility: { PUBLIC: 1 },
-  AndroidNotificationPriority: { HIGH: 'high' },
-}));
-
-vi.mock('expo-constants', () => ({ default: { expoConfig: { version: '1.0.0', extra: {} } } }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('expo-secure-store', () => ({
-  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'when-unlocked',
-  setItemAsync: vi.fn(),
-  getItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
-}));
-
-const { readOrderPush } = await import('./push');
+// The parser has no native dependencies, so it is tested without mocking any.
 
 describe('readOrderPush()', () => {
   it('reads the payload the worker actually sends', () => {

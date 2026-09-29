@@ -36,6 +36,7 @@ import { EmptyState, ErrorState, HScroll, RemoteImage, Row, Screen, Skeleton, Te
 import { Enter } from '@/ui/enter';
 import type { MerchantType } from '@jibli/contracts';
 import { useVertical } from '@/lib/vertical';
+import { sectionOf } from '@/lib/sections';
 import { IconTile, PromoBanner, RestaurantCard, SearchBar } from '@/ui/catalog';
 import { AreaPicker } from '@/ui/area-picker';
 import { AddressSheet } from '@/ui/address-sheet';
@@ -151,8 +152,9 @@ export default function HomeScreen() {
    * markets was told «لا مطاعم في بغداد بعد» — a sentence about the wrong half
    * of the app, in the one place where the app has nothing else to say.
    */
-  const noun = vertical === 'MARKET' ? 'ماركتات' : 'مطاعم';
-  const nounDefinite = vertical === 'MARKET' ? 'الماركتات' : 'المطاعم';
+  const section = sectionOf(vertical);
+  const noun = section.shopsNoun;
+  const nounDefinite = section.shopsNounDefinite;
 
   return (
     <Screen scroll edges={['top']} padded={false}>
@@ -243,20 +245,14 @@ export default function HomeScreen() {
                 ? `نتائج البحث عن «${term}»`
                 : category
                   ? (categories.find((entry) => entry.key === category)?.name_ar ?? 'مطاعم التصنيف')
-                  : vertical === 'MARKET'
-                    ? 'الماركتات القريبة منك'
-                    : 'المطاعم القريبة منك'}
+                  : section.nearbyTitle}
             </Text>
             <Text variant="caption" tone="muted">
               {searching
                 ? 'الوجبات المتاحة الآن أولاً'
                 : area
-                  ? vertical === 'MARKET'
-                    ? `ماركتات توصّل إلى ${area.cityNameAr}`
-                    : `أفضل المطاعم في ${area.cityNameAr}`
-                  : vertical === 'MARKET'
-                    ? 'اختر منطقتك لعرض الماركتات'
-                    : 'اختر منطقتك لعرض المطاعم'}
+                  ? section.areaCaption(area.cityNameAr)
+                  : section.pickAreaCaption}
             </Text>
           </View>
 
@@ -264,7 +260,7 @@ export default function HomeScreen() {
             <Pressable
               onPress={() => setCategory(null)}
               accessibilityRole="button"
-              accessibilityLabel="عرض كل المطاعم"
+              accessibilityLabel={`عرض كل ${nounDefinite}`}
               hitSlop={space[2]}
               style={{ minHeight: TAP_TARGET, justifyContent: 'center' }}
             >
@@ -425,7 +421,7 @@ function Header({
   search: string;
   onChangeSearch: (value: string) => void;
 }) {
-  const market = vertical === 'MARKET';
+  const section = sectionOf(vertical);
 
   return (
     <View style={{ marginBottom: space[2] }}>
@@ -433,7 +429,7 @@ function Header({
         // The section's own ramp: orange for food, green for the market. The
         // header is the one surface large enough for the two halves to be told
         // apart across a room, which is the whole point of the split.
-        colors={market ? MARKET_HEADER : FOOD_HEADER}
+        colors={[...section.header]}
         start={{ x: 0.15, y: 0 }}
         end={{ x: 0.85, y: 1 }}
         style={{
@@ -452,7 +448,7 @@ function Header({
         <Pressable
           onPress={onBack}
           accessibilityRole="button"
-          accessibilityLabel={`تبديل القسم. القسم الحالي ${market ? 'جيبلي ماركت' : 'جيبلي أكل'}`}
+          accessibilityLabel={`تبديل القسم. القسم الحالي ${section.label}`}
           accessibilityHint="يفتح شاشة اختيار القسم"
           style={({ pressed }) => [
             {
@@ -485,14 +481,14 @@ function Header({
             }}
           >
             <MaterialCommunityIcons
-              name={market ? 'basket-outline' : 'silverware-fork-knife'}
+              name={section.icon}
               size={15}
-              color={market ? palette.green[600] : BRAND[500]}
+              color={vertical === 'RESTAURANT' ? BRAND[500] : section.ramp[600]}
             />
           </View>
 
           <Text variant="caption" tone="inverse" style={{ fontWeight: '700' }}>
-            {market ? 'جيبلي ماركت' : 'جيبلي أكل'}
+            {section.label}
           </Text>
 
           <MaterialCommunityIcons name="swap-horizontal" size={15} color={palette.white} />
@@ -559,7 +555,10 @@ function Header({
             >
               <Text
                 variant="caption"
-                style={{ color: market ? palette.green[700] : BRAND[600], fontWeight: '700' }}
+                style={{
+                  color: vertical === 'RESTAURANT' ? BRAND[600] : section.ramp[700],
+                  fontWeight: '700',
+                }}
               >
                 تسجيل الدخول
               </Text>
@@ -582,9 +581,9 @@ function Header({
         <SearchBar
           value={search}
           onChangeText={onChangeSearch}
-          placeholder={market ? 'ابحث عن منتج أو ماركت…' : 'ابحث عن مطعم أو وجبة…'}
+          placeholder={section.searchPlaceholder}
           returnKeyType="search"
-          accessibilityLabel={market ? 'البحث عن منتج أو ماركت' : 'البحث عن مطعم أو وجبة'}
+          accessibilityLabel={section.searchLabel}
           style={shadow.lg}
         />
       </View>
@@ -602,9 +601,6 @@ function Header({
  */
 const HEADER_OVERLAP = 26;
 
-/** The two header ramps, one per half of the app. */
-const FOOD_HEADER = ['#ff8a14', '#fd6702', '#f05002'] as const;
-const MARKET_HEADER = [palette.green[400], palette.green[600], palette.green[800]] as const;
 
 /**
  * The way back to an update nobody was looking at when it arrived.
@@ -785,7 +781,7 @@ function CategoryStrip({
       <Row justify="space-between" style={{ paddingHorizontal: space[4] }}>
         <Text variant="h3">التصنيفات</Text>
         <Text variant="caption" tone="muted">
-          {vertical === 'MARKET' ? 'تسوّق حسب القسم' : 'اختر وجبتك'}
+          {sectionOf(vertical).categoriesCaption}
         </Text>
       </Row>
 

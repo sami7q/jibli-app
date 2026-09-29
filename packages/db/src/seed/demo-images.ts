@@ -437,8 +437,28 @@ export const DEMO_BANNERS: readonly {
    * customer who has switched sections should be able to tell from across the
    * room.
    */
-  merchantType?: 'RESTAURANT' | 'MARKET';
+  merchantType?: 'RESTAURANT' | 'MARKET' | 'COSMETICS';
 }[] = [
+  {
+    key: 'cosmetics_welcome',
+    titleAr: 'جيبلي كوزمتك',
+    subtitleAr: 'جمالك وعنايتك، تصلك لباب البيت',
+    from: palette.rose[400],
+    to: palette.rose[700],
+    linkType: 'NONE',
+    linkValue: null,
+    merchantType: 'COSMETICS',
+  },
+  {
+    key: 'cosmetics_makeup',
+    titleAr: 'كل المكياج بمكان واحد',
+    subtitleAr: 'ماركات أصلية بأسعار واضحة',
+    from: palette.rose[500],
+    to: palette.rose[800],
+    linkType: 'CATEGORY',
+    linkValue: 'cs_makeup',
+    merchantType: 'COSMETICS',
+  },
   {
     key: 'market_welcome',
     titleAr: 'جيبلي ماركت',

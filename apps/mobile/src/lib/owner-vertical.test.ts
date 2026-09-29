@@ -12,13 +12,15 @@ import { catalogNoun, isShopSupported, SUPPORTED_MERCHANT_TYPES } from './owner-
  * Which is why the rule lives in a module with no React in it. What is pinned
  * here is not an implementation, it is three promises:
  *
- *   a market is served, a restaurant is not, and the second is a decision;
+ *   a market and a cosmetics shop are served, a restaurant is not, and the
+ *   last is a decision;
  *   the words follow the shop rather than the screen;
  *   adding a vertical is adding a value, not writing a feature again.
  */
 
 const market = { merchant_type: 'MARKET' } as const;
 const restaurant = { merchant_type: 'RESTAURANT' } as const;
+const cosmetics = { merchant_type: 'COSMETICS' } as const;
 
 describe('which shops Owner Mode serves', () => {
   it('serves a market', () => {
@@ -36,24 +38,24 @@ describe('which shops Owner Mode serves', () => {
   });
 
   /*
-   * The guard on the promise made in docs/mobile/owner-mode.md: "adding
-   * Cosmetics is adding an enum value rather than writing the feature again."
-   *
-   * If a future vertical needs its own screens, this assertion is where that
-   * shows up — the list will have stopped being the only thing that decides.
+   * The promise made in docs/mobile/owner-mode.md — "adding Cosmetics is
+   * adding an enum value rather than writing the feature again" — kept: the
+   * cosmetics section is served by the same screens as the market, and the
+   * only thing that changed to allow it is the list.
    */
-  it('decides from the list alone, so a new vertical is a value not a feature', () => {
-    const cosmetics = { merchant_type: 'COSMETICS' as unknown as 'MARKET' };
-    expect(isShopSupported(cosmetics)).toBe(false);
-
-    const widened = [...SUPPORTED_MERCHANT_TYPES, 'COSMETICS' as unknown as 'MARKET'];
-    expect(widened.includes(cosmetics.merchant_type)).toBe(true);
+  it('serves a cosmetics shop, through the list alone', () => {
+    expect(SUPPORTED_MERCHANT_TYPES).toContain('COSMETICS');
+    expect(isShopSupported(cosmetics)).toBe(true);
   });
 });
 
 describe('what a shop calls its stock', () => {
   it('says المنتجات to a grocer', () => {
     expect(catalogNoun(market)).toBe('المنتجات');
+  });
+
+  it('says المنتجات to a cosmetics shop', () => {
+    expect(catalogNoun(cosmetics)).toBe('المنتجات');
   });
 
   it('says القائمة to a cook', () => {

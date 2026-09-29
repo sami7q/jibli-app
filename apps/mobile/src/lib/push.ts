@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import type * as ExpoNotifications from 'expo-notifications';
 import { configNested } from './app-config';
 import { useRouter } from 'expo-router';
 import { apiRequest } from './api';
+import { readOrderPush } from './push-payload';
 
 /**
  * Push registration.
@@ -31,35 +32,33 @@ import { apiRequest } from './api';
  *   itself is a routing address and lives in ordinary storage.
  */
 
+export { readOrderPush, type OrderPushData } from './push-payload';
+
 /**
- * What the worker actually puts in a push payload.
+ * Where push can work at all.
  *
- * `apps/worker/src/jobs/outbox-publisher.ts` sends
- * `{ orderId, eventType }` — and this file used to read `data.kind`, a key
- * nothing has ever sent. So `isOrder` was false for every notification the
- * platform produces: no sound and no high priority on exactly the messages
- * both were written for, silently, because a missing key reads as "not an
- * order" rather than as an error.
+ * Not on the web, which has no notification module — `getLastNotificationResponse`
+ * throws there, and took the whole web preview down with it. And not in Expo
+ * Go: since SDK 53 it ships without remote push, and merely importing
+ * `expo-notifications` there prints two warnings on every launch. Both are
+ * development surfaces; a store or development build is neither.
  *
- * Typed and parsed in one place so the next divergence is a type error rather
- * than a behaviour nobody notices.
+ * So the module is required only where it works, and everything below treats
+ * its absence the way it already treated a simulator: not an error, just
+ * nothing to do.
  */
-export interface OrderPushData {
-  readonly orderId: string;
-  readonly eventType: string;
-}
+export const PUSH_SUPPORTED =
+  Platform.OS !== 'web' && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
-export function readOrderPush(data: unknown): OrderPushData | null {
-  if (typeof data !== 'object' || data === null) return null;
+type NotificationsModule = typeof ExpoNotifications;
 
-  const { orderId, eventType } = data as Record<string, unknown>;
-  if (typeof orderId !== 'string' || orderId.length === 0) return null;
-
-  return { orderId, eventType: typeof eventType === 'string' ? eventType : '' };
-}
+const Notifications: NotificationsModule | null = PUSH_SUPPORTED
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded only where it works
+    (require('expo-notifications') as NotificationsModule)
+  : null;
 
 /** Foreground behaviour: an order update should interrupt, a promo should not. */
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async (notification) => {
     const isOrder = readOrderPush(notification.request.content.data) !== null;
 
@@ -77,7 +76,9 @@ Notifications.setNotificationHandler({
       // being told about is noise.
       shouldPlaySound: isOrder,
       shouldSetBadge: false,
-      ...(isOrder ? { priority: Notifications.AndroidNotificationPriority.HIGH } : {}),
+      ...(isOrder && Notifications
+        ? { priority: Notifications.AndroidNotificationPriority.HIGH }
+        : {}),
     };
   },
 });
@@ -95,6 +96,10 @@ export type PushOutcome =
  */
 export async function registerForPush(): Promise<PushOutcome> {
   try {
+    if (!Notifications) {
+      return { status: 'unavailable', reason: 'expo go or web' };
+    }
+
     if (!Constants.isDevice) {
       return { status: 'unavailable', reason: 'simulator' };
     }
@@ -182,9 +187,19 @@ export async function registerForPush(): Promise<PushOutcome> {
  * navigating before the navigator exists is a no-op that loses the tap
  * silently.
  */
+/**
+ * The cold-start tap, or nothing where push is unsupported.
+ *
+ * Chosen once at module load, so every render calls the same hook — the rule
+ * that makes a conditional hook safe.
+ */
+const useLastNotificationResponse: () => ReturnType<
+  NotificationsModule['useLastNotificationResponse']
+> = Notifications ? Notifications.useLastNotificationResponse : () => null;
+
 export function usePushNavigation(): void {
   const router = useRouter();
-  const last = Notifications.useLastNotificationResponse();
+  const last = useLastNotificationResponse();
 
   /*
    * The cold-start tap, handled once.
@@ -209,6 +224,8 @@ export function usePushNavigation(): void {
   }, [last, router]);
 
   useEffect(() => {
+    if (!Notifications) return;
+
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       /*
        * The cold-start response is delivered here too on some platforms, so the

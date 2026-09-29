@@ -2,8 +2,9 @@ import { and, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import {
+  ALL_CATEGORY_KEYS,
   AppError,
-  CUISINE_KEYS,
+  categoriesFor,
   ERROR_CODES,
   EVENT_TYPES,
   OPERATIONAL_STATUSES,
@@ -59,7 +60,7 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });
 
-const createSchema = z.object({
+export const createMerchantSchema = z.object({
   display_name: displayNameSchema(2, 120),
   /*
    * What is being created. Defaulted rather than required, because every
@@ -93,12 +94,28 @@ const createSchema = z.object({
    * customer app's filters end up matching nothing.
    */
   cuisine_tags: z
-    .array(z.enum(CUISINE_KEYS as [string, ...string[]]))
+    .array(z.enum(ALL_CATEGORY_KEYS as [string, ...string[]]))
     .max(4)
     .default([]),
   /** Required when the target city is not open for onboarding (plan §15.1). */
   override_coverage: z.boolean().default(false),
   reason: reasonSchema.optional(),
+}).superRefine((body, issue) => {
+  /*
+   * Each section tags from its own list. A cosmetics shop carrying «برغر»
+   * would appear under a food filter in a storefront it is not in, which is
+   * the same lie as the wrong shop in the wrong tab.
+   */
+  const allowed = new Set(categoriesFor(body.merchant_type).map((entry) => entry.key));
+  body.cuisine_tags.forEach((tag, index) => {
+    if (!allowed.has(tag)) {
+      issue.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cuisine_tags', index],
+        message: `${tag} is not a category for ${body.merchant_type}`,
+      });
+    }
+  });
 });
 
 export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -513,7 +530,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
     async (request, reply) => {
       const principal = requirePrincipal(request);
       assertAdminPermission(principal, 'restaurant.create');
-      const body = createSchema.parse(request.body);
+      const body = createMerchantSchema.parse(request.body);
 
       const result = await ctx.db.transaction(async (tx) => {
         // Geography must be real and consistent; the composite FK would catch a

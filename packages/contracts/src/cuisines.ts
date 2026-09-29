@@ -1,3 +1,5 @@
+import type { MerchantType } from './enums.js';
+
 /**
  * Food categories.
  *
@@ -55,7 +57,56 @@ export const CUISINES: readonly Cuisine[] = [
 
 export const CUISINE_KEYS: readonly string[] = CUISINES.map((cuisine) => cuisine.key);
 
-const BY_KEY = new Map(CUISINES.map((cuisine) => [cuisine.key, cuisine]));
+/**
+ * The market's aisles — the same keys migration 0017 seeded into
+ * `app_categories`, so a market tagged here appears under the aisle a
+ * customer taps.
+ */
+export const MARKET_AISLES: readonly Cuisine[] = [
+  { key: 'mk_produce', labelAr: 'خضار وفواكه', emoji: '🥬' },
+  { key: 'mk_dairy', labelAr: 'ألبان وأجبان', emoji: '🧀' },
+  { key: 'mk_meat', labelAr: 'لحوم ودواجن', emoji: '🥩' },
+  { key: 'mk_bakery', labelAr: 'مخبوزات', emoji: '🥖' },
+  { key: 'mk_household', labelAr: 'منظفات ومنزل', emoji: '🧴' },
+];
+
+/** The cosmetics section's aisles, seeded by migration 0019. */
+export const COSMETICS_AISLES: readonly Cuisine[] = [
+  { key: 'cs_makeup', labelAr: 'مكياج', emoji: '💄' },
+  { key: 'cs_skincare', labelAr: 'العناية بالبشرة', emoji: '🧴' },
+  { key: 'cs_haircare', labelAr: 'العناية بالشعر', emoji: '💇' },
+  { key: 'cs_perfume', labelAr: 'عطور', emoji: '🌸' },
+  { key: 'cs_nails', labelAr: 'أظافر', emoji: '💅' },
+  { key: 'cs_personal', labelAr: 'عناية شخصية', emoji: '🪥' },
+];
+
+/**
+ * Which vocabulary a merchant is tagged from, by the section it trades in.
+ *
+ * A cuisine says what a kitchen cooks and an aisle says what a shop stocks, so
+ * the picker offers only the list that belongs to the merchant being edited —
+ * «مكياج» on a restaurant would be a filter that lies in both directions.
+ */
+export const CATEGORY_VOCABULARY: Readonly<Record<MerchantType, readonly Cuisine[]>> = {
+  RESTAURANT: CUISINES,
+  MARKET: MARKET_AISLES,
+  COSMETICS: COSMETICS_AISLES,
+};
+
+export function categoriesFor(merchantType: MerchantType): readonly Cuisine[] {
+  return CATEGORY_VOCABULARY[merchantType];
+}
+
+/** Every key any merchant may carry, across all three sections. */
+export const ALL_CATEGORY_KEYS: readonly string[] = Object.values(CATEGORY_VOCABULARY).flatMap(
+  (list) => list.map((entry) => entry.key),
+);
+
+const BY_KEY = new Map(
+  Object.values(CATEGORY_VOCABULARY)
+    .flat()
+    .map((cuisine) => [cuisine.key, cuisine]),
+);
 
 export function cuisineByKey(key: string): Cuisine | undefined {
   return BY_KEY.get(key);
