@@ -14,6 +14,7 @@
   "bell-ring-outline": 983199,
   "bike": 983203,
   "bike-fast": 987423,
+  "briefcase-outline": 985108,
   "camera-outline": 986461,
   "camera-plus-outline": 986844,
   "cancel": 984890,
@@ -22,6 +23,7 @@
   "cart": 983312,
   "cart-outline": 983313,
   "cash": 983316,
+  "cash-multiple": 983318,
   "check": 983340,
   "check-circle": 984544,
   "check-circle-outline": 984545,
@@ -110,6 +112,7 @@
   "react": 984840,
   "receipt": 985124,
   "receipt-outline": 984311,
+  "receipt-text-outline": 989660,
   "refresh": 984144,
   "restore": 985499,
   "road": 984161,
@@ -131,7 +134,6 @@
   "tree-outline": 986729,
   "tune-variant": 988482,
   "walk": 984451,
-  "wallet-outline": 986077,
   "web": 984479,
   "wrap": 984502
 }

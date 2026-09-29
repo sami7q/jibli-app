@@ -6,6 +6,8 @@ import MaterialCommunityIcons from '@/ui/icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
+import { useServiceFee } from '@/lib/use-service-fee';
+import { customerDeliveryFee } from '@/lib/delivery-fee';
 import {
   api,
   ApiError,
@@ -200,12 +202,12 @@ export default function HomeScreen() {
        * edges reads as a mistake.
        */}
       {/*
-        * Offered once, above the merchandising and below the search.
-        *
-        * It hides itself when there is nothing to ask — a guest, an address
-        * that already carries a point, or an offer already waved away — so on
-        * the ordinary launch this renders nothing at all.
-        */}
+       * Offered once, above the merchandising and below the search.
+       *
+       * It hides itself when there is nothing to ask — a guest, an address
+       * that already carries a point, or an offer already waved away — so on
+       * the ordinary launch this renders nothing at all.
+       */}
       {searching ? null : <PinHomeCard />}
 
       {searching ? null : storefront.isLoading ? (
@@ -357,14 +359,14 @@ export default function HomeScreen() {
       </View>
 
       {/*
-        * Two different questions behind one line.
-        *
-        * A signed-in customer has addresses, and «التوصيل إلى» means «to which
-        * of them» — asking them to find their governorate in a list is asking
-        * them to repeat what the pin already said. A guest has none and nothing
-        * to attach one to, so for them it stays what it was: which city to
-        * browse.
-        */}
+       * Two different questions behind one line.
+       *
+       * A signed-in customer has addresses, and «التوصيل إلى» means «to which
+       * of them» — asking them to find their governorate in a list is asking
+       * them to repeat what the pin already said. A guest has none and nothing
+       * to attach one to, so for them it stays what it was: which city to
+       * browse.
+       */}
       {isGuest ? (
         <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
       ) : (
@@ -600,7 +602,6 @@ function Header({
  * the two numbers are a pair and moving one without the other closes that gap.
  */
 const HEADER_OVERLAP = 26;
-
 
 /**
  * The way back to an update nobody was looking at when it arrived.
@@ -1095,7 +1096,8 @@ function RestaurantSummaryCard({
   onPress: () => void;
 }) {
   const closed = !restaurant.is_open || !restaurant.accepts_orders;
-  const free = restaurant.delivery_fee_iqd === 0;
+  const deliveryShown = customerDeliveryFee(restaurant.delivery_fee_iqd, useServiceFee());
+  const free = deliveryShown === 0;
 
   return (
     <RestaurantCard
@@ -1112,9 +1114,7 @@ function RestaurantSummaryCard({
       coverUrl={restaurant.cover_asset_id ? assetUrl(restaurant.cover_asset_id) : null}
       rating={restaurant.rating}
       ratingCount={restaurant.rating_count}
-      deliveryFee={
-        free ? 'التوصيل مجاني' : `التوصيل ${formatIqdArabic(iqd(restaurant.delivery_fee_iqd))}`
-      }
+      deliveryFee={free ? 'التوصيل مجاني' : `التوصيل ${formatIqdArabic(iqd(deliveryShown))}`}
       etaMinutes={restaurant.estimated_preparation_minutes}
       offer={free ? 'توصيل مجاني' : null}
       closed={closed}

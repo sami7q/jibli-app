@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { formatIqdArabic, iqd } from '@jibli/money';
+import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, assetUrl } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
@@ -59,6 +60,8 @@ export default function CartScreen() {
 
   const belowMinimum = subtotalIqd < cart.minimumOrderIqd;
   const totalIqd = subtotalIqd + cart.deliveryFeeIqd + serviceFeeIqd;
+  // The service fee is shown inside the delivery fee — see lib/delivery-fee.
+  const deliveryShownIqd = customerDeliveryFee(cart.deliveryFeeIqd, serviceFeeIqd);
 
   return (
     <Screen edges={['top']} padded={false}>
@@ -205,12 +208,9 @@ export default function CartScreen() {
           <SummaryRow label="المجموع الفرعي" value={formatIqdArabic(iqd(subtotalIqd))} />
           <SummaryRow
             label="رسوم التوصيل"
-            value={cart.deliveryFeeIqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(cart.deliveryFeeIqd))}
-            tone={cart.deliveryFeeIqd === 0 ? 'success' : undefined}
+            value={deliveryShownIqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(deliveryShownIqd))}
+            tone={deliveryShownIqd === 0 ? 'success' : undefined}
           />
-          {serviceFeeIqd > 0 ? (
-            <SummaryRow label="رسوم الخدمة" value={formatIqdArabic(iqd(serviceFeeIqd))} />
-          ) : null}
           <SummaryRow label="الإجمالي" value={formatIqdArabic(iqd(totalIqd))} emphasis />
           <Text variant="caption" tone="muted">
             يُعاد احتساب الإجمالي عند تأكيد العنوان، وقد يتغيّر بخصم أو عرض.

@@ -41,6 +41,7 @@ import {
   users,
   uuidv7,
 } from '@jibli/db';
+import { attachServiceFees } from '../../services/service-fee-settlement.js';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 
@@ -480,8 +481,7 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
             adjustments_total_iqd: settlement.settlement.adjustmentsTotalIqd,
             amount_due_iqd: settlement.settlement.amountDueIqd,
             amount_paid_iqd: settlement.settlement.amountPaidIqd,
-            remaining_iqd:
-              settlement.settlement.amountDueIqd - settlement.settlement.amountPaidIqd,
+            remaining_iqd: settlement.settlement.amountDueIqd - settlement.settlement.amountPaidIqd,
             due_date: settlement.settlement.dueDate?.toISOString() ?? null,
             issued_at: settlement.settlement.issuedAt?.toISOString() ?? null,
             void_reason: settlement.settlement.voidReason,
@@ -547,6 +547,19 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
           ERROR_CODES.SETTLEMENT_INVALID_STATE,
         );
 
+        /*
+         * The worker drafts statements with commission only — it has no user
+         * to approve an adjustment. The service fees go on here, approved by
+         * whoever issues it, so a statement never reaches a shop without them.
+         */
+        const serviceFee = await attachServiceFees(tx, {
+          settlementId,
+          restaurantId: settlement.restaurantId,
+          approvedBy: principal.userId,
+        });
+        const adjustmentsTotal = settlement.adjustmentsTotalIqd + serviceFee;
+        const amountDue = settlement.amountDueIqd + serviceFee;
+
         // Never issue a statement whose numbers do not add up (plan §41 step 6).
         const [lineTotals] = await tx
           .select({ total: sql<number>`COALESCE(SUM(${settlementLines.commissionAmountIqd}), 0)` })
@@ -555,8 +568,8 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
 
         const check = reconcileSettlementTotals({
           lineCommissionTotalIqd: Number(lineTotals?.total ?? 0),
-          adjustmentsTotalIqd: settlement.adjustmentsTotalIqd,
-          amountDueIqd: settlement.amountDueIqd,
+          adjustmentsTotalIqd: adjustmentsTotal,
+          amountDueIqd: amountDue,
         });
 
         if (!check.balanced) {
@@ -595,7 +608,7 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
           entityType: 'settlement',
           entityId: settlementId,
           before: { status: settlement.status },
-          after: { status: 'ISSUED', amountDueIqd: settlement.amountDueIqd },
+          after: { status: 'ISSUED', amountDueIqd: amountDue, serviceFeeIqd: serviceFee },
           ip: clientIp(request),
           userAgent: userAgent(request),
           requestId: request.requestId,
@@ -611,7 +624,7 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
             restaurantId: settlement.restaurantId,
             periodStart: settlement.periodStart.toISOString(),
             periodEnd: settlement.periodEnd.toISOString(),
-            amountDueIqd: settlement.amountDueIqd,
+            amountDueIqd: amountDue,
             amountPaidIqd: settlement.amountPaidIqd,
             dueDate: null,
           },
@@ -777,7 +790,10 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
       const body = z
         .object({
           // Negative reduces what the restaurant owes; positive increases it.
-          amount_iqd: z.number().int().refine((v) => v !== 0, 'Adjustment cannot be zero'),
+          amount_iqd: z
+            .number()
+            .int()
+            .refine((v) => v !== 0, 'Adjustment cannot be zero'),
           reason: reasonSchema,
         })
         .parse(request.body);

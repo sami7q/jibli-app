@@ -98,6 +98,10 @@ export interface Collectable {
   partner_code: string;
   order_count: number;
   commission_iqd: number;
+  /** The platform service fee on the same orders. Absent on an older API. */
+  service_fee_iqd?: number;
+  /** Commission plus service fee — what «جمع الأرباح» collects. */
+  profit_iqd?: number;
   gross_sales_iqd: number;
   oldest_order_at: string | null;
   newest_order_at: string | null;

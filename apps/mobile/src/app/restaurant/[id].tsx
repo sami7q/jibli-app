@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { DishPlaceholder } from '@/ui/dish-placeholder';
 import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
+import { useServiceFee } from '@/lib/use-service-fee';
+import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
@@ -52,6 +54,7 @@ export default function RestaurantScreen() {
   const { id, item: itemToOpen } = useLocalSearchParams<{ id: string; item?: string }>();
   const router = useRouter();
   const { cart, itemCount, subtotalIqd } = useCart();
+  const serviceFee = useServiceFee();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
@@ -195,7 +198,7 @@ export default function RestaurantScreen() {
           rating={detail.rating}
           ratingCount={detail.rating_count}
           etaMinutes={detail.estimated_preparation_minutes}
-          deliveryFeeIqd={detail.delivery_fee_iqd}
+          deliveryFeeIqd={customerDeliveryFee(detail.delivery_fee_iqd, serviceFee)}
           minimumOrderIqd={detail.minimum_order_iqd}
           isOpen={detail.is_open}
           orderable={detail.orderable}
@@ -324,11 +327,7 @@ function Cover({
   return (
     <View style={{ height: 268, backgroundColor: color.surfaceSunken }}>
       {coverUrl ? (
-        <RemoteImage
-          uri={coverUrl}
-          style={{ width: '100%', height: '100%' }}
-          priority="high"
-        />
+        <RemoteImage uri={coverUrl} style={{ width: '100%', height: '100%' }} priority="high" />
       ) : (
         /*
          * No photograph yet — which is the normal state for a restaurant on

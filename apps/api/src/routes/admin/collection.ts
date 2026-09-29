@@ -17,6 +17,7 @@ import {
 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
+import { attachServiceFees } from '../../services/service-fee-settlement.js';
 
 /**
  * Collecting the commission a restaurant owes, in one action.
@@ -60,6 +61,7 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
           partnerCode: restaurants.partnerCode,
           orderCount: sql<number>`COUNT(${orders.id})`,
           commissionIqd: sql<number>`COALESCE(SUM(${orders.commissionAmountIqd}), 0)`,
+          serviceFeeIqd: sql<number>`COALESCE(SUM(${orders.platformServiceFeeIqd}), 0)`,
           grossSalesIqd: sql<number>`COALESCE(SUM(${orders.customerTotalIqd}), 0)`,
           oldestAt: sql<string | null>`MIN(${orders.completedAt})`,
           newestAt: sql<string | null>`MAX(${orders.completedAt})`,
@@ -69,7 +71,11 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
         .leftJoin(settlementLines, eq(settlementLines.orderId, orders.id))
         .where(and(eq(orders.status, 'COMPLETED'), isNull(settlementLines.id)))
         .groupBy(restaurants.id, restaurants.displayName, restaurants.partnerCode)
-        .orderBy(desc(sql`COALESCE(SUM(${orders.commissionAmountIqd}), 0)`));
+        .orderBy(
+          desc(
+            sql`COALESCE(SUM(${orders.commissionAmountIqd}), 0) + COALESCE(SUM(${orders.platformServiceFeeIqd}), 0)`,
+          ),
+        );
 
       return reply.send(
         success(
@@ -79,6 +85,9 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
             partner_code: row.partnerCode,
             order_count: Number(row.orderCount),
             commission_iqd: Number(row.commissionIqd),
+            service_fee_iqd: Number(row.serviceFeeIqd),
+            /** What the platform earned on these orders: commission plus service fee. */
+            profit_iqd: Number(row.commissionIqd) + Number(row.serviceFeeIqd),
             gross_sales_iqd: Number(row.grossSalesIqd),
             oldest_order_at: row.oldestAt ? new Date(row.oldestAt).toISOString() : null,
             newest_order_at: row.newestAt ? new Date(row.newestAt).toISOString() : null,
@@ -148,7 +157,7 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
         if (eligible.length === 0) {
           throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
             details: { reason: 'NOTHING_TO_COLLECT' },
-            messageAr: 'لا توجد عمولة غير محصّلة على هذا المطعم',
+            messageAr: 'لا توجد أرباح غير محصّلة على هذا المتجر',
           });
         }
 
@@ -203,11 +212,25 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
           })),
         );
 
+        // The service fees ride on the same statement, so one press collects
+        // everything the shop holds for the platform on these orders.
+        const serviceFeeTotal = await attachServiceFees(tx, {
+          settlementId,
+          restaurantId: body.restaurant_id,
+          approvedBy: principal.userId,
+        });
+        const collectedTotal = commissionTotal + serviceFeeTotal;
+
+        await tx
+          .update(settlements)
+          .set({ amountPaidIqd: collectedTotal })
+          .where(eq(settlements.id, settlementId));
+
         await tx.insert(settlementPayments).values({
           id: uuidv7(),
           settlementId,
           restaurantId: body.restaurant_id,
-          amountIqd: commissionTotal,
+          amountIqd: collectedTotal,
           method: body.method,
           reference: body.reference ?? null,
           paidAt: now,
@@ -228,7 +251,7 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
           restaurantId: body.restaurant_id,
           settlementId,
           entryType: 'COMMISSION_PAYMENT',
-          amountIqd: commissionTotal,
+          amountIqd: collectedTotal,
           effectiveAt: now,
           idempotencyKey: `collect:${settlementId}`,
           metadata: { orderCount: eligible.length, method: body.method },
@@ -242,7 +265,9 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
           after: {
             restaurantId: body.restaurant_id,
             orderCount: eligible.length,
-            amountIqd: commissionTotal,
+            amountIqd: collectedTotal,
+            commissionIqd: commissionTotal,
+            serviceFeeIqd: serviceFeeTotal,
             method: body.method,
           },
           reason: body.note ?? null,
@@ -255,7 +280,7 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
           settlementId,
           restaurantName: restaurant.displayName,
           orderCount: eligible.length,
-          amountIqd: commissionTotal,
+          amountIqd: collectedTotal,
         };
       });
 
@@ -265,7 +290,7 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
             settlement_id: result.settlementId,
             order_count: result.orderCount,
             collected_iqd: result.amountIqd,
-            note_ar: `حُصّلت ${result.amountIqd.toLocaleString('en-US')} د.ع من ${result.restaurantName} عن ${result.orderCount} طلباً. صارت العمولة المعلّقة صفراً وانتقل المبلغ إلى الأرشيف.`,
+            note_ar: `حُصّلت ${result.amountIqd.toLocaleString('en-US')} د.ع من ${result.restaurantName} عن ${result.orderCount} طلباً. صارت الأرباح المعلّقة صفراً وانتقل المبلغ إلى الأرشيف.`,
           },
           { request_id: request.requestId },
         ),

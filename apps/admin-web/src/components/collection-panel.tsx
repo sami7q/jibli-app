@@ -11,7 +11,10 @@ import { ApiError } from '@/lib/api';
 import { admin, type Collectable, type CollectionArchive } from '@/lib/admin-endpoints';
 
 /**
- * Collecting commission, and the archive of what has been collected.
+ * Collecting the platform's profit from each shop, and the archive of it.
+ *
+ * Profit is the commission plus the service fee: orders are paid in cash to
+ * the shop's courier, so both sit at the shop until somebody collects them.
  *
  * The commission a restaurant owes accumulates order by order; at some point
  * somebody hands over cash. This is that moment, and it has to do three things
@@ -51,15 +54,15 @@ export function CollectionPanel({ token }: { token: string }) {
   };
 
   const pending = collectable.data ?? [];
-  const outstanding = pending.reduce((sum, row) => sum + row.commission_iqd, 0);
+  const outstanding = pending.reduce((sum, row) => sum + profitOf(row), 0);
   const collected = archive.data?.total_collected_iqd ?? 0;
 
   return (
     <>
       <Card
-        title="تحصيل العمولة"
+        title="الأرباح غير المحصّلة"
         icon="commissions"
-        subtitle="ما تجمّع لدى كل مطعم ولم يُحصَّل بعد"
+        subtitle="العمولة ورسوم الخدمة المتجمّعة لدى كل متجر من الطلبات المكتملة"
       >
         {collectable.isError ? (
           <ErrorState
@@ -79,7 +82,7 @@ export function CollectionPanel({ token }: { token: string }) {
                 <span className="kpi__label">بانتظار التحصيل</span>
                 <span className="kpi__value">{money(outstanding)}</span>
                 <span className="kpi__note">
-                  من {pending.length} {pending.length === 1 ? 'مطعم' : 'مطاعم'}
+                  من {pending.length} {pending.length === 1 ? 'متجر' : 'متاجر'}
                 </span>
               </div>
               <div className="kpi kpi--primary">
@@ -90,17 +93,17 @@ export function CollectionPanel({ token }: { token: string }) {
             </div>
 
             {pending.length === 0 ? (
-              <p className="empty">لا توجد عمولة غير محصّلة. كل ما اكتمل تم تحصيله.</p>
+              <p className="empty">لا توجد أرباح غير محصّلة. كل ما اكتمل تم تحصيله.</p>
             ) : (
               <DataTable<Collectable>
-                caption="العمولة المستحقة لكل مطعم"
+                caption="الأرباح المستحقة لكل متجر"
                 rows={pending}
                 keyOf={(row) => row.restaurant_id}
                 emptyMessage="لا شيء للتحصيل"
                 columns={[
                   {
                     key: 'name',
-                    header: 'المطعم',
+                    header: 'المتجر',
                     render: (row) => (
                       <Link
                         href={`/restaurants/${row.restaurant_id}`}
@@ -122,12 +125,24 @@ export function CollectionPanel({ token }: { token: string }) {
                     render: (row) => (row.oldest_order_at ? dateAr(row.oldest_order_at) : '—'),
                   },
                   {
-                    key: 'amount',
+                    key: 'commission',
                     header: 'العمولة',
+                    numeric: true,
+                    render: (row) => <Money amount={row.commission_iqd} />,
+                  },
+                  {
+                    key: 'service',
+                    header: 'رسوم الخدمة',
+                    numeric: true,
+                    render: (row) => <Money amount={row.service_fee_iqd ?? 0} />,
+                  },
+                  {
+                    key: 'amount',
+                    header: 'إجمالي الأرباح',
                     numeric: true,
                     render: (row) => (
                       <strong style={{ color: 'var(--jibli-warning-700)' }}>
-                        <Money amount={row.commission_iqd} />
+                        <Money amount={profitOf(row)} />
                       </strong>
                     ),
                   },
@@ -140,7 +155,7 @@ export function CollectionPanel({ token }: { token: string }) {
                         className="btn btn--primary btn--sm"
                         onClick={() => setCollecting(row)}
                       >
-                        جمع
+                        جمع الأرباح
                       </button>
                     ),
                   },
@@ -256,8 +271,8 @@ export function CollectionPanel({ token }: { token: string }) {
               <span className="figure__value">{money(receipt.amount)}</span>
             </div>
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              من <strong>{receipt.name}</strong> عن {receipt.orders} طلباً. صارت العمولة المعلّقة
-              لهذا المطعم صفراً، وأُضيف المبلغ إلى أرشيف الأرباح.
+              من <strong>{receipt.name}</strong> عن {receipt.orders} طلباً. صارت الأرباح المعلّقة
+              لهذا المتجر صفراً، وأُضيف المبلغ إلى أرشيف الأرباح.
             </p>
             <div className="dialog__actions">
               <button type="button" className="btn btn--primary" onClick={() => setReceipt(null)}>
@@ -273,6 +288,11 @@ export function CollectionPanel({ token }: { token: string }) {
       ) : null}
     </>
   );
+}
+
+/** Commission plus service fee; an older API sends commission alone. */
+function profitOf(row: Collectable): number {
+  return row.profit_iqd ?? row.commission_iqd + (row.service_fee_iqd ?? 0);
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -319,14 +339,23 @@ function CollectDialog({
   });
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="collect-title">
+    <div
+      className="dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="collect-title"
+    >
       <div className="dialog">
         <h2 id="collect-title">تحصيل من {target.display_name}</h2>
 
         <div className="figure">
-          <span className="figure__label">المبلغ المستحق</span>
-          <span className="figure__value">{money(target.commission_iqd)}</span>
+          <span className="figure__label">الأرباح المستحقة</span>
+          <span className="figure__value">{money(profitOf(target))}</span>
         </div>
+
+        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+          عمولة {money(target.commission_iqd)} + رسوم خدمة {money(target.service_fee_iqd ?? 0)}
+        </p>
 
         <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
           عن <strong>{target.order_count}</strong> طلباً مكتملاً
@@ -369,9 +398,9 @@ function CollectDialog({
             <Icon name="alert" className="nav__icon" aria-hidden /> ماذا يحدث
           </strong>
           <p style={{ margin: 0 }}>
-            يُنشأ كشف بهذه الطلبات ويُسجَّل مدفوعاً بالكامل. تصبح العمولة المعلّقة لهذا المطعم
-            صفراً، ويظهر الكشف للمطعم في بوابته. التسجيل لا يُحذف ولا يُعدَّل — يُصحَّح بقيد
-            مقابل إن لزم.
+            يُنشأ كشف بهذه الطلبات، تُضاف إليه رسوم الخدمة، ويُسجَّل مدفوعاً بالكامل. تصبح الأرباح
+            المعلّقة لهذا المتجر صفراً، ويظهر الكشف للمطعم في بوابته. التسجيل لا يُحذف ولا يُعدَّل —
+            يُصحَّح بقيد مقابل إن لزم.
           </p>
         </div>
 
@@ -388,7 +417,7 @@ function CollectDialog({
             disabled={collect.isPending}
             onClick={() => collect.mutate()}
           >
-            {collect.isPending ? 'جاري التحصيل…' : `تأكيد استلام ${money(target.commission_iqd)}`}
+            {collect.isPending ? 'جاري التحصيل…' : `تأكيد استلام ${money(profitOf(target))}`}
           </button>
           <button type="button" className="btn btn--outline" onClick={onCancel}>
             إلغاء

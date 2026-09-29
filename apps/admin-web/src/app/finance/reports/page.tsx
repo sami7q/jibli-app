@@ -151,20 +151,26 @@ export default function FinanceReportsPage() {
         ) : (
           <div className="stats">
             <FigureTile
+              label="إجمالي الأرباح"
+              definition="العمولة ورسوم الخدمة على الطلبات المكتملة في الفترة"
+              value={(data?.commission_accrued_iqd ?? 0) + (data?.service_fee_revenue_iqd ?? 0)}
+              tone="green"
+            />
+            <FigureTile
               label="عمولة مستحقة"
               definition={data?.definitions_ar.commission_accrued}
               value={data?.commission_accrued_iqd ?? 0}
               tone="orange"
             />
             <FigureTile
-              label="عمولة محصّلة"
-              definition={data?.definitions_ar.commission_collected}
+              label="أرباح محصّلة"
+              definition="العمولة ورسوم الخدمة المحصّلة فعلياً من المتاجر"
               value={data?.commission_collected_iqd ?? 0}
               tone="green"
             />
             <FigureTile
               label="رسوم الخدمة"
-              definition="رسوم دفعها العملاء مباشرة لجيبلي"
+              definition="تُضاف لرسوم التوصيل عند العميل وتُحصَّل من المتجر مع العمولة"
               value={data?.service_fee_revenue_iqd ?? 0}
               tone="blue"
             />

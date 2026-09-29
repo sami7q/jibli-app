@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, idempotencyKey, NetworkError, type Address } from '@/lib/api';
 import { registerForPush } from '@/lib/push';
+import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { useCart, useOrderLines } from '@/lib/cart';
 import { notify } from '@/lib/dialog';
-import { color, radius, space, TAP_TARGET } from '@/theme';
+import { color, palette, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 import { SummaryRow } from '@/ui/catalog';
 import { AddressSheet } from '@/ui/address-sheet';
@@ -163,19 +164,47 @@ export default function CheckoutScreen() {
     );
   }
 
+  const deliveryShownIqd = quote.data
+    ? customerDeliveryFee(quote.data.delivery_fee_iqd, quote.data.platform_service_fee_iqd)
+    : 0;
+  const totalIqd = quote.data?.customer_total_iqd ?? null;
+  const canPlace = Boolean(selected && quote.data) && !place.isPending;
+
   return (
     <Screen edges={['top']} padded={false}>
-      <Row justify="space-between" style={{ paddingHorizontal: space[4], minHeight: TAP_TARGET }}>
+      <Row
+        justify="space-between"
+        style={{ paddingHorizontal: space[4], paddingVertical: space[2], gap: space[3] }}
+      >
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/cart'))}
           accessibilityRole="button"
           accessibilityLabel="رجوع"
-          style={{ width: TAP_TARGET, height: TAP_TARGET, justifyContent: 'center' }}
+          style={({ pressed }) => [
+            {
+              width: 40,
+              height: 40,
+              borderRadius: radius.full,
+              backgroundColor: color.surfaceCard,
+              borderWidth: 1,
+              borderColor: color.borderSubtle,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            pressed ? { opacity: 0.7 } : null,
+          ]}
         >
-          <MaterialCommunityIcons name="chevron-right" size={26} color={color.textPrimary} />
+          <MaterialCommunityIcons name="chevron-right" size={24} color={color.textPrimary} />
         </Pressable>
-        <Text variant="h3">تأكيد الطلب</Text>
-        <View style={{ width: TAP_TARGET }} />
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text variant="h3" align="center">
+            تأكيد الطلب
+          </Text>
+          <Text variant="caption" tone="muted" align="center" numberOfLines={1}>
+            من {cart.restaurantName}
+          </Text>
+        </View>
+        <View style={{ width: 40 }} />
       </Row>
 
       <ScrollView
@@ -215,10 +244,24 @@ export default function CheckoutScreen() {
                 onPress={() => setAddingAddress(true)}
                 accessibilityRole="button"
                 accessibilityLabel="إضافة عنوان جديد"
-                style={{ minHeight: TAP_TARGET, justifyContent: 'center' }}
+                style={({ pressed }) => [
+                  {
+                    minHeight: TAP_TARGET,
+                    flexDirection: ROW,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: space[2],
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderColor: color.brand,
+                  },
+                  pressed ? { backgroundColor: color.brandSoft } : null,
+                ]}
               >
+                <MaterialCommunityIcons name="plus" size={18} color={color.brand} />
                 <Text variant="smallBold" tone="brand">
-                  + إضافة عنوان جديد
+                  إضافة عنوان جديد
                 </Text>
               </Pressable>
             </View>
@@ -231,19 +274,36 @@ export default function CheckoutScreen() {
            * is a physical good, so Apple's in-app-purchase requirement
            * (guideline 3.1.1) does not apply and must not be used.
            */}
-          <Row gap={space[2]}>
-            <MaterialCommunityIcons name="check-circle" size={18} color={color.success} />
-            <Text variant="small">الدفع نقداً عند الاستلام</Text>
-          </Row>
+          <View
+            style={{
+              flexDirection: ROW,
+              alignItems: 'center',
+              gap: space[3],
+              padding: space[3],
+              borderRadius: radius.md,
+              borderWidth: 1.5,
+              borderColor: color.brand,
+              backgroundColor: color.brandSoft,
+            }}
+          >
+            <IconTile name="cash-multiple" />
+            <View style={{ flex: 1 }}>
+              <Text variant="smallBold">نقداً عند الاستلام</Text>
+              <Text variant="caption" tone="muted">
+                ادفع للمندوب عند وصول طلبك
+              </Text>
+            </View>
+            <RadioMark selected />
+          </View>
         </Section>
 
-        <Section title="الملخص" icon="wallet-outline">
+        <Section title="ملخص الطلب" icon="receipt-text-outline">
           {quote.isLoading ? (
             <Skeleton height={112} />
           ) : quote.isError ? (
             <QuoteError error={quote.error} onRetry={() => void quote.refetch()} />
           ) : quote.data ? (
-            <View style={{ gap: space[2] }}>
+            <View style={{ gap: space[3] }}>
               <SummaryRow
                 label="المجموع الفرعي"
                 value={formatIqdArabic(iqd(quote.data.items_subtotal_iqd))}
@@ -255,29 +315,34 @@ export default function CheckoutScreen() {
                   tone="success"
                 />
               ) : null}
+              {/* The service fee is inside this figure — see lib/delivery-fee. */}
               <SummaryRow
                 label="رسوم التوصيل"
-                value={
-                  quote.data.delivery_fee_iqd === 0
-                    ? 'مجاناً'
-                    : formatIqdArabic(iqd(quote.data.delivery_fee_iqd))
-                }
-                tone={quote.data.delivery_fee_iqd === 0 ? 'success' : undefined}
+                value={deliveryShownIqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(deliveryShownIqd))}
+                tone={deliveryShownIqd === 0 ? 'success' : undefined}
               />
-              {quote.data.platform_service_fee_iqd > 0 ? (
-                <SummaryRow
-                  label="رسوم الخدمة"
-                  value={formatIqdArabic(iqd(quote.data.platform_service_fee_iqd))}
-                />
-              ) : null}
               <SummaryRow
                 label="الإجمالي"
                 value={formatIqdArabic(iqd(quote.data.customer_total_iqd))}
                 emphasis
               />
-              <Text variant="caption" tone="muted">
-                يصل خلال {quote.data.estimated_preparation_minutes} دقيقة تقريباً
-              </Text>
+              <View
+                style={{
+                  flexDirection: ROW,
+                  alignItems: 'center',
+                  alignSelf: 'center',
+                  gap: space[2],
+                  paddingVertical: space[2],
+                  paddingHorizontal: space[3],
+                  borderRadius: radius.full,
+                  backgroundColor: color.surfaceSunken,
+                }}
+              >
+                <MaterialCommunityIcons name="clock-outline" size={16} color={color.brand} />
+                <Text variant="caption" tone="secondary">
+                  يصل خلال {quote.data.estimated_preparation_minutes} دقيقة تقريباً
+                </Text>
+              </View>
             </View>
           ) : (
             <Text variant="small" tone="muted">
@@ -295,31 +360,70 @@ export default function CheckoutScreen() {
         ) : null}
       </ScrollView>
 
+      {/*
+        One bar, one button, the total on it. The total used to be printed
+        above the button as well as inside the summary — three places for one
+        number. On the button it is also what is being agreed to.
+      */}
       <View
         style={{
-          padding: space[4],
+          paddingHorizontal: space[4],
+          paddingTop: space[3],
           paddingBottom: space[6],
           backgroundColor: color.surfaceCard,
-          borderTopWidth: 1,
-          borderTopColor: color.borderSubtle,
-          gap: space[2],
+          borderTopLeftRadius: radius.xl,
+          borderTopRightRadius: radius.xl,
+          ...shadow.lg,
         }}
       >
-        <Row justify="space-between">
-          <Text variant="small" tone="muted">
-            الإجمالي
-          </Text>
-          <Text variant="h3" tone="brand">
-            {formatIqdArabic(iqd(quote.data?.customer_total_iqd ?? subtotalIqd))}
-          </Text>
-        </Row>
-        <Button
-          label="تأكيد الطلب"
-          block
-          loading={place.isPending}
-          disabled={!selected || !quote.data || place.isPending}
+        <Pressable
           onPress={() => place.mutate()}
-        />
+          disabled={!canPlace}
+          accessibilityRole="button"
+          accessibilityLabel={
+            totalIqd === null
+              ? 'تأكيد الطلب'
+              : `تأكيد الطلب، الإجمالي ${formatIqdArabic(iqd(totalIqd))}`
+          }
+          accessibilityState={{ disabled: !canPlace, busy: place.isPending }}
+          style={({ pressed }) => [
+            {
+              minHeight: 56,
+              flexDirection: ROW,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: space[5],
+              borderRadius: radius.full,
+              backgroundColor: color.brand,
+              opacity: canPlace || place.isPending ? 1 : 0.45,
+            },
+            pressed ? { backgroundColor: color.brandStrong } : null,
+          ]}
+        >
+          {place.isPending ? (
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <ActivityIndicator color={palette.white} />
+            </View>
+          ) : (
+            <>
+              <Text variant="bodyBold" tone="inverse">
+                تأكيد الطلب
+              </Text>
+              <View
+                style={{
+                  paddingVertical: space[1],
+                  paddingHorizontal: space[3],
+                  borderRadius: radius.full,
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                }}
+              >
+                <Text variant="bodyBold" tone="inverse">
+                  {formatIqdArabic(iqd(totalIqd ?? subtotalIqd))}
+                </Text>
+              </View>
+            </>
+          )}
+        </Pressable>
       </View>
 
       <AddressSheet
@@ -338,13 +442,58 @@ export default function CheckoutScreen() {
   );
 }
 
+type GlyphName = keyof typeof MaterialCommunityIcons.glyphMap;
+
+/** A glyph on a soft square in the section's colour — the screen's one icon style. */
+function IconTile({ name, muted = false }: { name: GlyphName; muted?: boolean }) {
+  return (
+    <View
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: radius.md,
+        backgroundColor: muted ? color.surfaceSunken : color.brandSoft,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <MaterialCommunityIcons
+        name={name}
+        size={20}
+        color={muted ? color.textSecondary : color.brand}
+      />
+    </View>
+  );
+}
+
+/** A radio mark, drawn: filled ring when chosen, empty when not. */
+function RadioMark({ selected }: { selected: boolean }) {
+  return (
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 2,
+        borderColor: selected ? color.brand : color.borderStrong,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {selected ? (
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color.brand }} />
+      ) : null}
+    </View>
+  );
+}
+
 function Section({
   title,
   icon,
   children,
 }: {
   title: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  icon: GlyphName;
   children: React.ReactNode;
 }) {
   return (
@@ -352,19 +501,37 @@ function Section({
       style={{
         gap: space[3],
         padding: space[4],
-        borderRadius: radius.lg,
+        borderRadius: radius.xl,
         backgroundColor: color.surfaceCard,
-        borderWidth: 1,
-        borderColor: color.borderSubtle,
+        ...shadow.sm,
       }}
     >
-      <Row gap={space[2]}>
-        <MaterialCommunityIcons name={icon} size={18} color={color.brand} />
-        <Text variant="smallBold">{title}</Text>
-      </Row>
+      <View style={{ flexDirection: ROW, alignItems: 'center', gap: space[2] }}>
+        <View
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: radius.full,
+            backgroundColor: color.brandSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <MaterialCommunityIcons name={icon} size={16} color={color.brand} />
+        </View>
+        <Text variant="bodyBold">{title}</Text>
+      </View>
       {children}
     </View>
   );
+}
+
+/** Home, work, or a pin — read from the label the customer gave it. */
+function addressGlyph(label: string | null): GlyphName {
+  if (!label) return 'map-marker-outline';
+  if (/منزل|بيت/.test(label)) return 'home-outline';
+  if (/عمل|مكتب|دوام/.test(label)) return 'briefcase-outline';
+  return 'map-marker-outline';
 }
 
 function AddressRow({
@@ -376,38 +543,45 @@ function AddressRow({
   selected: boolean;
   onPress: () => void;
 }) {
-  const summary = [address.district_text, address.street, address.building]
-    .filter(Boolean)
-    .join('، ');
+  /*
+   * Never a bare dash. An address saved from a pin often has no street or
+   * building, and «المنزل / —» twice in a row gave two identical rows nobody
+   * could tell apart; the city and governorate always exist.
+   */
+  const summary =
+    [address.district_text, address.street, address.building, address.landmark]
+      .filter(Boolean)
+      .join('، ') || `${address.governorate.name_ar} — ${address.city.name_ar}`;
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={address.label ?? summary}
-      style={{
-        minHeight: TAP_TARGET + 8,
-        paddingHorizontal: space[3],
-        paddingVertical: space[2],
-        borderRadius: radius.md,
-        borderWidth: 1,
-        borderColor: selected ? color.brand : color.borderSubtle,
-        backgroundColor: selected ? color.brandSoft : color.surfaceCard,
-        justifyContent: 'center',
-      }}
+      accessibilityLabel={`${address.label ?? 'عنوان'}، ${summary}`}
+      style={({ pressed }) => [
+        {
+          flexDirection: ROW,
+          alignItems: 'center',
+          gap: space[3],
+          minHeight: TAP_TARGET + 12,
+          padding: space[3],
+          borderRadius: radius.md,
+          borderWidth: selected ? 1.5 : 1,
+          borderColor: selected ? color.brand : color.borderSubtle,
+          backgroundColor: selected ? color.brandSoft : color.surfaceCard,
+        },
+        pressed ? { opacity: 0.85 } : null,
+      ]}
     >
-      <Row justify="space-between">
-        <View style={{ flex: 1 }}>
-          <Text variant="smallBold">{address.label ?? 'عنوان'}</Text>
-          <Text variant="caption" tone="muted" numberOfLines={2}>
-            {summary || '—'}
-          </Text>
-        </View>
-        {selected ? (
-          <MaterialCommunityIcons name="check-circle" size={20} color={color.brand} />
-        ) : null}
-      </Row>
+      <IconTile name={addressGlyph(address.label)} muted={!selected} />
+      <View style={{ flex: 1 }}>
+        <Text variant="smallBold">{address.label ?? 'عنوان'}</Text>
+        <Text variant="caption" tone="muted" numberOfLines={2}>
+          {summary}
+        </Text>
+      </View>
+      <RadioMark selected={selected} />
     </Pressable>
   );
 }
@@ -435,9 +609,7 @@ function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void })
     : null;
 
   if (!line || !cart) {
-    return (
-      <ErrorState message={api?.messageAr ?? 'تعذّر حساب الطلب'} onRetry={onRetry} />
-    );
+    return <ErrorState message={api?.messageAr ?? 'تعذّر حساب الطلب'} onRetry={onRetry} />;
   }
 
   return (
@@ -465,9 +637,7 @@ function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void })
         <Button
           label="اختيار الخيارات"
           style={{ alignSelf: 'center' }}
-          onPress={() =>
-            router.push(`/restaurant/${cart.restaurantId}?item=${line.menuItemId}`)
-          }
+          onPress={() => router.push(`/restaurant/${cart.restaurantId}?item=${line.menuItemId}`)}
         />
         <Button
           label="حذف الصنف"
@@ -482,4 +652,3 @@ function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void })
     </View>
   );
 }
-

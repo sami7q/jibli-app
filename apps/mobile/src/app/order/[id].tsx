@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
+import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, ApiError } from '@/lib/api';
 import { color, palette, radius, space, TAP_TARGET } from '@/theme';
 import { Button, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
@@ -28,7 +29,6 @@ import { confirmAsync, notify } from '@/lib/dialog';
 
 /** Statuses the customer may still cancel from; the server decides finally. */
 const CANCELLABLE: OrderStatus[] = ['PLACED', 'PENDING_RESTAURANT'];
-
 
 export default function OrderScreen() {
   const { id, placed } = useLocalSearchParams<{ id: string; placed?: string }>();
@@ -65,10 +65,7 @@ export default function OrderScreen() {
       void queryClient.invalidateQueries({ queryKey: ['my-orders'] });
     },
     onError: (error) =>
-      notify(
-        'تعذّر الإلغاء',
-        error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
-      ),
+      notify('تعذّر الإلغاء', error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.'),
   });
 
   const steps = useMemo<TimelineStep[]>(() => {
@@ -159,15 +156,15 @@ export default function OrderScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/*
-          * The answer to «هل وصل طلبي؟», given before anything else.
-          *
-          * The screen used to open on a status timeline with a full-width red
-          * «إلغاء الطلب» under it, and that is the wrong first impression of a
-          * successful order: the loudest thing on the page was the way out of
-          * it. The confirmation is drawn only for the hop straight from
-          * checkout — coming back to the same order an hour later, it would be
-          * telling the customer something they did themselves.
-          */}
+         * The answer to «هل وصل طلبي؟», given before anything else.
+         *
+         * The screen used to open on a status timeline with a full-width red
+         * «إلغاء الطلب» under it, and that is the wrong first impression of a
+         * successful order: the loudest thing on the page was the way out of
+         * it. The confirmation is drawn only for the hop straight from
+         * checkout — coming back to the same order an hour later, it would be
+         * telling the customer something they did themselves.
+         */}
         {justPlaced ? <PlacedConfirmation orderNumber={data.public_order_number} /> : null}
 
         <StatusBanner status={data.status} etaMinutes={data.estimated_preparation_minutes} />
@@ -245,18 +242,17 @@ export default function OrderScreen() {
               tone="success"
             />
           ) : null}
+          {/* The service fee is inside this figure — see lib/delivery-fee. */}
           <SummaryRow
             label="رسوم التوصيل"
             value={
-              data.delivery_fee_iqd === 0 ? 'مجاناً' : formatIqdArabic(iqd(data.delivery_fee_iqd))
+              customerDeliveryFee(data.delivery_fee_iqd, data.platform_service_fee_iqd) === 0
+                ? 'مجاناً'
+                : formatIqdArabic(
+                    iqd(customerDeliveryFee(data.delivery_fee_iqd, data.platform_service_fee_iqd)),
+                  )
             }
           />
-          {data.platform_service_fee_iqd > 0 ? (
-            <SummaryRow
-              label="رسوم الخدمة"
-              value={formatIqdArabic(iqd(data.platform_service_fee_iqd))}
-            />
-          ) : null}
           <SummaryRow
             label="الإجمالي"
             value={formatIqdArabic(iqd(data.customer_total_iqd))}
@@ -284,14 +280,14 @@ export default function OrderScreen() {
         ) : null}
 
         {/*
-          * A way out, not an invitation.
-          *
-          * This was a filled red full-width button — the single most prominent
-          * control on a screen whose news is good — and a destructive action
-          * drawn like a primary one is an action people take by mistake and by
-          * suggestion. It is still one tap away and still says exactly what it
-          * does; it simply no longer outranks the order it would cancel.
-          */}
+         * A way out, not an invitation.
+         *
+         * This was a filled red full-width button — the single most prominent
+         * control on a screen whose news is good — and a destructive action
+         * drawn like a primary one is an action people take by mistake and by
+         * suggestion. It is still one tap away and still says exactly what it
+         * does; it simply no longer outranks the order it would cancel.
+         */}
         {CANCELLABLE.includes(data.status) ? (
           <Pressable
             onPress={() =>
@@ -387,11 +383,7 @@ function StatusBanner({ status, etaMinutes }: { status: OrderStatus; etaMinutes:
       style={{
         padding: space[4],
         borderRadius: radius.lg,
-        backgroundColor: failed
-          ? color.dangerSoft
-          : done
-            ? color.successSoft
-            : color.brandSoft,
+        backgroundColor: failed ? color.dangerSoft : done ? color.successSoft : color.brandSoft,
         gap: space[1],
       }}
     >

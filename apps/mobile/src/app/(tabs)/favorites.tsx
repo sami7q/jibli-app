@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { cuisineLabelAr } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
+import { useServiceFee } from '@/lib/use-service-fee';
+import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, ApiError, assetUrl } from '@/lib/api';
 import { useIsGuest } from '@/lib/session';
 import { radius, space } from '@/theme';
@@ -18,6 +20,7 @@ import { RestaurantCard } from '@/ui/catalog';
  * finally does.
  */
 export default function FavoritesScreen() {
+  const serviceFee = useServiceFee();
   const router = useRouter();
   const isGuest = useIsGuest();
 
@@ -82,9 +85,11 @@ export default function FavoritesScreen() {
               rating={restaurant.rating}
               ratingCount={restaurant.rating_count}
               deliveryFee={
-                restaurant.delivery_fee_iqd === 0
+                customerDeliveryFee(restaurant.delivery_fee_iqd, serviceFee) === 0
                   ? 'التوصيل مجاني'
-                  : `التوصيل ${formatIqdArabic(iqd(restaurant.delivery_fee_iqd))}`
+                  : `التوصيل ${formatIqdArabic(
+                      iqd(customerDeliveryFee(restaurant.delivery_fee_iqd, serviceFee)),
+                    )}`
               }
               etaMinutes={restaurant.estimated_preparation_minutes}
               closed={!restaurant.is_open || !restaurant.accepts_orders}
