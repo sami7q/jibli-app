@@ -17,7 +17,18 @@ import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { holdPendingCredentials } from '@/lib/pending-credentials';
 import { PasswordField } from '@/ui/password-field';
-import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import {
+  BRAND,
+  INPUT_TEXT_START,
+  ROW,
+  lazySheet,
+  TAP_TARGET,
+  color,
+  palette,
+  radius,
+  space,
+  text,
+} from '@/theme';
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
 import { useSession } from '@/lib/session';
@@ -477,132 +488,134 @@ export default function PhoneScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: color.surfaceCard,
-    padding: space[6],
-    justifyContent: 'center',
-    gap: space[4],
-  },
-  back: {
-    position: 'absolute',
-    top: space[10],
-    // The start corner, which in Arabic is the right one — and where a
-    // right-pointing chevron belongs.
-    right: space[4],
-    width: TAP_TARGET,
-    height: TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  /*
-   * A segmented control, drawn as one object with a moving fill rather than as
-   * two buttons. The tray carries the border; the active tab carries the brand.
-   */
-  tabs: {
-    flexDirection: ROW,
-    backgroundColor: palette.ink[50],
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    padding: space[1],
-    gap: space[1],
-  },
-  tab: {
-    flex: 1,
-    minHeight: TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-  },
-  tabActive: { backgroundColor: BRAND[500] },
-  tabText: { ...text.bodyBold, color: color.textSecondary },
-  tabTextActive: { color: palette.white },
+const styles = lazySheet(() =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: color.surfaceCard,
+      padding: space[6],
+      justifyContent: 'center',
+      gap: space[4],
+    },
+    back: {
+      position: 'absolute',
+      top: space[10],
+      // The start corner, which in Arabic is the right one — and where a
+      // right-pointing chevron belongs.
+      right: space[4],
+      width: TAP_TARGET,
+      height: TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    /*
+     * A segmented control, drawn as one object with a moving fill rather than as
+     * two buttons. The tray carries the border; the active tab carries the brand.
+     */
+    tabs: {
+      flexDirection: ROW,
+      backgroundColor: palette.ink[50],
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      padding: space[1],
+      gap: space[1],
+    },
+    tab: {
+      flex: 1,
+      minHeight: TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.sm,
+    },
+    tabActive: { backgroundColor: BRAND[500] },
+    tabText: { ...text.bodyBold, color: color.textSecondary },
+    tabTextActive: { color: palette.white },
 
-  /** Words, unlike a phone number, follow the layout direction. */
-  textInput: { writingDirection: 'auto', textAlign: 'right' },
+    /** Words, unlike a phone number, follow the layout direction. */
+    textInput: { writingDirection: 'auto', textAlign: INPUT_TEXT_START },
 
-  recovery: {
-    flexDirection: ROW,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  recoveryTap: { minHeight: TAP_TARGET, justifyContent: 'center' },
-  recoveryLink: { ...text.small, color: BRAND[600], fontWeight: '700' },
-  recoveryLinkDisabled: { color: palette.ink[400] },
+    recovery: {
+      flexDirection: ROW,
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    recoveryTap: { minHeight: TAP_TARGET, justifyContent: 'center' },
+    recoveryLink: { ...text.small, color: BRAND[600], fontWeight: '700' },
+    recoveryLinkDisabled: { color: palette.ink[400] },
 
-  header: { gap: space[2], alignItems: 'center', marginBottom: space[4] },
-  title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
-  brand: { color: BRAND[500] },
-  subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
+    header: { gap: space[2], alignItems: 'center', marginBottom: space[4] },
+    title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
+    brand: { color: BRAND[500] },
+    subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
 
-  inputRow: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    gap: space[2],
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    borderRadius: radius.md,
-    backgroundColor: palette.ink[50],
-    paddingHorizontal: space[3],
-    minHeight: TAP_TARGET + 8,
-  },
-  prefix: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    gap: space[1],
-    // The prefix block leads on the right, so the rule that separates it from
-    // the number sits on its left. Physical, like every other position in the
-    // app: the logical pair follows the native flag.
-    paddingLeft: space[3],
-    borderLeftWidth: 1,
-    borderLeftColor: color.borderSubtle,
-  },
-  prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
-  input: {
-    flex: 1,
-    ...text.body,
-    color: color.textPrimary,
-    paddingVertical: space[3],
-    // Digits stay LTR regardless of layout direction.
-    writingDirection: 'ltr',
-  },
+    inputRow: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      gap: space[2],
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      borderRadius: radius.md,
+      backgroundColor: palette.ink[50],
+      paddingHorizontal: space[3],
+      minHeight: TAP_TARGET + 8,
+    },
+    prefix: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      gap: space[1],
+      // The prefix block leads on the right, so the rule that separates it from
+      // the number sits on its left. Physical, like every other position in the
+      // app: the logical pair follows the native flag.
+      paddingLeft: space[3],
+      borderLeftWidth: 1,
+      borderLeftColor: color.borderSubtle,
+    },
+    prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
+    input: {
+      flex: 1,
+      ...text.body,
+      color: color.textPrimary,
+      paddingVertical: space[3],
+      // Digits stay LTR regardless of layout direction.
+      writingDirection: 'ltr',
+    },
 
-  error: {
-    ...text.small,
-    color: color.danger,
-    backgroundColor: color.dangerSoft,
-    padding: space[3],
-    borderRadius: radius.sm,
-  },
+    error: {
+      ...text.small,
+      color: color.danger,
+      backgroundColor: color.dangerSoft,
+      padding: space[3],
+      borderRadius: radius.sm,
+    },
 
-  button: {
-    backgroundColor: BRAND[500],
-    minHeight: TAP_TARGET + 8,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonDisabled: { backgroundColor: palette.ink[300] },
-  buttonText: { ...text.bodyBold, color: palette.white },
+    button: {
+      backgroundColor: BRAND[500],
+      minHeight: TAP_TARGET + 8,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonDisabled: { backgroundColor: palette.ink[300] },
+    buttonText: { ...text.bodyBold, color: palette.white },
 
-  alternatives: { gap: space[3], alignItems: 'stretch' },
-  divider: { ...text.small, color: color.textMuted, textAlign: 'center' },
-  googleButton: {
-    minHeight: TAP_TARGET + 8,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.borderStrong,
-    backgroundColor: color.surfaceCard,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleLabel: { ...text.bodyBold, color: color.textPrimary },
+    alternatives: { gap: space[3], alignItems: 'stretch' },
+    divider: { ...text.small, color: color.textMuted, textAlign: 'center' },
+    googleButton: {
+      minHeight: TAP_TARGET + 8,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: color.borderStrong,
+      backgroundColor: color.surfaceCard,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    googleLabel: { ...text.bodyBold, color: color.textPrimary },
 
-  legal: { ...text.small, color: color.textMuted, textAlign: 'center' },
-  link: { color: BRAND[600] },
-});
+    legal: { ...text.small, color: color.textMuted, textAlign: 'center' },
+    link: { color: BRAND[600] },
+  }),
+);
 
 /** Opens one of the legal URLs from the Expo config. */
 function openLegal(key: 'termsUrl' | 'privacyPolicyUrl'): void {

@@ -194,8 +194,15 @@ export const TAP_TARGET = tapTarget.native;
  * So the constant is now only the part that *is* constant, and every consumer
  * adds `useSafeAreaInsets().bottom` — the measured value, on both platforms —
  * via `useTabBarHeight()` below.
+ *
+ * The number is what the bar actually stacks, top to bottom: its own top
+ * padding (4), the navigator's item padding (5, not overridable), the icon's
+ * box (28 — see the tabs layout), the label's line (a caption, 19), the item
+ * padding again (5), and one point of slack. It was `TAP_TARGET + space[1]`,
+ * 52, which is nine short of that: the column overflowed the bar and the
+ * label sat wherever the overflow left it.
  */
-export const TAB_BAR_CONTENT_HEIGHT = TAP_TARGET + space[1];
+export const TAB_BAR_CONTENT_HEIGHT = 62;
 
 /**
  * One bundled font file per weight, named by the family React Native will ask
@@ -226,44 +233,44 @@ const FAMILY_FOR_WEIGHT: Record<string, string> = {
  * jitter by a pixel between re-renders on Android.
  */
 /**
- * A row that reads right-to-left, whatever the native flag happens to say.
+ * A row that reads right-to-left, whichever way the native layer is drawing.
  *
- * `I18nManager.forceRTL(true)` does not take effect until the app restarts,
- * and in Expo Go it may never stick at all — so `isRTL` is false on the device
- * this app is tested on and true in a store build that has been opened twice.
- * Code that writes `flexDirection: 'row'` and trusts the flag therefore renders
- * one way here and the other way there, which is exactly what happened: the
- * account screen, the search field and the phone input all laid themselves out
- * left-to-right on a phone while the screens that hard-coded `row-reverse`
- * looked correct beside them.
+ * The app is Arabic-only, so every row reads right-to-left — but whether the
+ * platform mirrors `flexDirection: 'row'` for us is not one fact, it is three:
  *
- * Hard-coding `row-reverse` is not the fix either — it is the same bug from the
- * other side, and it breaks the moment the flag flips.
+ *   - **Not at all.** A fresh install before `forceRTL` has taken, Expo Go
+ *     until it restarts, a browser with no `dir`. `'row'` draws left-to-right.
+ *   - **Yes.** A build with the localization plugin, any build opened a second
+ *     time, the web once `enforceRtl` has set `dir="rtl"`. `'row'` draws
+ *     right-to-left.
+ *   - **The flag says yes and the layout says no.** Seen in Expo Go on an
+ *     Android emulator on 2026-09-30: `I18nManager.isRTL` read `true` and not
+ *     one row was mirrored. Code that trusted the flag drew the whole app
+ *     left-to-right — headers, the account rows, the tab bar — while the same
+ *     code on a phone in the second state was right.
  *
- * So the direction is derived rather than assumed. `ROW` always reads
- * right-to-left and `ROW_LTR` always reads left-to-right, in both modes, and
- * nothing in the app has to know which mode it is in.
+ * So the direction is neither read off the flag nor hard-coded. It is
+ * measured: before the first screen renders, `DirectionProbe` lays out one
+ * hidden row and reports which side its first child landed on, and
+ * `applyLayoutDirection` sets the tokens below from that answer. `ROW` then
+ * always reads right-to-left and `ROW_LTR` always left-to-right, and nothing
+ * else in the app has to know which of the three states it is in.
  *
  * One consequence worth stating: with visual order pinned this way, positional
  * styles must be **physical** (`left`/`right`, `marginLeft`) rather than
- * logical (`start`/`end`, `marginStart`). The logical ones flip with the flag,
- * so they would reintroduce the same split they are meant to avoid.
+ * logical (`start`/`end`, `marginStart`). The logical ones flip with the native
+ * direction, so they would reintroduce the split. `enforceRtl` also switches
+ * off React Native's default of reading `left`/`right` as `start`/`end` once it
+ * is mirroring, so a physical side is physical in every state.
  */
-/**
- * Whether the platform is already laying out right-to-left on its own.
- *
- * Two different mechanisms, and both have to be asked. On a device it is the
- * native flag. On the web `I18nManager` is a stub whose flag never becomes
- * true, but `enforceRtl` sets `dir="rtl"` on the document — and CSS flexbox
- * follows the writing direction, so `flex-direction: row` is already reading
- * right-to-left there. Consulting only the flag would have given the browser
- * `row-reverse` inside an RTL document, which renders left-to-right: the web
- * preview would have come out mirrored the moment the phone came out right.
- */
-const laidOutRtl = I18nManager.isRTL || Platform.OS === 'web';
 
 /**
  * Whether the platform mirrors the layout for us.
+ *
+ * `let`, and set by `applyLayoutDirection` — see above. The initial value is
+ * only the best guess before the probe answers: the flag on a device, and true
+ * on the web, where CSS follows the document's `dir`. Nothing renders on the
+ * guess; the root holds the app until the measurement is in.
  *
  * Exported because a handful of things cannot be expressed as a style token and
  * have to branch on it directly: the order the tab bar's own row draws its
@@ -271,12 +278,12 @@ const laidOutRtl = I18nManager.isRTL || Platform.OS === 'web';
  * should reach for `ROW`, `ALIGN_START` or `TEXT_START` instead — a screen that
  * asks this question itself is a screen that will get it wrong.
  */
-export const LAID_OUT_RTL = laidOutRtl;
+export let LAID_OUT_RTL: boolean = Platform.OS === 'web' || I18nManager.isRTL;
 
-export const ROW: ViewStyle['flexDirection'] = laidOutRtl ? 'row' : 'row-reverse';
+export let ROW: ViewStyle['flexDirection'] = rowFor(LAID_OUT_RTL);
 
 /** For content that reads left-to-right inside this app: a phone number, a price. */
-export const ROW_LTR: ViewStyle['flexDirection'] = laidOutRtl ? 'row-reverse' : 'row';
+export let ROW_LTR: ViewStyle['flexDirection'] = rowLtrFor(LAID_OUT_RTL);
 
 /**
  * The cross-axis ends of a column, pinned the same way `ROW` pins a row.
@@ -285,25 +292,108 @@ export const ROW_LTR: ViewStyle['flexDirection'] = laidOutRtl ? 'row-reverse' : 
  * `flexDirection: 'row'` does, so a badge or a button that says `alignSelf:
  * 'flex-start'` lands against the left edge on a device where the native flag
  * never took — under a heading that is already sitting on the right. These two
- * always mean the right and the left edge respectively, in both modes.
+ * always mean the right and the left edge respectively, in every state.
  *
  * **Only inside a column.** The cross axis of a *row* is vertical and does not
  * mirror, so `alignSelf: ALIGN_START` on a child of a `Row` does not say "the
  * right edge" — it says "the bottom". A pill or a button in a row wants
  * `flex-start` or `center`, spelled physically, and means the ordinary thing.
  */
-export const ALIGN_START: ViewStyle['alignItems'] = laidOutRtl ? 'flex-start' : 'flex-end';
-export const ALIGN_END: ViewStyle['alignItems'] = laidOutRtl ? 'flex-end' : 'flex-start';
+export let ALIGN_START: ViewStyle['alignItems'] = alignStartFor(LAID_OUT_RTL);
+export let ALIGN_END: ViewStyle['alignItems'] = alignEndFor(LAID_OUT_RTL);
+
+function rowFor(mirrored: boolean): ViewStyle['flexDirection'] {
+  return mirrored ? 'row' : 'row-reverse';
+}
+
+function rowLtrFor(mirrored: boolean): ViewStyle['flexDirection'] {
+  return mirrored ? 'row-reverse' : 'row';
+}
+
+function alignStartFor(mirrored: boolean): ViewStyle['alignItems'] {
+  return mirrored ? 'flex-start' : 'flex-end';
+}
+
+function alignEndFor(mirrored: boolean): ViewStyle['alignItems'] {
+  return mirrored ? 'flex-end' : 'flex-start';
+}
 
 /**
- * Where a line of Arabic begins.
+ * Tell the tokens which way the native layer actually lays out.
  *
- * Physical on purpose. `textAlign: 'auto'` resolves from the first strong
- * character in the string, which is right for a sentence of Arabic and wrong
- * for every line that opens with a price, an order number or a Latin brand —
- * those slide to the left edge in the middle of a right-aligned column.
+ * Called once, by `DirectionProbe`, from the root and before any screen has
+ * rendered. Every reader of `ROW` and its siblings reads them at render time
+ * through the module's live binding, so the change needs no re-render to take
+ * — and no file captures one of them at module scope, which is what would
+ * freeze the guess. `direction.test.ts` keeps both of those true.
  */
-export const TEXT_START: TextStyle['textAlign'] = 'right';
+export function applyLayoutDirection(mirrored: boolean): void {
+  LAID_OUT_RTL = mirrored;
+  ROW = rowFor(mirrored);
+  ROW_LTR = rowLtrFor(mirrored);
+  ALIGN_START = alignStartFor(mirrored);
+  ALIGN_END = alignEndFor(mirrored);
+  TEXT_START = textStartFor(mirrored);
+}
+
+/**
+ * A stylesheet built on first use rather than when the module loads.
+ *
+ * `StyleSheet.create` at module scope runs while the app is still being
+ * imported — before the probe has measured anything — so a `flexDirection:
+ * ROW` inside one would keep the pre-measurement guess for the life of the
+ * process, and the six screens that keep their styles in a sheet would lay
+ * themselves out from a different answer than every screen that styles
+ * inline. Wrapped in this, the sheet is built the first time a style is read,
+ * which is inside a render and therefore after the root has measured. Reads
+ * look exactly as before: `styles.row`.
+ */
+export function lazySheet<T extends object>(build: () => T): T {
+  let sheet: T | null = null;
+  return new Proxy({} as T, {
+    get(_target, key) {
+      if (sheet === null) sheet = build();
+      return sheet[key as keyof T];
+    },
+  });
+}
+
+/**
+ * Where a line of Arabic begins, for `Text`: the right edge.
+ *
+ * Never `'auto'`: that resolves from the first strong character in the string,
+ * which is right for a sentence of Arabic and wrong for every line that opens
+ * with a price, an order number or a Latin brand — those slide to the left
+ * edge in the middle of a right-aligned column.
+ *
+ * And not always `'right'`, which is the part that was wrong. On Android a
+ * `Text`'s alignment goes through `TextLayoutManager`, which reads `'right'`
+ * against the paragraph direction: while the native layer is laying out
+ * left-to-right, `'right'` is the right edge; once it mirrors — a store build
+ * after `forceRTL` has taken, Expo Go after a restart — `'right'` resolves to
+ * `ALIGN_OPPOSITE` and lands on the *left*. Every heading in the app sat on
+ * the wrong edge in exactly the builds customers get. iOS and the web treat
+ * the word physically. So, like `ROW`, this follows the measured direction:
+ * `applyLayoutDirection` gives Android the word that its own flip turns into
+ * the right edge.
+ *
+ * For a `TextInput` use `INPUT_TEXT_START` instead — that one *is* physical
+ * on every platform, and giving it this token would flip it the wrong way.
+ */
+export let TEXT_START: TextStyle['textAlign'] = textStartFor(LAID_OUT_RTL);
+
+/**
+ * Where typed Arabic begins, for `TextInput`: the right edge, physically.
+ *
+ * Android sets an input's gravity from the word as written — `Gravity.RIGHT`
+ * for `'right'` — with no paragraph-direction flip, so a constant is correct
+ * in every state.
+ */
+export const INPUT_TEXT_START: TextStyle['textAlign'] = 'right';
+
+function textStartFor(mirrored: boolean): TextStyle['textAlign'] {
+  return Platform.OS === 'android' && mirrored ? 'left' : 'right';
+}
 
 function type(size: number, weight: keyof typeof FAMILY_FOR_WEIGHT, ratio: number): TextStyle {
   return {
@@ -364,20 +454,33 @@ export const shadow = {
 } as const;
 
 /**
- * Force RTL at startup.
+ * Force RTL at startup, and make a physical side stay physical.
  *
  * Release 1 is Arabic-only, so the layout direction is a product decision, not
  * something to inherit from the device locale — a phone set to English must
  * still render Jibli right-to-left (plan §2).
  *
- * Must run before the first render. On a fresh install `forceRTL` only takes
- * effect after a restart, which is why `isRtlActive()` exists: the first launch
- * can be laid out the wrong way round, and a screen that needs to know can ask.
+ * Must run before the first render. Two native switches, both persisted by
+ * React Native:
+ *
+ *   `forceRTL(true)` asks the native layer to mirror rows. It only takes on the
+ *   next launch, which is why the localization plugin also sets it at build
+ *   time — and why nothing in the app depends on it having taken:
+ *   `DirectionProbe` measures the outcome and the layout tokens follow the
+ *   measurement, whatever it is.
+ *
+ *   `swapLeftAndRightInRTL(false)` stops React Native reading `left`, `right`,
+ *   `marginLeft`, `paddingRight` and the rest as `start`/`end` once it is
+ *   mirroring — which it does by default, on both platforms, and which moved
+ *   every badge the app pins to the right over to the left the moment a
+ *   build's RTL took. The whole app writes physical sides on purpose; this
+ *   makes the platform honour them in every state.
  */
 export function enforceRtl(): void {
-  if (!I18nManager.isRTL) {
+  if (Platform.OS !== 'web') {
     I18nManager.allowRTL(true);
     I18nManager.forceRTL(true);
+    I18nManager.swapLeftAndRightInRTL(false);
   }
 
   /*
@@ -397,11 +500,6 @@ export function enforceRtl(): void {
     document.documentElement.setAttribute('dir', 'rtl');
     document.documentElement.setAttribute('lang', 'ar');
   }
-}
-
-/** True once the native layer is actually laying out RTL. */
-export function isRtlActive(): boolean {
-  return I18nManager.isRTL;
 }
 
 /**

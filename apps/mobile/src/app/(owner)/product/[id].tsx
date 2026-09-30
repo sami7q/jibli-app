@@ -10,7 +10,7 @@ import { api, ApiError, assetUrl, type OwnerCategory } from '@/lib/api';
 import { catalogNoun, useOwner } from '@/lib/owner';
 import { lastCategory, rememberLastCategory } from '@/lib/owner-store';
 import { confirmAsync, notify } from '@/lib/dialog';
-import { accent, color, radius, space, TAP_TARGET, TEXT_START, text } from '@/theme';
+import { accent, color, radius, space, TAP_TARGET, INPUT_TEXT_START, text } from '@/theme';
 import {
   Button,
   EmptyState,
@@ -68,10 +68,7 @@ export default function OwnerProductScreen() {
     staleTime: 60_000,
   });
 
-  const categories = useMemo<OwnerCategory[]>(
-    () => catalog.data?.categories ?? [],
-    [catalog.data],
-  );
+  const categories = useMemo<OwnerCategory[]>(() => catalog.data?.categories ?? [], [catalog.data]);
 
   /** The product being edited, found in the tree rather than fetched again. */
   const existing = useMemo(() => {
@@ -246,7 +243,7 @@ export default function OwnerProductScreen() {
                   backgroundColor: color.surfaceCard,
                   paddingHorizontal: space[3],
                   color: color.textPrimary,
-                  textAlign: TEXT_START,
+                  textAlign: INPUT_TEXT_START,
                 },
               ]}
             />

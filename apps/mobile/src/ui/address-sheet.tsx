@@ -13,7 +13,7 @@ import {
 } from '@/lib/location';
 import { lookupArea, metresBetween } from '@/lib/place-match';
 import { loadPreferredAddressId, savePreferredAddressId } from '@/lib/preferred-address';
-import { color, radius, space, TAP_TARGET, TEXT_START, text } from '@/theme';
+import { color, radius, space, TAP_TARGET, INPUT_TEXT_START, text } from '@/theme';
 import { Button, ErrorState, Row, Text } from '@/ui';
 import { MapPicker } from '@/ui/map-picker';
 import { AreaChoice, areaStepTitle } from '@/ui/area-choice';
@@ -523,12 +523,12 @@ export function AddressSheet({
       }
     >
       {/*
-        * Anything that went wrong, in the sheet.
-        *
-        * Never `notify` from in here: it draws a `Modal`, a `Modal` cannot be
-        * presented over this one, and the attempt leaves the dialog queue
-        * believing a dialog is open — which silences every message afterwards.
-        */}
+       * Anything that went wrong, in the sheet.
+       *
+       * Never `notify` from in here: it draws a `Modal`, a `Modal` cannot be
+       * presented over this one, and the attempt leaves the dialog queue
+       * believing a dialog is open — which silences every message afterwards.
+       */}
       {problem ? (
         <View
           style={{
@@ -568,12 +568,12 @@ export function AddressSheet({
       ) : step === 'area' ? (
         <>
           {/*
-            * A way out that is not «choose a city».
-            *
-            * Without this the only exits from the city list were picking one or
-            * dismissing the whole sheet, which throws away a half-written
-            * address for the crime of looking.
-            */}
+           * A way out that is not «choose a city».
+           *
+           * Without this the only exits from the city list were picking one or
+           * dismissing the whole sheet, which throws away a half-written
+           * address for the crime of looking.
+           */}
           <Pressable
             onPress={() => setStep('form')}
             accessibilityRole="button"
@@ -630,11 +630,11 @@ export function AddressSheet({
           ) : null}
 
           {/*
-            * The map first, because the map is the address. It opens on the
-            * customer, the pin stays in the middle, and what is under it is
-            * saved with the order and handed to the courier as a navigation
-            * link.
-            */}
+           * The map first, because the map is the address. It opens on the
+           * customer, the pin stays in the middle, and what is under it is
+           * saved with the order and handed to the courier as a navigation
+           * link.
+           */}
           {seededSession === formSession ? (
             <MapPicker
               // A fresh map per form: it opens on this session's pin, never the last one's.
@@ -692,10 +692,10 @@ export function AddressSheet({
           </Pressable>
 
           {/*
-            * The city, read off the pin — shown rather than asked, and tappable
-            * because a geocoder can be wrong and there is none at all in a
-            * browser.
-            */}
+           * The city, read off the pin — shown rather than asked, and tappable
+           * because a geocoder can be wrong and there is none at all in a
+           * browser.
+           */}
           <Pressable
             onPress={() => {
               setGovernorate(null);
@@ -737,10 +737,10 @@ export function AddressSheet({
           </Pressable>
 
           {/*
-            * The one thing left to type. Everything the old form asked — street,
-            * house number, floor — was an attempt to say what a pin already
-            * says. What a pin cannot say is which of the three doors is yours.
-            */}
+           * The one thing left to type. Everything the old form asked — street,
+           * house number, floor — was an attempt to say what a pin already
+           * says. What a pin cannot say is which of the three doors is yours.
+           */}
           <View style={{ gap: space[1] }}>
             <Text variant="caption" tone="muted">
               وصف المكان للمندوب
@@ -764,7 +764,7 @@ export function AddressSheet({
                   paddingTop: space[3],
                   paddingBottom: space[3],
                   color: color.textPrimary,
-                  textAlign: TEXT_START,
+                  textAlign: INPUT_TEXT_START,
                   textAlignVertical: 'top',
                 },
               ]}
@@ -863,10 +863,10 @@ function AddressList({
                     </Text>
                     <Text variant="caption" tone="muted" numberOfLines={2}>
                       {/*
-                        * A missing pin is called out rather than left blank: it
-                        * is the difference between a courier arriving and a
-                        * courier phoning, and it is fixable in two taps.
-                        */}
+                       * A missing pin is called out rather than left blank: it
+                       * is the difference between a courier arriving and a
+                       * courier phoning, and it is fixable in two taps.
+                       */}
                       {pinned
                         ? (entry.landmark ?? entry.district_text ?? 'مثبّت على الخريطة')
                         : 'بلا دبوس — افتحه وثبّته على الخريطة'}
@@ -879,14 +879,14 @@ function AddressList({
               </Pressable>
 
               {/*
-                * Deleting asks in the row.
-                *
-                * `confirmAsync` draws a dialog, and a dialog is a `Modal` that
-                * cannot be presented over the sheet holding this list — the ask
-                * never appeared, the delete never happened, and the queue was
-                * left wedged. An inline confirmation is also simply better: the
-                * question sits on the thing it is about.
-                */}
+               * Deleting asks in the row.
+               *
+               * `confirmAsync` draws a dialog, and a dialog is a `Modal` that
+               * cannot be presented over the sheet holding this list — the ask
+               * never appeared, the delete never happened, and the queue was
+               * left wedged. An inline confirmation is also simply better: the
+               * question sits on the thing it is about.
+               */}
               <Row
                 justify="space-between"
                 style={{

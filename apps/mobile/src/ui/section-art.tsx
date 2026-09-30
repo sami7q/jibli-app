@@ -44,15 +44,13 @@ export function SectionArt({ section }: { section: Section }) {
   const { ramp, type } = section;
   const skyId = `sky-${type}`;
 
+  /*
+   * No accessibility props on the Svg itself: on the web they are handed to
+   * the DOM `<svg>` as attributes React does not know, and the card's own
+   * label already describes the section.
+   */
   return (
-    <Svg
-      width="100%"
-      height="100%"
-      viewBox="0 0 100 120"
-      preserveAspectRatio="xMidYMid slice"
-      accessible={false}
-      importantForAccessibility="no-hide-descendants"
-    >
+    <Svg width="100%" height="100%" viewBox="0 0 100 120" preserveAspectRatio="xMidYMid slice">
       <Defs>
         {/* The ground: a step lighter than the card, so the slot reads as a lit window. */}
         <LinearGradient id={skyId} x1="0" y1="0" x2="0" y2="1">

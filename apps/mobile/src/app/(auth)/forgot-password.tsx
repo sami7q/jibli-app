@@ -16,7 +16,7 @@ import { api, ApiError, NetworkError } from '@/lib/api';
 import { holdPendingCredentials } from '@/lib/pending-credentials';
 import { PasswordField } from '@/ui/password-field';
 import { IraqFlag } from '@/ui/brand';
-import { BRAND, ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { BRAND, ROW, lazySheet, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
 
 /**
  * Setting a password again, for a number the customer can still receive on.
@@ -172,79 +172,81 @@ export default function ForgotPasswordScreen() {
        * promised «أرسلنا رمزاً» would be lying to half the people who see it.
        */}
       <Text style={styles.note}>
-        إن كان الرقم مسجّلاً لدينا فسيصلك رمز خلال لحظات. تغيير كلمة السر يُنهي
-        الجلسات المفتوحة على الأجهزة الأخرى.
+        إن كان الرقم مسجّلاً لدينا فسيصلك رمز خلال لحظات. تغيير كلمة السر يُنهي الجلسات المفتوحة على
+        الأجهزة الأخرى.
       </Text>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: color.surfaceCard,
-    padding: space[6],
-    justifyContent: 'center',
-    gap: space[4],
-  },
-  back: {
-    position: 'absolute',
-    top: space[10],
-    right: space[4],
-    width: TAP_TARGET,
-    height: TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: { gap: space[2], marginBottom: space[2] },
-  title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
-  subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
+const styles = lazySheet(() =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: color.surfaceCard,
+      padding: space[6],
+      justifyContent: 'center',
+      gap: space[4],
+    },
+    back: {
+      position: 'absolute',
+      top: space[10],
+      right: space[4],
+      width: TAP_TARGET,
+      height: TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    header: { gap: space[2], marginBottom: space[2] },
+    title: { ...text.h1, color: color.textPrimary, textAlign: 'center' },
+    subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
 
-  inputRow: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    gap: space[2],
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    borderRadius: radius.md,
-    backgroundColor: palette.ink[50],
-    paddingHorizontal: space[3],
-    minHeight: TAP_TARGET + 8,
-  },
-  prefix: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    gap: space[1],
-    paddingLeft: space[3],
-    borderLeftWidth: 1,
-    borderLeftColor: color.borderSubtle,
-  },
-  prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
-  input: {
-    flex: 1,
-    ...text.body,
-    color: color.textPrimary,
-    paddingVertical: space[3],
-    writingDirection: 'ltr',
-  },
+    inputRow: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      gap: space[2],
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      borderRadius: radius.md,
+      backgroundColor: palette.ink[50],
+      paddingHorizontal: space[3],
+      minHeight: TAP_TARGET + 8,
+    },
+    prefix: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      gap: space[1],
+      paddingLeft: space[3],
+      borderLeftWidth: 1,
+      borderLeftColor: color.borderSubtle,
+    },
+    prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
+    input: {
+      flex: 1,
+      ...text.body,
+      color: color.textPrimary,
+      paddingVertical: space[3],
+      writingDirection: 'ltr',
+    },
 
-  error: {
-    ...text.small,
-    color: color.danger,
-    backgroundColor: color.dangerSoft,
-    padding: space[3],
-    borderRadius: radius.sm,
-  },
+    error: {
+      ...text.small,
+      color: color.danger,
+      backgroundColor: color.dangerSoft,
+      padding: space[3],
+      borderRadius: radius.sm,
+    },
 
-  button: {
-    backgroundColor: BRAND[500],
-    minHeight: TAP_TARGET + 8,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonDisabled: { backgroundColor: palette.ink[300] },
-  buttonText: { ...text.bodyBold, color: palette.white },
+    button: {
+      backgroundColor: BRAND[500],
+      minHeight: TAP_TARGET + 8,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonDisabled: { backgroundColor: palette.ink[300] },
+    buttonText: { ...text.bodyBold, color: palette.white },
 
-  note: { ...text.small, color: color.textMuted, textAlign: 'center' },
-});
+    note: { ...text.small, color: color.textMuted, textAlign: 'center' },
+  }),
+);

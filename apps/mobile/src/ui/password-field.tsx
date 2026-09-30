@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import Icon from '@/ui/icon';
-import { ROW, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import { ROW, TAP_TARGET, color, lazySheet, palette, radius, space, text } from '@/theme';
 
 /**
  * A password box with a lock, and an eye that reveals what was typed.
@@ -42,12 +42,15 @@ export function PasswordField({
   return (
     <View style={styles.row}>
       {/*
-       * The eye sits on the leading edge and the lock on the trailing one,
-       * which under RTL puts the control on the left and the icon on the
-       * right — the arrangement the comps draw, and the one every Arabic app
-       * uses. `ROW` resolves the direction; hard-coding `row` here would
-       * mirror it wrongly in the one mode the app actually ships in.
+       * The lock leads and the eye trails. `ROW` reads right-to-left, so the
+       * first child is the one on the right: the icon marks the field where
+       * a line of Arabic begins, and the control sits at the far end where
+       * every Arabic app puts it. The order used to be the other way round,
+       * which put the eye on the right and the lock on the left — the mirror
+       * of what the comment beside it promised.
        */}
+      <Icon name="lock-outline" size={20} color={color.textMuted} style={styles.lock} />
+
       <Pressable
         onPress={() => setRevealed((shown) => !shown)}
         accessibilityRole="button"
@@ -84,37 +87,38 @@ export function PasswordField({
         {...(onSubmitEditing ? { onSubmitEditing } : {})}
         {...(returnKeyType ? { returnKeyType } : {})}
       />
-
-      <Icon name="lock-outline" size={20} color={color.textMuted} style={styles.lock} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    minHeight: TAP_TARGET,
-    backgroundColor: color.surfaceSunken,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    paddingHorizontal: space[3],
-  },
-  input: {
-    flex: 1,
-    ...text.body,
-    color: color.textPrimary,
-    paddingVertical: space[3],
-    paddingHorizontal: space[2],
-  },
-  reveal: {
-    minWidth: TAP_TARGET - space[4],
-    minHeight: TAP_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lock: {
-    marginStart: space[1],
-  },
-});
+const styles = lazySheet(() =>
+  StyleSheet.create({
+    row: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      minHeight: TAP_TARGET,
+      backgroundColor: color.surfaceSunken,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      paddingHorizontal: space[3],
+    },
+    input: {
+      flex: 1,
+      ...text.body,
+      color: color.textPrimary,
+      paddingVertical: space[3],
+      paddingHorizontal: space[2],
+    },
+    reveal: {
+      minWidth: TAP_TARGET - space[4],
+      minHeight: TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    lock: {
+      // Physical: the gap is between the lock and the field, on the lock's left.
+      marginLeft: space[1],
+    },
+  }),
+);

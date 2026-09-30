@@ -17,6 +17,7 @@ import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import {
   ALIGN_START,
   color,
+  INPUT_TEXT_START,
   LAID_OUT_RTL,
   palette,
   radius,
@@ -142,6 +143,16 @@ export function Text({
       maxFontSizeMultiplier={maxFontSizeMultiplier ?? TEXT_SCALE_CEILING}
       {...(numberOfLines === undefined ? {} : { numberOfLines })}
     >
+      {/*
+       * The children as given. Android has no `writingDirection`, so a line
+       * that opens with a Latin brand is a left-to-right paragraph there; the
+       * *edge* it sits on is still right, because `TEXT_START` accounts for
+       * the platform's flip, and that is what shows. Prefixing a right-to-left
+       * mark (U+200F) to force the paragraph was tried on 2026-09-30 and
+       * reverted the same day: Android measures a marked string a fraction
+       * narrower than it draws it, so every auto-width chip and badge wrapped
+       * its last word onto a second line.
+       */}
       {children}
     </RNText>
   );
@@ -367,7 +378,31 @@ export function Button({
       ) : (
         <>
           {icon}
-          <RNText style={[text.bodyBold, { color: labelTones[variant] }]}>{label}</RNText>
+          {/*
+           * The label never asks Android for its own width.
+           *
+           * A text measured at its intrinsic width in a row is laid out again
+           * at that width rounded to the pixel grid, and with Cairo's Arabic
+           * that rounding comes up a hair short: the last word wrapped to a
+           * second line the button had no room for, so «تسجيل الدخول» showed
+           * as «تسجيل» on every Android phone. A block button fills its row
+           * with the label and centres inside it, which hands the text a
+           * width it cannot fall short of; a button sized to its content
+           * keeps a point of slack on either side, which is more than the
+           * rounding ever takes. A single line means a label that still does
+           * not fit is clipped with an ellipsis rather than silently losing
+           * its second word.
+           */}
+          <RNText
+            numberOfLines={1}
+            style={[
+              text.bodyBold,
+              { color: labelTones[variant], textAlign: 'center' },
+              block && !icon ? { flex: 1 } : { paddingHorizontal: 1 },
+            ]}
+          >
+            {label}
+          </RNText>
         </>
       )}
     </Pressable>
@@ -593,7 +628,8 @@ export function Input({
           // field has no first strong character for it to read.
           ...(ltr
             ? { textAlign: 'left' as const, writingDirection: 'ltr' as const }
-            : { textAlign: TEXT_START }),
+            : // An input: physical on every platform, unlike a `Text`.
+              { textAlign: INPUT_TEXT_START }),
         },
         style,
       ]}

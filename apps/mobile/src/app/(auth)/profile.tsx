@@ -19,7 +19,18 @@ import { ensureLocationPermissionAsked } from '@/lib/location';
 import { AddressSheet } from '@/ui/address-sheet';
 import type { DeliveryArea } from '@/lib/area';
 import { api, ApiError, NetworkError, type GeographyOption } from '@/lib/api';
-import { BRAND, ROW, TAP_TARGET, color, palette, radius, shadow, space, text } from '@/theme';
+import {
+  BRAND,
+  ROW,
+  lazySheet,
+  TAP_TARGET,
+  color,
+  palette,
+  radius,
+  shadow,
+  space,
+  text,
+} from '@/theme';
 
 /**
  * Mandatory profile completion (plan §11).
@@ -439,113 +450,115 @@ const SUPPRESS_WEB_OUTLINE = (Platform.OS === 'web' ? { outlineStyle: 'none' } :
  * the same level. A tinted page behind a white card fixes it without a new
  * colour — both values are already in the token set.
  */
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: color.surfacePage },
-  scroll: { padding: space[4], paddingTop: space[8], gap: space[4] },
+const styles = lazySheet(() =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: color.surfacePage },
+    scroll: { padding: space[4], paddingTop: space[8], gap: space[4] },
 
-  header: { gap: space[2], paddingHorizontal: space[1] },
-  step: { ...text.captionBold, color: BRAND[600], letterSpacing: 0.5 },
-  title: { ...text.display, color: color.textPrimary },
-  subtitle: { ...text.body, color: color.textMuted },
+    header: { gap: space[2], paddingHorizontal: space[1] },
+    step: { ...text.captionBold, color: BRAND[600], letterSpacing: 0.5 },
+    title: { ...text.display, color: color.textPrimary },
+    subtitle: { ...text.body, color: color.textMuted },
 
-  card: {
-    backgroundColor: color.surfaceCard,
-    borderRadius: radius.xl,
-    paddingHorizontal: space[5],
-    ...shadow.sm,
-  },
-  row: { paddingVertical: space[4], gap: space[2] },
-  divider: { height: 1, backgroundColor: color.borderSubtle },
+    card: {
+      backgroundColor: color.surfaceCard,
+      borderRadius: radius.xl,
+      paddingHorizontal: space[5],
+      ...shadow.sm,
+    },
+    row: { paddingVertical: space[4], gap: space[2] },
+    divider: { height: 1, backgroundColor: color.borderSubtle },
 
-  label: { ...text.smallBold, color: color.textSecondary },
-  hint: { ...text.caption, color: color.textMuted },
+    label: { ...text.smallBold, color: color.textSecondary },
+    hint: { ...text.caption, color: color.textMuted },
 
-  input: {
-    ...text.body,
-    color: color.textPrimary,
-    backgroundColor: color.surfacePage,
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    borderRadius: radius.md,
-    paddingHorizontal: space[4],
-    minHeight: TAP_TARGET,
-    ...SUPPRESS_WEB_OUTLINE,
-  },
-  inputInvalid: { borderColor: color.danger, backgroundColor: color.dangerSoft },
+    input: {
+      ...text.body,
+      color: color.textPrimary,
+      backgroundColor: color.surfacePage,
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      borderRadius: radius.md,
+      paddingHorizontal: space[4],
+      minHeight: TAP_TARGET,
+      ...SUPPRESS_WEB_OUTLINE,
+    },
+    inputInvalid: { borderColor: color.danger, backgroundColor: color.dangerSoft },
 
-  select: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: color.surfacePage,
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    borderRadius: radius.md,
-    paddingHorizontal: space[4],
-    minHeight: TAP_TARGET,
-  },
-  selectPressed: { backgroundColor: color.surfaceSunken, borderColor: color.borderStrong },
-  selectDisabled: { opacity: 0.55 },
-  selectValue: { ...text.bodyBold, color: color.textPrimary },
-  selectPlaceholder: { ...text.body, color: palette.ink[400] },
-  /*
-   * A chevron from the bundled face rather than an icon set.
-   *
-   * This screen loads no icon font, and `‹` is already in Cairo. Under forced
-   * RTL the row is reversed, so it sits on the left and points outward.
-   */
-  chevron: { ...text.h3, color: palette.ink[400], marginTop: -2 },
+    select: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: color.surfacePage,
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      borderRadius: radius.md,
+      paddingHorizontal: space[4],
+      minHeight: TAP_TARGET,
+    },
+    selectPressed: { backgroundColor: color.surfaceSunken, borderColor: color.borderStrong },
+    selectDisabled: { opacity: 0.55 },
+    selectValue: { ...text.bodyBold, color: color.textPrimary },
+    selectPlaceholder: { ...text.body, color: palette.ink[400] },
+    /*
+     * A chevron from the bundled face rather than an icon set.
+     *
+     * This screen loads no icon font, and `‹` is already in Cairo. Under forced
+     * RTL the row is reversed, so it sits on the left and points outward.
+     */
+    chevron: { ...text.h3, color: palette.ink[400], marginTop: -2 },
 
-  fieldError: { ...text.caption, color: color.dangerStrong },
+    fieldError: { ...text.caption, color: color.dangerStrong },
 
-  error: {
-    ...text.smallBold,
-    color: color.dangerStrong,
-    backgroundColor: color.dangerSoft,
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-    borderRadius: radius.md,
-    textAlign: 'center',
-  },
+    error: {
+      ...text.smallBold,
+      color: color.dangerStrong,
+      backgroundColor: color.dangerSoft,
+      paddingVertical: space[3],
+      paddingHorizontal: space[4],
+      borderRadius: radius.md,
+      textAlign: 'center',
+    },
 
-  actionBar: {
-    backgroundColor: color.surfaceCard,
-    paddingHorizontal: space[5],
-    paddingTop: space[4],
-    paddingBottom: space[6],
-    borderTopWidth: 1,
-    borderTopColor: color.borderSubtle,
-  },
-  button: {
-    backgroundColor: BRAND[500],
-    minHeight: TAP_TARGET + 8,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPressed: { backgroundColor: BRAND[600] },
-  buttonDisabled: { backgroundColor: palette.ink[200] },
-  buttonText: { ...text.bodyBold, color: palette.white },
+    actionBar: {
+      backgroundColor: color.surfaceCard,
+      paddingHorizontal: space[5],
+      paddingTop: space[4],
+      paddingBottom: space[6],
+      borderTopWidth: 1,
+      borderTopColor: color.borderSubtle,
+    },
+    button: {
+      backgroundColor: BRAND[500],
+      minHeight: TAP_TARGET + 8,
+      borderRadius: radius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonPressed: { backgroundColor: BRAND[600] },
+    buttonDisabled: { backgroundColor: palette.ink[200] },
+    buttonText: { ...text.bodyBold, color: palette.white },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(22,24,29,0.5)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: color.surfaceCard,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: space[6],
-    maxHeight: '80%',
-    gap: space[3],
-  },
-  modalHeader: { flexDirection: ROW, alignItems: 'center', justifyContent: 'space-between' },
-  modalTitle: { ...text.h2, color: color.textPrimary },
-  modalClose: { ...text.bodyBold, color: BRAND[600] },
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(22,24,29,0.5)', justifyContent: 'flex-end' },
+    modalSheet: {
+      backgroundColor: color.surfaceCard,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      padding: space[6],
+      maxHeight: '80%',
+      gap: space[3],
+    },
+    modalHeader: { flexDirection: ROW, alignItems: 'center', justifyContent: 'space-between' },
+    modalTitle: { ...text.h2, color: color.textPrimary },
+    modalClose: { ...text.bodyBold, color: BRAND[600] },
 
-  option: {
-    minHeight: TAP_TARGET,
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: palette.ink[100],
-  },
-  optionText: { ...text.body, color: color.textPrimary },
-  emptyText: { ...text.body, color: color.textMuted, textAlign: 'center', padding: space[6] },
-});
+    option: {
+      minHeight: TAP_TARGET,
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: palette.ink[100],
+    },
+    optionText: { ...text.body, color: color.textPrimary },
+    emptyText: { ...text.body, color: color.textMuted, textAlign: 'center', padding: space[6] },
+  }),
+);

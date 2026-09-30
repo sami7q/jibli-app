@@ -32,6 +32,7 @@ import {
   radius,
   shadow,
   space,
+  text,
 } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { EmptyState, ErrorState, HScroll, RemoteImage, Row, Screen, Skeleton, Text } from '@/ui';
@@ -545,11 +546,12 @@ function Header({
               pressed ? { opacity: 0.75 } : null,
             ]}
           >
+            {/* The same 40 and corner as the bell across from it, so the row's two tiles match. */}
             <View
               style={{
-                width: 38,
-                height: 38,
-                borderRadius: 14,
+                width: 40,
+                height: 40,
+                borderRadius: radius.lg,
                 backgroundColor: 'rgba(255,255,255,0.2)',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -829,7 +831,7 @@ function CategoryStrip({
           paddingHorizontal: space[4],
           gap: space[3],
           // Room for the selected ring's shadow, which a tight container clips.
-          paddingVertical: space[1],
+          paddingVertical: space[2],
         }}
       >
         {categories.map((entry) => (
@@ -856,6 +858,13 @@ function CategoryStrip({
  */
 const CATEGORY_TILE = 68;
 const CATEGORY_SLOT = 78;
+/**
+ * Two caption lines, which is what every tile's label block reserves.
+ *
+ * `lineHeight` is optional on React Native's `TextStyle`; every style in
+ * `text` sets it, which is what the assertion says.
+ */
+const CATEGORY_LABEL_HEIGHT = 2 * text.caption.lineHeight!;
 
 /**
  * One category: a photograph, at a size worth photographing for.
@@ -947,9 +956,11 @@ function CategoryTile({
        *
        * A third of the real category list — «أسماك ومأكولات بحرية» — needs two
        * lines at this width, and reserving them for everybody is what keeps
-       * the tiles a row instead of a staircase.
+       * the tiles a row instead of a staircase. Two caption lines, exactly:
+       * it was 30, which is a line and a half, and the second line of a long
+       * name was cut off at the waist.
        */}
-      <View style={{ height: 30, justifyContent: 'flex-start' }}>
+      <View style={{ height: CATEGORY_LABEL_HEIGHT, justifyContent: 'flex-start' }}>
         <Text
           variant={active ? 'captionBold' : 'caption'}
           align="center"

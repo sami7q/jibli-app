@@ -31,7 +31,19 @@ import { notify } from '@/lib/dialog';
 import { PIECES, countAr } from '@/lib/arabic-count';
 import { useWorkLive } from '@/lib/work-live';
 import { PushPrompt } from '@/ui/push-prompt';
-import { BRAND, ROW, TEXT_START, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import {
+  BRAND,
+  INPUT_TEXT_START,
+  ROW,
+  TEXT_START,
+  lazySheet,
+  TAP_TARGET,
+  color,
+  palette,
+  radius,
+  space,
+  text,
+} from '@/theme';
 
 /**
  * Driver delivery task (plan §49, §50, §52, §132).
@@ -319,9 +331,7 @@ function DeliveryTaskView({
                 accessibilityState={{ expanded: showItems }}
                 style={[styles.row, styles.rowBetween, styles.itemsToggle]}
               >
-                <Text style={styles.itemsToggleText}>
-                  محتويات الطلب ({countAr(itemCount, PIECES)})
-                </Text>
+                <Text style={styles.itemsToggleText}>محتويات الطلب ({countAr(itemCount, PIECES)})</Text>
                 <MaterialCommunityIcons
                   name={showItems ? 'chevron-up' : 'chevron-down'}
                   size={20}
@@ -625,263 +635,265 @@ function NavigationButtons({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: color.surfacePage },
+const styles = lazySheet(() =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: color.surfacePage },
 
-  header: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: space[4],
-    paddingTop: space[10],
-    paddingBottom: space[3],
-    backgroundColor: color.surfaceCard,
-    borderBottomWidth: 1,
-    borderBottomColor: color.borderSubtle,
-  },
-  headerTitle: { ...text.bodyBold, color: color.textPrimary },
-  headerSide: { flexDirection: ROW, alignItems: 'center', gap: space[2] },
-  liveDot: { width: 8, height: 8, borderRadius: 4 },
+    header: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: space[4],
+      paddingTop: space[10],
+      paddingBottom: space[3],
+      backgroundColor: color.surfaceCard,
+      borderBottomWidth: 1,
+      borderBottomColor: color.borderSubtle,
+    },
+    headerTitle: { ...text.bodyBold, color: color.textPrimary },
+    headerSide: { flexDirection: ROW, alignItems: 'center', gap: space[2] },
+    liveDot: { width: 8, height: 8, borderRadius: 4 },
 
-  statusCard: {
-    margin: space[4],
-    marginBottom: 0,
-    padding: space[4],
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: space[3],
-  },
-  statusCardOn: { backgroundColor: color.successSoft, borderColor: color.success },
-  statusCardOff: { backgroundColor: color.surfaceCard, borderColor: color.borderSubtle },
-  statusRow: { flexDirection: ROW, alignItems: 'center', gap: space[3] },
-  statusDot: { width: 12, height: 12, borderRadius: 6 },
-  statusDotOn: { backgroundColor: color.success },
-  statusDotOff: { backgroundColor: palette.ink[300] },
-  statusTitle: { ...text.bodyBold, color: color.textPrimary, textAlign: TEXT_START },
-  statusBody: { ...text.caption, color: color.textMuted, textAlign: TEXT_START },
-  statsRow: { flexDirection: ROW, gap: space[3] },
-  statBox: {
-    flex: 1,
-    backgroundColor: color.surfaceCard,
-    borderRadius: radius.md,
-    paddingVertical: space[2],
-    paddingHorizontal: space[3],
-    alignItems: 'center',
-    gap: 2,
-  },
-  statValue: { ...text.h3, color: color.textPrimary },
-  statLabel: { ...text.caption, color: color.textMuted },
-  modeSwitch: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    gap: space[1],
-    paddingVertical: space[1],
-    paddingHorizontal: space[3],
-    borderRadius: radius.full,
-    backgroundColor: BRAND[50],
-    borderWidth: 1,
-    borderColor: BRAND[200],
-  },
-  modeSwitchText: { ...text.smallBold, color: BRAND[600] },
+    statusCard: {
+      margin: space[4],
+      marginBottom: 0,
+      padding: space[4],
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      gap: space[3],
+    },
+    statusCardOn: { backgroundColor: color.successSoft, borderColor: color.success },
+    statusCardOff: { backgroundColor: color.surfaceCard, borderColor: color.borderSubtle },
+    statusRow: { flexDirection: ROW, alignItems: 'center', gap: space[3] },
+    statusDot: { width: 12, height: 12, borderRadius: 6 },
+    statusDotOn: { backgroundColor: color.success },
+    statusDotOff: { backgroundColor: palette.ink[300] },
+    statusTitle: { ...text.bodyBold, color: color.textPrimary, textAlign: TEXT_START },
+    statusBody: { ...text.caption, color: color.textMuted, textAlign: TEXT_START },
+    statsRow: { flexDirection: ROW, gap: space[3] },
+    statBox: {
+      flex: 1,
+      backgroundColor: color.surfaceCard,
+      borderRadius: radius.md,
+      paddingVertical: space[2],
+      paddingHorizontal: space[3],
+      alignItems: 'center',
+      gap: 2,
+    },
+    statValue: { ...text.h3, color: color.textPrimary },
+    statLabel: { ...text.caption, color: color.textMuted },
+    modeSwitch: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      gap: space[1],
+      paddingVertical: space[1],
+      paddingHorizontal: space[3],
+      borderRadius: radius.full,
+      backgroundColor: BRAND[50],
+      borderWidth: 1,
+      borderColor: BRAND[200],
+    },
+    modeSwitchText: { ...text.smallBold, color: BRAND[600] },
 
-  stepper: {
-    flexDirection: ROW,
-    backgroundColor: color.surfaceCard,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    paddingVertical: space[3],
-    paddingHorizontal: space[2],
-  },
-  step: { flex: 1, alignItems: 'center', gap: space[1] },
-  stepDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotDone: { backgroundColor: color.success },
-  stepDotNow: { backgroundColor: BRAND[500] },
-  stepDotTodo: {
-    backgroundColor: palette.ink[100],
-    borderWidth: 1,
-    borderColor: palette.ink[200],
-  },
-  stepIndex: { ...text.captionBold, color: color.textMuted },
-  stepIndexNow: { color: palette.white },
-  stepLabel: { ...text.caption, color: color.textMuted, textAlign: 'center' },
-  stepLabelNow: { color: color.textPrimary, fontWeight: '700' },
+    stepper: {
+      flexDirection: ROW,
+      backgroundColor: color.surfaceCard,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      paddingVertical: space[3],
+      paddingHorizontal: space[2],
+    },
+    step: { flex: 1, alignItems: 'center', gap: space[1] },
+    stepDot: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepDotDone: { backgroundColor: color.success },
+    stepDotNow: { backgroundColor: BRAND[500] },
+    stepDotTodo: {
+      backgroundColor: palette.ink[100],
+      borderWidth: 1,
+      borderColor: palette.ink[200],
+    },
+    stepIndex: { ...text.captionBold, color: color.textMuted },
+    stepIndexNow: { color: palette.white },
+    stepLabel: { ...text.caption, color: color.textMuted, textAlign: 'center' },
+    stepLabelNow: { color: color.textPrimary, fontWeight: '700' },
 
-  buttonDanger: { backgroundColor: color.dangerStrong },
-  reasonInput: {
-    ...text.small,
-    color: color.textPrimary,
-    backgroundColor: color.surfacePage,
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    borderRadius: radius.md,
-    paddingHorizontal: space[3],
-    paddingTop: space[3],
-    paddingBottom: space[3],
-    minHeight: TAP_TARGET + 12,
-    textAlign: TEXT_START,
-    textAlignVertical: 'top',
-  },
+    buttonDanger: { backgroundColor: color.dangerStrong },
+    reasonInput: {
+      ...text.small,
+      color: color.textPrimary,
+      backgroundColor: color.surfacePage,
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      borderRadius: radius.md,
+      paddingHorizontal: space[3],
+      paddingTop: space[3],
+      paddingBottom: space[3],
+      minHeight: TAP_TARGET + 12,
+      textAlign: INPUT_TEXT_START,
+      textAlignVertical: 'top',
+    },
 
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[3],
-    padding: space[6],
-  },
-  emptyTitle: { ...text.h3, color: color.textPrimary, textAlign: 'center' },
-  emptyBody: { ...text.small, color: color.textMuted, textAlign: 'center' },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[3],
+      padding: space[6],
+    },
+    emptyTitle: { ...text.h3, color: color.textPrimary, textAlign: 'center' },
+    emptyBody: { ...text.small, color: color.textMuted, textAlign: 'center' },
 
-  switcher: {
-    paddingHorizontal: space[4],
-    paddingTop: space[3],
-    gap: space[2],
-    flexDirection: ROW,
-  },
-  chip: {
-    paddingHorizontal: space[4],
-    minHeight: TAP_TARGET - 8,
-    justifyContent: 'center',
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    backgroundColor: color.surfaceCard,
-  },
-  chipOn: { borderColor: BRAND[500], backgroundColor: color.brandSoft },
-  chipText: { ...text.caption, color: color.textSecondary, writingDirection: 'ltr' },
-  chipTextOn: { color: BRAND[600] },
-  content: { padding: space[4], gap: space[4], paddingBottom: space[10] },
-  promptSlot: { paddingHorizontal: space[4], paddingTop: space[3] },
-  gap: { gap: space[2] },
+    switcher: {
+      paddingHorizontal: space[4],
+      paddingTop: space[3],
+      gap: space[2],
+      flexDirection: ROW,
+    },
+    chip: {
+      paddingHorizontal: space[4],
+      minHeight: TAP_TARGET - 8,
+      justifyContent: 'center',
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      backgroundColor: color.surfaceCard,
+    },
+    chipOn: { borderColor: BRAND[500], backgroundColor: color.brandSoft },
+    chipText: { ...text.caption, color: color.textSecondary, writingDirection: 'ltr' },
+    chipTextOn: { color: BRAND[600] },
+    content: { padding: space[4], gap: space[4], paddingBottom: space[10] },
+    promptSlot: { paddingHorizontal: space[4], paddingTop: space[3] },
+    gap: { gap: space[2] },
 
-  card: {
-    backgroundColor: color.surfaceCard,
-    borderRadius: radius.lg,
-    padding: space[4],
-    gap: space[3],
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-  },
-  row: { flexDirection: ROW, alignItems: 'center', gap: space[2] },
-  /*
-   * The order number at one end of the row and the cash badge at the other.
-   *
-   * `justifyContent`, not the `marginStart: 'auto'` the badge used to carry:
-   * an auto margin names a physical side, and which physical side is the far
-   * one depends on whether the row is drawn `row` or `row-reverse`. Splitting
-   * the row is the same result and has no side in it.
-   */
-  rowBetween: { justifyContent: 'space-between' },
-  flex: { flex: 1 },
+    card: {
+      backgroundColor: color.surfaceCard,
+      borderRadius: radius.lg,
+      padding: space[4],
+      gap: space[3],
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+    },
+    row: { flexDirection: ROW, alignItems: 'center', gap: space[2] },
+    /*
+     * The order number at one end of the row and the cash badge at the other.
+     *
+     * `justifyContent`, not the `marginStart: 'auto'` the badge used to carry:
+     * an auto margin names a physical side, and which physical side is the far
+     * one depends on whether the row is drawn `row` or `row-reverse`. Splitting
+     * the row is the same result and has no side in it.
+     */
+    rowBetween: { justifyContent: 'space-between' },
+    flex: { flex: 1 },
 
-  orderNumber: { ...text.h3, color: color.textPrimary, writingDirection: 'ltr' },
-  cashBadge: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    gap: space[1],
-    backgroundColor: color.successSoft,
-    paddingHorizontal: space[3],
-    paddingVertical: space[1],
-    borderRadius: radius.full,
-  },
-  cashText: { ...text.smallBold, color: color.successStrong },
+    orderNumber: { ...text.h3, color: color.textPrimary, writingDirection: 'ltr' },
+    cashBadge: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      gap: space[1],
+      backgroundColor: color.successSoft,
+      paddingHorizontal: space[3],
+      paddingVertical: space[1],
+      borderRadius: radius.full,
+    },
+    cashText: { ...text.smallBold, color: color.successStrong },
 
-  placeRow: { flexDirection: ROW, alignItems: 'center', gap: space[3] },
-  placeIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: BRAND[50],
-  },
-  placeName: { ...text.bodyBold, color: color.textPrimary, textAlign: TEXT_START },
-  placeAddress: { ...text.small, color: color.textSecondary, textAlign: TEXT_START },
+    placeRow: { flexDirection: ROW, alignItems: 'center', gap: space[3] },
+    placeIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: BRAND[50],
+    },
+    placeName: { ...text.bodyBold, color: color.textPrimary, textAlign: TEXT_START },
+    placeAddress: { ...text.small, color: color.textSecondary, textAlign: TEXT_START },
 
-  stageChip: { paddingHorizontal: space[2], paddingVertical: 2, borderRadius: radius.full },
-  stageReady: { backgroundColor: color.successSoft },
-  stageWaiting: { backgroundColor: color.warningSoft },
-  stageText: { ...text.captionBold, color: color.warningStrong },
-  stageTextReady: { color: color.successStrong },
+    stageChip: { paddingHorizontal: space[2], paddingVertical: 2, borderRadius: radius.full },
+    stageReady: { backgroundColor: color.successSoft },
+    stageWaiting: { backgroundColor: color.warningSoft },
+    stageText: { ...text.captionBold, color: color.warningStrong },
+    stageTextReady: { color: color.successStrong },
 
-  itemsToggle: {
-    paddingTop: space[2],
-    borderTopWidth: 1,
-    borderTopColor: color.borderSubtle,
-  },
-  itemsToggleText: { ...text.smallBold, color: color.textSecondary },
-  itemRow: { alignItems: 'flex-start' },
-  itemQty: { ...text.smallBold, color: color.textPrimary, minWidth: 28, textAlign: TEXT_START },
-  itemName: { ...text.small, color: color.textPrimary, flex: 1, textAlign: TEXT_START },
+    itemsToggle: {
+      paddingTop: space[2],
+      borderTopWidth: 1,
+      borderTopColor: color.borderSubtle,
+    },
+    itemsToggleText: { ...text.smallBold, color: color.textSecondary },
+    itemRow: { alignItems: 'flex-start' },
+    itemQty: { ...text.smallBold, color: color.textPrimary, minWidth: 28, textAlign: TEXT_START },
+    itemName: { ...text.small, color: color.textPrimary, flex: 1, textAlign: TEXT_START },
 
-  note: {
-    ...text.small,
-    color: color.textSecondary,
-    backgroundColor: palette.ink[100],
-    padding: space[3],
-    borderRadius: radius.sm,
-    textAlign: TEXT_START,
-  },
+    note: {
+      ...text.small,
+      color: color.textSecondary,
+      backgroundColor: palette.ink[100],
+      padding: space[3],
+      borderRadius: radius.sm,
+      textAlign: TEXT_START,
+    },
 
-  sectionTitle: { ...text.h3, color: color.textPrimary, textAlign: TEXT_START },
-  hint: { ...text.small, color: color.textMuted, textAlign: TEXT_START },
-  waitingNote: { ...text.caption, color: color.warningStrong, textAlign: 'center' },
+    sectionTitle: { ...text.h3, color: color.textPrimary, textAlign: TEXT_START },
+    hint: { ...text.small, color: color.textMuted, textAlign: TEXT_START },
+    waitingNote: { ...text.caption, color: color.warningStrong, textAlign: 'center' },
 
-  button: {
-    minHeight: TAP_TARGET + 4,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: space[4],
-  },
-  buttonPrimary: { backgroundColor: BRAND[500] },
-  buttonPrimaryText: { ...text.bodyBold, color: palette.white },
-  buttonGhost: { backgroundColor: BRAND[50] },
-  buttonGhostText: { ...text.bodyBold, color: BRAND[700] },
-  buttonOutline: {
-    borderWidth: 1,
-    borderColor: color.borderSubtle,
-    backgroundColor: color.surfaceCard,
-  },
-  buttonOutlineText: { ...text.bodyBold, color: color.textSecondary },
-  buttonDisabled: { backgroundColor: palette.ink[300] },
-  textDisabled: { color: palette.ink[400] },
+    button: {
+      minHeight: TAP_TARGET + 4,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: space[4],
+    },
+    buttonPrimary: { backgroundColor: BRAND[500] },
+    buttonPrimaryText: { ...text.bodyBold, color: palette.white },
+    buttonGhost: { backgroundColor: BRAND[50] },
+    buttonGhostText: { ...text.bodyBold, color: BRAND[700] },
+    buttonOutline: {
+      borderWidth: 1,
+      borderColor: color.borderSubtle,
+      backgroundColor: color.surfaceCard,
+    },
+    buttonOutlineText: { ...text.bodyBold, color: color.textSecondary },
+    buttonDisabled: { backgroundColor: palette.ink[300] },
+    textDisabled: { color: palette.ink[400] },
 
-  pinInput: {
-    borderWidth: 1.5,
-    borderColor: color.borderSubtle,
-    borderRadius: radius.md,
-    backgroundColor: palette.ink[50],
-    minHeight: 64,
-    ...text.h1,
-    color: color.textPrimary,
-    letterSpacing: 12,
-  },
+    pinInput: {
+      borderWidth: 1.5,
+      borderColor: color.borderSubtle,
+      borderRadius: radius.md,
+      backgroundColor: palette.ink[50],
+      minHeight: 64,
+      ...text.h1,
+      color: color.textPrimary,
+      letterSpacing: 12,
+    },
 
-  warning: {
-    ...text.small,
-    color: color.warningStrong,
-    backgroundColor: color.warningSoft,
-    padding: space[3],
-    borderRadius: radius.sm,
-    textAlign: TEXT_START,
-  },
-  error: {
-    ...text.small,
-    color: color.danger,
-    backgroundColor: color.dangerSoft,
-    padding: space[3],
-    borderRadius: radius.sm,
-    textAlign: TEXT_START,
-  },
-});
+    warning: {
+      ...text.small,
+      color: color.warningStrong,
+      backgroundColor: color.warningSoft,
+      padding: space[3],
+      borderRadius: radius.sm,
+      textAlign: TEXT_START,
+    },
+    error: {
+      ...text.small,
+      color: color.danger,
+      backgroundColor: color.dangerSoft,
+      padding: space[3],
+      borderRadius: radius.sm,
+      textAlign: TEXT_START,
+    },
+  }),
+);
 
 /**
  * The courier screen — the route, which fetches what it shows.

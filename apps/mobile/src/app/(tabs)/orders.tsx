@@ -77,6 +77,10 @@ export default function OrdersScreen() {
     <Screen scroll edges={['top']} padded={false}>
       <View style={{ paddingHorizontal: space[4], paddingTop: space[2] }}>
         <Text variant="h2">طلباتي</Text>
+        {/* The line under the title that المفضلة has, so the two tabs open alike. */}
+        <Text variant="caption" tone="muted">
+          تابع كل طلب خطوة بخطوة
+        </Text>
       </View>
 
       <View style={{ padding: space[4], gap: space[3] }}>

@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Children, Fragment, useCallback, useMemo, useState } from 'react';
+import { Linking, StyleSheet, View } from 'react-native';
 import Constants from 'expo-constants';
 import { configString } from '@/lib/app-config';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -133,7 +133,15 @@ export default function AccountScreen() {
 
   return (
     <Screen scroll edges={['top']} padded={false}>
-      <View style={{ padding: space[4], gap: space[4] }}>
+      {/* The same top inset as the other tabs, so the four titles sit on one line. */}
+      <View
+        style={{
+          paddingHorizontal: space[4],
+          paddingTop: space[2],
+          paddingBottom: space[4],
+          gap: space[4],
+        }}
+      >
         {/*
          * `RTL_TEXT` is physical alignment, so it holds whichever way the
          * native layout flag happens to be set. It used to be this screen's
@@ -206,7 +214,17 @@ export default function AccountScreen() {
                 {me?.full_name ?? 'مستخدم جيبلي'}
               </Text>
               <Text variant="caption" tone="inverse" style={[RTL_TEXT, { opacity: 0.9 }]}>
-                {area ? `${area.governorateNameAr} — ${area.cityNameAr}` : 'لم تُحدَّد المنطقة'}
+                {/*
+                 * Governorate, then city — unless they are the same word.
+                 * Baghdad is a city in the governorate of the same name, and
+                 * «بغداد — بغداد» read as a bug on the one card that carries
+                 * the customer's own name.
+                 */}
+                {area
+                  ? area.governorateNameAr === area.cityNameAr
+                    ? area.cityNameAr
+                    : `${area.governorateNameAr} — ${area.cityNameAr}`
+                  : 'لم تُحدَّد المنطقة'}
               </Text>
               {state.status === 'offline-ready' ? (
                 <Text variant="caption" tone="inverse" style={[RTL_TEXT, { opacity: 0.9 }]}>
@@ -411,7 +429,11 @@ export default function AccountScreen() {
 
       <AreaPicker visible={pickingArea} onClose={() => setPickingArea(false)} />
 
-      <AddressSheet visible={editingAddress} start="list" onClose={() => setEditingAddress(false)} />
+      <AddressSheet
+        visible={editingAddress}
+        start="list"
+        onClose={() => setEditingAddress(false)}
+      />
       <DeleteAccountSheet visible={deleting} onClose={() => setDeleting(false)} />
     </Screen>
   );
@@ -429,6 +451,10 @@ export default function AccountScreen() {
  * stacked groups it turned into a ladder of lines.
  */
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  // Conditional rows leave `null` and `false` behind; only the rendered ones
+  // get a rule between them.
+  const rows = Children.toArray(children);
+
   return (
     <View style={{ paddingHorizontal: space[4], paddingBottom: space[4] }}>
       <Text
@@ -446,7 +472,31 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
           ...shadow.sm,
         }}
       >
-        {children}
+        {rows.map((row, index) => (
+          <Fragment key={index}>
+            {/*
+             * A hairline between rows, inset to the text edge.
+             *
+             * Rows with a sublabel are taller than rows without one, and
+             * with nothing between them the group read as a stack of
+             * uneven blocks. The rule starts where the words start — past
+             * the tile and its gap, on the right — so the tiles stay a clean
+             * column. Physical sides, because `ROW` pins the tile to the
+             * right in both layout modes.
+             */}
+            {index > 0 ? (
+              <View
+                style={{
+                  height: StyleSheet.hairlineWidth,
+                  backgroundColor: color.borderSubtle,
+                  marginLeft: space[3],
+                  marginRight: space[3] + 40 + space[3],
+                }}
+              />
+            ) : null}
+            {row}
+          </Fragment>
+        ))}
       </View>
     </View>
   );

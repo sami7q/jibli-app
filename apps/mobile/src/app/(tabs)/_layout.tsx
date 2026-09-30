@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
-import { View, type ColorValue } from 'react-native';
+import { Text as RNText, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@/ui/icon';
+import { TEXT_SCALE_CEILING } from '@/ui';
 import { color, LAID_OUT_RTL, radius, space, TAB_BAR_CONTENT_HEIGHT, text } from '@/theme';
 
 /**
@@ -39,6 +40,27 @@ const TABS = [
  * bounce every back press into it.
  */
 const HOME = 'index';
+
+/**
+ * The icon's box, and what is drawn in it.
+ *
+ * The navigator gives every icon a 31×28 slot and draws two copies in it —
+ * the active and the resting one, faded between — each absolutely positioned
+ * and stretched to the slot. Whatever the icon renders is centred in that
+ * slot, and anything taller than it spills out both ends. The dot used to be
+ * drawn *below* the icon in normal flow, which made the pair 31 tall in a 28
+ * slot: the overflow landed wherever the platform put it, and on a phone the
+ * dot sat off to one side of the icon rather than under it.
+ *
+ * So the box is sized here, once, and the slot is told to match it: the icon
+ * is centred in the upper part, and the dot is pinned to the bottom edge and
+ * centred by the box itself. Nothing overflows, so nothing drifts.
+ */
+const ICON_BOX = { width: 31, height: 28 } as const;
+const ICON_SIZE = 23;
+/** The band the icon is centred in; the dot takes the rest. */
+const ICON_BAND = 22;
+const DOT = 4;
 
 export default function TabsLayout() {
   /*
@@ -90,7 +112,9 @@ export default function TabsLayout() {
           paddingTop: space[1],
           paddingBottom: insets.bottom,
         },
-        tabBarLabelStyle: text.caption,
+        // The slot the navigator draws the icon in, matched to the box
+        // `TabIcon` fills — see `ICON_BOX`.
+        tabBarIconStyle: ICON_BOX,
       }}
     >
       {ordered.map((tab) => (
@@ -100,6 +124,24 @@ export default function TabsLayout() {
           options={{
             title: tab.title,
             tabBarIcon: (props) => <TabIcon {...props} name={tab.icon} />,
+            /*
+             * Drawn here rather than through `tabBarLabelStyle`, so the active
+             * label can be heavier than the resting one. Same size either
+             * way: `captionBold` is `caption` in the bold cut, so the word
+             * does not reflow under the finger that selected it.
+             */
+            tabBarLabel: ({ focused, color: tint }) => (
+              <RNText
+                numberOfLines={1}
+                maxFontSizeMultiplier={TEXT_SCALE_CEILING}
+                style={[
+                  focused ? text.captionBold : text.caption,
+                  { color: tint, textAlign: 'center' },
+                ]}
+              >
+                {tab.title}
+              </RNText>
+            ),
           }}
         />
       ))}
@@ -127,16 +169,28 @@ function TabIcon({
   name: 'home' | 'heart' | 'clipboard-list' | 'account';
 }) {
   return (
-    <View style={{ alignItems: 'center', gap: 3 }}>
-      <MaterialCommunityIcons
-        name={focused ? name : (`${name}-outline` as const)}
-        size={23}
-        color={tint}
-      />
+    <View style={{ width: ICON_BOX.width, height: ICON_BOX.height, alignItems: 'center' }}>
+      <View style={{ height: ICON_BAND, justifyContent: 'center' }}>
+        <MaterialCommunityIcons
+          name={focused ? name : (`${name}-outline` as const)}
+          size={ICON_SIZE}
+          color={tint}
+        />
+      </View>
+
+      {/*
+       * Always drawn, so the icon sits at the same height on every tab; only
+       * the colour says which one is open. Absolute, on the bottom edge, and
+       * centred by the box — the one arrangement that cannot end up beside
+       * the icon.
+       */}
       <View
         style={{
-          width: 5,
-          height: 5,
+          position: 'absolute',
+          bottom: 0,
+          alignSelf: 'center',
+          width: DOT,
+          height: DOT,
           borderRadius: radius.full,
           backgroundColor: focused ? tint : 'transparent',
         }}

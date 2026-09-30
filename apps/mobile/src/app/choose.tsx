@@ -64,8 +64,18 @@ export default function ChooseScreen() {
   // The picture keeps a third of a narrow phone's card for the words.
   const artWidth = Math.min(118, width * 0.3);
 
+  /*
+   * Clipped, because the glow below is drawn past the top-left corner on
+   * purpose. A phone clips at the screen edge anyway; the web preview does
+   * not, and let the overflow widen the page and push the whole screen aside.
+   */
   return (
-    <Screen edges={['top', 'bottom']} padded={false} background={GROUND}>
+    <Screen
+      edges={['top', 'bottom']}
+      padded={false}
+      background={GROUND}
+      style={{ overflow: 'hidden' }}
+    >
       <StatusBar style="light" />
 
       {/*

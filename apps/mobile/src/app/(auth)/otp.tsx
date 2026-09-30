@@ -28,6 +28,7 @@ import {
   shadow,
   space,
   text,
+  lazySheet,
 } from '@/theme';
 
 const OTP_LENGTH = 4;
@@ -424,182 +425,184 @@ const SUPPRESS_WEB_OUTLINE = (Platform.OS === 'web' ? { outlineStyle: 'none' } :
  * A tinted page behind a white card is the smallest change that fixes it, and
  * it costs no new colour: both values are already in the token set.
  */
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: color.surfacePage },
+const styles = lazySheet(() =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: color.surfacePage },
 
-  sheet: {
-    flex: 1,
-    backgroundColor: color.surfaceCard,
-    margin: space[4],
-    marginBottom: 0,
-    borderRadius: radius.xl,
-    paddingHorizontal: space[5],
-    paddingTop: space[8],
-    gap: space[3],
-    alignItems: 'center',
-    ...shadow.sm,
-  },
+    sheet: {
+      flex: 1,
+      backgroundColor: color.surfaceCard,
+      margin: space[4],
+      marginBottom: 0,
+      borderRadius: radius.xl,
+      paddingHorizontal: space[5],
+      paddingTop: space[8],
+      gap: space[3],
+      alignItems: 'center',
+      ...shadow.sm,
+    },
 
-  step: {
-    ...text.captionBold,
-    color: BRAND[600],
-    letterSpacing: 0.5,
-    marginBottom: space[1],
-  },
+    step: {
+      ...text.captionBold,
+      color: BRAND[600],
+      letterSpacing: 0.5,
+      marginBottom: space[1],
+    },
 
-  title: { ...text.display, color: color.textPrimary, textAlign: 'center' },
-  subtitle: {
-    ...text.body,
-    color: color.textMuted,
-    textAlign: 'center',
-    marginBottom: space[2],
-  },
+    title: { ...text.display, color: color.textPrimary, textAlign: 'center' },
+    subtitle: {
+      ...text.body,
+      color: color.textMuted,
+      textAlign: 'center',
+      marginBottom: space[2],
+    },
 
-  phonePill: {
-    flexDirection: ROW,
-    alignItems: 'center',
-    gap: space[3],
-    backgroundColor: BRAND[50],
-    borderWidth: 1,
-    borderColor: BRAND[200],
-    borderRadius: radius.full,
-    paddingVertical: space[2],
-    paddingHorizontal: space[4],
-    minHeight: TAP_TARGET,
-  },
-  phonePillPressed: { backgroundColor: BRAND[100] },
-  phoneText: { color: color.textPrimary },
-  phoneChange: { ...text.smallBold, color: BRAND[600] },
+    phonePill: {
+      flexDirection: ROW,
+      alignItems: 'center',
+      gap: space[3],
+      backgroundColor: BRAND[50],
+      borderWidth: 1,
+      borderColor: BRAND[200],
+      borderRadius: radius.full,
+      paddingVertical: space[2],
+      paddingHorizontal: space[4],
+      minHeight: TAP_TARGET,
+    },
+    phonePillPressed: { backgroundColor: BRAND[100] },
+    phoneText: { color: color.textPrimary },
+    phoneChange: { ...text.smallBold, color: BRAND[600] },
 
-  /*
-   * The boxes run left to right, against the page.
-   *
-   * A verification code is a number, and a number is read left to right in
-   * every script — typing 1 and watching it land in the rightmost box, then 2
-   * to its left, is the confusion this removes. `row-reverse` under a
-   * forced-RTL layout is what produces left-to-right.
-   */
-  codeRow: {
     /*
-     * Left to right, because a verification code is a number.
+     * The boxes run left to right, against the page.
      *
-     * This was `row-reverse`, which put the first digit typed in the rightmost
-     * box: entering 1234 produced a row reading «4 3 2 1». The layout was
-     * following the language and the content is not language — it is four
-     * digits that have one order, the order they were read out or texted in.
-     *
-     * `ROW_LTR` rather than a literal, because "left to right" is spelled
-     * differently depending on whether the platform is already laying out
-     * right-to-left: `row` on a device where the native flag never took, and
-     * `row-reverse` in a browser under `dir="rtl"`, where CSS has already
-     * flipped the main axis.
+     * A verification code is a number, and a number is read left to right in
+     * every script — typing 1 and watching it land in the rightmost box, then 2
+     * to its left, is the confusion this removes. `row-reverse` under a
+     * forced-RTL layout is what produces left-to-right.
      */
-    flexDirection: ROW_LTR,
-    gap: space[3],
-    marginVertical: space[6],
-    alignSelf: 'center',
-  },
-  codeBox: {
-    width: 60,
-    height: 70,
-    borderWidth: 1.5,
-    borderColor: color.borderSubtle,
-    borderRadius: radius.lg,
-    backgroundColor: color.surfacePage,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  /*
-   * The digit, in the platform's own face rather than Cairo.
-   *
-   * Cairo is an Arabic face whose Latin figures sit small against its tall
-   * line box — at 24pt in a 70pt field they read as an afterthought, and
-   * orange-on-peach took away what contrast was left. SF and Roboto have
-   * figures drawn to be checked one by one against a message in another app,
-   * which is exactly the job here; `tabular-nums` gives all ten the same
-   * width so four digits sit identically in four boxes.
-   */
-  codeDigit: {
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    color: color.textPrimary,
-    textAlign: 'center',
-    includeFontPadding: false,
-    // The digits are the one thing on this screen that must not be reordered.
-    writingDirection: 'ltr',
-  },
-  // Filled and focused are deliberately different: one says "this digit is
-  // entered", the other "this is where the next one goes".
-  codeBoxFilled: {
-    borderColor: BRAND[300],
-    backgroundColor: color.surfaceCard,
-  },
-  codeBoxFocused: {
-    borderColor: BRAND[600],
-    borderWidth: 2,
-    backgroundColor: color.surfaceCard,
-    ...shadow.sm,
-  },
-  caret: {
-    width: 2,
-    height: 34,
-    borderRadius: 1,
-    backgroundColor: BRAND[600],
-  },
-  /*
-   * Present and focusable, but never seen. Not opacity 0: some Android builds
-   * refuse focus to a fully transparent view.
-   */
-  hiddenInput: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    opacity: 0.011,
-    color: 'transparent',
-    fontSize: 1,
-    ...SUPPRESS_WEB_OUTLINE,
-  },
-  codeBoxError: { borderColor: color.danger, backgroundColor: color.dangerSoft },
+    codeRow: {
+      /*
+       * Left to right, because a verification code is a number.
+       *
+       * This was `row-reverse`, which put the first digit typed in the rightmost
+       * box: entering 1234 produced a row reading «4 3 2 1». The layout was
+       * following the language and the content is not language — it is four
+       * digits that have one order, the order they were read out or texted in.
+       *
+       * `ROW_LTR` rather than a literal, because "left to right" is spelled
+       * differently depending on whether the platform is already laying out
+       * right-to-left: `row` on a device where the native flag never took, and
+       * `row-reverse` in a browser under `dir="rtl"`, where CSS has already
+       * flipped the main axis.
+       */
+      flexDirection: ROW_LTR,
+      gap: space[3],
+      marginVertical: space[6],
+      alignSelf: 'center',
+    },
+    codeBox: {
+      width: 60,
+      height: 70,
+      borderWidth: 1.5,
+      borderColor: color.borderSubtle,
+      borderRadius: radius.lg,
+      backgroundColor: color.surfacePage,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    /*
+     * The digit, in the platform's own face rather than Cairo.
+     *
+     * Cairo is an Arabic face whose Latin figures sit small against its tall
+     * line box — at 24pt in a 70pt field they read as an afterthought, and
+     * orange-on-peach took away what contrast was left. SF and Roboto have
+     * figures drawn to be checked one by one against a message in another app,
+     * which is exactly the job here; `tabular-nums` gives all ten the same
+     * width so four digits sit identically in four boxes.
+     */
+    codeDigit: {
+      fontSize: 34,
+      lineHeight: 40,
+      fontWeight: '700',
+      fontVariant: ['tabular-nums'],
+      color: color.textPrimary,
+      textAlign: 'center',
+      includeFontPadding: false,
+      // The digits are the one thing on this screen that must not be reordered.
+      writingDirection: 'ltr',
+    },
+    // Filled and focused are deliberately different: one says "this digit is
+    // entered", the other "this is where the next one goes".
+    codeBoxFilled: {
+      borderColor: BRAND[300],
+      backgroundColor: color.surfaceCard,
+    },
+    codeBoxFocused: {
+      borderColor: BRAND[600],
+      borderWidth: 2,
+      backgroundColor: color.surfaceCard,
+      ...shadow.sm,
+    },
+    caret: {
+      width: 2,
+      height: 34,
+      borderRadius: 1,
+      backgroundColor: BRAND[600],
+    },
+    /*
+     * Present and focusable, but never seen. Not opacity 0: some Android builds
+     * refuse focus to a fully transparent view.
+     */
+    hiddenInput: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      opacity: 0.011,
+      color: 'transparent',
+      fontSize: 1,
+      ...SUPPRESS_WEB_OUTLINE,
+    },
+    codeBoxError: { borderColor: color.danger, backgroundColor: color.dangerSoft },
 
-  error: {
-    ...text.smallBold,
-    color: color.dangerStrong,
-    backgroundColor: color.dangerSoft,
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-    borderRadius: radius.md,
-    textAlign: 'center',
-    alignSelf: 'stretch',
-  },
+    error: {
+      ...text.smallBold,
+      color: color.dangerStrong,
+      backgroundColor: color.dangerSoft,
+      paddingVertical: space[3],
+      paddingHorizontal: space[4],
+      borderRadius: radius.md,
+      textAlign: 'center',
+      alignSelf: 'stretch',
+    },
 
-  resendWaiting: { ...text.small, color: color.textMuted, textAlign: 'center' },
-  resendButton: {
-    minHeight: TAP_TARGET,
-    justifyContent: 'center',
-    paddingHorizontal: space[4],
-  },
-  resendText: { ...text.bodyBold, color: BRAND[600], textAlign: 'center' },
+    resendWaiting: { ...text.small, color: color.textMuted, textAlign: 'center' },
+    resendButton: {
+      minHeight: TAP_TARGET,
+      justifyContent: 'center',
+      paddingHorizontal: space[4],
+    },
+    resendText: { ...text.bodyBold, color: BRAND[600], textAlign: 'center' },
 
-  actionBar: {
-    backgroundColor: color.surfaceCard,
-    paddingHorizontal: space[5],
-    paddingTop: space[4],
-    paddingBottom: space[6],
-    borderTopWidth: 1,
-    borderTopColor: color.borderSubtle,
-  },
-  button: {
-    backgroundColor: BRAND[500],
-    minHeight: TAP_TARGET + 8,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPressed: { backgroundColor: BRAND[600] },
-  buttonDisabled: { backgroundColor: palette.ink[200] },
-  buttonText: { ...text.bodyBold, color: palette.white },
-});
+    actionBar: {
+      backgroundColor: color.surfaceCard,
+      paddingHorizontal: space[5],
+      paddingTop: space[4],
+      paddingBottom: space[6],
+      borderTopWidth: 1,
+      borderTopColor: color.borderSubtle,
+    },
+    button: {
+      backgroundColor: BRAND[500],
+      minHeight: TAP_TARGET + 8,
+      borderRadius: radius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonPressed: { backgroundColor: BRAND[600] },
+    buttonDisabled: { backgroundColor: palette.ink[200] },
+    buttonText: { ...text.bodyBold, color: palette.white },
+  }),
+);

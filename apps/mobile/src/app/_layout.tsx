@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -38,6 +38,7 @@ import { GlobalCartBar } from '@/lib/cart-dock';
 import { ErrorBoundary } from '@/lib/error-boundary';
 import { startMonitoring } from '@/lib/monitoring';
 import { DialogHost } from '@/ui/dialog-host';
+import { DirectionProbe } from '@/ui/direction-probe';
 import { ICON_FONT, ICON_FONT_FAMILY } from '@/ui/icon';
 import { color, enforceRtl, palette } from '@/theme';
 
@@ -117,69 +118,108 @@ export default function RootLayout() {
   useEffect(() => startNetworkWatch(), []);
 
   /*
+   * Which way the native layer actually lays out, measured before anything
+   * that cares about it renders.
+   *
+   * `enforceRtl` above has *asked* for right-to-left; whether the platform
+   * obliged is a separate fact, and one the flag has been seen to get wrong.
+   * The probe lays out one hidden row, reads the answer off the layout, and
+   * sets the theme's direction tokens from it — so every screen below renders
+   * against the truth, on the first launch as on the hundredth.
+   *
+   * It keeps watching. A JavaScript reload has been seen to lay out its first
+   * frame one way and mirror on the next, so the answer can change after the
+   * screens are up; when it does, `generation` moves and everything under the
+   * providers is drawn again from the new tokens. The providers themselves —
+   * the session, the cart, the order watcher — keep their state through it.
+   */
+  const [direction, setDirection] = useState({ known: false, mirrored: false, generation: 0 });
+  const probe = (
+    <DirectionProbe
+      onMeasured={(mirrored) =>
+        setDirection((current) =>
+          current.known && current.mirrored === mirrored
+            ? current
+            : { known: true, mirrored, generation: current.generation + 1 },
+        )
+      }
+    />
+  );
+
+  /*
    * A font that fails to load is not a reason to show nothing. The system
    * Arabic face is worse-looking, not unreadable, and a blank screen is the
    * only outcome that loses the user entirely.
    */
-  if (!fontsLoaded && !fontError) {
-    return <View style={{ flex: 1, backgroundColor: color.brand }} />;
+  if (!direction.known || (!fontsLoaded && !fontError)) {
+    return <View style={{ flex: 1, backgroundColor: color.brand }}>{probe}</View>;
   }
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <SessionProvider>
-            <VerticalProvider>
-              <AreaProvider>
-                <CartProvider>
-                  {/*
-                   * Inside the router's tree and outside every screen: the bar
-                   * has to survive navigation to be worth anything, and the
-                   * watcher behind it has to keep polling while the customer is
-                   * three screens away reading a different menu.
-                   */}
-                  <OrderWatchProvider>
+    <View style={{ flex: 1 }}>
+      {probe}
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <QueryClientProvider client={queryClient}>
+            <SessionProvider>
+              <VerticalProvider>
+                <AreaProvider>
+                  <CartProvider>
                     {/*
-                     * The shop's and the courier's live work: rings for a new
-                     * order or task whatever screen is open. Idle for anyone
-                     * who is neither.
+                     * Inside the router's tree and outside every screen: the bar
+                     * has to survive navigation to be worth anything, and the
+                     * watcher behind it has to keep polling while the customer is
+                     * three screens away reading a different menu.
                      */}
-                    <WorkLiveProvider>
-                      <StatusBar style="dark" />
-                      <OfflineBanner />
-                      <Gate />
+                    <OrderWatchProvider>
                       {/*
-                       * After the screens, not before them. The card floats over
-                       * whatever is showing, and React Native stacks by order —
-                       * drawn first, it would sit under every screen it is meant
-                       * to float above.
+                       * The shop's and the courier's live work: rings for a new
+                       * order or task whatever screen is open. Idle for anyone
+                       * who is neither.
                        */}
-                      <ActiveOrderBar />
-                      <GlobalCartBar />
-                      {/* Above the customer's bars: somebody is waiting on this one. */}
-                      <WorkAlertBar />
-                      {/*
-                       * Last of all, so a dialog sits above every bar and sheet
-                       * the app can have open — which is the whole point of one.
-                       */}
-                      <DialogHost />
-                      {/*
-                       * Above even the dialogs. When the server has said this
-                       * binary may no longer be used, there is nothing underneath
-                       * worth interacting with — including a dialog asking to
-                       * confirm something the next request will refuse.
-                       */}
-                      <UpdateGate />
-                    </WorkLiveProvider>
-                  </OrderWatchProvider>
-                </CartProvider>
-              </AreaProvider>
-            </VerticalProvider>
-          </SessionProvider>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+                      <WorkLiveProvider>
+                        {/*
+                         * Keyed by the direction measurement: a changed answer
+                         * remounts everything the customer sees, under providers
+                         * that keep their state. See the note by `direction`.
+                         */}
+                        <Fragment key={direction.generation}>
+                          <StatusBar style="dark" />
+                          <OfflineBanner />
+                          <Gate />
+                          {/*
+                           * After the screens, not before them. The card floats over
+                           * whatever is showing, and React Native stacks by order —
+                           * drawn first, it would sit under every screen it is meant
+                           * to float above.
+                           */}
+                          <ActiveOrderBar />
+                          <GlobalCartBar />
+                          {/* Above the customer's bars: somebody is waiting on this one. */}
+                          <WorkAlertBar />
+                          {/*
+                           * Last of all, so a dialog sits above every bar and sheet
+                           * the app can have open — which is the whole point of one.
+                           */}
+                          <DialogHost />
+                          {/*
+                           * Above even the dialogs. When the server has said this
+                           * binary may no longer be used, there is nothing underneath
+                           * worth interacting with — including a dialog asking to
+                           * confirm something the next request will refuse.
+                           */}
+                          <UpdateGate />
+                        </Fragment>
+                      </WorkLiveProvider>
+                    </OrderWatchProvider>
+                  </CartProvider>
+                </AreaProvider>
+              </VerticalProvider>
+            </SessionProvider>
+          </QueryClientProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </View>
   );
 }
 

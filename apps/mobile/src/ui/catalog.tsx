@@ -7,6 +7,7 @@ import {
   View,
   type StyleProp,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import {
   ALIGN_START,
+  INPUT_TEXT_START,
   ROW,
   TAP_TARGET,
   TEXT_START,
@@ -94,12 +96,23 @@ export function IconTile({
 /**
  * Arabic that starts where Arabic starts.
  *
- * `textAlign` is physical, so it holds whichever way the native flag happens
- * to be set — and it says the right edge outright rather than leaving it to
- * the bidi algorithm, which reads the first strong character and therefore
- * sends a line opening with a price or an order number to the left.
+ * It says the edge outright rather than leaving it to the bidi algorithm,
+ * which reads the first strong character and therefore sends a line opening
+ * with a price or an order number to the left.
+ *
+ * A getter, not a literal: `TEXT_START` is set from the measured layout
+ * direction after this module has loaded, and on Android the word that means
+ * "the right edge" differs between a mirrored and an unmirrored layout. A
+ * frozen `'right'` here put every account row's label on the left in the
+ * builds where the native layer mirrors. Read at render, it follows the
+ * theme.
  */
-export const RTL_TEXT = { textAlign: 'right', writingDirection: 'rtl' } as const;
+export const RTL_TEXT: TextStyle = {
+  get textAlign() {
+    return TEXT_START;
+  },
+  writingDirection: 'rtl',
+};
 
 // ── SearchBar ───────────────────────────────────────────────────────────────
 
@@ -136,7 +149,8 @@ export function SearchBar({
             flex: 1,
             color: color.textPrimary,
             paddingVertical: space[2],
-            textAlign: TEXT_START,
+            // An input: physical on every platform, unlike a `Text`.
+            textAlign: INPUT_TEXT_START,
           },
         ]}
         {...props}
@@ -367,6 +381,9 @@ export function ListRow({
           gap: space[3],
           minHeight: TAP_TARGET + 8,
           paddingHorizontal: space[3],
+          // Air above and below the tile, so a two-line sublabel never
+          // touches the rule between rows.
+          paddingVertical: space[2],
           borderRadius: radius.md,
         },
         pressed ? { backgroundColor: color.surfaceSunken } : null,
