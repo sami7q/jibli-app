@@ -111,7 +111,15 @@ const SINGLETON_PATHS = new Map(
  * from its cause — hence this comment rather than a one-line exclusion.
  */
 const UNUSED_NATIVE_TABS = [
-  /^@expo\/ui(\/.*)?$/,
+  /*
+   * `@expo/ui` used to be on this list and is not any more. expo-router
+   * 57.0.23 calls `fillMaxHeight()` from `@expo/ui/jetpack-compose/modifiers`
+   * at module scope in its Android Stack toolbar, so an empty module there
+   * threw `undefined is not a function` while every route file was loading —
+   * the whole Android app, Expo Go and release builds alike, died on launch
+   * while iOS (which takes a different file) kept working. The font is the
+   * heavy part and it stays excluded.
+   */
   /^@expo-google-fonts\/material-symbols(\/.*)?$/,
 ];
 
