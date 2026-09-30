@@ -12,7 +12,8 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { formatIraqiPhoneDisplay, normalizeDigits } from '@jibli/validation';
+import { normalizeDigits } from '@jibli/validation/arabic';
+import { formatIraqiPhoneDisplay } from '@jibli/validation/phone';
 import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { clearPendingCredentials, readPendingCredentials } from '@/lib/pending-credentials';

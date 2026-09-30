@@ -16,7 +16,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import MaterialCommunityIcons from '@/ui/icon';
 import * as Clipboard from 'expo-clipboard';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { normalizeDigits } from '@jibli/validation';
+import { normalizeDigits } from '@jibli/validation/arabic';
 import {
   api,
   apiRequest,
@@ -331,7 +331,9 @@ function DeliveryTaskView({
                 accessibilityState={{ expanded: showItems }}
                 style={[styles.row, styles.rowBetween, styles.itemsToggle]}
               >
-                <Text style={styles.itemsToggleText}>محتويات الطلب ({countAr(itemCount, PIECES)})</Text>
+                <Text style={styles.itemsToggleText}>
+                  محتويات الطلب ({countAr(itemCount, PIECES)})
+                </Text>
                 <MaterialCommunityIcons
                   name={showItems ? 'chevron-up' : 'chevron-down'}
                   size={20}

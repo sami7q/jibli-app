@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promises as dns } from 'node:dns';
@@ -137,6 +137,26 @@ if (existsSync(subsetFont)) {
   }
 } else {
   bad('assets/icons/mci-subset.ttf is missing', 'node scripts/build-icon-font.mjs');
+}
+
+/*
+ * Notification sounds become Android raw resources under their own file name,
+ * and a resource name may hold only [a-z0-9_] and must start with a letter.
+ * `new-order.wav` — a hyphen — failed every Android prebuild with a stack trace
+ * from inside a config plugin, which is the last place anyone looks for a file
+ * name. Checked here so the next such file is caught on a laptop.
+ */
+const soundsDir = path.join(projectRoot, 'assets/sounds');
+if (existsSync(soundsDir)) {
+  for (const file of readdirSync(soundsDir)) {
+    const stem = path.parse(file).name;
+    if (/^[a-z][a-z0-9_]*$/.test(stem)) ok(`sound ${file} is a valid Android resource name`);
+    else
+      bad(
+        `assets/sounds/${file} is not a valid Android resource name`,
+        'Rename it to lowercase letters, digits and underscores only, and update every reference.',
+      );
+  }
 }
 
 const androidSplash = path.join(projectRoot, 'assets/splash-android.png');

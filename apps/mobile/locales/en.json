@@ -2,7 +2,9 @@
   "ios": {
     "CFBundleDisplayName": "Jibli",
     "CFBundleName": "Jibli",
-    "NSLocationWhenInUseUsageDescription": "Used once, when you tap «Use my location» while saving a delivery address, so the courier has a point to find. You can always type the address instead."
+    "NSLocationWhenInUseUsageDescription": "Used once, when you tap «Use my location» while saving a delivery address, so the courier has a point to find. You can always type the address instead.",
+    "NSCameraUsageDescription": "Jibli uses the camera to photograph your products and your shop.",
+    "NSPhotoLibraryUsageDescription": "Jibli uses your photos to add product pictures and your shop's picture."
   },
   "android": {
     "app_name": "Jibli"

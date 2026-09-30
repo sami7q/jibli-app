@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, Switch, TextInput, View } from 'react-nat
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
-import { normalizeDigits } from '@jibli/validation';
+import { normalizeDigits } from '@jibli/validation/arabic';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type OwnerCategory } from '@/lib/api';
 import { countAr } from '@/lib/arabic-count';

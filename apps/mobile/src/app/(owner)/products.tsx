@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { FlatList, Pressable, Switch, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
@@ -28,6 +28,9 @@ import { OwnerHeader } from './index';
  * job, which is working through one shelf.
  */
 type Filter = 'all' | 'no-photo' | 'unavailable';
+
+/** The air between rows, as the list draws it. */
+const Separator = () => <View style={{ height: space[2] }} />;
 
 export default function OwnerProductsScreen() {
   const router = useRouter();
@@ -191,14 +194,40 @@ export default function OwnerProductsScreen() {
         ) : null}
       </View>
 
-      <Screen scroll padded={false} edges={[]}>
-        <View style={{ padding: space[4], gap: space[2], paddingBottom: space[10] }}>
-          {catalog.isLoading ? (
-            <>
+      {/*
+        A virtualised list, not a scroll view of every row: a market carries
+        hundreds of products, and drawing all of them at once is the difference
+        between a screen that opens and one that stutters for a second on a
+        cheap phone. Ten rows fill a screen; the rest are drawn as they come.
+      */}
+      <FlatList
+        data={rows}
+        keyExtractor={({ item }) => item.id}
+        renderItem={({ item: row }) => (
+          <ProductRow
+            product={row.item}
+            categoryName={row.categoryName}
+            canWrite={canWrite}
+            onPress={() => router.push(`/(owner)/product/${row.item.id}`)}
+            onToggle={(available) => availability.mutate({ id: row.item.id, available })}
+          />
+        )}
+        ItemSeparatorComponent={Separator}
+        contentContainerStyle={{ padding: space[4], paddingBottom: space[10], flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+        style={{ flex: 1 }}
+        ListEmptyComponent={
+          catalog.isLoading ? (
+            <View style={{ gap: space[2] }}>
               <Skeleton height={84} style={{ borderRadius: radius.lg }} />
               <Skeleton height={84} style={{ borderRadius: radius.lg }} />
               <Skeleton height={84} style={{ borderRadius: radius.lg }} />
-            </>
+            </View>
           ) : catalog.isError ? (
             <ErrorState
               message={
@@ -232,7 +261,7 @@ export default function OwnerProductsScreen() {
                   }
                 : {})}
             />
-          ) : rows.length === 0 ? (
+          ) : (
             <EmptyState
               title="لا نتائج"
               body="جرّب اسماً آخر أو امسح التصفية."
@@ -245,20 +274,9 @@ export default function OwnerProductsScreen() {
                 },
               }}
             />
-          ) : (
-            rows.map(({ item, categoryName }) => (
-              <ProductRow
-                key={item.id}
-                product={item}
-                categoryName={categoryName}
-                canWrite={canWrite}
-                onPress={() => router.push(`/(owner)/product/${item.id}`)}
-                onToggle={(available) => availability.mutate({ id: item.id, available })}
-              />
-            ))
-          )}
-        </View>
-      </Screen>
+          )
+        }
+      />
 
       {/*
         The add button floats, because this screen is a list somebody scrolls

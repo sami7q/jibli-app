@@ -559,31 +559,6 @@ export function DriverCard({
   );
 }
 
-// ── SegmentedProgress ───────────────────────────────────────────────────────
-
-/** The step indicator from the profile-completion comp. */
-export function SegmentedProgress({ total, current }: { total: number; current: number }) {
-  return (
-    <View
-      accessibilityRole="progressbar"
-      accessibilityValue={{ min: 1, max: total, now: current }}
-      style={{ flexDirection: ROW, gap: space[1] }}
-    >
-      {Array.from({ length: total }, (_, index) => (
-        <View
-          key={index}
-          style={{
-            flex: 1,
-            height: 4,
-            borderRadius: radius.full,
-            backgroundColor: index < current ? color.brand : color.borderSubtle,
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
 // ── PromoBanner ─────────────────────────────────────────────────────────────
 
 /**

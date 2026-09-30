@@ -172,7 +172,7 @@ export async function registerForPush(): Promise<PushOutcome> {
       await Notifications.setNotificationChannelAsync('work', {
         name: 'طلبات المتجر ومهام التوصيل',
         importance: Notifications.AndroidImportance.MAX,
-        sound: 'new-order.wav',
+        sound: 'new_order.wav',
         vibrationPattern: [0, 380, 160, 380],
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });

@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { fullNameSchema } from '@jibli/validation';
+import { checkFullName } from '@jibli/validation/names';
 import { useSession } from '@/lib/session';
 import { ensureLocationPermissionAsked } from '@/lib/location';
 import { AddressSheet } from '@/ui/address-sheet';
@@ -109,17 +109,17 @@ export default function ProfileScreen() {
     }
   };
 
-  const nameResult = fullNameSchema.safeParse(fullName);
-  const canSubmit = nameResult.success && governorate !== null && city !== null && !isSubmitting;
+  const nameResult = checkFullName(fullName);
+  const canSubmit = nameResult.ok && governorate !== null && city !== null && !isSubmitting;
 
   const handleSubmit = async () => {
-    if (!nameResult.success || !governorate || !city) return;
+    if (!nameResult.ok || !governorate || !city) return;
     setSubmitting(true);
     setError(null);
 
     try {
       await api.completeProfile({
-        full_name: nameResult.data,
+        full_name: nameResult.value,
         governorate_id: governorate.id,
         city_id: city.id,
       });
@@ -190,7 +190,7 @@ export default function ProfileScreen() {
     router.replace(signedInDestination() as never);
   };
 
-  const nameInvalid = fullName.length > 0 && !nameResult.success;
+  const nameInvalid = fullName.length > 0 && !nameResult.ok;
 
   return (
     <View style={styles.container}>
@@ -232,7 +232,7 @@ export default function ProfileScreen() {
             />
             {nameInvalid ? (
               <Text style={styles.fieldError}>
-                {nameResult.error.issues[0]?.message ?? 'الاسم غير صالح'}
+                {nameResult.ok ? 'الاسم غير صالح' : nameResult.message}
               </Text>
             ) : (
               <Text style={styles.hint}>اسم واحد يكفي</Text>

@@ -82,7 +82,8 @@ function startFocusWatch(): () => void {
   return () => focusManager.setEventListener(() => () => {});
 }
 
-export function useIsOffline(): boolean {
+/** Whether the phone is cut off, as the banner below needs to know. */
+function useIsOffline(): boolean {
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {

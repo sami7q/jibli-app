@@ -30,7 +30,7 @@ export async function notifyNewOrderOnDevice(order: OwnerLiveOrder): Promise<voi
       content: {
         title: summary.title,
         body: summary.body,
-        sound: 'new-order.wav',
+        sound: 'new_order.wav',
         data: { orderId: order.id, eventType: 'order.placed', audience: 'restaurant', local: true },
         ...(Platform.OS === 'android'
           ? { priority: notifications.AndroidNotificationPriority.MAX }

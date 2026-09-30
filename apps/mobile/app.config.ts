@@ -295,6 +295,13 @@ const config: ExpoConfig = {
           NSPrivacyCollectedDataTypeTracking: false,
           NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
         },
+        {
+          /* A shop's product photos and its own picture, taken or chosen by the owner. */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePhotosorVideos',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
       ],
       /*
        * Required-reason APIs this binary reaches, through its dependencies
@@ -334,6 +341,18 @@ const config: ExpoConfig = {
        * change with it, because the declaration is a legal one.
        */
       ITSAppUsesNonExemptEncryption: false,
+      /*
+       * HTTPS only. Expo's template allows arbitrary loads, which App Review
+       * notices and asks about; every host this app talks to — the API, the
+       * asset store, the map tiles — is HTTPS, so the honest answer is no.
+       * `localhost` stays exempt for a development build talking to a local
+       * API through a port forward; a phone on the LAN uses Expo Go, which
+       * carries its own plist.
+       */
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: false,
+        NSExceptionDomains: { localhost: { NSExceptionAllowsInsecureHTTPLoads: true } },
+      },
       // Foreground-only, and only to help place a delivery pin (plan §13).
       /*
        * One capability, and the string says exactly what it is for.
@@ -344,9 +363,11 @@ const config: ExpoConfig = {
        * there is no background entitlement here and ADR-0005 explains why
        * there is no driver tracking either.
        *
-       * Camera is still absent. It claimed delivery-proof photography, which
-       * is Driver Mode's job and does not ship in this binary, and a purpose
-       * string for an unused capability is a rejection in its own right.
+       * The camera and the photo library are declared by the `expo-image-picker`
+       * plugin below, with their own strings, because Owner Mode photographs
+       * products and the shop's picture. A purpose string for a capability the
+       * app does not use is a rejection in its own right, which is why the
+       * microphone is switched off on both media plugins.
        */
       NSLocationWhenInUseUsageDescription:
         'لتحديد موقع التوصيل بدقة عند حفظ عنوانك. يمكنك دائماً كتابة العنوان يدوياً بدلاً من ذلك.',
@@ -397,6 +418,8 @@ const config: ExpoConfig = {
       'android.permission.WRITE_EXTERNAL_STORAGE',
       'android.permission.USE_BIOMETRIC',
       'android.permission.USE_FINGERPRINT',
+      // Belt to the braces above: no module here records anything.
+      'android.permission.RECORD_AUDIO',
     ],
     /*
      * Firebase, which is how a push notification reaches an Android phone at all.
@@ -425,7 +448,31 @@ const config: ExpoConfig = {
   },
   plugins: [
     'expo-router',
-    'expo-secure-store',
+    /*
+     * The keystore, without the Face ID purpose string the plugin writes by
+     * default: nothing here asks for biometric authentication, and a string
+     * for a capability the app never uses is a question in review.
+     */
+    ['expo-secure-store', { faceIDPermission: false }],
+    /*
+     * Location, stated exactly. Left to its defaults the plugin declares the
+     * «always» and motion-activity purpose strings as well, in English —
+     * three capabilities the app does not have, on the one screen App Review
+     * reads most carefully. Foreground, once, in Arabic, and nothing else.
+     */
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'لتحديد موقع التوصيل بدقة عند حفظ عنوانك. يمكنك دائماً كتابة العنوان يدوياً بدلاً من ذلك.',
+        locationAlwaysPermission: false,
+        locationAlwaysAndWhenInUsePermission: false,
+        motionUsagePermission: false,
+        isIosBackgroundLocationEnabled: false,
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
+      },
+    ],
     /*
      * RTL decided natively, before JavaScript runs.
      *
@@ -478,14 +525,30 @@ const config: ExpoConfig = {
         icon: './assets/splash-android.png',
         color: '#FF5400',
         defaultChannel: 'orders',
-        sounds: ['./assets/sounds/new-order.wav'],
+        sounds: ['./assets/sounds/new_order.wav'],
       },
     ],
     /*
      * The in-app alert: a shop owner with the app open, or a courier riding
      * with it on the dashboard, hears a new order the moment it lands.
      */
-    'expo-audio',
+    /*
+     * Playback only. Left bare, the plugin also declares RECORD_AUDIO on
+     * Android and a microphone purpose string on iOS — a microphone the app
+     * never opens, which Play lists as a sensitive permission and asks to
+     * justify, and which a reviewer reads as a capability being hidden.
+     */
+    /*
+     * And foreground only. The plugin's default declares background audio on
+     * iOS (`UIBackgroundModes: audio`) and a media-playback foreground service
+     * on Android — for an app whose only sound is a two-second chime while it
+     * is open. Apple rejects a background mode nothing uses (2.5.4), and Play
+     * asks for a declaration form for every foreground service type.
+     */
+    [
+      'expo-audio',
+      { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: false },
+    ],
     /*
      * The camera and the photo library: a shop's product photos and its own
      * picture, taken where the products are. The strings are what iOS shows
@@ -587,6 +650,26 @@ const config: ExpoConfig = {
      * Sentry project configured behaves exactly as it did before.
      */
     '@sentry/react-native',
+    /*
+     * The release build, trimmed.
+     *
+     * Expo's template ships Android release builds with R8 minification and
+     * resource shrinking off. On, the classes and resources nothing reaches
+     * leave the APK — a build that carries a WebView, Sentry, an image
+     * loader and a map has megabytes of them — and a smaller dex is a
+     * faster cold start. Every module here ships its own keep rules, which
+     * is what makes the switch safe; if a release build ever dies with a
+     * ClassNotFoundException, this is the first thing to flip back.
+     */
+    [
+      'expo-build-properties',
+      {
+        android: {
+          enableProguardInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+        },
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

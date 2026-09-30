@@ -38,6 +38,15 @@ export default defineConfig({
       '@jibli/config': pkg('config'),
       '@jibli/logger': pkg('logger'),
       '@jibli/money': pkg('money'),
+      '@jibli/validation/arabic': fileURLToPath(
+        new URL('./packages/validation/src/arabic.ts', import.meta.url),
+      ),
+      '@jibli/validation/phone': fileURLToPath(
+        new URL('./packages/validation/src/phone.ts', import.meta.url),
+      ),
+      '@jibli/validation/names': fileURLToPath(
+        new URL('./packages/validation/src/names.ts', import.meta.url),
+      ),
       '@jibli/validation': pkg('validation'),
       '@jibli/contracts': pkg('contracts'),
       '@jibli/db': pkg('db'),

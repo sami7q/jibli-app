@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { containsArabic, normalizeDigits, sanitizeDisplayText } from './arabic.js';
+import { checkFullName } from './names.js';
 import { toE164Iraq } from './phone.js';
 
 /**
@@ -43,16 +44,15 @@ export const iraqiPhoneSchema = z
  * identified by a phone number and a PIN, never by matching a name against
  * anything — so the rule rejected real people and protected nothing.
  */
-export const fullNameSchema = z
-  .string()
-  .transform(sanitizeDisplayText)
-  .pipe(
-    z
-      .string()
-      .min(2, 'الاسم قصير جداً')
-      .max(80, 'الاسم طويل جداً')
-      .regex(/^[^\d<>{}[\]\\/|@#$%^*_=+~`]+$/u, 'الاسم يحتوي على رموز غير مسموحة'),
-  );
+export const fullNameSchema = z.string().transform((value, ctx) => {
+  // The rule itself lives in names.ts, where the phone can read it without zod.
+  const result = checkFullName(value);
+  if (!result.ok) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: result.message });
+    return z.NEVER;
+  }
+  return result.value;
+});
 
 /** Free-form display text such as a restaurant or menu item name. */
 export const displayNameSchema = (min = 2, max = 120) =>

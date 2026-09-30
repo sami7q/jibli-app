@@ -40,9 +40,6 @@ import { configString } from './app-config';
 const configured = configString('sentryDsn');
 const dsn = configured?.startsWith('https://') ? configured : null;
 
-/** Whether reports are actually going anywhere. Read by `captureError`. */
-export const isMonitoringEnabled = Boolean(dsn);
-
 export function startMonitoring(): void {
   if (!dsn) return;
 

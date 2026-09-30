@@ -45,15 +45,6 @@ export async function savePreferredAddressId(addressId: string): Promise<void> {
   }
 }
 
-export async function clearPreferredAddressId(): Promise<void> {
-  try {
-    if (isWeb) globalThis.localStorage?.removeItem(KEY);
-    else await SecureStore.deleteItemAsync(KEY);
-  } catch {
-    /* Same cost again. */
-  }
-}
-
 /*
  * The choosing rule lives next door, with nothing imported, so it can be
  * tested without a React Native runtime — this file cannot be, because

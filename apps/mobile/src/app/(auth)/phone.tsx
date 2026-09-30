@@ -13,7 +13,8 @@ import {
 import { configString } from '@/lib/app-config';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@/ui/icon';
-import { tryToE164Iraq, normalizeDigits } from '@jibli/validation';
+import { normalizeDigits } from '@jibli/validation/arabic';
+import { tryToE164Iraq } from '@jibli/validation/phone';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { holdPendingCredentials } from '@/lib/pending-credentials';
 import { PasswordField } from '@/ui/password-field';

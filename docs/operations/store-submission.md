@@ -16,7 +16,10 @@ Each of these is a documented rejection reason that has already been closed.
 | **Play target API level** — API 36 since 31 August 2026                          | Expo SDK 57, which targets 36 and above                                               |
 | **Export compliance**                                                            | `ITSAppUsesNonExemptEncryption: false` in `app.config.ts`                             |
 | **Permission purpose strings**                                                   | `NSLocationWhenInUseUsageDescription`, in Arabic, naming the one screen that uses it  |
-| **Least privilege**                                                              | Android asks for three permissions. No camera, and never `ACCESS_BACKGROUND_LOCATION` |
+| **Least privilege**                                                              | Android asks for notifications, foreground location and the camera (product and shop photos). The microphone, storage and biometric permissions the media modules would add are blocked in `android.blockedPermissions`; never `ACCESS_BACKGROUND_LOCATION` |
+| **Camera and photo purpose strings**                                             | `expo-image-picker` plugin options in `app.config.ts`, localised in `locales/*.json`; the microphone is off on both media plugins |
+| **Smaller release APK**                                                          | `expo-build-properties`: R8 minification and resource shrinking on for Android release builds |
+| **No capabilities the app does not use**                                         | `expo-audio` with background playback off (no `UIBackgroundModes: audio`, no media foreground service), `expo-location` with the «always» and motion strings off, `expo-secure-store` without the Face ID string; `NSAllowsArbitraryLoads: false` |
 | **Privacy policy and terms reachable in-app**                                    | Two rows in `(tabs)/account.tsx`, from `extra.privacyPolicyUrl` / `extra.termsUrl`    |
 | **RTL on first launch**                                                          | `['expo-localization', { forcesRTL: true }]` — see "The first launch was mirrored"   |
 | **iOS privacy manifest**                                                         | `ios.privacyManifests` in `app.config.ts`, `NSPrivacyTracking: false`                |

@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Switch, TextInput, View } from 'react-nat
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
-import { normalizeDigits } from '@jibli/validation';
+import { normalizeDigits } from '@jibli/validation/arabic';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type OwnerSettingsInput } from '@/lib/api';
 import { notify } from '@/lib/dialog';
