@@ -399,8 +399,22 @@ function type(size: number, weight: keyof typeof FAMILY_FOR_WEIGHT, ratio: numbe
   return {
     fontFamily: FAMILY_FOR_WEIGHT[weight],
     fontSize: size,
-    lineHeight: Math.round(size * ratio),
+    lineHeight: Math.round(size * lineRatio(ratio)),
   };
+}
+
+/**
+ * The line-height ratio a style actually gets.
+ *
+ * Android clips a glyph to its line box, and Cairo's descenders reach past
+ * a `tight` box: a final yeh lost the two dots that make it a yeh, so
+ * «مرحباً بك في جيبلي» read as «فى جيبلى» on every heading. iOS and the web
+ * draw the overflow. So on Android no style goes below the ratio `normal`
+ * already uses for body text — the headings sit a little airier there, and
+ * every letter in them is the letter that was typed.
+ */
+function lineRatio(ratio: number): number {
+  return Platform.OS === 'android' ? Math.max(ratio, lineHeight.normal) : ratio;
 }
 
 export const text = {

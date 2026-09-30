@@ -296,7 +296,9 @@ export default function PhoneScreen() {
             accessibilityState={{ selected: tab === key }}
             style={[styles.tab, tab === key && styles.tabActive]}
           >
-            <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{label}</Text>
+            <Text numberOfLines={1} style={[styles.tabText, tab === key && styles.tabTextActive]}>
+              {label}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -534,7 +536,13 @@ const styles = lazySheet(() =>
       borderRadius: radius.sm,
     },
     tabActive: { backgroundColor: BRAND[500] },
-    tabText: { ...text.bodyBold, color: color.textSecondary },
+    // Stretched and centred, never measured at its own width: see the label in `Button`.
+    tabText: {
+      ...text.bodyBold,
+      color: color.textSecondary,
+      textAlign: 'center',
+      alignSelf: 'stretch',
+    },
     tabTextActive: { color: palette.white },
 
     /** Words, unlike a phone number, follow the layout direction. */
