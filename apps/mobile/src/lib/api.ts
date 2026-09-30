@@ -122,6 +122,16 @@ export interface RequestOptions {
   readonly idempotencyKey?: string;
   readonly authenticated?: boolean;
   /**
+   * A bearer token for this one request, instead of the stored session's.
+   *
+   * For asking a question *about* an account before this phone becomes it:
+   * the shop sign-in fetches the new account's shop list with the token it
+   * was just issued, and only then decides whether to store the session at
+   * all. A 401 with an explicit token is an answer about that token, so the
+   * stored session is not refreshed on its behalf.
+   */
+  readonly accessToken?: string;
+  /**
    * Which shop a portal request is about.
    *
    * A *selector*, never a grant: `resolveRestaurantScope` on the server throws
@@ -350,7 +360,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (options.idempotencyKey) headers['X-Idempotency-Key'] = options.idempotencyKey;
   if (options.restaurantId) headers['X-Restaurant-Id'] = options.restaurantId;
 
-  if (options.authenticated !== false) {
+  if (options.accessToken) {
+    headers.Authorization = `Bearer ${options.accessToken}`;
+  } else if (options.authenticated !== false) {
     const session = await loadSession();
     if (session) headers.Authorization = `Bearer ${session.accessToken}`;
   }
@@ -385,7 +397,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     timeout.done();
   }
 
-  if (response.status === 401 && !options._isRetry && options.authenticated !== false) {
+  if (
+    response.status === 401 &&
+    !options._isRetry &&
+    options.authenticated !== false &&
+    !options.accessToken
+  ) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       return apiRequest<T>(path, { ...options, _isRetry: true });
@@ -1388,8 +1405,7 @@ export const api = {
     ),
 
   /** Where a new shop may open: the governorates and cities taking applications. */
-  onboardingCoverage: () =>
-    apiRequest<OnboardingGovernorate[]>('/api/v1/applications/coverage'),
+  onboardingCoverage: () => apiRequest<OnboardingGovernorate[]>('/api/v1/applications/coverage'),
 
   /** Whether this order can be rated yet — the 15-minute window (plan §31). */
   reviewEligibility: (orderId: string) =>
@@ -1494,12 +1510,17 @@ export const api = {
       { method: 'POST', restaurantId, body: { reason } },
     ),
 
-  /** The shops this account belongs to, with the role held in each. */
-  ownerShops: () =>
+  /**
+   * The shops this account belongs to, with the role held in each.
+   *
+   * `accessToken` asks on behalf of an account that is not yet this phone's
+   * session — see `RequestOptions.accessToken`.
+   */
+  ownerShops: (options: { accessToken?: string } = {}) =>
     apiRequest<{
       user: { id: string; full_name: string | null };
       restaurants: OwnerShop[];
-    }>('/api/v1/restaurant-portal/me'),
+    }>('/api/v1/restaurant-portal/me', options),
 
   /** The whole product tree for one shop. */
   ownerCatalog: (restaurantId: string) =>

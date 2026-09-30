@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RESTAURANT_ROLE_LABELS, dateAr, NumberField } from '@jibli/ui-web';
-import type { RestaurantRole } from '@jibli/contracts';
+import {
+  MERCHANT_TYPES,
+  MERCHANT_TYPE_LABELS,
+  type MerchantType,
+  type RestaurantRole,
+} from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import { PortalCredentials } from '@/components/portal-credentials';
 import {
@@ -39,6 +44,8 @@ export default function RestaurantDetailPage() {
 
   const [suspending, setSuspending] = useState(false);
   const [editingCommission, setEditingCommission] = useState(false);
+  const [editingKind, setEditingKind] = useState(false);
+  const [kindNote, setKindNote] = useState<string | null>(null);
   const [needsMfa, setNeedsMfa] = useState(false);
 
   const token = session.status === 'authenticated' ? session.accessToken : '';
@@ -79,6 +86,8 @@ export default function RestaurantDetailPage() {
 
   const data = restaurant.data;
   const isActive = data?.operational_status === 'ACTIVE';
+  // An older API says nothing; the column's default is what it holds then.
+  const kind: MerchantType = data?.merchant_type ?? 'RESTAURANT';
   const canActivate = readiness.data?.ready === true && !isActive;
 
   return (
@@ -144,6 +153,44 @@ export default function RestaurantDetailPage() {
             </div>
           ) : null}
 
+          {/*
+            Which section the shop sells in, said up front. The page never
+            showed it, so a market that had been saved as a restaurant looked
+            exactly like a market here — until its owner opened the app and
+            was turned away.
+          */}
+          <Card
+            title="نوع الشريك"
+            icon="restaurants"
+            subtitle="القسم الذي يظهر فيه داخل التطبيق، ومن أين يُدار"
+            actions={
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={() => setEditingKind(true)}
+              >
+                تغيير النوع
+              </button>
+            }
+          >
+            {kindNote ? (
+              <p className="alert-bar alert-bar--warning" role="status">
+                {kindNote}
+              </p>
+            ) : null}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-3)',
+                flexWrap: 'wrap',
+              }}
+            >
+              <Badge tone={KIND_TONE[kind]}>{MERCHANT_TYPE_LABELS[kind].nameAr}</Badge>
+              <span style={{ color: 'var(--text-secondary)' }}>{KIND_MANAGED[kind]}</span>
+            </div>
+          </Card>
+
           <Card title="قائمة الجاهزية" icon="applications" subtitle="ما يلزم قبل استقبال الطلبات">
             {readiness.isLoading ? (
               <Skeleton height={200} />
@@ -165,7 +212,11 @@ export default function RestaurantDetailPage() {
                           : 'var(--jibli-warning-50)',
                     }}
                   >
-                    <Icon name={check.passed ? 'check' : 'close'} className="nav__icon" aria-hidden />
+                    <Icon
+                      name={check.passed ? 'check' : 'close'}
+                      className="nav__icon"
+                      aria-hidden
+                    />
                     <span style={{ flex: 1 }}>{check.label_ar}</span>
                     {!check.blocking ? <Badge tone="neutral">غير مانع</Badge> : null}
                   </div>
@@ -188,7 +239,6 @@ export default function RestaurantDetailPage() {
               </button>
             }
           >
-
             <DataTable<CommissionConfigView>
               caption="سجل قيم العمولة"
               rows={data.commission_history}
@@ -217,7 +267,11 @@ export default function RestaurantDetailPage() {
                   key: 'to',
                   header: 'سارية حتى',
                   render: (row) =>
-                    row.is_current ? <Badge tone="success">الحالية</Badge> : dateAr(row.effective_to ?? ''),
+                    row.is_current ? (
+                      <Badge tone="success">الحالية</Badge>
+                    ) : (
+                      dateAr(row.effective_to ?? '')
+                    ),
                 },
               ]}
             />
@@ -331,8 +385,8 @@ export default function RestaurantDetailPage() {
                 <Icon name="alert" className="nav__icon" aria-hidden /> ماذا يحدث
               </strong>
               <p style={{ margin: 0 }}>
-                يتوقف استقبال الطلبات الجديدة فوراً ويختفي المطعم من التطبيق. الطلبات النشطة
-                الحالية تكمل مسارها حتى لا يضيع طعام أو نقد. لا تُحذف أي بيانات أو كشوف.
+                يتوقف استقبال الطلبات الجديدة فوراً ويختفي المطعم من التطبيق. الطلبات النشطة الحالية
+                تكمل مسارها حتى لا يضيع طعام أو نقد. لا تُحذف أي بيانات أو كشوف.
               </p>
             </div>
           }
@@ -355,6 +409,21 @@ export default function RestaurantDetailPage() {
             setNeedsMfa(true);
           }}
           onCancel={() => setEditingCommission(false)}
+        />
+      ) : null}
+
+      {editingKind && data ? (
+        <KindDialog
+          token={token}
+          restaurantId={restaurantId}
+          name={data.display_name}
+          current={kind}
+          onDone={(note) => {
+            setEditingKind(false);
+            setKindNote(note);
+            invalidate();
+          }}
+          onCancel={() => setEditingKind(false)}
         />
       ) : null}
 
@@ -396,7 +465,12 @@ function CommissionDialog({
   });
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="commission-title">
+    <div
+      className="dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="commission-title"
+    >
       <div className="dialog">
         <h2 id="commission-title">تعديل عمولة هذا المطعم</h2>
 
@@ -423,8 +497,8 @@ function CommissionDialog({
 
         <div className="dialog__impact">
           <p style={{ margin: 0 }}>
-            تسري القيمة الجديدة على الطلبات الجديدة فقط. الطلبات والكشوف السابقة تحتفظ بالقيمة
-            التي سُجّلت عليها — هذا يمنع تغيّر الفواتير الصادرة بأثر رجعي.
+            تسري القيمة الجديدة على الطلبات الجديدة فقط. الطلبات والكشوف السابقة تحتفظ بالقيمة التي
+            سُجّلت عليها — هذا يمنع تغيّر الفواتير الصادرة بأثر رجعي.
           </p>
         </div>
 
@@ -452,6 +526,127 @@ function CommissionDialog({
             onClick={() => update.mutate()}
           >
             {update.isPending ? 'جاري الحفظ…' : 'حفظ العمولة'}
+          </button>
+          <button type="button" className="btn btn--outline" onClick={onCancel}>
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const KIND_TONE: Record<MerchantType, 'neutral' | 'success' | 'rose'> = {
+  RESTAURANT: 'neutral',
+  MARKET: 'success',
+  COSMETICS: 'rose',
+};
+
+/** Where the owner of each kind does their work — the consequence of the choice. */
+const KIND_MANAGED: Record<MerchantType, string> = {
+  RESTAURANT: 'يظهر في قسم «طعام». القائمة والطلبات تُدار من لوحة التحكم على المتصفّح.',
+  MARKET: 'يظهر في قسم «ماركت». صاحبه يدير المنتجات والطلبات من تطبيق جيبلي أو من لوحة التحكم.',
+  COSMETICS: 'يظهر في قسم «كوزمتك». صاحبه يدير المنتجات والطلبات من تطبيق جيبلي أو من لوحة التحكم.',
+};
+
+/**
+ * Move the shop to another section.
+ *
+ * A reason is required because this is audited: the shop changes tab for
+ * every customer, and its owner gains or loses the app.
+ */
+function KindDialog({
+  token,
+  restaurantId,
+  name,
+  current,
+  onDone,
+  onCancel,
+}: {
+  token: string;
+  restaurantId: string;
+  name: string;
+  current: MerchantType;
+  onDone: (noteAr: string) => void;
+  onCancel: () => void;
+}) {
+  const [kind, setKind] = useState<MerchantType>(current);
+  const [reason, setReason] = useState('');
+
+  const update = useMutation({
+    mutationFn: () =>
+      admin.updateMerchantType(token, restaurantId, { merchant_type: kind, reason }),
+    onSuccess: (result) => onDone(result.note_ar),
+  });
+
+  return (
+    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="kind-title">
+      <div className="dialog">
+        <h2 id="kind-title">نوع «{name}»</h2>
+
+        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+          النوع يحدد القسم الذي يظهر فيه المتجر داخل التطبيق، وهل يستطيع صاحبه إدارته من تطبيق جيبلي
+          (الماركت ومتاجر التجميل) أم من لوحة التحكم فقط (المطاعم).
+        </p>
+
+        <div className="field">
+          <label htmlFor="kind-picker">النوع</label>
+          <div
+            id="kind-picker"
+            role="radiogroup"
+            aria-label="النوع"
+            style={{ display: 'flex', flexDirection: 'row-reverse', gap: 'var(--space-2)' }}
+          >
+            {MERCHANT_TYPES.map((value) => {
+              const active = kind === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setKind(value)}
+                  className={`btn btn--sm ${active ? 'btn--primary' : 'btn--ghost'}`}
+                  style={{ flex: 1 }}
+                >
+                  {MERCHANT_TYPE_LABELS[value].nameAr}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="dialog__impact">
+          <p style={{ margin: 0 }}>
+            التصنيفات التي لا تنتمي إلى القسم الجديد تُزال من المتجر — أعد إضافتها بعد التغيير.
+            الطلبات والكشوف السابقة لا تتأثر.
+          </p>
+        </div>
+
+        <div className="field">
+          <label htmlFor="kind-reason">سبب التغيير (مطلوب)</label>
+          <textarea
+            id="kind-reason"
+            rows={2}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </div>
+
+        {update.error ? (
+          <p className="alert-bar alert-bar--danger" role="alert">
+            {update.error instanceof ApiError ? update.error.messageAr : 'تعذّر تغيير النوع'}
+          </p>
+        ) : null}
+
+        <div className="dialog__actions">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={kind === current || reason.trim().length < 5 || update.isPending}
+            onClick={() => update.mutate()}
+          >
+            {update.isPending ? 'جاري الحفظ…' : 'حفظ النوع'}
           </button>
           <button type="button" className="btn btn--outline" onClick={onCancel}>
             إلغاء

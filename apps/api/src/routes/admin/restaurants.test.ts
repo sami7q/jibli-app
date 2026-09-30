@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMerchantSchema } from './restaurants.js';
+import { createMerchantSchema, tagsForMerchantType } from './restaurants.js';
 
 /**
  * The one rule the create route adds for three sections: a merchant is tagged
@@ -48,8 +48,36 @@ describe('creating a merchant', () => {
 
   it('accepts a market tagged with its aisles', () => {
     expect(
-      createMerchantSchema.safeParse({ ...base, merchant_type: 'MARKET', cuisine_tags: ['mk_dairy'] })
-        .success,
+      createMerchantSchema.safeParse({
+        ...base,
+        merchant_type: 'MARKET',
+        cuisine_tags: ['mk_dairy'],
+      }).success,
     ).toBe(true);
+  });
+});
+
+/**
+ * What happens to a shop's tags when it changes section.
+ *
+ * The create route refuses tags from the wrong section; the correction route
+ * cannot, because the shop already carries them. It keeps what fits and says
+ * what it dropped, and the two lists together are exactly the input.
+ */
+describe('moving a shop to another section', () => {
+  it('keeps the tags that exist in the new section and drops the rest', () => {
+    const { kept, dropped } = tagsForMerchantType(['burger', 'mk_dairy', 'pizza'], 'MARKET');
+    expect(kept).toEqual(['mk_dairy']);
+    expect(dropped).toEqual(['burger', 'pizza']);
+  });
+
+  it('drops nothing from a shop already tagged for the section', () => {
+    const { kept, dropped } = tagsForMerchantType(['cs_makeup', 'cs_skincare'], 'COSMETICS');
+    expect(kept).toEqual(['cs_makeup', 'cs_skincare']);
+    expect(dropped).toEqual([]);
+  });
+
+  it('leaves an untagged shop untagged', () => {
+    expect(tagsForMerchantType([], 'RESTAURANT')).toEqual({ kept: [], dropped: [] });
   });
 });

@@ -326,11 +326,19 @@ function Gate() {
      * screen a tick before their own screen could ask for anything.
      */
     const onPortalSignIn = path[1] === 'driver-login' || path[1] === 'owner-login';
+    /*
+     * «صاحب متجر؟» is a question, and a signed-in customer may be asked it
+     * too — on the way back from the form, or from the welcome screen after
+     * signing in. It sends people on itself; it is not a screen to be
+     * hurried off.
+     */
+    const onPartnerDoors = path[1] === 'partner';
 
     if (
       (state.status === 'ready' || state.status === 'offline-ready') &&
       inAuth &&
-      !onPortalSignIn
+      !onPortalSignIn &&
+      !onPartnerDoors
     ) {
       // The same answer the sign-in screens give, so neither can win a race
       // against the other and strand someone who came to register a shop.

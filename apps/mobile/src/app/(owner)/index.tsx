@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import type { MerchantType } from '@jibli/contracts';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError, type PartnerApplication } from '@/lib/api';
 import { NEW_ORDERS, countAr } from '@/lib/arabic-count';
 import { catalogNoun, useOwner } from '@/lib/owner';
 import { sectionOf } from '@/lib/sections';
 import { PushPrompt } from '@/ui/push-prompt';
+import { Door, KindBadge, Step } from '@/ui/partner-doors';
 import { useMe, useSession } from '@/lib/session';
 import { BRAND, color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
@@ -396,6 +396,17 @@ function PartnerHub({
             ? 'قوائم المطاعم فيها خيارات وإضافات وأسعار لكل خيار، وتحريرها أدقّ على لوحة التحكم. ولديك ماركت أو متجر تجميل؟ سجّله من هنا وأدِره من التطبيق بحسابك هذا.'
             : 'سجّل ماركتك أو متجر التجميل من هنا. بعد موافقة فريق جيبلي يظهر متجرك في هذه الصفحة بحسابك نفسه: منتجات بالصور، أسعار، وطلبات تستلمها وتجهّزها.'}
         </Text>
+        {/*
+         * The commonest way for a market to land here is to have been filed
+         * as a restaurant, and the fix is one field in Admin — said here, or
+         * the owner concludes the app does not do what it was sold as doing.
+         */}
+        {restaurantOnly ? (
+          <Text variant="caption" tone="muted">
+            متجرك ماركت أو متجر تجميل وظهر هنا كمطعم؟ نوعه مسجّل خطأً — يصحّحه فريق جيبلي من لوحة
+            الإدارة (صفحة المتجر ← نوع الشريك) ثم يفتح هنا.
+          </Text>
+        ) : null}
         {!pending ? (
           <View style={{ gap: space[2], paddingTop: space[1] }}>
             <Step number="١" text="سجّل بيانات متجرك — دقيقتان" />
@@ -421,7 +432,11 @@ function PartnerHub({
           icon="close-circle-outline"
           tone="danger"
           title={`لم يُقبل طلب «${rejected.display_name}»`}
-          body={rejected.rejection_reason ? `السبب: ${rejected.rejection_reason}` : 'يمكنك تعديل البيانات وتقديم طلب جديد.'}
+          body={
+            rejected.rejection_reason
+              ? `السبب: ${rejected.rejection_reason}`
+              : 'يمكنك تعديل البيانات وتقديم طلب جديد.'
+          }
           onPress={() => router.push('/(owner)/apply')}
         />
       ) : null}
@@ -435,59 +450,20 @@ function PartnerHub({
         />
       ) : null}
 
-      {/* Second, on purpose: only owners the team issued a login to have one. */}
-      <Button
-        label="لديّ حساب متجر — الدخول باسم المستخدم"
-        variant="ghost"
-        block
+      {/*
+       * The other door, the same size as the first. It was a ghost link under
+       * the primary button, and the owner of a real username read the screen
+       * as "register, or nothing".
+       */}
+      <Door
+        icon="key-outline"
+        tint={sectionOf('MARKET').ramp}
+        title="لديّ حساب متجر"
+        body="أصدر لك فريق جيبلي اسم مستخدم وكلمة مرور؟ ادخل بهما لتفتح متجرك: المنتجات، الأسعار، والطلبات الحيّة."
+        cta="الدخول باسم المستخدم"
         onPress={() => router.push('/(auth)/owner-login')}
       />
     </View>
-  );
-}
-
-/** A section's own colour and icon: what «ماركت» and «كوزمتك» look like everywhere else. */
-function KindBadge({ kind }: { kind: MerchantType }) {
-  const section = sectionOf(kind);
-  return (
-    <Row
-      gap={space[1]}
-      style={{
-        paddingVertical: space[1],
-        paddingHorizontal: space[3],
-        borderRadius: radius.full,
-        backgroundColor: section.ramp[500],
-      }}
-    >
-      <MaterialCommunityIcons name={section.shopIcon} size={16} color="#fff" />
-      <Text variant="captionBold" tone="inverse">
-        {section.shortName}
-      </Text>
-    </Row>
-  );
-}
-
-function Step({ number, text }: { number: string; text: string }) {
-  return (
-    <Row gap={space[2]}>
-      <View
-        style={{
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: BRAND[500],
-        }}
-      >
-        <Text variant="captionBold" tone="inverse">
-          {number}
-        </Text>
-      </View>
-      <Text variant="small" style={{ flex: 1 }}>
-        {text}
-      </Text>
-    </Row>
   );
 }
 

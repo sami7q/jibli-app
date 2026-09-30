@@ -108,6 +108,8 @@ export const AUDIT_ACTIONS = {
   RESTAURANT_SUSPEND: 'restaurant.suspend',
   RESTAURANT_REACTIVATE: 'restaurant.reactivate',
   RESTAURANT_COMMISSION_UPDATE: 'restaurant.commission.update',
+  /** A shop moved between food, market and cosmetics. */
+  RESTAURANT_MERCHANT_TYPE_UPDATE: 'restaurant.merchant_type.update',
   RESTAURANT_LOCATION_CHANGE_APPROVE: 'restaurant.location_change.approve',
   ROLE_GRANT: 'roles.grant',
   ROLE_REVOKE: 'roles.revoke',

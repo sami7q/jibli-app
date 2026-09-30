@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@/ui/icon';
-import { color, radius, space, TAP_TARGET, text } from '@/theme';
+import { BRAND, color, palette, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, Ltr, Row, Text } from '@/ui';
 import { JibliWordmark } from '@/ui/brand';
 
@@ -119,7 +119,11 @@ export function PortalSignIn({
       ) : null}
 
       <View style={{ alignItems: 'center', gap: space[2] }}>
-        <JibliWordmark width={140} />
+        {/*
+         * In the brand's own colours: the mark defaults to white, which on this
+         * white card left only the orange pin — a dot where the name should be.
+         */}
+        <JibliWordmark width={140} tint={BRAND[500]} pinTint={palette.white} />
         <Text variant="h2" align="center">
           {title}
         </Text>
@@ -147,14 +151,14 @@ export function PortalSignIn({
           style={[text.body, field]}
         />
         {/*
-          * The example, below the box rather than inside it.
-          *
-          * Latin text in a placeholder also renders badly here: the field is
-          * forced `ltr` inside an app laid out `rtl`, and iOS spaces the
-          * characters out — «a h m e d . a l i» — which reads as neither a hint
-          * nor a value. As a caption it is ordinary text in an ordinary
-          * direction, and it is unambiguously guidance.
-          */}
+         * The example, below the box rather than inside it.
+         *
+         * Latin text in a placeholder also renders badly here: the field is
+         * forced `ltr` inside an app laid out `rtl`, and iOS spaces the
+         * characters out — «a h m e d . a l i» — which reads as neither a hint
+         * nor a value. As a caption it is ordinary text in an ordinary
+         * direction, and it is unambiguously guidance.
+         */}
         <Row gap={space[1]}>
           <Text variant="caption" tone="muted">
             مثال:

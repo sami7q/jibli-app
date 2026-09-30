@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@/ui/icon';
 import { useSession } from '@/lib/session';
-import { clearAfterSignIn, continueAfterSignIn } from '@/lib/after-sign-in';
+import { clearAfterSignIn } from '@/lib/after-sign-in';
 import { SECTIONS, SECTION_ORDER } from '@/lib/sections';
 import { BRAND, ROW, TAP_TARGET, palette, radius, space } from '@/theme';
 import { Button, Screen, Text } from '@/ui';
@@ -252,16 +252,16 @@ export default function WelcomeScreen() {
           </Text>
 
           {/*
-           * The door for sellers. A shop is registered by the account that will
-           * run it, so the visitor signs in with their phone first and lands on
-           * the application form after — not on the customer home, which is
-           * where every sign-in used to end.
+           * The door for sellers — to the question, not to a form.
+           *
+           * It used to start the phone sign-in with the application form as
+           * the destination, which was right for a first-time applicant and
+           * wrong for the owner of a shop the team had already issued a login
+           * for: they were asked to register a shop that exists. «صاحب متجر؟»
+           * asks which of the two they are before anything is asked of them.
            */}
           <Pressable
-            onPress={() => {
-              continueAfterSignIn('/(owner)/apply');
-              router.push('/(auth)/phone');
-            }}
+            onPress={() => router.push('/(auth)/partner')}
             accessibilityRole="button"
             accessibilityLabel="صاحب متجر؟ سجّل متجرك في جيبلي"
             style={({ pressed }) => ({

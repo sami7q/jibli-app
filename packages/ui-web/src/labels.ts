@@ -315,6 +315,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'restaurant.suspend': 'إيقاف مطعم',
   'restaurant.reactivate': 'إعادة تفعيل مطعم',
   'restaurant.commission.update': 'تعديل نسبة عمولة',
+  'restaurant.merchant_type.update': 'تغيير نوع الشريك',
   'restaurant.location_change.approve': 'اعتماد تغيير موقع مطعم',
 
   'roles.grant': 'منح صلاحية',

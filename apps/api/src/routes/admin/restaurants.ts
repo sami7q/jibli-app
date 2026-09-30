@@ -10,6 +10,8 @@ import {
   OPERATIONAL_STATUSES,
   success,
   MERCHANT_TYPES,
+  MERCHANT_TYPE_LABELS,
+  type MerchantType,
 } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
 import { commissionFeeDisplay } from '@jibli/money';
@@ -60,63 +62,65 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });
 
-export const createMerchantSchema = z.object({
-  display_name: displayNameSchema(2, 120),
-  /*
-   * What is being created. Defaulted rather than required, because every
-   * caller written before markets existed omits it and means a restaurant —
-   * and because a field that must be filled in to create the common case is a
-   * field that gets filled in wrongly.
-   */
-  merchant_type: z.enum(MERCHANT_TYPES).default('RESTAURANT'),
-  owner_phone: iraqiPhoneSchema,
-  owner_name: displayNameSchema(3, 80),
-  governorate_id: uuidSchema,
-  city_id: uuidSchema,
-  address_text: z.string().min(5).max(300),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  /*
-   * Optional, and normally absent. The commission is one platform-wide number
-   * set in Admin > Settings; typing it again for each restaurant is how two
-   * restaurants silently end up on different fees. It stays accepted so a
-   * negotiated exception can still be recorded deliberately.
-   */
-  commission_flat_iqd: z.number().int().min(0).max(100_000).optional(),
-  /** Asset id from POST /api/v1/uploads. */
-  logo_asset_id: uuidSchema.optional(),
-  settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']).default('HALF_MONTH'),
-  minimum_order_iqd: z.number().int().min(0).default(0),
-  delivery_fee_iqd: z.number().int().min(0).default(0),
-  /*
-   * Validated against the shipped vocabulary rather than accepting free text.
-   * Free text is how "دجاج" and "الدجاج" became two categories, and how the
-   * customer app's filters end up matching nothing.
-   */
-  cuisine_tags: z
-    .array(z.enum(ALL_CATEGORY_KEYS as [string, ...string[]]))
-    .max(4)
-    .default([]),
-  /** Required when the target city is not open for onboarding (plan §15.1). */
-  override_coverage: z.boolean().default(false),
-  reason: reasonSchema.optional(),
-}).superRefine((body, issue) => {
-  /*
-   * Each section tags from its own list. A cosmetics shop carrying «برغر»
-   * would appear under a food filter in a storefront it is not in, which is
-   * the same lie as the wrong shop in the wrong tab.
-   */
-  const allowed = new Set(categoriesFor(body.merchant_type).map((entry) => entry.key));
-  body.cuisine_tags.forEach((tag, index) => {
-    if (!allowed.has(tag)) {
-      issue.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['cuisine_tags', index],
-        message: `${tag} is not a category for ${body.merchant_type}`,
-      });
-    }
+export const createMerchantSchema = z
+  .object({
+    display_name: displayNameSchema(2, 120),
+    /*
+     * What is being created. Defaulted rather than required, because every
+     * caller written before markets existed omits it and means a restaurant —
+     * and because a field that must be filled in to create the common case is a
+     * field that gets filled in wrongly.
+     */
+    merchant_type: z.enum(MERCHANT_TYPES).default('RESTAURANT'),
+    owner_phone: iraqiPhoneSchema,
+    owner_name: displayNameSchema(3, 80),
+    governorate_id: uuidSchema,
+    city_id: uuidSchema,
+    address_text: z.string().min(5).max(300),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    /*
+     * Optional, and normally absent. The commission is one platform-wide number
+     * set in Admin > Settings; typing it again for each restaurant is how two
+     * restaurants silently end up on different fees. It stays accepted so a
+     * negotiated exception can still be recorded deliberately.
+     */
+    commission_flat_iqd: z.number().int().min(0).max(100_000).optional(),
+    /** Asset id from POST /api/v1/uploads. */
+    logo_asset_id: uuidSchema.optional(),
+    settlement_policy: z.enum(['HALF_MONTH', 'MONTHLY']).default('HALF_MONTH'),
+    minimum_order_iqd: z.number().int().min(0).default(0),
+    delivery_fee_iqd: z.number().int().min(0).default(0),
+    /*
+     * Validated against the shipped vocabulary rather than accepting free text.
+     * Free text is how "دجاج" and "الدجاج" became two categories, and how the
+     * customer app's filters end up matching nothing.
+     */
+    cuisine_tags: z
+      .array(z.enum(ALL_CATEGORY_KEYS as [string, ...string[]]))
+      .max(4)
+      .default([]),
+    /** Required when the target city is not open for onboarding (plan §15.1). */
+    override_coverage: z.boolean().default(false),
+    reason: reasonSchema.optional(),
+  })
+  .superRefine((body, issue) => {
+    /*
+     * Each section tags from its own list. A cosmetics shop carrying «برغر»
+     * would appear under a food filter in a storefront it is not in, which is
+     * the same lie as the wrong shop in the wrong tab.
+     */
+    const allowed = new Set(categoriesFor(body.merchant_type).map((entry) => entry.key));
+    body.cuisine_tags.forEach((tag, index) => {
+      if (!allowed.has(tag)) {
+        issue.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['cuisine_tags', index],
+          message: `${tag} is not a category for ${body.merchant_type}`,
+        });
+      }
+    });
   });
-});
 
 export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppContext): void {
   /** Restaurant directory with live operational counts. */
@@ -470,6 +474,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
             display_name: row.restaurant.displayName,
             legal_name: row.restaurant.legalName,
             partner_code: row.restaurant.partnerCode,
+            merchant_type: row.restaurant.merchantType,
             description_ar: row.restaurant.descriptionAr,
             onboarding_status: row.restaurant.onboardingStatus,
             operational_status: row.restaurant.operationalStatus,
@@ -620,6 +625,17 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           providerId,
           displayName: body.display_name,
           partnerCode: await nextPartnerCode(tx),
+          /*
+           * Which section of the app this shop sells in.
+           *
+           * It was written to the audit row below and never to this one, so
+           * every market and cosmetics shop Admin created landed in the
+           * database as a restaurant by the column's default: the customer
+           * app listed it under food, and Owner Mode on the phone turned its
+           * owner away with «إدارة المطاعم على المتصفّح». The form had asked
+           * the right question and the answer went nowhere.
+           */
+          merchantType: body.merchant_type,
           onboardingStatus: 'APPROVED',
           // Approved on creation, but not yet trading: the readiness checklist
           // still has to pass before staff flip it to ACTIVE (plan §122).
@@ -691,6 +707,93 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
             restaurant_id: result.restaurantId,
             branch_id: result.branchId,
             owner_user_id: result.ownerUserId,
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
+  /**
+   * Correct which section a shop sells in.
+   *
+   * Exists because of the bug fixed in the create route above: every market
+   * and cosmetics shop Admin created before the fix is a restaurant in the
+   * database, and the only way to move one was SQL. Same permission as
+   * creating a shop — it is the same decision, made late.
+   *
+   * Tags from the old section are dropped rather than refused. The point of
+   * the call is to get the shop into the right tab, and a market that was
+   * filed under «برغر» by mistake should not have to be re-tagged before it
+   * can stop being a restaurant. What was dropped is said back, so the
+   * operator can tag it properly next.
+   */
+  app.patch(
+    '/api/v1/admin/restaurants/:restaurantId/merchant-type',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'restaurant.create');
+      const { restaurantId } = z.object({ restaurantId: uuidSchema }).parse(request.params);
+      const body = z
+        .object({ merchant_type: z.enum(MERCHANT_TYPES), reason: reasonSchema })
+        .parse(request.body);
+
+      const outcome = await ctx.db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({
+            merchantType: restaurants.merchantType,
+            cuisineTags: restaurants.cuisineTags,
+            displayName: restaurants.displayName,
+          })
+          .from(restaurants)
+          .where(and(eq(restaurants.id, restaurantId), isNull(restaurants.deletedAt)))
+          .for('update')
+          .limit(1);
+
+        if (!current)
+          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'restaurant' } });
+
+        const changed = current.merchantType !== body.merchant_type;
+        const { kept, dropped } = tagsForMerchantType(current.cuisineTags, body.merchant_type);
+
+        if (changed) {
+          await tx
+            .update(restaurants)
+            .set({ merchantType: body.merchant_type, cuisineTags: kept, updatedAt: new Date() })
+            .where(eq(restaurants.id, restaurantId));
+
+          await writeAudit(tx, {
+            actorUserId: principal.userId,
+            action: AUDIT_ACTIONS.RESTAURANT_MERCHANT_TYPE_UPDATE,
+            entityType: 'restaurant',
+            entityId: restaurantId,
+            before: { merchantType: current.merchantType, cuisineTags: current.cuisineTags },
+            after: { merchantType: body.merchant_type, cuisineTags: kept },
+            reason: body.reason,
+            ip: clientIp(request),
+            userAgent: userAgent(request),
+            requestId: request.requestId,
+          });
+        }
+
+        return { changed, dropped: changed ? dropped : [], displayName: current.displayName };
+      });
+
+      const kind = MERCHANT_TYPE_LABELS[body.merchant_type].nameAr;
+      const noteAr = !outcome.changed
+        ? `«${outcome.displayName}» مسجّل أصلاً بنوع ${kind}.`
+        : outcome.dropped.length > 0
+          ? `أصبح «${outcome.displayName}» ${kind}. أُزيلت ${outcome.dropped.length} من تصنيفاته لأنها لا تنتمي إلى هذا القسم — أضف تصنيفاته من جديد.`
+          : `أصبح «${outcome.displayName}» ${kind}. يظهر الآن في القسم الصحيح داخل التطبيق، ويستطيع صاحبه إدارته من تطبيق جيبلي.`;
+
+      return reply.send(
+        success(
+          {
+            updated: outcome.changed,
+            merchant_type: body.merchant_type,
+            dropped_tags: outcome.dropped,
+            note_ar: noteAr,
           },
           { request_id: request.requestId },
         ),
@@ -946,4 +1049,23 @@ async function nextPartnerCode(tx: Transaction): Promise<string> {
   // Exhausted the 4-digit space; widen rather than loop forever. The unique
   // index remains the real guarantee either way.
   return String(Math.floor(100_000 + Math.random() * 900_000));
+}
+
+/**
+ * The tags a shop keeps when it moves to another section.
+ *
+ * Each section tags from its own vocabulary — `createMerchantSchema` refuses a
+ * food cuisine on a cosmetics shop — so a shop that changes section keeps only
+ * the tags that exist in the new one. Pure, and exported for the test beside
+ * this file.
+ */
+export function tagsForMerchantType(
+  tags: readonly string[],
+  merchantType: MerchantType,
+): { kept: string[]; dropped: string[] } {
+  const allowed = new Set(categoriesFor(merchantType).map((entry) => entry.key));
+  const kept: string[] = [];
+  const dropped: string[] = [];
+  for (const tag of tags) (allowed.has(tag) ? kept : dropped).push(tag);
+  return { kept, dropped };
 }

@@ -111,6 +111,7 @@ choice; the server never trusts it.
 ## Shape
 
 ```
+src/app/(auth)/partner.tsx         «صاحب متجر؟» — register a shop, or sign into one: the two doors
 src/app/(auth)/owner-login.tsx     username + password, rejects non-RESTAURANT portals
 src/app/(owner)/_layout.tsx        holds the selected shop, refuses a non-market shop
 src/app/(owner)/index.tsx          the shop: picture, open/closed, product count

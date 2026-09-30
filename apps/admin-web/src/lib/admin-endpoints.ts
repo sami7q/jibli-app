@@ -239,6 +239,8 @@ export interface AdminRestaurantDetail {
   display_name: string;
   legal_name: string | null;
   partner_code: string;
+  /** Which section it sells in. Absent on an API deployed before the detail carried it. */
+  merchant_type?: MerchantType;
   description_ar: string | null;
   onboarding_status: string;
   operational_status: string;
@@ -706,6 +708,29 @@ export const admin = {
       `/api/v1/admin/restaurants/${id}/commission`,
       { method: 'PATCH', accessToken: token, body },
     ),
+
+  /**
+   * Move a shop between food, market and cosmetics.
+   *
+   * The way to repair a shop that was created as the wrong kind: it changes
+   * which tab the customer app lists it in and whether Owner Mode on the
+   * phone will open it.
+   */
+  updateMerchantType: (
+    token: string,
+    id: string,
+    body: { merchant_type: MerchantType; reason: string },
+  ) =>
+    apiRequest<{
+      updated: boolean;
+      merchant_type: MerchantType;
+      dropped_tags: string[];
+      note_ar: string;
+    }>(`/api/v1/admin/restaurants/${id}/merchant-type`, {
+      method: 'PATCH',
+      accessToken: token,
+      body,
+    }),
 
   readiness: (token: string, id: string) =>
     apiRequest<{

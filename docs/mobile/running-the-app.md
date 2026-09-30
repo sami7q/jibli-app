@@ -55,7 +55,9 @@ API is awake — each of which otherwise fails in a way that points elsewhere.
 pnpm dev:mobile
 ```
 
-That starts Metro and prints a QR code. Scan it with the **Camera** app on iOS
+That starts Metro with a cleared bundler cache — a few extra seconds on the
+first bundle, and never a screen you have already changed — and prints a QR
+code. `pnpm dev:mobile:fast` skips the clear. Scan it with the **Camera** app on iOS
 or with **Expo Go** on Android, and the app opens on your phone.
 
 The app points at the deployed API by default — `https://jibli-api.onrender.com`
@@ -183,7 +185,7 @@ Both platforms bundle: **1224 modules (iOS), 1220 (Android)**.
 | The app opens on a welcome screen, not the home | Correct. First launch asks once: sign in, or browse as a guest. |
 | Home says «اختر منطقتك» and lists nothing | No delivery area chosen yet. Tap the location row in the header. If an area is chosen and the list is still empty, see §8. |
 | Sign-in never arrives | No SMS gateway on staging. §3. |
-| Metro cannot resolve a module after pulling | `pnpm install`, then `pnpm dev:mobile --clear`. |
+| Metro cannot resolve a module after pulling, or the phone shows a screen you have already changed | `pnpm install`, then `pnpm dev:mobile` — it starts Metro with `--clear`, so nothing transformed by an earlier run survives. |
 | `CommandError: No Android connected device found` | You pressed **a** with no device or emulator attached. Nothing is wrong: scan the QR with Expo Go instead, or press **w** for the browser (§9). An emulator needs Android Studio. |
 | Expo warns a package version is wrong | `pnpm --filter @jibli/mobile exec expo install --fix`, then restart Metro. Worth doing: `expo-splash-screen` was once pinned to a version from a *later* SDK, whose native API differs. |
 | Arabic renders left-to-right on a fresh install | RTL is forced at startup and Android applies it after one restart. Close and reopen. |

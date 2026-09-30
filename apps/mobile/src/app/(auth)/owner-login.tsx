@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, NetworkError } from '@/lib/api';
+import { judgeShopSignIn } from '@/lib/owner-sign-in';
 import { useSession } from '@/lib/session';
 import { PortalSignIn } from '@/ui/portal-sign-in';
 
@@ -18,8 +19,18 @@ import { PortalSignIn } from '@/ui/portal-sign-in';
  * need is the camera, and the camera is in the app. That is the whole argument
  * — everything else about this screen is the same form the portal shows.
  *
- * The app refused these accounts until now, with a sentence sending them to a
- * browser. That sentence was the feature request.
+ * **Decide first, switch second.** The screen used to store the new tokens,
+ * clear the shop cache and send the owner to «متجري», which then asked which
+ * shops the account held — a request racing the live-orders engine the new
+ * session had just started, and which the cache clearing could cancel from
+ * under it. When the answer was "no shop the phone serves", the owner had
+ * already lost the account they were signed in as and was looking at the
+ * screen that offers the login they had just used.
+ *
+ * Now the account's shop list is fetched with the token it was just issued,
+ * while the old session still stands. Only an account with a shop the phone
+ * can open becomes the session, and it arrives with that list already in the
+ * cache, so «متجري» opens on the shop rather than on a skeleton.
  */
 export default function OwnerLoginScreen() {
   const router = useRouter();
@@ -48,21 +59,39 @@ export default function OwnerLoginScreen() {
               : 'هذا الحساب لا يتبع متجراً. استخدم لوحة الإدارة على المتصفّح.';
           }
 
+          /*
+           * What the account owns, asked with its own token before this phone
+           * becomes it. A refusal leaves whoever was signed in signed in, and
+           * says — by name — why the shop cannot open here.
+           */
+          const shops = await api.ownerShops({ accessToken: result.access_token });
+          const verdict = judgeShopSignIn(shops.restaurants);
+          if (verdict.kind === 'refused') return verdict.message;
+
+          /*
+           * The previous account's Owner Mode, forgotten before the new
+           * session exists — so nothing of it can be read for a frame, and so
+           * nothing of the new account's is in flight yet to be cancelled.
+           * The keys carry the user id, but a shared phone should not keep
+           * the last owner's catalog in memory either way.
+           */
+          queryClient.removeQueries({ queryKey: ['owner-shops'] });
+          queryClient.removeQueries({ queryKey: ['owner-catalog'] });
+          queryClient.removeQueries({ queryKey: ['owner-orders'] });
+          queryClient.removeQueries({ queryKey: ['owner-selected-shop'] });
+
+          /*
+           * The list, already known, under the key the new session will read
+           * it by. «متجري» and the live-orders engine then start from the shop
+           * instead of from a request — and cannot disagree about it.
+           */
+          queryClient.setQueryData(['owner-shops', result.user.id], shops);
+
           await signIn({
             accessToken: result.access_token,
             refreshToken: result.refresh_token,
             userId: result.user.id,
           });
-
-          /*
-           * The shop list is keyed per session, and a previous owner's list
-           * must not survive into this one on a shared phone.
-           */
-          // Every account's list, not only this one's: the previous
-          // account's must be gone before «متجري» renders again.
-          queryClient.removeQueries({ queryKey: ['owner-shops'] });
-          queryClient.removeQueries({ queryKey: ['owner-catalog'] });
-          queryClient.removeQueries({ queryKey: ['owner-orders'] });
 
           router.replace('/(owner)');
           return null;
