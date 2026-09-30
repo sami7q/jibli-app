@@ -7,6 +7,7 @@ import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError, type OwnerLiveOrder, type OwnerRejectReason } from '@/lib/api';
 import { MINUTES, countAr } from '@/lib/arabic-count';
 import { useOwner } from '@/lib/owner';
+import { describeAddress } from '@/lib/owner-catalog';
 import { useWorkLive } from '@/lib/work-live';
 import type { RealtimeStatus } from '@/lib/realtime';
 import { BRAND, color, palette, radius, ROW, space, TAP_TARGET } from '@/theme';
@@ -879,19 +880,4 @@ function DriverPicker({
       <Button label="إلغاء" variant="ghost" block onPress={onCancel} />
     </View>
   );
-}
-
-/**
- * A readable line from the address snapshot the order carries. The snapshot's
- * shape belongs to the API, so every field is optional here.
- */
-function describeAddress(address: Record<string, unknown>): string | null {
-  const read = (key: string) => {
-    const value = address[key];
-    return typeof value === 'string' && value.trim() ? value.trim() : null;
-  };
-  const parts = [read('cityNameAr'), read('districtText'), read('street'), read('landmark')].filter(
-    Boolean,
-  );
-  return parts.length > 0 ? parts.join(' — ') : null;
 }

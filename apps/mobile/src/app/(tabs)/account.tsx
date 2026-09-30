@@ -29,7 +29,7 @@ import { ListRow, RTL_TEXT, Sheet } from '@/ui/catalog';
  */
 export default function AccountScreen() {
   const router = useRouter();
-  const { state, signOut, refresh } = useSession();
+  const { state, signOut, refresh, parkedAccount, switchToParked } = useSession();
   const isGuest = useIsGuest();
 
   /*
@@ -82,6 +82,8 @@ export default function AccountScreen() {
   const ownsShop =
     (state.status === 'ready' || state.status === 'needs-profile') &&
     Object.keys(state.me.restaurant_roles ?? {}).length > 0;
+  /** The shop this person signed into earlier, kept while they shop as themselves. */
+  const parkedShop = !ownsShop && parkedAccount === 'shop';
 
   /*
    * A shop application waiting on Jibli, if there is one — so the row says
@@ -94,7 +96,8 @@ export default function AccountScreen() {
       state.status === 'ready' || state.status === 'needs-profile' ? state.me.user_id : null,
     ],
     queryFn: () => api.partnerApplication(),
-    enabled: !isGuest && !ownsShop && (state.status === 'ready' || state.status === 'needs-profile'),
+    enabled:
+      !isGuest && !ownsShop && (state.status === 'ready' || state.status === 'needs-profile'),
     staleTime: 60_000,
   });
   const partnerStatus = partnerApplication.data?.status ?? null;
@@ -365,20 +368,28 @@ export default function AccountScreen() {
          * application once there is one.
          */}
         <ListRow
-          label={ownsShop ? 'متجري' : 'سجّل متجرك في جيبلي'}
+          label={ownsShop ? 'متجري' : parkedShop ? 'العودة إلى متجري' : 'سجّل متجرك في جيبلي'}
           sublabel={
             ownsShop
               ? 'أضف المنتجات وعدّل الأسعار واستلم الطلبات'
-              : partnerStatus === 'UNDER_REVIEW' ||
-                  partnerStatus === 'INFO_REQUESTED' ||
-                  partnerStatus === 'DRAFT'
-                ? 'طلبك قيد المراجعة — سنتواصل معك'
-                : partnerStatus === 'REJECTED'
-                  ? 'لم يُقبل الطلب — اضغط للتفاصيل'
-                  : 'لأصحاب الماركت ومتاجر التجميل'
+              : parkedShop
+                ? 'حساب متجرك محفوظ — يفتح بلا كلمة مرور'
+                : partnerStatus === 'UNDER_REVIEW' ||
+                    partnerStatus === 'INFO_REQUESTED' ||
+                    partnerStatus === 'DRAFT'
+                  ? 'طلبك قيد المراجعة — سنتواصل معك'
+                  : partnerStatus === 'REJECTED'
+                    ? 'لم يُقبل الطلب — اضغط للتفاصيل'
+                    : 'لأصحاب الماركت ومتاجر التجميل'
           }
           icon={<MaterialCommunityIcons name="storefront-outline" size={20} color={color.brand} />}
-          onPress={() => router.push('/(owner)')}
+          onPress={() => {
+            if (parkedShop) {
+              void switchToParked().then(() => router.push('/(owner)'));
+              return;
+            }
+            router.push('/(owner)');
+          }}
         />
       </Group>
 
@@ -413,7 +424,9 @@ export default function AccountScreen() {
             onPress={() =>
               void confirmAsync({
                 title: 'تسجيل الخروج؟',
-                message: 'ستحتاج إلى رمز تحقق جديد لتسجيل الدخول مرة أخرى.',
+                message: parkedAccount
+                  ? 'سيُسجَّل خروج هذا الحساب والحساب المحفوظ معه. ستحتاج إلى تسجيل الدخول من جديد لكليهما.'
+                  : 'ستحتاج إلى رمز تحقق جديد لتسجيل الدخول مرة أخرى.',
                 confirmLabel: 'خروج',
                 destructive: true,
               }).then((yes) => {

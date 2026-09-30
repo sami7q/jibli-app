@@ -1,33 +1,40 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import MaterialCommunityIcons from '@/ui/icon';
-import { api, ApiError, type PartnerApplication } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatIqdArabic, iqd } from '@jibli/money';
+import MaterialCommunityIcons, { type IconName } from '@/ui/icon';
+import { api, ApiError, assetUrl, type PartnerApplication } from '@/lib/api';
 import { NEW_ORDERS, countAr } from '@/lib/arabic-count';
+import { notify } from '@/lib/dialog';
 import { catalogNoun, useOwner } from '@/lib/owner';
+import { PRODUCTS } from '@/lib/owner-catalog';
 import { sectionOf } from '@/lib/sections';
+import { useVertical } from '@/lib/vertical';
 import { PushPrompt } from '@/ui/push-prompt';
 import { Door, KindBadge, Step } from '@/ui/partner-doors';
 import { useMe, useSession } from '@/lib/session';
 import { BRAND, color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
-import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
+import { Button, ErrorState, RemoteImage, Row, Screen, Skeleton, Text } from '@/ui';
 
 /**
  * Owner Mode — the shop, on one screen.
  *
- * Three questions, in the order a shopkeeper asks them: which shop is this, how
- * many products are in it, and where do I add one. Everything else a merchant
- * account can do — finance, staff, working hours, settlement — stays on the web
- * portal, which is better at tables and is where that work actually gets done.
+ * The questions a shopkeeper asks, in order: is anybody waiting on me, how
+ * did today go, and where do I add the next thing. Everything else a merchant
+ * account can do — finance, staff, working hours, settlement — stays on the
+ * web portal, which is better at tables and is where that work gets done.
  *
- * This screen is deliberately small. It is the lobby, and the product list is
- * the room.
+ * The lobby is deliberately a set of doors: the board, the products, the
+ * aisles, the shop's own page, and the way back to the customer app without
+ * losing the shop's sign-in.
  */
 export default function OwnerHomeScreen() {
   const router = useRouter();
-  const { state, refresh } = useSession();
+  const { state, refresh, parkedAccount, switchToParked } = useSession();
   const owner = useOwner();
+  const queryClient = useQueryClient();
+  const { choose } = useVertical();
 
   const shop = owner.shop;
 
@@ -70,6 +77,31 @@ export default function OwnerHomeScreen() {
     ['ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(order.status),
   ).length;
 
+  /** The shop's picture and whether it is taking orders — the card's two facts. */
+  const settings = useQuery({
+    queryKey: ['owner-settings', shop?.id],
+    queryFn: () => api.ownerSettings(shop?.id as string),
+    enabled: Boolean(shop?.id) && owner.can('settings.read'),
+    staleTime: 60_000,
+  });
+
+  /** Today, in two numbers. */
+  const dashboard = useQuery({
+    queryKey: ['owner-dashboard', shop?.id],
+    queryFn: () => api.ownerDashboard(shop?.id as string),
+    enabled: Boolean(shop?.id) && owner.can('order.read'),
+    refetchInterval: 60_000,
+  });
+
+  const acceptsOrders = settings.data?.branch.accepts_orders ?? true;
+  const toggleOrders = useMutation({
+    mutationFn: (accepts: boolean) =>
+      api.ownerUpdateSettings(shop?.id as string, { accepts_orders: accepts }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['owner-settings', shop?.id] }),
+    onError: (caught) =>
+      notify('تعذّر التغيير', caught instanceof ApiError ? caught.messageAr : 'حاول مرة أخرى.'),
+  });
+
   const counts = useMemo(() => {
     const categories = catalog.data?.categories ?? [];
     const products = categories.flatMap((entry) => entry.items);
@@ -95,7 +127,8 @@ export default function OwnerHomeScreen() {
       <Screen edges={['top', 'bottom']}>
         <OwnerHeader title="متجري" />
         <View style={{ gap: space[3], paddingTop: space[4] }}>
-          <Skeleton height={104} style={{ borderRadius: radius.xl }} />
+          <Skeleton height={124} style={{ borderRadius: radius.xl }} />
+          <Skeleton height={72} style={{ borderRadius: radius.lg }} />
           <Skeleton height={72} style={{ borderRadius: radius.lg }} />
         </View>
       </Screen>
@@ -114,15 +147,11 @@ export default function OwnerHomeScreen() {
   /*
    * Signed in, but no shop Owner Mode can open.
    *
-   * This used to be a dead end with one button — «الدخول بحساب متجر ماركت أو
-   * تجميل» — which wants a username only Jibli staff can issue. Somebody who
-   * signed in with their phone had nothing to type there and came straight
-   * back. Now the first thing on offer is registering a shop as this very
-   * account, which approval turns into a shop this screen opens; the portal
-   * login stays, second, for owners who already have one.
-   *
-   * A restaurant owner is told why their restaurant is not here rather than
-   * "you have no shops", which would be false about their own account.
+   * The first thing on offer is registering a shop as this very account, which
+   * approval turns into a shop this screen opens; the portal login stays,
+   * second, for owners who already have one. A restaurant owner is told why
+   * their restaurant is not here rather than "you have no shops", which would
+   * be false about their own account.
    */
   if (!shop) {
     return (
@@ -133,76 +162,119 @@ export default function OwnerHomeScreen() {
     );
   }
 
+  const section = sectionOf(shop.merchant_type);
   const noun = catalogNoun(shop);
+  const live = shop.operational_status === 'ACTIVE';
+  const logoAssetId = settings.data?.restaurant.logo_asset_id ?? null;
+
+  /**
+   * Back to the customer app. The shop stays signed in: if the owner came from
+   * a customer account it is restored, and «حسابي» keeps a way back here.
+   */
+  const leaveToApp = async () => {
+    if (parkedAccount === 'customer') await switchToParked();
+    router.replace('/(tabs)');
+  };
+
+  /** The shop's page as a customer sees it, drawn in the shop's own section. */
+  const viewAsCustomer = () => {
+    choose(shop.merchant_type);
+    router.push({ pathname: '/restaurant/[id]', params: { id: shop.id } });
+  };
 
   return (
     <Screen scroll edges={['top']} padded={false}>
-      <View style={{ padding: space[4], gap: space[4] }}>
+      <View style={{ padding: space[4], gap: space[4], paddingBottom: space[10] }}>
         <OwnerHeader title="متجري" />
 
         <PushPrompt audience="owner" />
 
-        {/* Which shop this is — and, when there is more than one, the way to
-            switch. A grocer who adds stock to the wrong branch blames the app,
-            and rightly: the app never told them which one it was on. */}
+        {/* ── The shop ────────────────────────────────────────────────── */}
         <View
           style={{
             padding: space[4],
             borderRadius: radius.xl,
-            backgroundColor: sectionOf(shop.merchant_type).ramp[500],
-            gap: space[1],
+            backgroundColor: section.ramp[500],
+            gap: space[3],
             ...shadow.md,
           }}
         >
-          <Row justify="space-between" align="flex-start">
+          <Row gap={space[3]} align="flex-start">
+            <Pressable
+              onPress={() => router.push('/(owner)/settings')}
+              accessibilityRole="button"
+              accessibilityLabel="صورة المتجر — تغيير"
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                overflow: 'hidden',
+                backgroundColor: 'rgba(255,255,255,0.22)',
+                borderWidth: 2,
+                borderColor: 'rgba(255,255,255,0.6)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {logoAssetId ? (
+                <RemoteImage
+                  uri={assetUrl(logoAssetId)}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              ) : (
+                <MaterialCommunityIcons
+                  name={section.shopIcon}
+                  size={30}
+                  color="rgba(255,255,255,0.95)"
+                />
+              )}
+            </Pressable>
             <View style={{ flex: 1, gap: 2 }}>
               <Text variant="caption" tone="inverse" style={{ opacity: 0.85 }}>
-                {sectionOf(shop.merchant_type).label}
+                {section.label}
               </Text>
               <Text variant="h3" tone="inverse" numberOfLines={2}>
                 {shop.display_name}
               </Text>
+              <Text variant="caption" tone="inverse" style={{ opacity: 0.85 }}>
+                {!live
+                  ? 'بانتظار التفعيل من فريق جيبلي'
+                  : acceptsOrders
+                    ? settings.data && !settings.data.is_open
+                      ? 'مغلق الآن حسب ساعات العمل'
+                      : 'يستقبل الطلبات'
+                    : 'متوقف عن استقبال الطلبات'}
+              </Text>
             </View>
-            <MaterialCommunityIcons
-              name={sectionOf(shop.merchant_type).shopIcon}
-              size={30}
-              color="rgba(255,255,255,0.9)"
-            />
+            {owner.can('settings.write') && live ? (
+              <Switch
+                value={acceptsOrders}
+                disabled={settings.isLoading || toggleOrders.isPending}
+                onValueChange={(value) => toggleOrders.mutate(value)}
+                trackColor={{ true: 'rgba(255,255,255,0.55)', false: 'rgba(0,0,0,0.25)' }}
+                thumbColor="#fff"
+                accessibilityLabel="استقبال الطلبات"
+              />
+            ) : null}
           </Row>
 
-          {owner.usable.length > 1 ? (
-            <Pressable
-              onPress={() => router.push('/(owner)/shops')}
-              accessibilityRole="button"
-              accessibilityLabel="تبديل المتجر"
-              style={({ pressed }) => [
-                {
-                  flexDirection: ROW,
-                  alignItems: 'center',
-                  alignSelf: 'flex-start',
-                  gap: space[1],
-                  marginTop: space[2],
-                  paddingVertical: space[1],
-                  paddingHorizontal: space[3],
-                  borderRadius: radius.full,
-                  backgroundColor: 'rgba(255,255,255,0.22)',
-                },
-                pressed ? { opacity: 0.8 } : null,
-              ]}
-            >
-              <MaterialCommunityIcons name="swap-horizontal" size={15} color="#fff" />
-              <Text variant="caption" tone="inverse">
-                تبديل المتجر ({owner.usable.length})
-              </Text>
-            </Pressable>
-          ) : null}
+          <Row gap={space[2]} style={{ flexWrap: 'wrap' }}>
+            <CardPill
+              icon="pencil-outline"
+              label="تعديل المتجر"
+              onPress={() => router.push('/(owner)/settings')}
+            />
+            {owner.usable.length > 1 ? (
+              <CardPill
+                icon="swap-horizontal"
+                label={`تبديل المتجر (${owner.usable.length})`}
+                onPress={() => router.push('/(owner)/shops')}
+              />
+            ) : null}
+          </Row>
         </View>
 
-        {/*
-          Orders first. The menu changes once a week; an order waits on a
-          customer now — so it is the first thing in the lobby, and red when
-          somebody is waiting.
-        */}
+        {/* ── Orders first: an order waits on a customer now. ─────────── */}
         {owner.can('order.read') ? (
           <Pressable
             onPress={() => router.push('/(owner)/orders')}
@@ -235,7 +307,7 @@ export default function OwnerHomeScreen() {
                 {orders.isLoading
                   ? '…'
                   : inProgress > 0
-                    ? `${inProgress} قيد التنفيذ — اقبل، حضّر، وأسند للمندوب`
+                    ? `${inProgress} قيد التنفيذ — اقبل، جهّز، وأسند للمندوب`
                     : 'اقبل الطلبات وتابع حالتها من هنا'}
               </Text>
             </View>
@@ -243,6 +315,25 @@ export default function OwnerHomeScreen() {
           </Pressable>
         ) : null}
 
+        {/* ── Today ───────────────────────────────────────────────────── */}
+        {owner.can('order.read') ? (
+          <Row gap={space[3]}>
+            <Stat
+              label="طلبات اليوم"
+              value={dashboard.isLoading ? '…' : String(dashboard.data?.orders_today ?? 0)}
+            />
+            <Stat
+              label="مبيعات اليوم"
+              value={
+                dashboard.isLoading
+                  ? '…'
+                  : formatIqdArabic(iqd(dashboard.data?.sales_today_iqd ?? 0))
+              }
+            />
+          </Row>
+        ) : null}
+
+        {/* ── The catalog ─────────────────────────────────────────────── */}
         {catalog.isError ? (
           <ErrorState
             message={
@@ -253,62 +344,70 @@ export default function OwnerHomeScreen() {
         ) : (
           <>
             <Row gap={space[3]}>
-              <Stat label={noun} value={catalog.isLoading ? '…' : String(counts.products)} />
-              <Stat label="الأقسام" value={catalog.isLoading ? '…' : String(counts.categories)} />
-              <Stat
-                label="غير متوفر"
-                value={catalog.isLoading ? '…' : String(counts.unavailable)}
-                tone={counts.unavailable > 0 ? 'warning' : 'plain'}
+              <Tile
+                icon="basket-outline"
+                title={noun}
+                caption={
+                  catalog.isLoading
+                    ? '…'
+                    : counts.products === 0
+                      ? 'لا شيء بعد'
+                      : countAr(counts.products, PRODUCTS)
+                }
+                onPress={() => router.push('/(owner)/products')}
+              />
+              <Tile
+                icon="label-outline"
+                title="الأقسام"
+                caption={
+                  catalog.isLoading
+                    ? '…'
+                    : counts.categories === 0
+                      ? 'أنشئها أولاً'
+                      : String(counts.categories)
+                }
+                highlight={!catalog.isLoading && counts.categories === 0 && owner.can('menu.write')}
+                onPress={() => router.push('/(owner)/categories')}
               />
             </Row>
 
             {/*
-              The one number that is a to-do rather than a fact.
-              A product with no photograph is the commonest reason a customer
-              scrolls past it, and it is the thing the phone is uniquely good at
-              fixing — the camera is right here.
+              The two numbers that are to-dos rather than facts: a product with
+              no photograph is the commonest reason a customer scrolls past it,
+              and the phone is the device that fixes that.
             */}
-            {!catalog.isLoading && counts.withoutPhoto > 0 ? (
-              <Pressable
-                onPress={() => router.push('/(owner)/products?filter=no-photo')}
-                accessibilityRole="button"
-                style={({ pressed }) => [
-                  {
-                    flexDirection: ROW,
-                    alignItems: 'center',
-                    gap: space[3],
-                    padding: space[3],
-                    borderRadius: radius.lg,
-                    backgroundColor: color.warningSoft,
-                  },
-                  pressed ? { opacity: 0.85 } : null,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="camera-plus-outline"
-                  size={22}
-                  color={color.warningStrong}
-                />
-                <Text variant="small" style={{ flex: 1, color: color.warningStrong }}>
-                  {counts.withoutPhoto} من {noun} بلا صورة
-                </Text>
-                <MaterialCommunityIcons name="chevron-left" size={20} color={color.warningStrong} />
-              </Pressable>
+            {!catalog.isLoading && (counts.withoutPhoto > 0 || counts.unavailable > 0) ? (
+              <Row gap={space[2]} style={{ flexWrap: 'wrap' }}>
+                {counts.withoutPhoto > 0 ? (
+                  <Todo
+                    icon="camera-plus-outline"
+                    label={`${counts.withoutPhoto} بلا صورة`}
+                    onPress={() => router.push('/(owner)/products?filter=no-photo')}
+                  />
+                ) : null}
+                {counts.unavailable > 0 ? (
+                  <Todo
+                    icon="eye-off-outline"
+                    label={`${counts.unavailable} غير متوفر`}
+                    onPress={() => router.push('/(owner)/products?filter=unavailable')}
+                  />
+                ) : null}
+              </Row>
             ) : null}
-
-            <Button
-              label={`عرض ${noun}`}
-              block
-              size="lg"
-              onPress={() => router.push('/(owner)/products')}
-            />
 
             {owner.can('menu.write') ? (
               <Button
                 label="إضافة منتج"
-                variant="secondary"
                 block
-                onPress={() => router.push('/(owner)/product/new')}
+                size="lg"
+                icon={<MaterialCommunityIcons name="plus" size={20} color={color.textInverse} />}
+                onPress={() =>
+                  router.push(
+                    counts.categories === 0 && !catalog.isLoading
+                      ? '/(owner)/categories'
+                      : '/(owner)/product/new',
+                  )
+                }
               />
             ) : (
               <Text variant="caption" tone="muted" align="center">
@@ -317,8 +416,158 @@ export default function OwnerHomeScreen() {
             )}
           </>
         )}
+
+        {/* ── Out, without leaving ────────────────────────────────────── */}
+        <View style={{ gap: space[2], paddingTop: space[2] }}>
+          <Button
+            label="عرض المتجر كما يراه الزبون"
+            variant="secondary"
+            block
+            icon={<MaterialCommunityIcons name="eye-outline" size={18} color={color.textPrimary} />}
+            disabled={!live}
+            onPress={viewAsCustomer}
+          />
+          <LeaveRow parked={parkedAccount === 'customer'} onPress={() => void leaveToApp()} />
+        </View>
       </View>
     </Screen>
+  );
+}
+
+/** A small white action on the shop card. */
+function CardPill({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        {
+          flexDirection: ROW,
+          alignItems: 'center',
+          gap: space[1],
+          paddingVertical: space[1],
+          paddingHorizontal: space[3],
+          minHeight: TAP_TARGET - 12,
+          borderRadius: radius.full,
+          backgroundColor: 'rgba(255,255,255,0.22)',
+        },
+        pressed ? { opacity: 0.8 } : null,
+      ]}
+    >
+      <MaterialCommunityIcons name={icon} size={15} color="#fff" />
+      <Text variant="caption" tone="inverse">
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** A door to one part of the shop, with the one number worth knowing before opening it. */
+function Tile({
+  icon,
+  title,
+  caption,
+  highlight = false,
+  onPress,
+}: {
+  icon: IconName;
+  title: string;
+  caption: string;
+  highlight?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}: ${caption}`}
+      style={({ pressed }) => [
+        {
+          flex: 1,
+          padding: space[3],
+          gap: space[2],
+          borderRadius: radius.lg,
+          backgroundColor: highlight ? color.brandSoft : color.surfaceCard,
+          borderWidth: 1,
+          borderColor: highlight ? color.brand : color.borderSubtle,
+        },
+        pressed ? { opacity: 0.85 } : null,
+      ]}
+    >
+      <MaterialCommunityIcons name={icon} size={24} color={color.brand} />
+      <View style={{ gap: 2 }}>
+        <Text variant="bodyBold">{title}</Text>
+        <Text variant="caption" tone={highlight ? 'brand' : 'muted'} numberOfLines={1}>
+          {caption}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/** Something on the shelf that needs doing, one tap from the list that shows it. */
+function Todo({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        {
+          flexDirection: ROW,
+          alignItems: 'center',
+          gap: space[1],
+          minHeight: TAP_TARGET - 8,
+          paddingHorizontal: space[3],
+          borderRadius: radius.full,
+          backgroundColor: color.warningSoft,
+        },
+        pressed ? { opacity: 0.85 } : null,
+      ]}
+    >
+      <MaterialCommunityIcons name={icon} size={16} color={color.warningStrong} />
+      <Text variant="caption" style={{ color: color.warningStrong }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** The way back to the customer app — with the shop kept signed in. */
+function LeaveRow({ parked, onPress }: { parked: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        {
+          flexDirection: ROW,
+          alignItems: 'center',
+          gap: space[3],
+          padding: space[3],
+          borderRadius: radius.lg,
+          backgroundColor: color.surfaceSunken,
+        },
+        pressed ? { opacity: 0.85 } : null,
+      ]}
+    >
+      <MaterialCommunityIcons name="home-outline" size={22} color={color.textSecondary} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text variant="smallBold">{parked ? 'العودة إلى حسابي كزبون' : 'تصفّح التطبيق كزبون'}</Text>
+        <Text variant="caption" tone="muted">
+          يبقى متجرك مسجّلاً — ارجع إليه من «حسابي» بلا كلمة مرور.
+        </Text>
+      </View>
+      <MaterialCommunityIcons name="chevron-left" size={20} color={color.textMuted} />
+    </Pressable>
   );
 }
 
@@ -517,16 +766,8 @@ function ApplicationCard({
   );
 }
 
-/** A number and what it counts. Three of these fit one row on the narrowest phone. */
-function Stat({
-  label,
-  value,
-  tone = 'plain',
-}: {
-  label: string;
-  value: string;
-  tone?: 'plain' | 'warning';
-}) {
+/** A number and what it counts. Two of these share a row. */
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View
       style={{
@@ -535,12 +776,12 @@ function Stat({
         borderRadius: radius.lg,
         backgroundColor: color.surfaceCard,
         borderWidth: 1,
-        borderColor: tone === 'warning' ? color.warning : color.borderSubtle,
+        borderColor: color.borderSubtle,
         alignItems: 'center',
         gap: 2,
       }}
     >
-      <Text variant="h3" tone={tone === 'warning' ? 'danger' : 'primary'}>
+      <Text variant="h3" numberOfLines={1}>
         {value}
       </Text>
       <Text variant="caption" tone="muted" numberOfLines={1}>

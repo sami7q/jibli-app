@@ -10,12 +10,16 @@ import {
 } from 'react';
 import { apiRequest, ApiError, NetworkError } from './api';
 import {
+  clearParkedSession,
   clearSession,
   forgetGuestChoice,
   loadGuestChoice,
+  loadParkedSession,
   loadSession,
+  parkSession,
   rememberGuestChoice,
   saveSession,
+  type ParkedKind,
   type StoredSession,
 } from './secure-session';
 
@@ -83,9 +87,20 @@ export type SessionState =
 
 interface SessionApi {
   readonly state: SessionState;
-  /** Store tokens after a successful OTP verification and resolve the user. */
-  readonly signIn: (session: StoredSession) => Promise<void>;
+  /**
+   * Store tokens after a successful sign-in and resolve the user.
+   *
+   * `park` keeps the account that was signed in, as that kind, so the
+   * person gets it back with one tap: a customer signing into their shop
+   * does not lose their own account to do it.
+   */
+  readonly signIn: (session: StoredSession, options?: { park?: ParkedKind }) => Promise<void>;
+  /** Both accounts: the active one and any parked one. */
   readonly signOut: () => Promise<void>;
+  /** The account waiting to be switched back to, if any. */
+  readonly parkedAccount: ParkedKind | null;
+  /** Swap the active and the parked account. False when nothing is parked. */
+  readonly switchToParked: () => Promise<boolean>;
   /** Re-ask the server — after completing the profile, or changing city. */
   readonly refresh: () => Promise<void>;
   /** Take «تصفح كضيف» and remember it, so the welcome screen asks once. */
@@ -96,6 +111,7 @@ const SessionContext = createContext<SessionApi | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({ status: 'loading' });
+  const [parkedAccount, setParkedAccount] = useState<ParkedKind | null>(null);
 
   // Guards against a resolve that finishes after the component unmounts, and
   // against two overlapping resolves racing to set the state.
@@ -172,12 +188,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void resolve();
+    void loadParkedSession().then((parked) => setParkedAccount(parked?.kind ?? null));
   }, [resolve]);
 
   const api = useMemo<SessionApi>(
     () => ({
       state,
-      signIn: async (session) => {
+      parkedAccount,
+      signIn: async (session, options) => {
+        if (options?.park) {
+          const current = await loadSession();
+          if (current && current.userId !== session.userId) {
+            await parkSession({ ...current, kind: options.park });
+            setParkedAccount(options.park);
+          }
+        }
         await saveSession(session);
         // They have an account now; the guest flag would otherwise send them
         // back to browsing anonymously the next time a session expires.
@@ -185,9 +210,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await resolve();
       },
       signOut: async () => {
-        await Promise.all([clearSession(), forgetGuestChoice()]);
+        await Promise.all([clearSession(), clearParkedSession(), forgetGuestChoice()]);
         generation.current += 1;
+        setParkedAccount(null);
         setState({ status: 'signed-out' });
+      },
+      /*
+       * The swap. The parked account becomes the session and the session is
+       * parked in its place, as the other kind — so the way back is always
+       * there. The resolve that follows asks the server about the account
+       * that just came out, and its access token may have expired while it
+       * waited; the request layer refreshes it with the refresh token it
+       * carried, exactly as it would after a night's sleep.
+       */
+      switchToParked: async () => {
+        const parked = await loadParkedSession();
+        if (!parked) return false;
+        const current = await loadSession();
+        await saveSession({
+          accessToken: parked.accessToken,
+          refreshToken: parked.refreshToken,
+          userId: parked.userId,
+        });
+        if (current && current.userId !== parked.userId) {
+          const kind: ParkedKind = parked.kind === 'shop' ? 'customer' : 'shop';
+          await parkSession({ ...current, kind });
+          setParkedAccount(kind);
+        } else {
+          await clearParkedSession();
+          setParkedAccount(null);
+        }
+        await resolve();
+        return true;
       },
       refresh: resolve,
       continueAsGuest: async () => {
@@ -196,7 +250,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setState({ status: 'guest' });
       },
     }),
-    [state, resolve],
+    [state, parkedAccount, resolve],
   );
 
   return <SessionContext.Provider value={api}>{children}</SessionContext.Provider>;

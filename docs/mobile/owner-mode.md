@@ -114,7 +114,10 @@ choice; the server never trusts it.
 src/app/(auth)/partner.tsx         «صاحب متجر؟» — register a shop, or sign into one: the two doors
 src/app/(auth)/owner-login.tsx     username + password, rejects non-RESTAURANT portals
 src/app/(owner)/_layout.tsx        holds the selected shop, refuses a non-market shop
-src/app/(owner)/index.tsx          the shop: picture, open/closed, product count
+src/app/(owner)/_layout.tsx        draws Owner Mode in the shop's own section colour
+src/app/(owner)/index.tsx          the lobby: picture, taking orders or not, today, the doors
+src/app/(owner)/categories.tsx     the aisles: suggested per kind, custom, rename, hide, delete
+src/app/(owner)/settings.tsx       picture, name, blurb, phone, fees; «عرض المتجر كزبون»
 src/app/(owner)/products.tsx       the product list — search, category filter, availability toggle
 src/app/(owner)/product/[id].tsx   add or edit: name, price, category, photo, available
 src/lib/owner.tsx                  the owner session: shops, the selected one, roles

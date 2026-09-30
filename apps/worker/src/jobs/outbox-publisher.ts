@@ -328,7 +328,11 @@ async function buildNotifications(
 
   if (event.eventType === 'order.placed' && typeof payload.restaurantId === 'string') {
     const total = formatIqdArabic(iqd(Number(payload.customerTotalIqd ?? 0)));
-    const template = NOTIFICATION_TEMPLATES.newOrderForRestaurant(orderNumber, total);
+    const template = NOTIFICATION_TEMPLATES.newOrderForRestaurant(orderNumber, total, {
+      customerName: typeof payload.customerFirstName === 'string' ? payload.customerFirstName : '',
+      itemCount: Number(payload.itemCount ?? 0),
+      area: typeof payload.deliveryArea === 'string' ? payload.deliveryArea : '',
+    });
 
     // Everyone who can act on a live order gets the alert.
     for (const userId of await orderDesk(ctx, payload.restaurantId)) {

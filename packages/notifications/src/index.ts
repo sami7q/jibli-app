@@ -1045,10 +1045,35 @@ export const NOTIFICATION_TEMPLATES = {
     bodyAr: `تم إلغاء طلبك رقم ${orderNumber}`,
   }),
 
-  newOrderForRestaurant: (orderNumber: string, total: string): NotificationTemplate => ({
-    titleAr: 'طلب جديد',
-    bodyAr: `وصل طلب جديد رقم ${orderNumber} بقيمة ${total}`,
-  }),
+  /**
+   * The shop's alert, with what the owner would otherwise open the app to
+   * learn: who (first name only — it may show on a locked screen), how
+   * many items, the total, and the district. An older event without
+   * those details still produces the plain line.
+   */
+  newOrderForRestaurant: (
+    orderNumber: string,
+    total: string,
+    details: { customerName?: string; itemCount?: number; area?: string } = {},
+  ): NotificationTemplate => {
+    const count = details.itemCount ?? 0;
+    const items =
+      count === 1
+        ? 'صنف واحد'
+        : count === 2
+          ? 'صنفان'
+          : count >= 3 && count <= 10
+            ? `${count} أصناف`
+            : count > 10
+              ? `${count} صنفاً`
+              : '';
+    return {
+      titleAr: details.customerName ? `طلب جديد من ${details.customerName}` : 'طلب جديد',
+      bodyAr: [`رقم ${orderNumber}`, items, total, details.area]
+        .filter((part) => Boolean(part))
+        .join(' · '),
+    };
+  },
   lowStock: (itemName: string): NotificationTemplate => ({
     titleAr: 'تنبيه مخزون',
     bodyAr: `كمية "${itemName}" أوشكت على النفاد`,

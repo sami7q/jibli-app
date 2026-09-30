@@ -915,6 +915,64 @@ export interface OwnerCatalog {
   readonly categories: OwnerCategory[];
 }
 
+/**
+ * The shop's own page and where it stands — `GET /restaurant-portal/settings`.
+ *
+ * The part of the portal's settings the phone shows: the picture, the words,
+ * the numbers a customer sees, and whether orders are being taken. Working
+ * hours and exceptions come back too and are left to the portal.
+ */
+export interface OwnerSettings {
+  readonly restaurant: {
+    readonly id: string;
+    readonly display_name: string;
+    readonly description_ar: string | null;
+    readonly logo_url: string | null;
+    /** Absent on an API deployed before the phone could change the picture. */
+    readonly logo_asset_id?: string | null;
+    readonly partner_code: string;
+    readonly operational_status: string;
+    readonly cuisine_tags: string[];
+    readonly minimum_order_iqd: number;
+  };
+  readonly branch: {
+    readonly id: string;
+    readonly name: string;
+    readonly address_text: string;
+    readonly district_text: string | null;
+    readonly city_name_ar: string | null;
+    readonly governorate_name_ar: string | null;
+    readonly phone: string | null;
+    readonly is_active: boolean;
+    readonly accepts_orders: boolean;
+    readonly delivery_fee_iqd: number;
+    readonly base_preparation_minutes: number;
+  };
+  readonly is_open: boolean;
+  readonly accepts_orders_now: boolean;
+  readonly closed_reason: string | null;
+  readonly estimated_preparation_minutes: number;
+}
+
+/** What `PATCH /restaurant-portal/settings` accepts. Only what changed is sent. */
+export interface OwnerSettingsInput {
+  readonly display_name?: string;
+  readonly description_ar?: string;
+  /** Null clears the picture. */
+  readonly logo_asset_id?: string | null;
+  readonly minimum_order_iqd?: number;
+  readonly delivery_fee_iqd?: number;
+  readonly base_preparation_minutes?: number;
+  readonly phone?: string;
+  readonly accepts_orders?: boolean;
+}
+
+/** Today, in the two numbers the lobby shows — `GET /restaurant-portal/dashboard`. */
+export interface OwnerDashboard {
+  readonly orders_today: number;
+  readonly sales_today_iqd: number;
+}
+
 /** What the server accepts when creating a product. */
 export interface OwnerProductInput {
   readonly category_id: string;
@@ -1533,6 +1591,25 @@ export const api = {
       body: { sort_order: 0, ...body },
     }),
 
+  /** Rename an aisle, reorder it, or hide it from customers without losing it. */
+  ownerUpdateCategory: (
+    restaurantId: string,
+    categoryId: string,
+    body: { name_ar?: string; sort_order?: number; is_active?: boolean },
+  ) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/menu/categories/${categoryId}`, {
+      method: 'PATCH',
+      restaurantId,
+      body,
+    }),
+
+  /** Only an empty aisle: the server refuses one that still holds products. */
+  ownerDeleteCategory: (restaurantId: string, categoryId: string) =>
+    apiRequest<{ deleted: boolean }>(`/api/v1/restaurant-portal/menu/categories/${categoryId}`, {
+      method: 'DELETE',
+      restaurantId,
+    }),
+
   ownerCreateProduct: (restaurantId: string, body: OwnerProductInput) =>
     apiRequest<{ id: string }>('/api/v1/restaurant-portal/menu/items', {
       method: 'POST',
@@ -1552,6 +1629,26 @@ export const api = {
       method: 'DELETE',
       restaurantId,
     }),
+
+  /** «نفد» / «متوفر» — its own endpoint, so a cashier may flip it without editing. */
+  ownerSetAvailability: (restaurantId: string, itemId: string, isAvailable: boolean) =>
+    apiRequest<{ is_available: boolean }>(
+      `/api/v1/restaurant-portal/menu/items/${itemId}/availability`,
+      { method: 'POST', restaurantId, body: { is_available: isAvailable } },
+    ),
+
+  ownerSettings: (restaurantId: string) =>
+    apiRequest<OwnerSettings>('/api/v1/restaurant-portal/settings', { restaurantId }),
+
+  ownerUpdateSettings: (restaurantId: string, body: OwnerSettingsInput) =>
+    apiRequest<{ updated: boolean }>('/api/v1/restaurant-portal/settings', {
+      method: 'PATCH',
+      restaurantId,
+      body,
+    }),
+
+  ownerDashboard: (restaurantId: string) =>
+    apiRequest<OwnerDashboard>('/api/v1/restaurant-portal/dashboard/overview', { restaurantId }),
 
   /**
    * Store an image and get its id back.

@@ -144,6 +144,62 @@ export async function forgetGuestChoice(): Promise<void> {
   }
 }
 
+// ── The parked account ──────────────────────────────────────────────────────
+
+const PARKED_KEY = 'jibli.parked_session';
+
+/** Which of the two the parked account is, for the row that offers it. */
+export type ParkedKind = 'customer' | 'shop';
+
+export interface ParkedSession extends StoredSession {
+  readonly kind: ParkedKind;
+}
+
+/**
+ * One person, two accounts: the customer they are, and the shop they run.
+ *
+ * A shop's portal login is a separate user, so signing into it used to cost
+ * the customer account — and signing back in as a customer cost the shop's
+ * password. The account not in use is kept here, whole, so switching is a
+ * swap rather than a sign-in. The keystore holds it exactly as it holds
+ * the active one; nothing about it is less sensitive for being parked.
+ */
+export async function parkSession(session: ParkedSession): Promise<void> {
+  await putSecure(PARKED_KEY, JSON.stringify(session));
+}
+
+export async function loadParkedSession(): Promise<ParkedSession | null> {
+  try {
+    const raw = await readSecure(PARKED_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ParkedSession>;
+    if (
+      typeof parsed.accessToken !== 'string' ||
+      typeof parsed.refreshToken !== 'string' ||
+      typeof parsed.userId !== 'string' ||
+      (parsed.kind !== 'customer' && parsed.kind !== 'shop')
+    ) {
+      return null;
+    }
+    return {
+      accessToken: parsed.accessToken,
+      refreshToken: parsed.refreshToken,
+      userId: parsed.userId,
+      kind: parsed.kind,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearParkedSession(): Promise<void> {
+  try {
+    await dropSecure(PARKED_KEY);
+  } catch {
+    /* Nothing to do: a parked account that cannot be read is not offered. */
+  }
+}
+
 // ── The chosen area ─────────────────────────────────────────────────────────
 
 const AREA_KEY = 'jibli.delivery_area';

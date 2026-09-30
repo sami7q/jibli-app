@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { MerchantType } from '@jibli/contracts';
-import { Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Switch, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { normalizeDigits } from '@jibli/validation';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type OwnerCategory } from '@/lib/api';
-import { catalogNoun, useOwner } from '@/lib/owner';
-import { lastCategory, rememberLastCategory } from '@/lib/owner-store';
+import { countAr } from '@/lib/arabic-count';
 import { confirmAsync, notify } from '@/lib/dialog';
-import { accent, color, radius, space, TAP_TARGET, INPUT_TEXT_START, text } from '@/theme';
+import { catalogNoun, useOwner } from '@/lib/owner';
+import { PRODUCTS, suggestedCategories } from '@/lib/owner-catalog';
+import { lastCategory, rememberLastCategory } from '@/lib/owner-store';
+import { describePickOutcome, pickImage, uploadShopImage, type PickSource } from '@/lib/upload';
+import { accent, color, INPUT_TEXT_START, radius, ROW, space, TAP_TARGET, text } from '@/theme';
 import {
   Button,
   EmptyState,
@@ -33,22 +36,21 @@ import { OwnerHeader } from '../index';
  *
  * Which decides the shape:
  *
- *   **Three required fields and no more.** A name, a price, a category. A
+ *   **A photo, a name, a price, a category — and nothing else required.** A
  *   grocery product has no preparation time and no modifier groups; asking for
  *   them would be the restaurant's form wearing a market's label.
  *
- *   **The category remembers itself.** Somebody stocking a shelf adds eight
- *   things from one aisle in a row, and re-picking «ألبان وأجبان» eight times
- *   is most of the minute.
+ *   **The photo is the first thing on the screen and one tap from the camera.**
+ *   A product without one is the commonest reason a customer scrolls past it,
+ *   and the phone is the device that fixes that.
  *
- *   **Saving a new product returns to a blank form**, not to the list. The next
- *   product is the likeliest next action by a wide margin, and a list you have
- *   to tap «إضافة» from again costs a screen each time.
+ *   **The category remembers itself, and can be made right here.** Somebody
+ *   stocking a shelf adds eight things from one aisle in a row; and a shop with
+ *   no aisles yet should not be sent to another screen to make the first one.
  *
- * The photograph is phase two: it needs `expo-image-picker`, which is a native
- * module and therefore a new build rather than an over-the-air update. The slot
- * is drawn here and says so, because a product with no picture is the commonest
- * reason a customer scrolls past it and the owner should know that is coming.
+ *   **Saving a new product returns to a blank form**, not to the list, with a
+ *   running count. The next product is the likeliest next action by a wide
+ *   margin.
  */
 export default function OwnerProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,6 +61,7 @@ export default function OwnerProductScreen() {
   const shop = owner.shop;
   const isNew = id === 'new';
   const noun = catalogNoun(shop);
+  const canWrite = owner.can('menu.write');
   const productExample = PRODUCT_EXAMPLE[shop?.merchant_type ?? 'MARKET'];
 
   const catalog = useQuery({
@@ -82,8 +85,12 @@ export default function OwnerProductScreen() {
 
   const [nameAr, setNameAr] = useState('');
   const [price, setPrice] = useState('');
+  const [description, setDescription] = useState('');
+  const [describing, setDescribing] = useState(false);
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [imageAssetId, setImageAssetId] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  const [addedThisSession, setAddedThisSession] = useState(0);
 
   /*
    * Fill the form once the product arrives, and never again.
@@ -97,7 +104,10 @@ export default function OwnerProductScreen() {
     if (existing) {
       setNameAr(existing.name_ar);
       setPrice(String(existing.base_price_iqd));
+      setDescription(existing.description_ar ?? '');
+      setDescribing(Boolean(existing.description_ar));
       setCategoryId(existing.category_id);
+      setImageAssetId(existing.image_asset_id);
     }
   }, [existing, touched]);
 
@@ -119,7 +129,11 @@ export default function OwnerProductScreen() {
   const priceIqd = Number.parseInt(normalizeDigits(price).replace(/\D/g, ''), 10);
   const priceValid = Number.isFinite(priceIqd) && priceIqd > 0;
   const nameValid = nameAr.trim().length >= 2;
-  const canSave = nameValid && priceValid && Boolean(categoryId) && owner.can('menu.write');
+  const canSave = nameValid && priceValid && Boolean(categoryId) && canWrite;
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['owner-catalog', shop?.id] });
+  const explain = (caught: unknown) =>
+    caught instanceof ApiError ? caught.messageAr : 'حاول مرة أخرى.';
 
   const save = useMutation({
     mutationFn: async () => {
@@ -128,36 +142,96 @@ export default function OwnerProductScreen() {
         category_id: categoryId,
         name_ar: nameAr.trim(),
         base_price_iqd: priceIqd,
+        ...(description.trim()
+          ? { description_ar: description.trim() }
+          : isNew
+            ? {}
+            : { description_ar: '' }),
+        image_asset_id: imageAssetId,
       };
       if (isNew) return api.ownerCreateProduct(shop.id, body);
       return api.ownerUpdateProduct(shop.id, id, body);
     },
     onSuccess: async () => {
       if (categoryId) await rememberLastCategory(categoryId);
-      await queryClient.invalidateQueries({ queryKey: ['owner-catalog', shop?.id] });
+      await invalidate();
 
       if (isNew) {
         // Straight back to a blank form: the next product is one tap, not four.
+        setAddedThisSession((count) => count + 1);
         notify('تمت الإضافة', `أُضيف «${nameAr.trim()}» إلى ${noun}.`);
         setNameAr('');
         setPrice('');
+        setDescription('');
+        setDescribing(false);
+        setImageAssetId(null);
         setTouched(false);
         return;
       }
       router.back();
     },
-    onError: (error) =>
-      notify('تعذّر الحفظ', error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.'),
+    onError: (caught) => notify('تعذّر الحفظ', explain(caught)),
+  });
+
+  /*
+   * The picture goes up the moment it is chosen, not with the save: an upload
+   * on a shop's connection takes a few seconds, and doing it while the owner
+   * types the name and price hides that time entirely.
+   */
+  const photo = useMutation({
+    mutationFn: async (source: PickSource) => {
+      if (!shop) return null;
+      const picked = await pickImage(source, 'photo');
+      if (picked.status !== 'picked') {
+        const message = describePickOutcome(picked);
+        if (message) throw new Error(message);
+        return null;
+      }
+      return uploadShopImage(shop.id, picked.dataUrl, 'MENU_ITEM');
+    },
+    onSuccess: (assetId) => {
+      if (!assetId) return;
+      setImageAssetId(assetId);
+      setTouched(true);
+    },
+    onError: (caught) =>
+      notify(
+        'تعذّر رفع الصورة',
+        caught instanceof ApiError
+          ? caught.messageAr
+          : caught instanceof Error
+            ? caught.message
+            : 'حاول مرة أخرى.',
+      ),
+  });
+
+  const availability = useMutation({
+    mutationFn: (available: boolean) => api.ownerSetAvailability(shop?.id as string, id, available),
+    onSuccess: invalidate,
+    onError: (caught) => notify('تعذّر التغيير', explain(caught)),
+  });
+
+  const createCategory = useMutation({
+    mutationFn: (name: string) =>
+      api.ownerCreateCategory(shop?.id as string, {
+        name_ar: name,
+        sort_order: Math.max(0, ...categories.map((entry) => entry.sort_order)) + 1,
+      }),
+    onSuccess: async (created) => {
+      await invalidate();
+      setCategoryId(created.id);
+      setTouched(true);
+    },
+    onError: (caught) => notify('تعذّرت إضافة القسم', explain(caught)),
   });
 
   const remove = useMutation({
     mutationFn: () => api.ownerDeleteProduct(shop?.id as string, id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['owner-catalog', shop?.id] });
+      await invalidate();
       router.back();
     },
-    onError: (error) =>
-      notify('تعذّر الحذف', error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.'),
+    onError: (caught) => notify('تعذّر الحذف', explain(caught)),
   });
 
   if (!shop) {
@@ -169,12 +243,14 @@ export default function OwnerProductScreen() {
     );
   }
 
+  const title = isNew ? 'منتج جديد' : 'تعديل المنتج';
+
   if (catalog.isLoading) {
     return (
       <Screen edges={['top', 'bottom']}>
-        <OwnerHeader title={isNew ? 'منتج جديد' : 'تعديل المنتج'} />
+        <OwnerHeader title={title} />
         <View style={{ gap: space[3], paddingTop: space[4] }}>
-          <Skeleton height={160} style={{ borderRadius: radius.lg }} />
+          <Skeleton height={180} style={{ borderRadius: radius.lg }} />
           <Skeleton height={64} style={{ borderRadius: radius.md }} />
           <Skeleton height={64} style={{ borderRadius: radius.md }} />
         </View>
@@ -185,20 +261,8 @@ export default function OwnerProductScreen() {
   if (catalog.isError) {
     return (
       <Screen edges={['top', 'bottom']}>
-        <OwnerHeader title={isNew ? 'منتج جديد' : 'تعديل المنتج'} />
+        <OwnerHeader title={title} />
         <ErrorState message="تعذّر تحميل الأقسام" onRetry={() => void catalog.refetch()} />
-      </Screen>
-    );
-  }
-
-  if (categories.length === 0) {
-    return (
-      <Screen edges={['top', 'bottom']}>
-        <OwnerHeader title="منتج جديد" />
-        <EmptyState
-          title="أضف قسماً أولاً"
-          body="كل منتج يقع تحت قسم — «ألبان وأجبان»، «منظفات». أنشئ الأقسام من لوحة التحكم، ثم أضف المنتجات من هنا."
-        />
       </Screen>
     );
   }
@@ -215,16 +279,44 @@ export default function OwnerProductScreen() {
   return (
     <Screen edges={['top']} padded={false}>
       <View style={{ paddingHorizontal: space[4], paddingTop: space[2] }}>
-        <OwnerHeader title={isNew ? 'منتج جديد' : 'تعديل المنتج'} />
+        <OwnerHeader title={title} />
       </View>
 
       <Screen scroll padded={false} edges={[]}>
         <View style={{ padding: space[4], gap: space[4], paddingBottom: space[10] }}>
-          <PhotoSlot assetId={existing?.image_asset_id ?? null} />
+          {addedThisSession > 0 ? (
+            <View
+              style={{
+                flexDirection: ROW,
+                alignItems: 'center',
+                gap: space[2],
+                padding: space[2],
+                borderRadius: radius.md,
+                backgroundColor: color.successSoft,
+              }}
+            >
+              <MaterialCommunityIcons name="check-circle" size={18} color={color.successStrong} />
+              <Text variant="caption" style={{ color: color.successStrong, flex: 1 }}>
+                أضفت {countAr(addedThisSession, PRODUCTS)} في هذه الجلسة. تابع — القسم محفوظ.
+              </Text>
+            </View>
+          ) : null}
+
+          <PhotoSlot
+            assetId={imageAssetId}
+            busy={photo.isPending}
+            canWrite={canWrite}
+            onPick={(source) => photo.mutate(source)}
+            onClear={() => {
+              setImageAssetId(null);
+              setTouched(true);
+            }}
+          />
 
           <Field label="اسم المنتج" hint={`كما يقرأه الزبون — «${productExample}»`}>
             <TextInput
               value={nameAr}
+              editable={canWrite}
               onChangeText={(value) => {
                 setNameAr(value);
                 setTouched(true);
@@ -256,6 +348,7 @@ export default function OwnerProductScreen() {
           >
             <TextInput
               value={price}
+              editable={canWrite}
               onChangeText={(value) => {
                 setPrice(value);
                 setTouched(true);
@@ -283,52 +376,119 @@ export default function OwnerProductScreen() {
             />
           </Field>
 
-          <View style={{ gap: space[1] }}>
-            <Text variant="smallBold" tone="secondary">
-              القسم
-            </Text>
-            <Row gap={space[2]} style={{ flexWrap: 'wrap' }}>
-              {categories.map((entry) => {
-                const active = categoryId === entry.id;
-                return (
-                  <Pressable
-                    key={entry.id}
-                    onPress={() => {
-                      setCategoryId(entry.id);
-                      setTouched(true);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    accessibilityLabel={entry.name_ar}
-                    style={{
-                      minHeight: TAP_TARGET - 6,
-                      paddingHorizontal: space[3],
-                      justifyContent: 'center',
-                      borderRadius: radius.full,
-                      backgroundColor: active ? color.brand : color.surfaceCard,
-                      borderWidth: 1,
-                      borderColor: active ? color.brand : color.borderSubtle,
-                    }}
-                  >
-                    <Text variant="caption" tone={active ? 'inverse' : 'secondary'}>
-                      {entry.name_ar}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </Row>
-          </View>
+          <CategoryPicker
+            kind={shop.merchant_type}
+            categories={categories}
+            selected={categoryId}
+            canWrite={canWrite}
+            creating={createCategory.isPending}
+            onSelect={(next) => {
+              setCategoryId(next);
+              setTouched(true);
+            }}
+            onCreate={(name) => createCategory.mutate(name)}
+          />
+
+          {/* A line under the name, for the product that needs one. Folded away
+              because most do not, and an empty field is a question. */}
+          {describing ? (
+            <Field label="وصف قصير" hint="الوزن، العدد، أو ما يميّزه. اختياري.">
+              <TextInput
+                value={description}
+                editable={canWrite}
+                onChangeText={(value) => {
+                  setDescription(value);
+                  setTouched(true);
+                }}
+                placeholder={
+                  shop.merchant_type === 'COSMETICS'
+                    ? 'مثال: ٣٠ مل، مناسب للبشرة الجافة'
+                    : 'مثال: عبوة ٢ كغم'
+                }
+                placeholderTextColor={color.textMuted}
+                maxLength={300}
+                multiline
+                accessibilityLabel="وصف المنتج"
+                style={[
+                  text.body,
+                  {
+                    minHeight: TAP_TARGET * 1.4,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderColor: color.borderSubtle,
+                    backgroundColor: color.surfaceCard,
+                    paddingHorizontal: space[3],
+                    paddingVertical: space[2],
+                    color: color.textPrimary,
+                    textAlign: INPUT_TEXT_START,
+                    textAlignVertical: 'top',
+                  },
+                ]}
+              />
+            </Field>
+          ) : canWrite ? (
+            <Pressable
+              onPress={() => setDescribing(true)}
+              accessibilityRole="button"
+              style={{
+                alignSelf: 'flex-start',
+                minHeight: TAP_TARGET - 8,
+                justifyContent: 'center',
+              }}
+            >
+              <Row gap={space[1]}>
+                <MaterialCommunityIcons name="plus" size={16} color={color.brand} />
+                <Text variant="small" tone="brand">
+                  إضافة وصف قصير
+                </Text>
+              </Row>
+            </Pressable>
+          ) : null}
+
+          {!isNew && existing && canWrite ? (
+            <View
+              style={{
+                flexDirection: ROW,
+                alignItems: 'center',
+                gap: space[3],
+                padding: space[3],
+                borderRadius: radius.lg,
+                backgroundColor: existing.is_available ? color.successSoft : color.dangerSoft,
+              }}
+            >
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="smallBold">
+                  {existing.is_available ? 'متوفر للزبائن' : 'غير متوفر — نفد'}
+                </Text>
+                <Text variant="caption" tone="secondary">
+                  يُحفظ فوراً، بلا حاجة لزر الحفظ.
+                </Text>
+              </View>
+              <Switch
+                value={existing.is_available}
+                disabled={availability.isPending}
+                onValueChange={(value) => availability.mutate(value)}
+                trackColor={{ true: color.success, false: color.borderStrong }}
+                accessibilityLabel="متوفر"
+              />
+            </View>
+          ) : null}
 
           <Button
             label={isNew ? 'إضافة المنتج' : 'حفظ التعديل'}
             block
             size="lg"
-            disabled={!canSave || save.isPending}
+            disabled={!canSave || save.isPending || photo.isPending}
             loading={save.isPending}
             onPress={() => save.mutate()}
           />
+          {photo.isPending ? (
+            <Text variant="caption" tone="muted" align="center">
+              بانتظار رفع الصورة…
+            </Text>
+          ) : null}
 
-          {!owner.can('menu.write') ? (
+          {!canWrite ? (
             <Text variant="caption" tone="muted" align="center">
               حسابك يستطيع العرض فقط.
             </Text>
@@ -339,7 +499,7 @@ export default function OwnerProductScreen() {
             cancellation. A filled red button is how a shelf gets emptied by
             accident.
           */}
-          {!isNew && owner.can('menu.write') ? (
+          {!isNew && canWrite ? (
             <Pressable
               onPress={() =>
                 void confirmAsync({
@@ -368,45 +528,316 @@ export default function OwnerProductScreen() {
 }
 
 /**
- * Where the photograph goes.
+ * The photograph: the picture, or the two ways to get one.
  *
- * Drawn but not yet wired: capture needs `expo-image-picker`, a native module,
- * which means a new build rather than an over-the-air update. Showing the slot
- * with the reason on it beats hiding it — the owner learns that a picture is
- * expected, and an existing one is visible while editing.
+ * Camera first — the product is on the shelf in front of the owner — and the
+ * library second for the one photographed earlier. While the upload runs the
+ * slot says so, and the form stays usable underneath.
  */
-function PhotoSlot({ assetId }: { assetId: string | null }) {
+function PhotoSlot({
+  assetId,
+  busy,
+  canWrite,
+  onPick,
+  onClear,
+}: {
+  assetId: string | null;
+  busy: boolean;
+  canWrite: boolean;
+  onPick: (source: PickSource) => void;
+  onClear: () => void;
+}) {
   return (
-    <View
-      style={{
-        aspectRatio: 16 / 9,
-        borderRadius: radius.lg,
-        overflow: 'hidden',
-        backgroundColor: color.brandSoft,
-        borderWidth: 1,
-        borderColor: color.borderSubtle,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: space[2],
-      }}
-    >
-      {assetId ? (
-        <RemoteImage
-          uri={assetUrl(assetId)}
-          style={{ width: '100%', height: '100%' }}
-          priority="high"
-        />
-      ) : (
-        <>
-          <MaterialCommunityIcons name="camera-outline" size={34} color={accent[300]} />
-          <Text variant="caption" tone="muted" align="center">
-            التصوير من التطبيق قريباً
+    <View style={{ gap: space[2] }}>
+      <View
+        style={{
+          aspectRatio: 16 / 9,
+          borderRadius: radius.lg,
+          overflow: 'hidden',
+          backgroundColor: color.brandSoft,
+          borderWidth: 1,
+          borderColor: color.borderSubtle,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: space[2],
+        }}
+      >
+        {assetId ? (
+          <RemoteImage
+            uri={assetUrl(assetId)}
+            style={{ width: '100%', height: '100%' }}
+            priority="high"
+          />
+        ) : busy ? (
+          <>
+            <ActivityIndicator color={color.brand} />
+            <Text variant="caption" tone="muted">
+              جارٍ رفع الصورة…
+            </Text>
+          </>
+        ) : (
+          <>
+            <MaterialCommunityIcons name="camera-outline" size={34} color={accent[300]} />
+            <Text variant="caption" tone="muted" align="center">
+              {canWrite ? 'صوّر المنتج أو اختر صورة — المنتجات بصور تُباع أكثر' : 'بلا صورة'}
+            </Text>
+          </>
+        )}
+      </View>
+
+      {canWrite ? (
+        <Row gap={space[2]}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={assetId ? 'صورة أخرى' : 'التقاط صورة'}
+              block
+              icon={
+                <MaterialCommunityIcons name="camera-outline" size={18} color={color.textInverse} />
+              }
+              disabled={busy}
+              onPress={() => onPick('camera')}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="من الصور"
+              variant="secondary"
+              block
+              icon={
+                <MaterialCommunityIcons name="image-outline" size={18} color={color.textPrimary} />
+              }
+              disabled={busy}
+              onPress={() => onPick('library')}
+            />
+          </View>
+          {assetId ? (
+            <Pressable
+              onPress={onClear}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="إزالة الصورة"
+              style={{
+                width: TAP_TARGET,
+                height: TAP_TARGET,
+                borderRadius: radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: color.borderSubtle,
+                backgroundColor: color.surfaceCard,
+              }}
+            >
+              <MaterialCommunityIcons
+                name="trash-can-outline"
+                size={20}
+                color={color.dangerStrong}
+              />
+            </Pressable>
+          ) : null}
+        </Row>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Which aisle — and, when the right one does not exist yet, making it here.
+ *
+ * The suggestions are the usual aisles for this kind of shop, offered right in
+ * the picker; a name typed in the field becomes a category on the spot. Either
+ * way the new aisle is selected, so the product being added lands in it.
+ */
+function CategoryPicker({
+  kind,
+  categories,
+  selected,
+  canWrite,
+  creating,
+  onSelect,
+  onCreate,
+}: {
+  kind: MerchantType;
+  categories: OwnerCategory[];
+  selected: string | null;
+  canWrite: boolean;
+  creating: boolean;
+  onSelect: (id: string) => void;
+  onCreate: (name: string) => void;
+}) {
+  const [adding, setAdding] = useState(categories.length === 0);
+  const [draft, setDraft] = useState('');
+  const suggestions = useMemo(
+    () =>
+      suggestedCategories(
+        kind,
+        categories.map((entry) => entry.name_ar),
+      ),
+    [kind, categories],
+  );
+  const draftName = draft.trim();
+  const draftTaken = categories.some((entry) => entry.name_ar.trim() === draftName);
+  const canAdd = draftName.length >= 2 && !draftTaken && !creating;
+
+  const submit = () => {
+    if (!canAdd) return;
+    onCreate(draftName);
+    setDraft('');
+    setAdding(false);
+  };
+
+  return (
+    <View style={{ gap: space[2] }}>
+      <Row justify="space-between">
+        <Text variant="smallBold" tone="secondary">
+          القسم
+        </Text>
+        {categories.length === 0 ? (
+          <Text variant="caption" tone="danger">
+            مطلوب — أنشئ الأول
           </Text>
-          <Text variant="caption" tone="muted" align="center">
-            حتى ذلك الحين ارفع الصورة من لوحة التحكم
-          </Text>
-        </>
-      )}
+        ) : null}
+      </Row>
+
+      <Row gap={space[2]} style={{ flexWrap: 'wrap' }}>
+        {categories.map((entry) => {
+          const active = selected === entry.id;
+          return (
+            <Pressable
+              key={entry.id}
+              disabled={!canWrite}
+              onPress={() => onSelect(entry.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={entry.name_ar}
+              style={{
+                minHeight: TAP_TARGET - 6,
+                paddingHorizontal: space[3],
+                justifyContent: 'center',
+                borderRadius: radius.full,
+                backgroundColor: active ? color.brand : color.surfaceCard,
+                borderWidth: 1,
+                borderColor: active ? color.brand : color.borderSubtle,
+              }}
+            >
+              <Text variant="caption" tone={active ? 'inverse' : 'secondary'}>
+                {entry.name_ar}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {canWrite && !adding ? (
+          <Pressable
+            onPress={() => setAdding(true)}
+            accessibilityRole="button"
+            accessibilityLabel="قسم جديد"
+            style={{
+              flexDirection: ROW,
+              alignItems: 'center',
+              gap: 4,
+              minHeight: TAP_TARGET - 6,
+              paddingHorizontal: space[3],
+              borderRadius: radius.full,
+              borderWidth: 1,
+              borderStyle: 'dashed',
+              borderColor: color.brand,
+              backgroundColor: color.brandSoft,
+            }}
+          >
+            <MaterialCommunityIcons name="plus" size={16} color={color.brand} />
+            <Text variant="caption" tone="brand">
+              قسم جديد
+            </Text>
+          </Pressable>
+        ) : null}
+      </Row>
+
+      {canWrite && adding ? (
+        <View
+          style={{
+            padding: space[3],
+            gap: space[2],
+            borderRadius: radius.lg,
+            backgroundColor: color.brandSoft,
+            borderWidth: 1,
+            borderColor: color.borderSubtle,
+          }}
+        >
+          {suggestions.length > 0 ? (
+            <>
+              <Text variant="caption" tone="secondary">
+                اضغط قسماً لإنشائه واختياره:
+              </Text>
+              <View style={{ flexDirection: ROW, flexWrap: 'wrap', gap: space[2] }}>
+                {suggestions.map((aisle) => (
+                  <Pressable
+                    key={aisle.key}
+                    disabled={creating}
+                    onPress={() => {
+                      onCreate(aisle.labelAr);
+                      setAdding(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`إنشاء قسم ${aisle.labelAr}`}
+                    style={({ pressed }) => ({
+                      minHeight: TAP_TARGET - 8,
+                      paddingHorizontal: space[3],
+                      justifyContent: 'center',
+                      borderRadius: radius.full,
+                      borderWidth: 1,
+                      borderColor: color.brand,
+                      backgroundColor: pressed ? color.brand : color.surfaceCard,
+                    })}
+                  >
+                    {({ pressed }) => (
+                      <Text variant="caption" tone={pressed ? 'inverse' : 'primary'}>
+                        {`${aisle.emoji} ${aisle.labelAr}`}
+                      </Text>
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+          <Row gap={space[2]}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="أو اكتب اسم قسم"
+              placeholderTextColor={color.textMuted}
+              accessibilityLabel="اسم القسم الجديد"
+              maxLength={60}
+              returnKeyType="done"
+              onSubmitEditing={submit}
+              style={[
+                text.body,
+                {
+                  flex: 1,
+                  minHeight: TAP_TARGET,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: draftTaken ? color.danger : color.borderSubtle,
+                  backgroundColor: color.surfaceCard,
+                  paddingHorizontal: space[3],
+                  color: color.textPrimary,
+                  textAlign: INPUT_TEXT_START,
+                },
+              ]}
+            />
+            <Button label="إنشاء" disabled={!canAdd} loading={creating} onPress={submit} />
+          </Row>
+          {categories.length > 0 ? (
+            <Pressable
+              onPress={() => setAdding(false)}
+              accessibilityRole="button"
+              style={{ alignSelf: 'center', minHeight: TAP_TARGET - 12, justifyContent: 'center' }}
+            >
+              <Text variant="caption" tone="muted">
+                إغلاق
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }

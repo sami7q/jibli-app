@@ -34,7 +34,17 @@ import { PortalSignIn } from '@/ui/portal-sign-in';
  */
 export default function OwnerLoginScreen() {
   const router = useRouter();
-  const { signIn } = useSession();
+  const { signIn, state } = useSession();
+  /*
+   * Whoever is signed in now, if they are not a shop themselves, is kept:
+   * a customer opening their shop should not have to sign in again as a
+   * customer afterwards. A shop signing into another shop is a plain swap.
+   */
+  const customerSignedIn =
+    (state.status === 'ready' ||
+      state.status === 'needs-profile' ||
+      state.status === 'offline-ready') &&
+    Object.keys(state.me?.restaurant_roles ?? {}).length === 0;
   const queryClient = useQueryClient();
 
   return (
@@ -87,11 +97,14 @@ export default function OwnerLoginScreen() {
            */
           queryClient.setQueryData(['owner-shops', result.user.id], shops);
 
-          await signIn({
-            accessToken: result.access_token,
-            refreshToken: result.refresh_token,
-            userId: result.user.id,
-          });
+          await signIn(
+            {
+              accessToken: result.access_token,
+              refreshToken: result.refresh_token,
+              userId: result.user.id,
+            },
+            customerSignedIn ? { park: 'customer' } : {},
+          );
 
           router.replace('/(owner)');
           return null;

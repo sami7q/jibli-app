@@ -3,12 +3,8 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, BUSY_MODES, ERROR_CODES, success } from '@jibli/contracts';
 import { assertRestaurantPermission } from '@jibli/auth';
-import { isoDateSchema, reasonSchema, uuidSchema } from '@jibli/validation';
-import {
-  evaluateOpenState,
-  formatMinuteOfDay,
-  WEEKDAY_NAMES_AR,
-} from '@jibli/domain';
+import { displayNameSchema, isoDateSchema, reasonSchema, uuidSchema } from '@jibli/validation';
+import { evaluateOpenState, formatMinuteOfDay, WEEKDAY_NAMES_AR } from '@jibli/domain';
 import {
   branchHourExceptions,
   branchLocationChangeRequests,
@@ -100,6 +96,8 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
               logo_url: row.restaurant.logoAssetId
                 ? `/api/v1/assets/${row.restaurant.logoAssetId}`
                 : null,
+              /* The id as well: the phone stores it back on the product form's terms. */
+              logo_asset_id: row.restaurant.logoAssetId,
               partner_code: row.restaurant.partnerCode,
               operational_status: row.restaurant.operationalStatus,
               cuisine_tags: row.restaurant.cuisineTags,
@@ -145,9 +143,14 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
               id: exception.id,
               local_date: exception.localDate,
               is_closed: exception.isClosed,
-              opens_at: exception.opensAtMinute !== null ? formatMinuteOfDay(exception.opensAtMinute) : null,
+              opens_at:
+                exception.opensAtMinute !== null
+                  ? formatMinuteOfDay(exception.opensAtMinute)
+                  : null,
               closes_at:
-                exception.closesAtMinute !== null ? formatMinuteOfDay(exception.closesAtMinute) : null,
+                exception.closesAtMinute !== null
+                  ? formatMinuteOfDay(exception.closesAtMinute)
+                  : null,
               note_ar: exception.noteAr,
             })),
           },
@@ -205,7 +208,9 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
           .limit(1);
 
         if (!branch) {
-          throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, { details: { reason: 'NO_BRANCH' } });
+          throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, {
+            details: { reason: 'NO_BRANCH' },
+          });
         }
 
         await tx.delete(branchWorkingHours).where(eq(branchWorkingHours.branchId, branch.id));
@@ -253,7 +258,9 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
           .limit(1);
 
         if (!branch) {
-          throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, { details: { reason: 'NO_BRANCH' } });
+          throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, {
+            details: { reason: 'NO_BRANCH' },
+          });
         }
 
         await tx
@@ -367,6 +374,12 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
       assertRestaurantPermission(principal, restaurantId, 'settings.write');
       const body = z
         .object({
+          /**
+           * The name, at last editable by the shop itself. Admin set it at
+           * onboarding and a typo there was a support ticket; the same rule
+           * as creation applies, so it cannot become empty or a novel.
+           */
+          display_name: displayNameSchema(2, 120).optional(),
           description_ar: z.string().max(300).optional(),
           /** Asset id from POST /api/v1/uploads. Null clears the logo. */
           logo_asset_id: uuidSchema.nullable().optional(),
@@ -383,10 +396,22 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
         .parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
-        if (body.description_ar !== undefined || body.minimum_order_iqd !== undefined) {
+        /*
+         * Every field that lives on the restaurant row, including the logo:
+         * the guard used to name only two of them, so a request that changed
+         * the picture alone — which is exactly what the picture control
+         * sends — was accepted and saved nothing.
+         */
+        if (
+          body.display_name !== undefined ||
+          body.description_ar !== undefined ||
+          body.logo_asset_id !== undefined ||
+          body.minimum_order_iqd !== undefined
+        ) {
           await tx
             .update(restaurants)
             .set({
+              ...(body.display_name !== undefined ? { displayName: body.display_name } : {}),
               ...(body.description_ar !== undefined ? { descriptionAr: body.description_ar } : {}),
               ...(body.logo_asset_id !== undefined ? { logoAssetId: body.logo_asset_id } : {}),
               ...(body.minimum_order_iqd !== undefined
@@ -457,7 +482,9 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
           .limit(1);
 
         if (!branch) {
-          throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, { details: { reason: 'NO_BRANCH' } });
+          throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, {
+            details: { reason: 'NO_BRANCH' },
+          });
         }
 
         // The composite FK would reject a mismatched pair; checking here gives

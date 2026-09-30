@@ -15,6 +15,7 @@ import { useOwner } from './owner';
 import { registerForPush } from './push';
 import { useRealtime, type RealtimeStatus } from './realtime';
 import { useSession } from './session';
+import { notifyNewOrderOnDevice } from './owner-notify';
 import { ringWorkAlert } from './work-alert';
 import { onWorkSignal } from './work-signals';
 import { courierChanges, freshPending, shouldRemind, type TaskSnapshot } from './work-watch';
@@ -233,6 +234,17 @@ function OwnerEngine({
       lastRang.current = now;
       onFresh();
       void ringWorkAlert();
+      /*
+       * With the app in front the banner says it; behind another app, or
+       * with the screen off, the tray is the only place it can be said.
+       * The first poll after a launch is not news — `known` was empty —
+       * and it happens with the app in front, so it never lands here.
+       */
+      if (AppState.currentState !== 'active') {
+        for (const order of data) {
+          if (fresh.includes(order.id)) void notifyNewOrderOnDevice(order);
+        }
+      }
     }
 
     onState({ active: true, live, pending });

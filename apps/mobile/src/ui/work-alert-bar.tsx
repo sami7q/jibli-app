@@ -6,6 +6,7 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import MaterialCommunityIcons from '@/ui/icon';
 import { Text } from '@/ui';
 import { NEW_ORDERS, countAr } from '@/lib/arabic-count';
+import { summarizeNewOrder } from '@/lib/owner-catalog';
 import { useWorkLive } from '@/lib/work-live';
 import { BRAND, ROW, palette, radius, shadow, space } from '@/theme';
 
@@ -70,9 +71,11 @@ export function WorkAlertBar() {
       role: 'owner',
       icon: 'bell-ring',
       title: `${countAr(count, NEW_ORDERS)} بانتظار قبولك`,
+      // The customer, the count, the total and the district: what the owner
+      // would ask on the phone, answered before the board is even open.
       detail: orderLine(
         oldest.public_order_number,
-        formatIqdArabic(iqd(oldest.customer_total_iqd)),
+        summarizeNewOrder(oldest).line,
         oldest.age_minutes < 1 ? 'الآن' : `منذ ${oldest.age_minutes} د`,
       ),
       href: '/(owner)/orders',

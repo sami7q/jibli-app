@@ -487,6 +487,19 @@ const config: ExpoConfig = {
      */
     'expo-audio',
     /*
+     * The camera and the photo library: a shop's product photos and its own
+     * picture, taken where the products are. The strings are what iOS shows
+     * on the permission prompt; Android gets its permissions from the plugin.
+     */
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'يحتاج جيبلي إلى صورك لإضافة صور المنتجات وصورة المتجر.',
+        cameraPermission: 'يحتاج جيبلي إلى الكاميرا لتصوير المنتجات وصورة المتجر.',
+        microphonePermission: false,
+      },
+    ],
+    /*
      * Required since SDK 54: fonts are embedded at build time by the plugin
      * rather than loaded from the bundle at runtime. Without it the Cairo
      * faces are missing on a release build and every screen falls back to the

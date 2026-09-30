@@ -162,7 +162,9 @@ export async function placeOrder(
       .limit(1);
 
     if (!branchRow) {
-      throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, { details: { branchId: input.branchId } });
+      throw new AppError(ERROR_CODES.BRANCH_NOT_AVAILABLE, {
+        details: { branchId: input.branchId },
+      });
     }
 
     // 4. Eligibility: geography, approval, operational state, hours (plan §125).
@@ -407,6 +409,8 @@ export async function placeOrder(
         itemCount: quote.lines.length,
         // First name only: a push body can appear on a locked screen (plan §107).
         customerFirstName: (customer.fullName ?? '').split(' ')[0] ?? '',
+        // The district, or the city without one — never the street, for the same reason.
+        deliveryArea: address.districtText || branchRow.city.nameAr,
       },
     });
 
