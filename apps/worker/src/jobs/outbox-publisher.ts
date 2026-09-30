@@ -15,6 +15,7 @@ import {
   notificationDeliveries,
   outboxEvents,
   restaurantMembers,
+  restaurants,
   userDevices,
   uuidv7,
   type OutboxEventRow,
@@ -143,7 +144,29 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
 
   // 2. Push notifications.
   const notifications = await buildNotifications(ctx, event, audience);
+
+  /*
+   * The order a push is about.
+   *
+   * It was `event.aggregateId`, which is the order only for order events: a
+   * delivery event's aggregate is the *assignment*, so «المندوب وصل» carried an
+   * assignment id as `orderId` and tapping it opened an order that does not
+   * exist. The payload names the order for both kinds.
+   */
+  const payloadOrderId = (event.payload as Record<string, unknown>).orderId;
+  const orderId = typeof payloadOrderId === 'string' ? payloadOrderId : event.aggregateId;
+
   for (const notification of notifications) {
+    /*
+     * Who it is for decides where a tap lands and how loud it is. A customer's
+     * order update rides the `orders` channel with the system sound; a shop's
+     * new order and a courier's task ride `work` with the new-order chime, and
+     * the app routes them to the owner board or the delivery screen rather
+     * than to a customer order page.
+     */
+    const data = { orderId, eventType: event.eventType, audience: notification.audience };
+    const work = notification.audience !== 'customer';
+
     // The unique index on (event, recipient, channel) is what makes a retried
     // batch safe: the second insert collides instead of alerting twice.
     const inserted = await ctx.db
@@ -155,7 +178,7 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
         channel: 'PUSH',
         titleAr: notification.titleAr,
         bodyAr: notification.bodyAr,
-        dataJson: { orderId: event.aggregateId, eventType: event.eventType },
+        dataJson: data,
         status: 'PENDING',
       })
       .onConflictDoNothing()
@@ -166,7 +189,9 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
     const devices = await ctx.db
       .select({ pushToken: userDevices.pushToken })
       .from(userDevices)
-      .where(and(eq(userDevices.userId, notification.userId), sql`${userDevices.revokedAt} IS NULL`));
+      .where(
+        and(eq(userDevices.userId, notification.userId), sql`${userDevices.revokedAt} IS NULL`),
+      );
 
     if (devices.length === 0) {
       await ctx.db
@@ -181,8 +206,9 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
         token: device.pushToken,
         titleAr: notification.titleAr,
         bodyAr: notification.bodyAr,
-        data: { orderId: event.aggregateId, eventType: event.eventType },
-        channelId: 'orders',
+        data,
+        channelId: work ? 'work' : 'orders',
+        ...(work ? { sound: 'new-order.wav' } : {}),
       })),
     );
 
@@ -276,6 +302,8 @@ interface PendingNotification {
   readonly userId: string;
   readonly titleAr: string;
   readonly bodyAr: string;
+  /** Which app surface the push belongs to — see `publishEvent`. */
+  readonly audience: 'customer' | 'restaurant' | 'driver';
 }
 
 /** Turn an event into the Arabic notifications its audience should receive. */
@@ -290,7 +318,7 @@ async function buildNotifications(
 
   const customerTemplate = customerTemplateFor(event.eventType as EventType, orderNumber);
   if (customerTemplate && audience.includes('customer') && typeof payload.customerId === 'string') {
-    out.push({ userId: payload.customerId, ...customerTemplate });
+    out.push({ userId: payload.customerId, audience: 'customer', ...customerTemplate });
   }
 
   if (event.eventType === 'order.placed' && typeof payload.restaurantId === 'string') {
@@ -298,18 +326,48 @@ async function buildNotifications(
     const template = NOTIFICATION_TEMPLATES.newOrderForRestaurant(orderNumber, total);
 
     // Everyone who can act on a live order gets the alert.
-    const members = await ctx.db
-      .select({ userId: restaurantMembers.userId })
-      .from(restaurantMembers)
+    for (const userId of await orderDesk(ctx, payload.restaurantId)) {
+      out.push({ userId, audience: 'restaurant', ...template });
+    }
+  }
+
+  /*
+   * A courier turned the order down. Until somebody picks another one the
+   * order is packed and going nowhere, so the shop hears about it now rather
+   * than when the customer phones to ask.
+   */
+  if (event.eventType === 'delivery.rejected' && typeof payload.restaurantId === 'string') {
+    const template = NOTIFICATION_TEMPLATES.deliveryRejectedForRestaurant(orderNumber);
+    for (const userId of await orderDesk(ctx, payload.restaurantId)) {
+      out.push({ userId, audience: 'restaurant', ...template });
+    }
+  }
+
+  /*
+   * The order is packed: tell the courier already assigned to it. Couriers are
+   * assigned while the order is still being prepared so they arrive as it is
+   * ready, and this is the moment they were waiting for.
+   */
+  if (event.eventType === 'order.ready' && typeof payload.orderId === 'string') {
+    const [assignment] = await ctx.db
+      .select({ userId: drivers.userId, shopName: restaurants.displayName })
+      .from(deliveryAssignments)
+      .innerJoin(drivers, eq(drivers.id, deliveryAssignments.driverId))
+      .innerJoin(restaurants, eq(restaurants.id, deliveryAssignments.restaurantId))
       .where(
         and(
-          eq(restaurantMembers.restaurantId, payload.restaurantId),
-          eq(restaurantMembers.isActive, true),
-          inArray(restaurantMembers.role, ['OWNER', 'MANAGER', 'CASHIER']),
+          eq(deliveryAssignments.orderId, payload.orderId),
+          inArray(deliveryAssignments.status, ['ASSIGNED', 'ACCEPTED']),
         ),
-      );
-
-    for (const member of members) out.push({ userId: member.userId, ...template });
+      )
+      .limit(1);
+    if (assignment) {
+      out.push({
+        userId: assignment.userId,
+        audience: 'driver',
+        ...NOTIFICATION_TEMPLATES.orderReadyForDriver(orderNumber, assignment.shopName),
+      });
+    }
   }
 
   if (event.eventType === 'delivery.assigned' && typeof payload.driverId === 'string') {
@@ -319,7 +377,11 @@ async function buildNotifications(
       .where(eq(drivers.id, payload.driverId))
       .limit(1);
     if (driver) {
-      out.push({ userId: driver.userId, ...NOTIFICATION_TEMPLATES.newAssignmentForDriver(orderNumber) });
+      out.push({
+        userId: driver.userId,
+        audience: 'driver',
+        ...NOTIFICATION_TEMPLATES.newAssignmentForDriver(orderNumber),
+      });
     }
   }
 
@@ -330,11 +392,30 @@ async function buildNotifications(
       .where(eq(drivers.id, payload.driverId))
       .limit(1);
     if (driver) {
-      out.push({ userId: driver.userId, ...NOTIFICATION_TEMPLATES.assignmentCancelled(orderNumber) });
+      out.push({
+        userId: driver.userId,
+        audience: 'driver',
+        ...NOTIFICATION_TEMPLATES.assignmentCancelled(orderNumber),
+      });
     }
   }
 
   return out;
+}
+
+/** The shop staff who act on live orders — everyone who should hear one arrive. */
+async function orderDesk(ctx: WorkerContext, restaurantId: string): Promise<string[]> {
+  const members = await ctx.db
+    .select({ userId: restaurantMembers.userId })
+    .from(restaurantMembers)
+    .where(
+      and(
+        eq(restaurantMembers.restaurantId, restaurantId),
+        eq(restaurantMembers.isActive, true),
+        inArray(restaurantMembers.role, ['OWNER', 'MANAGER', 'CASHIER']),
+      ),
+    );
+  return [...new Set(members.map((member) => member.userId))];
 }
 
 function customerTemplateFor(

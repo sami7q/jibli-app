@@ -20,6 +20,7 @@ import {
   deliveryAssignments,
   driverCashEvents,
   drivers,
+  orderItems,
   orders,
   restaurants,
   users,
@@ -28,6 +29,7 @@ import {
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { confirmDelivery } from '../services/delivery-service.js';
+import { transitionOrder } from '../services/order-service.js';
 
 /**
  * Driver Mode API (plan §47, §49, §71).
@@ -196,11 +198,7 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
     const principal = requirePrincipal(request);
     const driverId = assertDriver(principal);
 
-    const [driver] = await ctx.db
-      .select()
-      .from(drivers)
-      .where(eq(drivers.id, driverId))
-      .limit(1);
+    const [driver] = await ctx.db.select().from(drivers).where(eq(drivers.id, driverId)).limit(1);
 
     if (!driver) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'driver' } });
 
@@ -355,9 +353,16 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
           addressSnapshot: orders.deliveryAddressSnapshotJson,
           restaurantSnapshot: orders.restaurantLocationSnapshotJson,
           customerNotes: orders.customerNotes,
+          orderStatus: orders.status,
+          paymentMethod: orders.paymentMethod,
+          acceptedAt: orders.acceptedAt,
+          readyAt: orders.readyAt,
+          estimatedPreparationMinutes: orders.estimatedPreparationMinutes,
+          restaurantName: restaurants.displayName,
         })
         .from(deliveryAssignments)
         .innerJoin(orders, eq(deliveryAssignments.orderId, orders.id))
+        .innerJoin(restaurants, eq(deliveryAssignments.restaurantId, restaurants.id))
         .where(eq(deliveryAssignments.id, assignmentId))
         .limit(1);
 
@@ -371,6 +376,26 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
         .filter(Boolean)
         .join(' - ');
 
+      /*
+       * What is in the bag. A courier collecting from a busy counter checks the
+       * count before leaving; without it the first they learn of a missing item
+       * is from the customer.
+       */
+      const items = await ctx.db
+        .select({
+          nameAr: orderItems.nameArSnapshot,
+          quantity: orderItems.quantity,
+          notes: orderItems.notes,
+        })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, row.assignment.orderId));
+
+      /** When the shop said it would be ready: accepted at + its preparation estimate. */
+      const readyBy =
+        row.acceptedAt && row.estimatedPreparationMinutes
+          ? new Date(row.acceptedAt.getTime() + row.estimatedPreparationMinutes * 60_000)
+          : null;
+
       return reply.send(
         success(
           {
@@ -378,9 +403,26 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
             order_id: row.assignment.orderId,
             public_order_number: row.publicOrderNumber,
             status: row.assignment.status,
+            // The order's own stage: a courier may only collect a READY order.
+            order_status: row.orderStatus,
+            payment_method: row.paymentMethod,
             cash_to_collect_iqd: row.customerTotalIqd,
             customer: { name: row.customerName, phone: row.customerPhone },
             customer_notes: row.customerNotes,
+            restaurant: {
+              name: row.restaurantName,
+              branch_name: (restaurant.branchName as string | null) ?? null,
+              phone: (restaurant.phone as string | null) ?? null,
+              address_text: (restaurant.addressText as string | null) ?? null,
+              city_name_ar: (restaurant.cityNameAr as string | null) ?? null,
+            },
+            items: items.map((item) => ({
+              name_ar: item.nameAr,
+              quantity: item.quantity,
+              notes: item.notes,
+            })),
+            ready_by: readyBy ? readyBy.toISOString() : null,
+            ready_at: row.readyAt ? row.readyAt.toISOString() : null,
             delivery_address: address,
             // No token, PIN or secret ever goes into an external link (plan §50).
             navigation: buildNavigationLinks({
@@ -407,100 +449,144 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
     eventType: (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES],
     options: { requiresReason?: boolean; orderPatch?: boolean } = {},
   ) => {
-    app.post(`/api/v1/driver/deliveries/:assignmentId${path}`, { preHandler: app.authenticate }, async (request, reply) => {
-      const principal = requirePrincipal(request);
-      const { assignmentId } = assignmentParamsSchema.parse(request.params);
-      const reason = options.requiresReason
-        ? rejectSchema.parse(request.body).reason
-        : null;
+    app.post(
+      `/api/v1/driver/deliveries/:assignmentId${path}`,
+      { preHandler: app.authenticate },
+      async (request, reply) => {
+        const principal = requirePrincipal(request);
+        const { assignmentId } = assignmentParamsSchema.parse(request.params);
+        const reason = options.requiresReason ? rejectSchema.parse(request.body).reason : null;
 
-      await ctx.db.transaction(async (tx) => {
-        const [assignment] = await tx
-          .select()
-          .from(deliveryAssignments)
-          .where(eq(deliveryAssignments.id, assignmentId))
-          .for('update')
-          .limit(1);
+        await ctx.db.transaction(async (tx) => {
+          const [assignment] = await tx
+            .select()
+            .from(deliveryAssignments)
+            .where(eq(deliveryAssignments.id, assignmentId))
+            .for('update')
+            .limit(1);
 
-        if (!assignment) {
-          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'assignment' } });
-        }
-        // A reassigned driver loses rights immediately (plan §49).
-        assertOwnsAssignment(principal, assignment.driverId);
+          if (!assignment) {
+            throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'assignment' } });
+          }
+          // A reassigned driver loses rights immediately (plan §49).
+          assertOwnsAssignment(principal, assignment.driverId);
 
-        assertTransition(
-          DELIVERY_TRANSITIONS,
-          { from: assignment.status, to: toStatus, actorType: 'DRIVER', reason },
-          ERROR_CODES.DELIVERY_CANNOT_TRANSITION,
-        );
+          assertTransition(
+            DELIVERY_TRANSITIONS,
+            { from: assignment.status, to: toStatus, actorType: 'DRIVER', reason },
+            ERROR_CODES.DELIVERY_CANNOT_TRANSITION,
+          );
 
-        const now = new Date();
-        const timestampPatch: Record<string, Date | string | null> = {};
-        if (toStatus === 'ACCEPTED') timestampPatch.acceptedAt = now;
-        if (toStatus === 'PICKED_UP') timestampPatch.pickedUpAt = now;
-        if (toStatus === 'ARRIVED_CUSTOMER') timestampPatch.arrivedCustomerAt = now;
-        if (toStatus === 'REJECTED') {
-          timestampPatch.rejectionReason = reason;
-          timestampPatch.cancelledAt = now;
-        }
-
-        await tx
-          .update(deliveryAssignments)
-          .set({
-            status: toStatus,
-            version: sql`${deliveryAssignments.version} + 1`,
-            updatedAt: now,
-            ...timestampPatch,
-          })
-          .where(eq(deliveryAssignments.id, assignmentId));
-
-        // Pickup is what moves the order to OUT_FOR_DELIVERY — assignment alone
-        // leaves it READY (plan §49).
-        if (toStatus === 'PICKED_UP') {
-          await tx
-            .update(orders)
-            .set({
-              status: 'OUT_FOR_DELIVERY',
-              outForDeliveryAt: now,
-              version: sql`${orders.version} + 1`,
-              updatedAt: now,
+          const [order] = await tx
+            .select({
+              status: orders.status,
+              publicOrderNumber: orders.publicOrderNumber,
+              customerId: orders.userId,
             })
-            .where(eq(orders.id, assignment.orderId));
-        }
+            .from(orders)
+            .where(eq(orders.id, assignment.orderId))
+            .limit(1);
 
-        // The driver frees up again when they decline.
-        if (toStatus === 'REJECTED') {
-          await tx
-            .update(drivers)
-            .set({ availability: 'AVAILABLE', updatedAt: now })
-            .where(eq(drivers.id, assignment.driverId));
-        } else if (toStatus === 'ACCEPTED') {
-          await tx
-            .update(drivers)
-            .set({ availability: 'ON_DELIVERY', updatedAt: now })
-            .where(eq(drivers.id, assignment.driverId));
-        }
+          if (!order) {
+            throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'order' } });
+          }
 
-        await enqueueOutboxEvent(tx, {
-          eventType,
-          aggregateType: 'delivery',
-          aggregateId: assignmentId,
-          aggregateVersion: assignment.version + 1,
-          requestId: request.requestId,
-          payload: {
-            assignmentId,
-            orderId: assignment.orderId,
-            restaurantId: assignment.restaurantId,
-            branchId: assignment.branchId,
-            driverId: assignment.driverId,
-            status: toStatus,
-            reason,
-          },
+          /*
+           * Collection only once the shop has said the order is packed.
+           *
+           * Pickup used to write OUT_FOR_DELIVERY straight onto the order from
+           * whatever state it was in, so a courier who tapped «استلمت» while the
+           * kitchen was still working skipped READY entirely: the customer was
+           * told the order was on its way when it was still on the counter, and
+           * the shop's board lost the order mid-preparation.
+           */
+          if (toStatus === 'PICKED_UP' && order.status !== 'READY') {
+            throw new AppError(ERROR_CODES.DELIVERY_CANNOT_TRANSITION, {
+              details: { reason: 'ORDER_NOT_READY', orderStatus: order.status },
+              messageAr:
+                'المتجر لم يجهّز الطلب بعد. سيصلك تنبيه حين يصبح جاهزاً، ثم أكّد الاستلام.',
+            });
+          }
+
+          const now = new Date();
+          const timestampPatch: Record<string, Date | string | null> = {};
+          if (toStatus === 'ACCEPTED') timestampPatch.acceptedAt = now;
+          if (toStatus === 'PICKED_UP') timestampPatch.pickedUpAt = now;
+          if (toStatus === 'ARRIVED_CUSTOMER') timestampPatch.arrivedCustomerAt = now;
+          if (toStatus === 'REJECTED') {
+            timestampPatch.rejectionReason = reason;
+            timestampPatch.cancelledAt = now;
+          }
+
+          await tx
+            .update(deliveryAssignments)
+            .set({
+              status: toStatus,
+              version: sql`${deliveryAssignments.version} + 1`,
+              updatedAt: now,
+              ...timestampPatch,
+            })
+            .where(eq(deliveryAssignments.id, assignmentId));
+
+          /*
+           * Pickup is what moves the order to OUT_FOR_DELIVERY — assignment alone
+           * leaves it READY (plan §49).
+           *
+           * Through the order state machine rather than a raw update, so the move
+           * is in the status history and emits `order.out_for_delivery` — the
+           * event behind the customer's «طلبك في الطريق», which a raw update
+           * never sent.
+           */
+          if (toStatus === 'PICKED_UP') {
+            await transitionOrder(tx, {
+              orderId: assignment.orderId,
+              toStatus: 'OUT_FOR_DELIVERY',
+              actorType: 'DRIVER',
+              actorUserId: principal.userId,
+              expectedVersion: null,
+              requestId: request.requestId,
+              eventType: EVENT_TYPES.ORDER_OUT_FOR_DELIVERY,
+            });
+          }
+
+          // The driver frees up again when they decline.
+          if (toStatus === 'REJECTED') {
+            await tx
+              .update(drivers)
+              .set({ availability: 'AVAILABLE', updatedAt: now })
+              .where(eq(drivers.id, assignment.driverId));
+          } else if (toStatus === 'ACCEPTED') {
+            await tx
+              .update(drivers)
+              .set({ availability: 'ON_DELIVERY', updatedAt: now })
+              .where(eq(drivers.id, assignment.driverId));
+          }
+
+          await enqueueOutboxEvent(tx, {
+            eventType,
+            aggregateType: 'delivery',
+            aggregateId: assignmentId,
+            aggregateVersion: assignment.version + 1,
+            requestId: request.requestId,
+            payload: {
+              assignmentId,
+              orderId: assignment.orderId,
+              // Named so the notification can say which order, and so a customer
+              // event (`delivery.arrived`) can find its customer at all.
+              publicOrderNumber: order.publicOrderNumber,
+              customerId: order.customerId,
+              restaurantId: assignment.restaurantId,
+              branchId: assignment.branchId,
+              driverId: assignment.driverId,
+              status: toStatus,
+              reason,
+            },
+          });
         });
-      });
 
-      return reply.send(success({ status: toStatus }, { request_id: request.requestId }));
-    });
+        return reply.send(success({ status: toStatus }, { request_id: request.requestId }));
+      },
+    );
   };
 
   transitionRoute('/accept', 'ACCEPTED', EVENT_TYPES.DELIVERY_ACCEPTED);

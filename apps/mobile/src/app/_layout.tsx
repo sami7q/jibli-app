@@ -32,6 +32,8 @@ import { VerticalProvider, useVertical } from '@/lib/vertical';
 import { CartProvider } from '@/lib/cart';
 import { OfflineBanner, startNetworkWatch } from '@/lib/network';
 import { ActiveOrderBar, OrderWatchProvider } from '@/lib/order-watch';
+import { WorkLiveProvider } from '@/lib/work-live';
+import { WorkAlertBar } from '@/ui/work-alert-bar';
 import { GlobalCartBar } from '@/lib/cart-dock';
 import { ErrorBoundary } from '@/lib/error-boundary';
 import { startMonitoring } from '@/lib/monitoring';
@@ -138,29 +140,38 @@ export default function RootLayout() {
                    * three screens away reading a different menu.
                    */}
                   <OrderWatchProvider>
-                    <StatusBar style="dark" />
-                    <OfflineBanner />
-                    <Gate />
                     {/*
-                     * After the screens, not before them. The card floats over
-                     * whatever is showing, and React Native stacks by order —
-                     * drawn first, it would sit under every screen it is meant
-                     * to float above.
+                     * The shop's and the courier's live work: rings for a new
+                     * order or task whatever screen is open. Idle for anyone
+                     * who is neither.
                      */}
-                    <ActiveOrderBar />
-                    <GlobalCartBar />
-                    {/*
-                     * Last of all, so a dialog sits above every bar and sheet
-                     * the app can have open — which is the whole point of one.
-                     */}
-                    <DialogHost />
-                    {/*
-                     * Above even the dialogs. When the server has said this
-                     * binary may no longer be used, there is nothing underneath
-                     * worth interacting with — including a dialog asking to
-                     * confirm something the next request will refuse.
-                     */}
-                    <UpdateGate />
+                    <WorkLiveProvider>
+                      <StatusBar style="dark" />
+                      <OfflineBanner />
+                      <Gate />
+                      {/*
+                       * After the screens, not before them. The card floats over
+                       * whatever is showing, and React Native stacks by order —
+                       * drawn first, it would sit under every screen it is meant
+                       * to float above.
+                       */}
+                      <ActiveOrderBar />
+                      <GlobalCartBar />
+                      {/* Above the customer's bars: somebody is waiting on this one. */}
+                      <WorkAlertBar />
+                      {/*
+                       * Last of all, so a dialog sits above every bar and sheet
+                       * the app can have open — which is the whole point of one.
+                       */}
+                      <DialogHost />
+                      {/*
+                       * Above even the dialogs. When the server has said this
+                       * binary may no longer be used, there is nothing underneath
+                       * worth interacting with — including a dialog asking to
+                       * confirm something the next request will refuse.
+                       */}
+                      <UpdateGate />
+                    </WorkLiveProvider>
                   </OrderWatchProvider>
                 </CartProvider>
               </AreaProvider>

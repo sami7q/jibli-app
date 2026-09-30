@@ -289,6 +289,57 @@ const COLD_START_BACKOFF_MS = 4000;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Where the realtime socket lives: the API's own origin over `ws(s)://`.
+ *
+ * Not through the development web proxy — it forwards HTTP only — so a browser
+ * preview without `EXPO_PUBLIC_API_URL` simply falls back to polling, which is
+ * what every live screen does anyway when the socket is down.
+ */
+export function realtimeUrl(): string {
+  return `${API_BASE.replace(/^http/, 'ws')}/api/v1/realtime`;
+}
+
+/** Seconds of life a token must have left to be worth handing to a socket. */
+const SOCKET_TOKEN_MARGIN_S = 60;
+
+/** The `exp` claim of a JWT, or null when it cannot be read. */
+function tokenExpiry(token: string): number | null {
+  try {
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const claims = JSON.parse(globalThis.atob(padded)) as { exp?: unknown };
+    return typeof claims.exp === 'number' ? claims.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * An access token a WebSocket can open with.
+ *
+ * A socket is authenticated once, at the handshake, and `apiRequest`'s
+ * refresh-on-401 never sees it — so a token with seconds left would open a
+ * socket that the next reconnect cannot reopen. Refreshed here first when it
+ * is close to expiring, through the same single-flight refresh every request
+ * shares, so a socket and a burst of requests cannot race two refreshes.
+ */
+export async function accessTokenForSocket(): Promise<string | null> {
+  const session = await loadSession();
+  if (!session) return null;
+
+  const expiry = tokenExpiry(session.accessToken);
+  if (expiry !== null && expiry * 1000 - Date.now() > SOCKET_TOKEN_MARGIN_S * 1000) {
+    return session.accessToken;
+  }
+
+  const refreshed = await refreshAccessToken();
+  if (!refreshed) return null;
+  return (await loadSession())?.accessToken ?? null;
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -656,12 +707,31 @@ export interface DriverDeliveryTask {
   order_id: string;
   public_order_number: string;
   status: string;
+  /**
+   * The order's own stage. A courier may collect only a READY order; absent on
+   * an API deployed before pickup was gated on it.
+   */
+  order_status?: OrderStatus;
+  payment_method?: string;
   cash_to_collect_iqd: number;
   customer: { name: string; phone: string };
   customer_notes: string | null;
   delivery_address: Record<string, unknown>;
   navigation: DriverNavigationLinks;
   restaurant_navigation: DriverNavigationLinks;
+  /** Where to collect it. Absent on an older API. */
+  restaurant?: {
+    name: string;
+    branch_name: string | null;
+    phone: string | null;
+    address_text: string | null;
+    city_name_ar: string | null;
+  };
+  /** What is in the bag, to check at the counter. */
+  items?: { name_ar: string; quantity: number; notes: string | null }[];
+  /** The shop's promised ready time (accepted at + its estimate). */
+  ready_by?: string | null;
+  ready_at?: string | null;
 }
 
 export interface Quote {
@@ -867,7 +937,10 @@ export interface OwnerLiveOrder {
   /** Optimistic-concurrency token: every command sends back the one it saw. */
   version: number;
   delivery_address: Record<string, unknown>;
-  driver: { name: string; assignment_status: string } | null;
+  /** Minutes the shop said it needs, set on acceptance. */
+  estimated_preparation_minutes?: number;
+  accepted_at?: string | null;
+  driver: { name: string; phone?: string | null; assignment_status: string } | null;
   items: {
     id: string;
     name_ar: string;
@@ -1319,11 +1392,18 @@ export const api = {
     orderId: string,
     command: 'accept' | 'start-preparing' | 'mark-ready',
     version: number,
+    /** Accept only: how long the shop needs, which the customer is shown. */
+    preparationMinutes?: number,
   ) =>
     apiRequest<{ status: string }>(`/api/v1/restaurant-portal/orders/${orderId}/${command}`, {
       method: 'POST',
       restaurantId,
-      body: { expected_version: version },
+      body: {
+        expected_version: version,
+        ...(command === 'accept' && preparationMinutes
+          ? { estimated_preparation_minutes: preparationMinutes }
+          : {}),
+      },
     }),
 
   ownerRejectOrder: (
@@ -1347,6 +1427,13 @@ export const api = {
     apiRequest<{ assignment_id: string }>(
       `/api/v1/restaurant-portal/orders/${orderId}/assign-driver`,
       { method: 'POST', restaurantId, body: { driver_id: driverId } },
+    ),
+
+  /** Take an order back from a courier who has not collected it yet. */
+  ownerUnassignDriver: (restaurantId: string, orderId: string, reason: string) =>
+    apiRequest<{ unassigned: boolean }>(
+      `/api/v1/restaurant-portal/orders/${orderId}/unassign-driver`,
+      { method: 'POST', restaurantId, body: { reason } },
     ),
 
   /** The shops this account belongs to, with the role held in each. */

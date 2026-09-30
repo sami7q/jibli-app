@@ -738,6 +738,12 @@ export interface PushMessage {
   readonly data?: Record<string, string>;
   /** Android channel / iOS category for order alerts. */
   readonly channelId?: string;
+  /**
+   * A sound bundled into the app (`new-order.wav`), or the system default.
+   * iOS plays the named file; Android takes the sound from the channel, which
+   * is why work alerts also travel on their own `work` channel.
+   */
+  readonly sound?: string;
 }
 
 export interface PushResult {
@@ -821,9 +827,7 @@ export class ExpoPushProvider implements PushProvider {
       readonly accessToken?: string | undefined;
     } = {},
   ) {
-    this.client = new Expo(
-      config.accessToken ? { accessToken: config.accessToken } : {},
-    );
+    this.client = new Expo(config.accessToken ? { accessToken: config.accessToken } : {});
   }
 
   async send(message: PushMessage): Promise<PushResult> {
@@ -868,7 +872,7 @@ export class ExpoPushProvider implements PushProvider {
            * Android to deliver rather than to batch.
            */
           priority: 'high',
-          sound: 'default',
+          sound: message.sound ?? 'default',
         },
       });
     }
@@ -1010,11 +1014,11 @@ export interface NotificationTemplate {
 export const NOTIFICATION_TEMPLATES = {
   orderAccepted: (orderNumber: string): NotificationTemplate => ({
     titleAr: 'تم قبول طلبك',
-    bodyAr: `المطعم قبل طلبك رقم ${orderNumber} وبدأ التحضير قريباً`,
+    bodyAr: `تم قبول طلبك رقم ${orderNumber} وسيبدأ تجهيزه الآن`,
   }),
   orderPreparing: (orderNumber: string): NotificationTemplate => ({
-    titleAr: 'جاري تحضير طلبك',
-    bodyAr: `طلبك رقم ${orderNumber} قيد التحضير الآن`,
+    titleAr: 'جاري تجهيز طلبك',
+    bodyAr: `طلبك رقم ${orderNumber} قيد التجهيز الآن`,
   }),
   orderReady: (orderNumber: string): NotificationTemplate => ({
     titleAr: 'طلبك جاهز',
@@ -1034,7 +1038,7 @@ export const NOTIFICATION_TEMPLATES = {
   }),
   orderRejected: (orderNumber: string): NotificationTemplate => ({
     titleAr: 'تعذّر قبول الطلب',
-    bodyAr: `للأسف لم يتمكن المطعم من قبول طلبك رقم ${orderNumber}`,
+    bodyAr: `للأسف لم يتمكن المتجر من قبول طلبك رقم ${orderNumber}`,
   }),
   orderCancelled: (orderNumber: string): NotificationTemplate => ({
     titleAr: 'تم إلغاء الطلب',
@@ -1061,6 +1065,18 @@ export const NOTIFICATION_TEMPLATES = {
   newAssignmentForDriver: (orderNumber: string): NotificationTemplate => ({
     titleAr: 'طلب توصيل جديد',
     bodyAr: `تم تعيينك لتوصيل الطلب رقم ${orderNumber}`,
+  }),
+  /** The order a courier is holding is packed — time to collect it. */
+  orderReadyForDriver: (orderNumber: string, shopName: string): NotificationTemplate => ({
+    titleAr: 'الطلب جاهز للاستلام',
+    bodyAr: shopName
+      ? `الطلب رقم ${orderNumber} جاهز في ${shopName}. توجّه لاستلامه`
+      : `الطلب رقم ${orderNumber} جاهز. توجّه لاستلامه`,
+  }),
+  /** A courier said no: the shop has an order with nobody to carry it. */
+  deliveryRejectedForRestaurant: (orderNumber: string): NotificationTemplate => ({
+    titleAr: 'المندوب رفض التوصيل',
+    bodyAr: `رفض المندوب توصيل الطلب رقم ${orderNumber}. أسنده إلى مندوب آخر`,
   }),
   assignmentCancelled: (orderNumber: string): NotificationTemplate => ({
     titleAr: 'تم إلغاء التعيين',

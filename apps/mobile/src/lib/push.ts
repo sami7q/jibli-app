@@ -5,7 +5,8 @@ import type * as ExpoNotifications from 'expo-notifications';
 import { configNested } from './app-config';
 import { useRouter } from 'expo-router';
 import { apiRequest } from './api';
-import { readOrderPush } from './push-payload';
+import { pushDestination, readOrderPush } from './push-payload';
+import { emitWorkSignal, hasWorkListeners } from './work-signals';
 
 /**
  * Push registration.
@@ -60,7 +61,28 @@ const Notifications: NotificationsModule | null = PUSH_SUPPORTED
 /** Foreground behaviour: an order update should interrupt, a promo should not. */
 Notifications?.setNotificationHandler({
   handleNotification: async (notification) => {
-    const isOrder = readOrderPush(notification.request.content.data) !== null;
+    const push = readOrderPush(notification.request.content.data);
+    const isOrder = push !== null;
+
+    /*
+     * A shop's new order or a courier's task, arriving with the app open.
+     *
+     * The live engine for that role is listening, so it refetches and rings
+     * from inside the app — its own banner, its own sound. The system banner
+     * on top of that would be the same news twice, the second one covering
+     * the first. It still goes to Notification Centre. When nothing is
+     * listening (another account is signed in on this phone), the system
+     * banner stands.
+     */
+    if (push && push.audience !== 'customer' && hasWorkListeners()) {
+      emitWorkSignal({ audience: push.audience, eventType: push.eventType, orderId: push.orderId });
+      return {
+        shouldShowBanner: false,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
 
     /*
      * `shouldShowAlert` was one switch; iOS 14 split the decision in two and
@@ -82,6 +104,27 @@ Notifications?.setNotificationHandler({
     };
   },
 });
+
+/**
+ * Whether this phone can be reached by push, as a shop or courier needs to know.
+ *
+ * `askable` — never asked, or asked and not refused for good: one tap asks.
+ * `blocked` — refused; only the system settings can undo it.
+ * `unavailable` — Expo Go or the web preview, where remote push does not exist
+ * and there is nothing to prompt for.
+ */
+export type PushPermission = 'granted' | 'askable' | 'blocked' | 'unavailable';
+
+export async function pushPermission(): Promise<PushPermission> {
+  if (!Notifications) return 'unavailable';
+  try {
+    const current = await Notifications.getPermissionsAsync();
+    if (current.granted) return 'granted';
+    return current.canAskAgain ? 'askable' : 'blocked';
+  } catch {
+    return 'unavailable';
+  }
+}
 
 export type PushOutcome =
   | { status: 'registered'; token: string }
@@ -114,6 +157,23 @@ export async function registerForPush(): Promise<PushOutcome> {
         name: 'حالة الطلبات',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 200, 100, 200],
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+
+      /*
+       * The channel a shop's new order and a courier's task arrive on.
+       *
+       * Its own channel because Android takes a notification's sound from its
+       * channel, fixed when the channel is first created: the new-order chime
+       * (bundled by the expo-notifications plugin) must not leak onto the
+       * customer's quieter order updates, and the owner can silence one
+       * without the other in the system settings.
+       */
+      await Notifications.setNotificationChannelAsync('work', {
+        name: 'طلبات المتجر ومهام التوصيل',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: 'new-order.wav',
+        vibrationPattern: [0, 380, 160, 380],
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
     }
@@ -220,7 +280,7 @@ export function usePushNavigation(): void {
     handled.current = id;
 
     const payload = readOrderPush(last.notification.request.content.data);
-    if (payload) router.push(`/order/${payload.orderId}`);
+    if (payload) router.push(pushDestination(payload) as never);
   }, [last, router]);
 
   useEffect(() => {
@@ -237,7 +297,7 @@ export function usePushNavigation(): void {
       handled.current = id;
 
       const payload = readOrderPush(response.notification.request.content.data);
-      if (payload) router.push(`/order/${payload.orderId}`);
+      if (payload) router.push(pushDestination(payload) as never);
     });
 
     return () => subscription.remove();

@@ -273,35 +273,27 @@ const config: ExpoConfig = {
           NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePhoneNumber',
           NSPrivacyCollectedDataTypeLinked: true,
           NSPrivacyCollectedDataTypeTracking: false,
-          NSPrivacyCollectedDataTypePurposes: [
-            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
-          ],
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
         },
         {
           NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeName',
           NSPrivacyCollectedDataTypeLinked: true,
           NSPrivacyCollectedDataTypeTracking: false,
-          NSPrivacyCollectedDataTypePurposes: [
-            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
-          ],
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
         },
         {
           /* The delivery pin, attached to an address the customer saved. */
           NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePreciseLocation',
           NSPrivacyCollectedDataTypeLinked: true,
           NSPrivacyCollectedDataTypeTracking: false,
-          NSPrivacyCollectedDataTypePurposes: [
-            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
-          ],
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
         },
         {
           /* Order history — what was bought, from where. */
           NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePurchaseHistory',
           NSPrivacyCollectedDataTypeLinked: true,
           NSPrivacyCollectedDataTypeTracking: false,
-          NSPrivacyCollectedDataTypePurposes: [
-            'NSPrivacyCollectedDataTypePurposeAppFunctionality',
-          ],
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
         },
       ],
       /*
@@ -473,10 +465,27 @@ const config: ExpoConfig = {
      * tints it with `color` and the result is the brand mark rather than a
      * square. One asset doing two jobs, both of which want the same shape.
      */
+    /*
+     * `sounds` bundles the new-order chime into the native build, so a push
+     * for a shop's new order or a courier's new task rings with the same three
+     * notes the app plays when it is open. The `work` channel (created in
+     * src/lib/push.ts) points at it; customer updates stay on `orders` with
+     * the system sound.
+     */
     [
       'expo-notifications',
-      { icon: './assets/splash-android.png', color: '#FF5400', defaultChannel: 'orders' },
+      {
+        icon: './assets/splash-android.png',
+        color: '#FF5400',
+        defaultChannel: 'orders',
+        sounds: ['./assets/sounds/new-order.wav'],
+      },
     ],
+    /*
+     * The in-app alert: a shop owner with the app open, or a courier riding
+     * with it on the dashboard, hears a new order the moment it lands.
+     */
+    'expo-audio',
     /*
      * Required since SDK 54: fonts are embedded at build time by the plugin
      * rather than loaded from the bundle at runtime. Without it the Cairo

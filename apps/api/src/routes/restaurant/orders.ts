@@ -4,6 +4,8 @@ import type { FastifyInstance } from 'fastify';
 import {
   ACTIVE_DELIVERY_STATUSES,
   AppError,
+  assertTransition,
+  DELIVERY_TRANSITIONS,
   ERROR_CODES,
   EVENT_TYPES,
   LIVE_ORDER_STATUSES,
@@ -56,6 +58,21 @@ const assignDriverSchema = z.object({
   expected_version: z.number().int().min(0).optional(),
 });
 
+/** Why the shop pulled an order back: read by dispatch, and by the courier. */
+const unassignDriverSchema = z.object({ reason: z.string().trim().min(3).max(200) });
+
+/**
+ * When a courier may be given an order.
+ *
+ * From acceptance onward, not only once it is packed: a courier assigned while
+ * the order is being prepared arrives as it becomes ready, which is how every
+ * delivery counter runs. Before acceptance there is nothing to carry yet, and
+ * after rejection or cancellation there never will be — the route accepted
+ * both before, and a courier could be sent to collect an order the shop had
+ * turned down.
+ */
+const ASSIGNABLE_ORDER_STATUSES: readonly OrderStatus[] = ['ACCEPTED', 'PREPARING', 'READY'];
+
 export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppContext): void {
   /**
    * The live operations board (plan §29).
@@ -77,6 +94,7 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
           order: orders,
           assignmentStatus: deliveryAssignments.status,
           driverName: users.fullName,
+          driverPhone: users.phoneE164,
         })
         .from(orders)
         .leftJoin(
@@ -91,10 +109,7 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
         .where(
           and(
             eq(orders.restaurantId, restaurantId),
-            or(
-              inArray(orders.status, [...LIVE_ORDER_STATUSES]),
-              gte(orders.completedAt, since),
-            ),
+            or(inArray(orders.status, [...LIVE_ORDER_STATUSES]), gte(orders.completedAt, since)),
           ),
         )
         .orderBy(desc(orders.placedAt))
@@ -137,8 +152,15 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
             commission_amount_iqd: row.order.commissionAmountIqd,
             version: row.order.version,
             delivery_address: row.order.deliveryAddressSnapshotJson,
+            // The shop's own estimate, set on acceptance: drives the «جاهز خلال» countdown.
+            estimated_preparation_minutes: row.order.estimatedPreparationMinutes,
+            accepted_at: row.order.acceptedAt ? row.order.acceptedAt.toISOString() : null,
             driver: row.driverName
-              ? { name: row.driverName, assignment_status: row.assignmentStatus }
+              ? {
+                  name: row.driverName,
+                  phone: row.driverPhone,
+                  assignment_status: row.assignmentStatus,
+                }
               : null,
             items: items
               .filter((item) => item.orderId === row.order.id)
@@ -335,6 +357,13 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
       const assignmentId = await ctx.db.transaction(async (tx) => {
         const order = await assertOrderBelongsToRestaurant(tx, orderId, restaurantId);
 
+        if (!ASSIGNABLE_ORDER_STATUSES.includes(order.status)) {
+          throw new AppError(ERROR_CODES.ORDER_CANNOT_TRANSITION, {
+            details: { reason: 'ORDER_NOT_ASSIGNABLE', orderStatus: order.status },
+            messageAr: 'يمكن إسناد الطلب إلى مندوب بعد قبوله وحتى يصبح جاهزاً.',
+          });
+        }
+
         // The driver must belong to THIS restaurant (plan §182 test).
         const [membership] = await tx
           .select({
@@ -360,7 +389,9 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
           });
         }
         if (membership.driverStatus !== 'ACTIVE') {
-          throw new AppError(ERROR_CODES.DRIVER_SUSPENDED, { details: { driverId: body.driver_id } });
+          throw new AppError(ERROR_CODES.DRIVER_SUSPENDED, {
+            details: { driverId: body.driver_id },
+          });
         }
 
         const id = uuidv7();
@@ -420,6 +451,101 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
   );
 
   /** Low-stock summary for the dashboard card (plan §129). */
+  /**
+   * Take an order back from its courier, so it can go to somebody else.
+   *
+   * The state machine has allowed the shop to reassign from ASSIGNED and
+   * ACCEPTED since it was written; nothing exposed it. A courier who stopped
+   * answering therefore held the order hostage — the unique index on live
+   * assignments refused a second courier, and the only way out was Admin.
+   *
+   * Not once the order is collected: from PICKED_UP it is in the courier's
+   * hands, and only Admin may unwind that.
+   */
+  app.post(
+    '/api/v1/restaurant-portal/orders/:orderId/unassign-driver',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { principal, restaurantId } = restaurantScope(request);
+      assertRestaurantPermission(principal, restaurantId, 'driver.assign');
+      const { orderId } = orderParamsSchema.parse(request.params);
+      const body = unassignDriverSchema.parse(request.body ?? {});
+
+      await ctx.db.transaction(async (tx) => {
+        const order = await assertOrderBelongsToRestaurant(tx, orderId, restaurantId);
+
+        const [assignment] = await tx
+          .select()
+          .from(deliveryAssignments)
+          .where(
+            and(
+              eq(deliveryAssignments.orderId, orderId),
+              inArray(deliveryAssignments.status, ['ASSIGNED', 'ACCEPTED']),
+            ),
+          )
+          .for('update')
+          .limit(1);
+
+        if (!assignment) {
+          throw new AppError(ERROR_CODES.DELIVERY_CANNOT_TRANSITION, {
+            details: { reason: 'NO_RECALLABLE_ASSIGNMENT' },
+            messageAr: 'لا يوجد مندوب يمكن سحب الطلب منه — ربما استلمه بالفعل.',
+          });
+        }
+
+        assertTransition(
+          DELIVERY_TRANSITIONS,
+          {
+            from: assignment.status,
+            to: 'REASSIGNED',
+            actorType: 'RESTAURANT',
+            reason: body.reason,
+          },
+          ERROR_CODES.DELIVERY_CANNOT_TRANSITION,
+        );
+
+        const now = new Date();
+
+        await tx
+          .update(deliveryAssignments)
+          .set({
+            status: 'REASSIGNED',
+            cancelledAt: now,
+            cancellationReason: body.reason,
+            version: sql`${deliveryAssignments.version} + 1`,
+            updatedAt: now,
+          })
+          .where(eq(deliveryAssignments.id, assignment.id));
+
+        // Free for the next order; one live task per courier (plan §48).
+        await tx
+          .update(drivers)
+          .set({ availability: 'AVAILABLE', updatedAt: now })
+          .where(eq(drivers.id, assignment.driverId));
+
+        await enqueueOutboxEvent(tx, {
+          eventType: EVENT_TYPES.DELIVERY_REASSIGNED,
+          aggregateType: 'delivery',
+          aggregateId: assignment.id,
+          aggregateVersion: assignment.version + 1,
+          requestId: request.requestId,
+          payload: {
+            assignmentId: assignment.id,
+            orderId,
+            publicOrderNumber: order.publicOrderNumber,
+            restaurantId,
+            branchId: order.branchId,
+            driverId: assignment.driverId,
+            status: 'REASSIGNED',
+            reason: body.reason,
+          },
+        });
+      });
+
+      return reply.send(success({ unassigned: true }, { request_id: request.requestId }));
+    },
+  );
+
   app.get(
     '/api/v1/restaurant-portal/inventory/low-stock',
     { preHandler: app.authenticate },
@@ -480,6 +606,7 @@ async function assertOrderBelongsToRestaurant(
       restaurantId: orders.restaurantId,
       branchId: orders.branchId,
       publicOrderNumber: orders.publicOrderNumber,
+      status: orders.status,
     })
     .from(orders)
     .where(eq(orders.id, orderId))

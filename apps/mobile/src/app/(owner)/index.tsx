@@ -4,8 +4,10 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError } from '@/lib/api';
+import { NEW_ORDERS, countAr } from '@/lib/arabic-count';
 import { catalogNoun, useOwner } from '@/lib/owner';
 import { sectionOf } from '@/lib/sections';
+import { PushPrompt } from '@/ui/push-prompt';
 import { useSession } from '@/lib/session';
 import { color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
@@ -46,7 +48,9 @@ export default function OwnerHomeScreen() {
     enabled: Boolean(shop?.id) && owner.can('order.read'),
     refetchInterval: 15_000,
   });
-  const waiting = (orders.data ?? []).filter((order) => order.status === 'PENDING_RESTAURANT').length;
+  const waiting = (orders.data ?? []).filter(
+    (order) => order.status === 'PENDING_RESTAURANT',
+  ).length;
   const inProgress = (orders.data ?? []).filter((order) =>
     ['ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(order.status),
   ).length;
@@ -69,7 +73,10 @@ export default function OwnerHomeScreen() {
         <EmptyState
           title="سجّل دخولك كصاحب متجر"
           body="بنفس اسم المستخدم وكلمة المرور اللذين تدخل بهما إلى لوحة التحكم."
-          action={{ label: 'دخول أصحاب المتاجر', onPress: () => router.push('/(auth)/owner-login') }}
+          action={{
+            label: 'دخول أصحاب المتاجر',
+            onPress: () => router.push('/(auth)/owner-login'),
+          }}
         />
       </Screen>
     );
@@ -137,6 +144,8 @@ export default function OwnerHomeScreen() {
     <Screen scroll edges={['top']} padded={false}>
       <View style={{ padding: space[4], gap: space[4] }}>
         <OwnerHeader title="متجري" />
+
+        <PushPrompt audience="owner" />
 
         {/* Which shop this is — and, when there is more than one, the way to
             switch. A grocer who adds stock to the wrong branch blames the app,
@@ -225,11 +234,7 @@ export default function OwnerHomeScreen() {
             />
             <View style={{ flex: 1, gap: 2 }}>
               <Text variant="bodyBold" tone={waiting > 0 ? 'danger' : 'primary'}>
-                {waiting > 0
-                  ? waiting === 1
-                    ? 'طلب جديد بانتظار موافقتك'
-                    : `${waiting} طلبات جديدة بانتظار موافقتك`
-                  : 'الطلبات'}
+                {waiting > 0 ? `${countAr(waiting, NEW_ORDERS)} بانتظار موافقتك` : 'الطلبات'}
               </Text>
               <Text variant="caption" tone="muted">
                 {orders.isLoading
@@ -254,10 +259,7 @@ export default function OwnerHomeScreen() {
           <>
             <Row gap={space[3]}>
               <Stat label={noun} value={catalog.isLoading ? '…' : String(counts.products)} />
-              <Stat
-                label="الأقسام"
-                value={catalog.isLoading ? '…' : String(counts.categories)}
-              />
+              <Stat label="الأقسام" value={catalog.isLoading ? '…' : String(counts.categories)} />
               <Stat
                 label="غير متوفر"
                 value={catalog.isLoading ? '…' : String(counts.unavailable)}
@@ -287,7 +289,11 @@ export default function OwnerHomeScreen() {
                   pressed ? { opacity: 0.85 } : null,
                 ]}
               >
-                <MaterialCommunityIcons name="camera-plus-outline" size={22} color={color.warningStrong} />
+                <MaterialCommunityIcons
+                  name="camera-plus-outline"
+                  size={22}
+                  color={color.warningStrong}
+                />
                 <Text variant="small" style={{ flex: 1, color: color.warningStrong }}>
                   {counts.withoutPhoto} من {noun} بلا صورة
                 </Text>

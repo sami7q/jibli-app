@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from 'vitest';
-import { readOrderPush } from './push-payload';
+import { pushDestination, readOrderPush } from './push-payload';
 
 /**
  * The shape of a push payload, asserted against the sender.
@@ -27,12 +27,17 @@ describe('readOrderPush()', () => {
     expect(readOrderPush(sent)).toEqual({
       orderId: '0195e2a1-0000-7000-8000-000000000001',
       eventType: 'order.accepted',
+      audience: 'customer',
     });
   });
 
   it('still identifies an order when the event type is missing', () => {
     // The id is what makes it navigable; the event type only colours the copy.
-    expect(readOrderPush({ orderId: 'abc' })).toEqual({ orderId: 'abc', eventType: '' });
+    expect(readOrderPush({ orderId: 'abc' })).toEqual({
+      orderId: 'abc',
+      eventType: '',
+      audience: 'customer',
+    });
   });
 
   it('rejects the key the app used to look for', () => {
@@ -50,5 +55,41 @@ describe('readOrderPush()', () => {
     ['a non-string id', { orderId: 42 }],
   ])('treats %s as not an order', (_label, payload) => {
     expect(readOrderPush(payload)).toBeNull();
+  });
+});
+
+describe('where a push opens', () => {
+  it('takes a shop owner to the order board', () => {
+    const push = readOrderPush({
+      orderId: 'o1',
+      eventType: 'order.placed',
+      audience: 'restaurant',
+    });
+    expect(push?.audience).toBe('restaurant');
+    expect(pushDestination(push!)).toBe('/(owner)/orders');
+  });
+
+  it('takes a courier to the delivery screen', () => {
+    const push = readOrderPush({
+      orderId: 'o1',
+      eventType: 'delivery.assigned',
+      audience: 'driver',
+    });
+    expect(pushDestination(push!)).toBe('/(driver)/delivery');
+  });
+
+  it('takes a customer to their order', () => {
+    const push = readOrderPush({ orderId: 'o1', eventType: 'order.ready', audience: 'customer' });
+    expect(pushDestination(push!)).toBe('/order/o1');
+  });
+
+  it('treats a push from before audiences existed as a customer update', () => {
+    // Sent by a worker deployed before this change: no audience key at all.
+    const push = readOrderPush({ orderId: 'o1', eventType: 'order.accepted' });
+    expect(pushDestination(push!)).toBe('/order/o1');
+  });
+
+  it('does not trust an audience it does not know', () => {
+    expect(readOrderPush({ orderId: 'o1', audience: 'admin' })?.audience).toBe('customer');
   });
 });
