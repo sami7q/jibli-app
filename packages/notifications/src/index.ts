@@ -1082,6 +1082,13 @@ export const NOTIFICATION_TEMPLATES = {
     titleAr: 'تم إلغاء التعيين',
     bodyAr: `لم يعد الطلب رقم ${orderNumber} معيّناً لك`,
   }),
+  /** To the owner who applied from the app: the shop is theirs to stock now. */
+  shopApproved: (shopName: string): NotificationTemplate => ({
+    titleAr: 'تمت الموافقة على متجرك',
+    bodyAr: shopName
+      ? `أهلاً بك شريكاً في جيبلي! افتح «متجري» وأضف منتجات «${shopName}» وأسعارها.`
+      : 'أهلاً بك شريكاً في جيبلي! افتح «متجري» وأضف منتجاتك وأسعارها.',
+  }),
   driverInvited: (): NotificationTemplate => ({
     titleAr: 'مرحباً بك في جيبلي',
     bodyAr: 'تم إنشاء حسابك كمندوب توصيل. سجّل الدخول بالتطبيق لتفعيل الحساب',

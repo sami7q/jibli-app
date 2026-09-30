@@ -1,16 +1,17 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import type { MerchantType } from '@jibli/contracts';
 import MaterialCommunityIcons from '@/ui/icon';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, type PartnerApplication } from '@/lib/api';
 import { NEW_ORDERS, countAr } from '@/lib/arabic-count';
 import { catalogNoun, useOwner } from '@/lib/owner';
 import { sectionOf } from '@/lib/sections';
 import { PushPrompt } from '@/ui/push-prompt';
-import { useSession } from '@/lib/session';
-import { color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
-import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
+import { useMe, useSession } from '@/lib/session';
+import { BRAND, color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
+import { Button, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
 
 /**
  * Owner Mode — the shop, on one screen.
@@ -25,10 +26,24 @@ import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/u
  */
 export default function OwnerHomeScreen() {
   const router = useRouter();
-  const { state } = useSession();
+  const { state, refresh } = useSession();
   const owner = useOwner();
 
   const shop = owner.shop;
+
+  /*
+   * A shop approved while this account was already signed in.
+   *
+   * Owner Mode finds it — the shop list is asked afresh — but the session was
+   * resolved before the approval and still says "no shops", and the live order
+   * engine (`WorkLiveProvider`) starts from the session. Asking the session
+   * once more is what makes the new owner's phone ring for their first order.
+   */
+  const rolesKnown =
+    state.status === 'ready' ? Object.keys(state.me.restaurant_roles ?? {}).length : null;
+  useEffect(() => {
+    if (owner.usable.length > 0 && rolesKnown === 0) void refresh();
+  }, [owner.usable.length, rolesKnown, refresh]);
 
   const catalog = useQuery({
     queryKey: ['owner-catalog', shop?.id],
@@ -68,16 +83,9 @@ export default function OwnerHomeScreen() {
 
   if (state.status === 'signed-out' || state.status === 'guest') {
     return (
-      <Screen edges={['top', 'bottom']}>
+      <Screen scroll edges={['top', 'bottom']}>
         <OwnerHeader title="متجري" />
-        <EmptyState
-          title="سجّل دخولك كصاحب متجر"
-          body="بنفس اسم المستخدم وكلمة المرور اللذين تدخل بهما إلى لوحة التحكم."
-          action={{
-            label: 'دخول أصحاب المتاجر',
-            onPress: () => router.push('/(auth)/owner-login'),
-          }}
-        />
+        <PartnerHub restaurantOnly={false} />
       </Screen>
     );
   }
@@ -104,36 +112,23 @@ export default function OwnerHomeScreen() {
   }
 
   /*
-   * Signed in, but nothing here for them.
+   * Signed in, but no shop Owner Mode can open.
    *
-   * Two different situations that must not be told as one: an account with no
-   * shop at all, and an account whose only shop is a restaurant — which Owner
-   * Mode does not serve on purpose, because a dish's modifier groups are a
-   * worse job on a phone than in the portal. Saying "you have no shops" to a
-   * restaurant owner who plainly does would be a lie about their own account.
+   * This used to be a dead end with one button — «الدخول بحساب متجر ماركت أو
+   * تجميل» — which wants a username only Jibli staff can issue. Somebody who
+   * signed in with their phone had nothing to type there and came straight
+   * back. Now the first thing on offer is registering a shop as this very
+   * account, which approval turns into a shop this screen opens; the portal
+   * login stays, second, for owners who already have one.
+   *
+   * A restaurant owner is told why their restaurant is not here rather than
+   * "you have no shops", which would be false about their own account.
    */
   if (!shop) {
-    const onlyRestaurants = owner.shops.length > 0;
     return (
-      <Screen edges={['top', 'bottom']}>
+      <Screen scroll edges={['top', 'bottom']}>
         <OwnerHeader title="متجري" />
-        <EmptyState
-          title={onlyRestaurants ? 'إدارة المطاعم على المتصفّح' : 'لا يوجد متجر على هذا الحساب'}
-          body={
-            onlyRestaurants
-              ? 'قوائم المطاعم فيها خيارات وإضافات وأسعار لكل خيار، وتحريرها أدقّ على لوحة التحكم. إدارة المنتجات من التطبيق متاحة لمتاجر الماركت والتجميل.'
-              : 'هذا الحساب لا يملك متجراً. تواصل مع دعم جيبلي إن كان يفترض أن يملك واحداً.'
-          }
-          /*
-           * The way to the shop that *is* served. A market or cosmetics shop
-           * has its own portal account, and an owner signed in as a customer
-           * (or as a restaurant) was left here with no route to it.
-           */
-          action={{
-            label: 'الدخول بحساب متجر ماركت أو تجميل',
-            onPress: () => router.push('/(auth)/owner-login'),
-          }}
-        />
+        <PartnerHub restaurantOnly={owner.shops.length > 0} onApproved={owner.refetch} />
       </Screen>
     );
   }
@@ -324,6 +319,225 @@ export default function OwnerHomeScreen() {
         )}
       </View>
     </Screen>
+  );
+}
+
+const isOpenApplication = (status: PartnerApplication['status']) =>
+  status === 'DRAFT' || status === 'UNDER_REVIEW' || status === 'INFO_REQUESTED';
+
+/**
+ * Where an account without a shop starts selling.
+ *
+ * First the offer — register a market or cosmetics shop as this account, and
+ * manage it here once Jibli approves — then, if an application is already in,
+ * where it stands, and last the portal login for owners who have one. The
+ * order matters: the login used to be the only thing here, and it was the
+ * wrong door for almost everyone who opened this screen.
+ */
+function PartnerHub({
+  restaurantOnly,
+  onApproved,
+}: {
+  restaurantOnly: boolean;
+  onApproved?: () => void;
+}) {
+  const router = useRouter();
+  const { state } = useSession();
+  const me = useMe();
+  const signedIn = state.status === 'ready' || state.status === 'offline-ready';
+
+  const application = useQuery({
+    queryKey: ['partner-application', me?.user_id ?? null],
+    queryFn: () => api.partnerApplication(),
+    enabled: signedIn,
+    // Decided in Admin while this screen is open.
+    refetchInterval: (query) =>
+      query.state.data && isOpenApplication(query.state.data.status) ? 60_000 : false,
+  });
+
+  /*
+   * Approved onto this account: the shop exists; the shop list has not asked
+   * yet. Once — `onApproved` is a fresh function every render, and calling it
+   * on each would refetch in a loop.
+   */
+  const approvedHere = application.data?.status === 'APPROVED' && application.data.owned;
+  const toldApproved = useRef(false);
+  useEffect(() => {
+    if (!approvedHere || toldApproved.current) return;
+    toldApproved.current = true;
+    onApproved?.();
+  }, [approvedHere, onApproved]);
+
+  const pending =
+    application.data && isOpenApplication(application.data.status) ? application.data : null;
+  const rejected = application.data?.status === 'REJECTED' ? application.data : null;
+
+  return (
+    <View style={{ gap: space[4], paddingTop: space[2], paddingBottom: space[6] }}>
+      <View
+        style={{
+          padding: space[5],
+          borderRadius: radius.xl,
+          backgroundColor: BRAND[50],
+          borderWidth: 1,
+          borderColor: BRAND[200],
+          gap: space[3],
+        }}
+      >
+        <Row gap={space[2]}>
+          <KindBadge kind="MARKET" />
+          <KindBadge kind="COSMETICS" />
+        </Row>
+        <Text variant="h2">
+          {restaurantOnly ? 'مطعمك يُدار من لوحة التحكم' : 'ابدأ البيع على جيبلي'}
+        </Text>
+        <Text variant="small" tone="secondary">
+          {restaurantOnly
+            ? 'قوائم المطاعم فيها خيارات وإضافات وأسعار لكل خيار، وتحريرها أدقّ على لوحة التحكم. ولديك ماركت أو متجر تجميل؟ سجّله من هنا وأدِره من التطبيق بحسابك هذا.'
+            : 'سجّل ماركتك أو متجر التجميل من هنا. بعد موافقة فريق جيبلي يظهر متجرك في هذه الصفحة بحسابك نفسه: منتجات بالصور، أسعار، وطلبات تستلمها وتجهّزها.'}
+        </Text>
+        {!pending ? (
+          <View style={{ gap: space[2], paddingTop: space[1] }}>
+            <Step number="١" text="سجّل بيانات متجرك — دقيقتان" />
+            <Step number="٢" text="يتصل بك فريق جيبلي ويوافق على المتجر" />
+            <Step number="٣" text="أضف منتجاتك وأسعارك، واستلم الطلبات" />
+          </View>
+        ) : null}
+      </View>
+
+      {pending ? (
+        <ApplicationCard
+          application={pending}
+          icon="clock-outline"
+          title={`طلب «${pending.display_name}» قيد المراجعة`}
+          body="سيتصل بك فريق جيبلي على رقمك. بعد الموافقة يظهر متجرك هنا مباشرة."
+          onPress={() => router.push('/(owner)/apply')}
+        />
+      ) : null}
+
+      {rejected ? (
+        <ApplicationCard
+          application={rejected}
+          icon="close-circle-outline"
+          tone="danger"
+          title={`لم يُقبل طلب «${rejected.display_name}»`}
+          body={rejected.rejection_reason ? `السبب: ${rejected.rejection_reason}` : 'يمكنك تعديل البيانات وتقديم طلب جديد.'}
+          onPress={() => router.push('/(owner)/apply')}
+        />
+      ) : null}
+
+      {!pending ? (
+        <Button
+          label={rejected ? 'قدّم طلباً جديداً' : 'سجّل متجرك الآن'}
+          block
+          size="lg"
+          onPress={() => router.push('/(owner)/apply')}
+        />
+      ) : null}
+
+      {/* Second, on purpose: only owners the team issued a login to have one. */}
+      <Button
+        label="لديّ حساب متجر — الدخول باسم المستخدم"
+        variant="ghost"
+        block
+        onPress={() => router.push('/(auth)/owner-login')}
+      />
+    </View>
+  );
+}
+
+/** A section's own colour and icon: what «ماركت» and «كوزمتك» look like everywhere else. */
+function KindBadge({ kind }: { kind: MerchantType }) {
+  const section = sectionOf(kind);
+  return (
+    <Row
+      gap={space[1]}
+      style={{
+        paddingVertical: space[1],
+        paddingHorizontal: space[3],
+        borderRadius: radius.full,
+        backgroundColor: section.ramp[500],
+      }}
+    >
+      <MaterialCommunityIcons name={section.shopIcon} size={16} color="#fff" />
+      <Text variant="captionBold" tone="inverse">
+        {section.shortName}
+      </Text>
+    </Row>
+  );
+}
+
+function Step({ number, text }: { number: string; text: string }) {
+  return (
+    <Row gap={space[2]}>
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: BRAND[500],
+        }}
+      >
+        <Text variant="captionBold" tone="inverse">
+          {number}
+        </Text>
+      </View>
+      <Text variant="small" style={{ flex: 1 }}>
+        {text}
+      </Text>
+    </Row>
+  );
+}
+
+function ApplicationCard({
+  application,
+  icon,
+  tone = 'brand',
+  title,
+  body,
+  onPress,
+}: {
+  application: PartnerApplication;
+  icon: 'clock-outline' | 'close-circle-outline';
+  tone?: 'brand' | 'danger';
+  title: string;
+  body: string;
+  onPress: () => void;
+}) {
+  const accent = tone === 'danger' ? color.dangerStrong : BRAND[500];
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. تفاصيل الطلب`}
+      style={({ pressed }) => ({
+        flexDirection: ROW,
+        alignItems: 'center',
+        gap: space[3],
+        padding: space[4],
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: tone === 'danger' ? color.danger : BRAND[200],
+        backgroundColor: tone === 'danger' ? color.dangerSoft : color.surfaceCard,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <MaterialCommunityIcons name={icon} size={28} color={accent} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text variant="bodyBold" tone={tone === 'danger' ? 'danger' : 'primary'}>
+          {title}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {`${sectionOf(application.merchant_type).shortName} · ${application.city_name_ar}`}
+        </Text>
+        <Text variant="caption" tone="secondary">
+          {body}
+        </Text>
+      </View>
+      <MaterialCommunityIcons name="chevron-left" size={22} color={color.textMuted} />
+    </Pressable>
   );
 }
 

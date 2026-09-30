@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from 'vitest';
-import { pushDestination, readOrderPush } from './push-payload';
+import { isLiveWork, pushDestination, readOrderPush } from './push-payload';
 
 /**
  * The shape of a push payload, asserted against the sender.
@@ -81,6 +81,28 @@ describe('where a push opens', () => {
   it('takes a customer to their order', () => {
     const push = readOrderPush({ orderId: 'o1', eventType: 'order.ready', audience: 'customer' });
     expect(pushDestination(push!)).toBe('/order/o1');
+  });
+
+  it('opens «متجري» for a shop that was just approved', () => {
+    const push = readOrderPush({
+      orderId: 'shop-1',
+      eventType: 'restaurant.approved',
+      audience: 'restaurant',
+    });
+    expect(pushDestination(push!)).toBe('/(owner)');
+  });
+
+  it('never treats the approval as live work, so its banner always shows', () => {
+    const approval = readOrderPush({
+      orderId: 'shop-1',
+      eventType: 'restaurant.approved',
+      audience: 'restaurant',
+    });
+    const newOrder = readOrderPush({ orderId: 'o1', eventType: 'order.placed', audience: 'restaurant' });
+    const customer = readOrderPush({ orderId: 'o1', eventType: 'order.ready', audience: 'customer' });
+    expect(isLiveWork(approval!)).toBe(false);
+    expect(isLiveWork(newOrder!)).toBe(true);
+    expect(isLiveWork(customer!)).toBe(false);
   });
 
   it('treats a push from before audiences existed as a customer update', () => {

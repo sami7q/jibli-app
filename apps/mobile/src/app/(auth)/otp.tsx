@@ -16,6 +16,7 @@ import { formatIraqiPhoneDisplay, normalizeDigits } from '@jibli/validation';
 import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { clearPendingCredentials, readPendingCredentials } from '@/lib/pending-credentials';
+import { signedInDestination } from '@/lib/after-sign-in';
 import { useSession } from '@/lib/session';
 import {
   BRAND,
@@ -173,7 +174,12 @@ export default function OtpScreen() {
 
       // The server decides where the user goes next: profile completion is
       // mandatory and the client does not get to skip it (plan §11).
-      router.replace(result.next_step === 'COMPLETE_PROFILE' ? '/(auth)/profile' : '/(tabs)');
+      // A sign-in started from «سجّل متجرك» continues to the application form.
+      router.replace(
+        (result.next_step === 'COMPLETE_PROFILE'
+          ? '/(auth)/profile'
+          : signedInDestination()) as never,
+      );
     } catch (caught) {
       setCode('');
       input.current?.focus();

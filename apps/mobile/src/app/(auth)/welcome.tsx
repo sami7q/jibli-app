@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@/ui/icon';
 import { useSession } from '@/lib/session';
+import { clearAfterSignIn, continueAfterSignIn } from '@/lib/after-sign-in';
 import { SECTIONS, SECTION_ORDER } from '@/lib/sections';
-import { BRAND, ROW, palette, radius, space } from '@/theme';
+import { BRAND, ROW, TAP_TARGET, palette, radius, space } from '@/theme';
 import { Button, Screen, Text } from '@/ui';
 import { JibliWordmark, WORDMARK_ENTRANCE_MS } from '@/ui/brand';
 
@@ -223,14 +224,21 @@ export default function WelcomeScreen() {
             label="تسجيل الدخول"
             size="lg"
             block
-            onPress={() => router.push('/(auth)/phone')}
+            onPress={() => {
+              // A plain sign-in goes home, whatever was started and abandoned.
+              clearAfterSignIn();
+              router.push('/(auth)/phone');
+            }}
           />
           <Button
             label="تصفح كضيف"
             variant="secondary"
             size="lg"
             block
-            onPress={() => void continueAsGuest()}
+            onPress={() => {
+              clearAfterSignIn();
+              void continueAsGuest();
+            }}
           />
 
           {/*
@@ -242,6 +250,38 @@ export default function WelcomeScreen() {
           <Text variant="caption" tone="muted" align="center" style={{ marginTop: space[1] }}>
             تصفّح بلا حساب، ويُطلب رقمك عند إتمام الطلب فقط
           </Text>
+
+          {/*
+           * The door for sellers. A shop is registered by the account that will
+           * run it, so the visitor signs in with their phone first and lands on
+           * the application form after — not on the customer home, which is
+           * where every sign-in used to end.
+           */}
+          <Pressable
+            onPress={() => {
+              continueAfterSignIn('/(owner)/apply');
+              router.push('/(auth)/phone');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="صاحب متجر؟ سجّل متجرك في جيبلي"
+            style={({ pressed }) => ({
+              flexDirection: ROW,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: space[2],
+              minHeight: TAP_TARGET,
+              marginTop: space[1],
+              borderTopWidth: 1,
+              borderTopColor: palette.ink[100],
+              paddingTop: space[3],
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <MaterialCommunityIcons name="storefront-outline" size={20} color={BRAND[600]} />
+            <Text variant="smallBold" style={{ color: BRAND[600] }}>
+              صاحب متجر؟ سجّل متجرك في جيبلي
+            </Text>
+          </Pressable>
         </View>
       </Enter>
     </Screen>

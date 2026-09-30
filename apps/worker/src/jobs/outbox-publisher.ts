@@ -165,7 +165,7 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
      * than to a customer order page.
      */
     const data = { orderId, eventType: event.eventType, audience: notification.audience };
-    const work = notification.audience !== 'customer';
+    const work = notification.work ?? notification.audience !== 'customer';
 
     // The unique index on (event, recipient, channel) is what makes a retried
     // batch safe: the second insert collides instead of alerting twice.
@@ -304,6 +304,11 @@ interface PendingNotification {
   readonly bodyAr: string;
   /** Which app surface the push belongs to — see `publishEvent`. */
   readonly audience: 'customer' | 'restaurant' | 'driver';
+  /**
+   * Ring with the new-order chime on the `work` channel. Defaults to every
+   * shop and courier push; news that is not a job to do opts out.
+   */
+  readonly work?: boolean;
 }
 
 /** Turn an event into the Arabic notifications its audience should receive. */
@@ -383,6 +388,21 @@ async function buildNotifications(
         ...NOTIFICATION_TEMPLATES.newAssignmentForDriver(orderNumber),
       });
     }
+  }
+
+  /*
+   * A shop was approved. Its owner applied from the app and has been looking at
+   * «قيد المراجعة» since; this is the moment they can start stocking it. Good
+   * news rather than a job waiting, so it rides the ordinary channel — the
+   * new-order chime would send them looking for an order that does not exist.
+   */
+  if (event.eventType === 'restaurant.approved' && typeof payload.ownerUserId === 'string') {
+    out.push({
+      userId: payload.ownerUserId,
+      audience: 'restaurant',
+      work: false,
+      ...NOTIFICATION_TEMPLATES.shopApproved(String(payload.displayName ?? '')),
+    });
   }
 
   if (event.eventType === 'delivery.reassigned' && typeof payload.driverId === 'string') {

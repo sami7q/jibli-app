@@ -32,6 +32,7 @@ import {
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
 import { useSession } from '@/lib/session';
+import { signedInDestination } from '@/lib/after-sign-in';
 
 /**
  * The way in — sign in, or create an account (plan §10).
@@ -166,7 +167,11 @@ export default function PhoneScreen() {
         refreshToken: result.refresh_token,
         userId: result.user.id,
       });
-      router.replace(result.next_step === 'COMPLETE_PROFILE' ? '/(auth)/profile' : '/(tabs)');
+      router.replace(
+        (result.next_step === 'COMPLETE_PROFILE'
+          ? '/(auth)/profile'
+          : signedInDestination()) as never,
+      );
     } catch (caught) {
       setError(describe(caught, 'تعذّر تسجيل الدخول، الرجاء المحاولة مرة أخرى'));
     } finally {

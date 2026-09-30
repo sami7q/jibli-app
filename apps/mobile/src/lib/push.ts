@@ -5,7 +5,7 @@ import type * as ExpoNotifications from 'expo-notifications';
 import { configNested } from './app-config';
 import { useRouter } from 'expo-router';
 import { apiRequest } from './api';
-import { pushDestination, readOrderPush } from './push-payload';
+import { isLiveWork, pushDestination, readOrderPush } from './push-payload';
 import { emitWorkSignal, hasWorkListeners } from './work-signals';
 
 /**
@@ -74,7 +74,7 @@ Notifications?.setNotificationHandler({
      * listening (another account is signed in on this phone), the system
      * banner stands.
      */
-    if (push && push.audience !== 'customer' && hasWorkListeners()) {
+    if (push && isLiveWork(push) && hasWorkListeners()) {
       emitWorkSignal({ audience: push.audience, eventType: push.eventType, orderId: push.orderId });
       return {
         shouldShowBanner: false,

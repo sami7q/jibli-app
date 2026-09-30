@@ -48,19 +48,68 @@ export const applySchema = z
       .default([]),
     note: z.string().trim().max(500).optional(),
   })
-  .superRefine((body, issue) => {
-    // Each kind of shop is tagged from its own list, as in the Admin create form.
-    const allowed = new Set(categoriesFor(body.merchant_type).map((entry) => entry.key));
-    body.cuisine_tags.forEach((tag, index) => {
-      if (!allowed.has(tag)) {
-        issue.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['cuisine_tags', index],
-          message: `${tag} is not a category for ${body.merchant_type}`,
-        });
-      }
-    });
+  .superRefine(tagsFromOwnKind);
+
+/**
+ * Each kind of shop is tagged from its own list, as in the Admin create form.
+ * Shared by the public form and the in-app one (`partner.ts`).
+ */
+export function tagsFromOwnKind(
+  body: { merchant_type: (typeof MERCHANT_TYPES)[number]; cuisine_tags: string[] },
+  issue: z.RefinementCtx,
+): void {
+  const allowed = new Set(categoriesFor(body.merchant_type).map((entry) => entry.key));
+  body.cuisine_tags.forEach((tag, index) => {
+    if (!allowed.has(tag)) {
+      issue.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cuisine_tags', index],
+        message: `${tag} is not a category for ${body.merchant_type}`,
+      });
+    }
   });
+}
+
+/**
+ * Refuse a city that is not taking new shops.
+ *
+ * Checked on the server rather than trusted from the form: the coverage list is
+ * public, so its ids are too, and a closed city would otherwise collect
+ * applications nobody intends to work. Shared by both ways of applying.
+ */
+export async function assertOnboardingOpen(
+  ctx: AppContext,
+  governorateId: string,
+  cityId: string,
+): Promise<void> {
+  const [city] = await ctx.db
+    .select({
+      governorateId: cities.governorateId,
+      open: cities.restaurantOnboardingEnabled,
+      cityEnabled: cities.isEnabled,
+      governorateOpen: governorates.restaurantOnboardingEnabled,
+      governorateEnabled: governorates.isEnabled,
+    })
+    .from(cities)
+    .innerJoin(governorates, eq(cities.governorateId, governorates.id))
+    .where(eq(cities.id, cityId))
+    .limit(1);
+
+  const open =
+    city &&
+    city.governorateId === governorateId &&
+    city.cityEnabled &&
+    city.open &&
+    city.governorateEnabled &&
+    city.governorateOpen;
+
+  if (!open) {
+    throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+      details: { field: 'city_id', reason: 'CITY_NOT_OPEN' },
+      messageAr: 'جيبلي لا يستقبل طلبات انضمام في هذه المدينة حالياً',
+    });
+  }
+}
 
 /** A second application within this window is the same one, sent again. */
 const DUPLICATE_WINDOW_HOURS = 24;
@@ -126,39 +175,7 @@ export function registerPublicApplicationRoutes(app: FastifyInstance, ctx: AppCo
 
       const phone = toE164Iraq(body.applicant_phone);
 
-      /*
-       * The city must be open, and it is checked here rather than trusted from
-       * the form: the coverage list is public, so the ids in it are too, and a
-       * closed city would otherwise accept applications nobody intends to work.
-       */
-      const [city] = await ctx.db
-        .select({
-          id: cities.id,
-          governorateId: cities.governorateId,
-          open: cities.restaurantOnboardingEnabled,
-          cityEnabled: cities.isEnabled,
-          governorateOpen: governorates.restaurantOnboardingEnabled,
-          governorateEnabled: governorates.isEnabled,
-        })
-        .from(cities)
-        .innerJoin(governorates, eq(cities.governorateId, governorates.id))
-        .where(eq(cities.id, body.city_id))
-        .limit(1);
-
-      const open =
-        city &&
-        city.governorateId === body.governorate_id &&
-        city.cityEnabled &&
-        city.open &&
-        city.governorateEnabled &&
-        city.governorateOpen;
-
-      if (!open) {
-        throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
-          details: { field: 'city_id', reason: 'CITY_NOT_OPEN' },
-          messageAr: 'جيبلي لا يستقبل طلبات انضمام في هذه المدينة حالياً',
-        });
-      }
+      await assertOnboardingOpen(ctx, body.governorate_id, body.city_id);
 
       /*
        * A restaurant that applies twice in a day has not heard back; it is not

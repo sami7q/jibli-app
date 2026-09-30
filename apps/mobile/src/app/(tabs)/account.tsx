@@ -82,6 +82,22 @@ export default function AccountScreen() {
   const ownsShop =
     (state.status === 'ready' || state.status === 'needs-profile') &&
     Object.keys(state.me.restaurant_roles ?? {}).length > 0;
+
+  /*
+   * A shop application waiting on Jibli, if there is one — so the row says
+   * where it stands, as the courier row does. Keyed like «متجري»'s own read,
+   * so the two screens share one answer.
+   */
+  const partnerApplication = useQuery({
+    queryKey: [
+      'partner-application',
+      state.status === 'ready' || state.status === 'needs-profile' ? state.me.user_id : null,
+    ],
+    queryFn: () => api.partnerApplication(),
+    enabled: !isGuest && !ownsShop && (state.status === 'ready' || state.status === 'needs-profile'),
+    staleTime: 60_000,
+  });
+  const partnerStatus = partnerApplication.data?.status ?? null;
   const { area } = useArea();
 
   const [pickingArea, setPickingArea] = useState(false);
@@ -338,25 +354,31 @@ export default function AccountScreen() {
         {/*
          * The shop owner's door, shown to everyone.
          *
-         * It has to be. A grocer who installs the app to manage their shop
-         * arrives as a guest like anybody else — hiding this row until the
-         * session already proves a shop role would mean the only way to sign in
-         * as an owner is to be signed in as one already.
+         * It has to be. A grocer who installs the app to sell arrives as a guest
+         * like anybody else — hiding this row until the session already proves
+         * a shop role would mean the only way in is to be in already.
          *
-         * Which is why it reads as a sign-in and not an invitation. Nobody
-         * becomes a shop by tapping a row; the partnership is agreed off the
-         * app and the credential is issued with it. Same shape as «دخول
-         * المندوبين» above, and for the same reason.
+         * It used to go straight to «دخول أصحاب المتاجر», a username and
+         * password that only Jibli staff issue — so anyone without one came
+         * back empty-handed. It now opens «متجري», which offers registering a
+         * shop as this account first and that login second, and shows the
+         * application once there is one.
          */}
         <ListRow
-          label={ownsShop ? 'متجري' : 'دخول أصحاب المتاجر'}
+          label={ownsShop ? 'متجري' : 'سجّل متجرك في جيبلي'}
           sublabel={
             ownsShop
-              ? 'أضف المنتجات وعدّل الأسعار من هاتفك'
-              : 'لديك حساب متجر على لوحة التحكم؟ ادخل من هنا'
+              ? 'أضف المنتجات وعدّل الأسعار واستلم الطلبات'
+              : partnerStatus === 'UNDER_REVIEW' ||
+                  partnerStatus === 'INFO_REQUESTED' ||
+                  partnerStatus === 'DRAFT'
+                ? 'طلبك قيد المراجعة — سنتواصل معك'
+                : partnerStatus === 'REJECTED'
+                  ? 'لم يُقبل الطلب — اضغط للتفاصيل'
+                  : 'لأصحاب الماركت ومتاجر التجميل'
           }
           icon={<MaterialCommunityIcons name="storefront-outline" size={20} color={color.brand} />}
-          onPress={() => router.push(ownsShop ? '/(owner)' : '/(auth)/owner-login')}
+          onPress={() => router.push('/(owner)')}
         />
       </Group>
 

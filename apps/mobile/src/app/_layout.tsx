@@ -26,6 +26,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiError, NetworkError } from '@/lib/api';
 import { usePushNavigation } from '@/lib/push';
 import { SessionProvider, useSession } from '@/lib/session';
+import { signedInDestination } from '@/lib/after-sign-in';
 import { UpdateGate } from '@/ui/update-gate';
 import { AreaProvider } from '@/lib/area';
 import { VerticalProvider, useVertical } from '@/lib/vertical';
@@ -331,7 +332,9 @@ function Gate() {
       inAuth &&
       !onPortalSignIn
     ) {
-      router.replace('/(tabs)');
+      // The same answer the sign-in screens give, so neither can win a race
+      // against the other and strand someone who came to register a shop.
+      router.replace(signedInDestination() as never);
     }
   }, [state, vertical, segments, router]);
 

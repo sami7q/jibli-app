@@ -19,6 +19,7 @@ import { ensureLocationPermissionAsked } from '@/lib/location';
 import { AddressSheet } from '@/ui/address-sheet';
 import type { DeliveryArea } from '@/lib/area';
 import { api, ApiError, NetworkError, type GeographyOption } from '@/lib/api';
+import { signedInDestination } from '@/lib/after-sign-in';
 import {
   BRAND,
   ROW,
@@ -164,7 +165,7 @@ export default function ProfileScreen() {
           // Completed on another device: the status here is stale for the same
           // reason, and needs the same re-resolve before leaving.
           await refresh();
-          router.replace('/(tabs)');
+          router.replace(signedInDestination() as never);
         }
       } else if (caught instanceof NetworkError) {
         setError('تعذّر الاتصال بالإنترنت. تحقق من الاتصال وحاول مرة أخرى.');
@@ -185,7 +186,8 @@ export default function ProfileScreen() {
   const finish = async () => {
     setAskingAddress(false);
     await refresh();
-    router.replace('/(tabs)');
+    // A sign-in started from «سجّل متجرك» continues to the application form.
+    router.replace(signedInDestination() as never);
   };
 
   const nameInvalid = fullName.length > 0 && !nameResult.success;

@@ -45,8 +45,27 @@ export function readOrderPush(data: unknown): OrderPushData | null {
   };
 }
 
+/**
+ * A shop's approval: news for its new owner, sent to the shop's audience but
+ * about no order at all (its `orderId` is the shop's id).
+ */
+export const SHOP_APPROVED = 'restaurant.approved';
+
+/**
+ * Whether a push is live work — a new order, a task — that the in-app engines
+ * ring for themselves while the app is open. The approval is not: it has no
+ * board to refresh, and swallowing its banner would hide the one message the
+ * applicant has been waiting days for.
+ */
+export function isLiveWork(
+  push: OrderPushData,
+): push is OrderPushData & { readonly audience: 'restaurant' | 'driver' } {
+  return push.audience !== 'customer' && push.eventType !== SHOP_APPROVED;
+}
+
 /** Where tapping a push should take its reader. */
 export function pushDestination(push: OrderPushData): string {
+  if (push.eventType === SHOP_APPROVED) return '/(owner)';
   switch (push.audience) {
     case 'restaurant':
       return '/(owner)/orders';

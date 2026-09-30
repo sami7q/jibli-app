@@ -832,6 +832,47 @@ export interface OwnerShop {
   readonly permissions: string[];
 }
 
+/**
+ * An application to open a shop, filed from the app by the signed-in account.
+ * Approval makes this account the shop's OWNER, so «متجري» opens it with the
+ * same sign-in — see `apps/api/src/routes/partner.ts`.
+ */
+export interface PartnerApplication {
+  readonly id: string;
+  readonly display_name: string;
+  readonly merchant_type: MerchantType;
+  readonly status: 'DRAFT' | 'UNDER_REVIEW' | 'INFO_REQUESTED' | 'APPROVED' | 'REJECTED';
+  readonly address_text: string;
+  readonly city_name_ar: string;
+  readonly governorate_name_ar: string;
+  readonly applied_at: string;
+  readonly reviewed_at: string | null;
+  readonly rejection_reason: string | null;
+  readonly restaurant_id: string | null;
+  /** Approved and already this account's shop: Owner Mode will open it. */
+  readonly owned: boolean;
+}
+
+export interface PartnerApplyInput {
+  readonly display_name: string;
+  readonly merchant_type: MerchantType;
+  readonly applicant_name?: string;
+  readonly governorate_id: string;
+  readonly city_id: string;
+  readonly address_text: string;
+  readonly latitude?: number;
+  readonly longitude?: number;
+  readonly cuisine_tags?: string[];
+  readonly note?: string;
+}
+
+/** A governorate taking new shops, with its open cities. */
+export interface OnboardingGovernorate {
+  readonly id: string;
+  readonly name_ar: string;
+  readonly cities: { readonly id: string; readonly name_ar: string }[];
+}
+
 /** One product. A market's product is a menu item; there is no second table. */
 export interface OwnerProduct {
   readonly id: string;
@@ -1332,6 +1373,23 @@ export const api = {
       activated_at: string | null;
       suspended_reason: string | null;
     } | null>('/api/v1/driver/application'),
+
+  /** My latest shop application, or null. */
+  partnerApplication: () => apiRequest<PartnerApplication | null>('/api/v1/partner/application'),
+
+  /**
+   * Apply to open a market or cosmetics shop, as this account. Idempotent while
+   * one is open: a second tap gets the first application back.
+   */
+  applyAsPartner: (payload: PartnerApplyInput) =>
+    apiRequest<{ application: PartnerApplication; already_applied: boolean }>(
+      '/api/v1/partner/apply',
+      { method: 'POST', body: payload },
+    ),
+
+  /** Where a new shop may open: the governorates and cities taking applications. */
+  onboardingCoverage: () =>
+    apiRequest<OnboardingGovernorate[]>('/api/v1/applications/coverage'),
 
   /** Whether this order can be rated yet — the 15-minute window (plan §31). */
   reviewEligibility: (orderId: string) =>
