@@ -117,6 +117,15 @@ export default function OwnerHomeScreen() {
               ? 'قوائم المطاعم فيها خيارات وإضافات وأسعار لكل خيار، وتحريرها أدقّ على لوحة التحكم. إدارة المنتجات من التطبيق متاحة لمتاجر الماركت والتجميل.'
               : 'هذا الحساب لا يملك متجراً. تواصل مع دعم جيبلي إن كان يفترض أن يملك واحداً.'
           }
+          /*
+           * The way to the shop that *is* served. A market or cosmetics shop
+           * has its own portal account, and an owner signed in as a customer
+           * (or as a restaurant) was left here with no route to it.
+           */
+          action={{
+            label: 'الدخول بحساب متجر ماركت أو تجميل',
+            onPress: () => router.push('/(auth)/owner-login'),
+          }}
         />
       </Screen>
     );
