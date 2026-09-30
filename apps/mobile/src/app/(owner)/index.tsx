@@ -145,7 +145,7 @@ export default function OwnerHomeScreen() {
           style={{
             padding: space[4],
             borderRadius: radius.xl,
-            backgroundColor: color.brand,
+            backgroundColor: sectionOf(shop.merchant_type).ramp[500],
             gap: space[1],
             ...shadow.md,
           }}

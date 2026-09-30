@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { MerchantType } from '@jibli/contracts';
 import { Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,6 +59,7 @@ export default function OwnerProductScreen() {
   const shop = owner.shop;
   const isNew = id === 'new';
   const noun = catalogNoun(shop);
+  const productExample = PRODUCT_EXAMPLE[shop?.merchant_type ?? 'MARKET'];
 
   const catalog = useQuery({
     queryKey: ['owner-catalog', shop?.id],
@@ -223,14 +225,14 @@ export default function OwnerProductScreen() {
         <View style={{ padding: space[4], gap: space[4], paddingBottom: space[10] }}>
           <PhotoSlot assetId={existing?.image_asset_id ?? null} />
 
-          <Field label="اسم المنتج" hint="كما يقرأه الزبون — «حليب طازج ١ لتر»">
+          <Field label="اسم المنتج" hint={`كما يقرأه الزبون — «${productExample}»`}>
             <TextInput
               value={nameAr}
               onChangeText={(value) => {
                 setNameAr(value);
                 setTouched(true);
               }}
-              placeholder="حليب طازج ١ لتر"
+              placeholder={productExample}
               placeholderTextColor={color.textMuted}
               accessibilityLabel="اسم المنتج"
               maxLength={100}
@@ -411,3 +413,10 @@ function PhotoSlot({ assetId }: { assetId: string | null }) {
     </View>
   );
 }
+
+/** A product name the way this kind of shop would write one. */
+const PRODUCT_EXAMPLE: Record<MerchantType, string> = {
+  RESTAURANT: 'شاورما دجاج عربي',
+  MARKET: 'حليب طازج ١ لتر',
+  COSMETICS: 'أحمر شفاه مات',
+};

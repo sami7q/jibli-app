@@ -41,9 +41,23 @@ export interface OwnerSession {
 export function useOwner(): OwnerSession {
   const { state } = useSession();
   const signedIn = state.status === 'ready' || state.status === 'offline-ready';
+  /*
+   * Whose shops these are, as part of the cache key.
+   *
+   * Keyed on the query alone, a phone that switched accounts — a customer
+   * linked to a restaurant signing in as a cosmetics shop — rendered the first
+   * account's cached list until the refetch landed. On a slow connection that
+   * was the only thing the owner ever saw: the restaurant screen again, which
+   * reads exactly like a sign-in that did nothing. With the user in the key a
+   * new account starts from nothing and waits on a skeleton instead.
+   */
+  const userId =
+    state.status === 'ready' || state.status === 'offline-ready'
+      ? (state.me?.user_id ?? null)
+      : null;
 
   const shops = useQuery({
-    queryKey: ['owner-shops'],
+    queryKey: ['owner-shops', userId],
     queryFn: () => api.ownerShops(),
     enabled: signedIn,
     // A shop list changes when staff add a branch, not by the minute.

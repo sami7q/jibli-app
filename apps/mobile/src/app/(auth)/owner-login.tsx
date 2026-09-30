@@ -58,7 +58,11 @@ export default function OwnerLoginScreen() {
            * The shop list is keyed per session, and a previous owner's list
            * must not survive into this one on a shared phone.
            */
-          await queryClient.invalidateQueries({ queryKey: ['owner-shops'] });
+          // Every account's list, not only this one's: the previous
+          // account's must be gone before «متجري» renders again.
+          queryClient.removeQueries({ queryKey: ['owner-shops'] });
+          queryClient.removeQueries({ queryKey: ['owner-catalog'] });
+          queryClient.removeQueries({ queryKey: ['owner-orders'] });
 
           router.replace('/(owner)');
           return null;

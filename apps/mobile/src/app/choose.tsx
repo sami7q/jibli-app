@@ -1,22 +1,22 @@
 import { useState } from 'react';
-import { Pressable, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQueries } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import MaterialCommunityIcons from '@/ui/icon';
 import type { MerchantType } from '@jibli/contracts';
-import { api, assetUrl } from '@/lib/api';
 import { useArea } from '@/lib/area';
 import { useIsGuest } from '@/lib/session';
 import { useVertical } from '@/lib/vertical';
 import { SECTIONS, SECTION_ORDER, type Section } from '@/lib/sections';
 import { ALIGN_START, BRAND, ROW, TEXT_START, palette, radius, space } from '@/theme';
-import { RemoteImage, Screen, Text } from '@/ui';
+import { Screen, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
 import { JibliWordmark } from '@/ui/brand';
 import { AreaPicker } from '@/ui/area-picker';
 import { AddressSheet } from '@/ui/address-sheet';
+import { SectionArt, SectionTexture } from '@/ui/section-art';
 
 /**
  * Which section of Jibli, asked before anything else is shown (Home v3).
@@ -30,9 +30,11 @@ import { AddressSheet } from '@/ui/address-sheet';
  * order is going (tappable, the same picker the home screen opens) and the
  * question itself.
  *
- * The picture slot shows the top banner of that section's own storefront, so
- * an operator who schedules artwork in Admin sees it advertised on the way in;
- * a section with no artwork shows its glyph instead.
+ * The cards are drawn, not photographed. Each is its ramp as a gradient with
+ * the section's own texture laid over it, and the picture slot holds a scene
+ * drawn in that ramp — a set table, a bag of groceries, a dressing table — so
+ * the page never waits on artwork nobody has uploaded and never shows a
+ * photograph fighting a coloured ground. See `SectionArt`.
  */
 
 /** The page ground: a warm near-black, so the three section colours carry it. */
@@ -53,24 +55,6 @@ export default function ChooseScreen() {
   const { area, isResolving } = useArea();
   const isGuest = useIsGuest();
   const [pickingArea, setPickingArea] = useState(false);
-
-  /*
-   * Every storefront, for its artwork. Small, cached for the session, and the
-   * one the customer picks is exactly what the home screen asks for next.
-   */
-  const storefronts = useQueries({
-    queries: SECTION_ORDER.map((type) => ({
-      queryKey: ['storefront', type],
-      queryFn: () => api.storefront(type),
-      staleTime: 5 * 60_000,
-    })),
-  });
-
-  const artworkFor = (type: MerchantType): string | null => {
-    const query = storefronts[SECTION_ORDER.indexOf(type)];
-    const first = (query?.data?.banners ?? []).find((banner) => banner.image_asset_id);
-    return first?.image_asset_id ? assetUrl(first.image_asset_id) : null;
-  };
 
   const enter = (type: MerchantType) => {
     choose(type);
@@ -174,7 +158,6 @@ export default function ChooseScreen() {
           <Enter key={section.type} delay={180 + index * 90} style={{ flex: 1 }}>
             <SectionCard
               section={section}
-              artwork={artworkFor(section.type)}
               artWidth={artWidth}
               onPress={() => enter(section.type)}
             />
@@ -202,12 +185,10 @@ export default function ChooseScreen() {
 
 function SectionCard({
   section,
-  artwork,
   artWidth,
   onPress,
 }: {
   section: Section;
-  artwork: string | null;
   artWidth: number;
   onPress: () => void;
 }) {
@@ -234,6 +215,20 @@ function SectionCard({
         pressed ? { transform: [{ scale: 0.98 }] } : null,
       ]}
     >
+      {/*
+        The ground: the ramp from a step above the card colour to a step below,
+        corner to corner, so the flat block gets a light. The middle of the
+        gradient is the card colour the arrow and the badge are tinted with.
+      */}
+      <LinearGradient
+        colors={[section.ramp[500], section.ramp[700]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <SectionTexture section={section} />
+
       <View style={{ flex: 1, minWidth: 0, justifyContent: 'space-between' }}>
         <View style={{ gap: 4, alignItems: ALIGN_START }}>
           <View style={{ flexDirection: ROW, alignItems: 'center', gap: space[2] }}>
@@ -301,25 +296,21 @@ function SectionCard({
         </View>
       </View>
 
+      {/*
+        The picture slot: a framed window onto the section's scene. The hairline
+        border is what lifts it off the card, since the scene's ground is the
+        same ramp a step lighter.
+      */}
       <View
         style={{
           width: artWidth,
           borderRadius: 22,
           overflow: 'hidden',
-          backgroundColor: 'rgba(255,255,255,0.14)',
-          alignItems: 'center',
-          justifyContent: 'center',
+          borderWidth: StyleSheet.hairlineWidth * 2,
+          borderColor: 'rgba(255,255,255,0.28)',
         }}
       >
-        {artwork ? (
-          <RemoteImage
-            uri={artwork}
-            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-            priority="high"
-          />
-        ) : (
-          <MaterialCommunityIcons name={section.icon} size={44} color="rgba(255,255,255,0.9)" />
-        )}
+        <SectionArt section={section} />
       </View>
     </Pressable>
   );
