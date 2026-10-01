@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, Switch, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import MaterialCommunityIcons, { type IconName } from '@/ui/icon';
-import { api, ApiError, assetUrl, type PartnerApplication } from '@/lib/api';
+import { api, ApiError, assetUrl, type OwnerReadiness, type PartnerApplication } from '@/lib/api';
 import { NEW_ORDERS, countAr } from '@/lib/arabic-count';
 import { notify } from '@/lib/dialog';
 import { catalogNoun, useOwner } from '@/lib/owner';
+import { activationState } from '@/lib/owner-activation';
 import { PRODUCTS } from '@/lib/owner-catalog';
 import { sectionOf } from '@/lib/sections';
 import { useVertical } from '@/lib/vertical';
+import { ActivationCard } from '@/ui/activation-card';
 import { PushPrompt } from '@/ui/push-prompt';
 import { Door, KindBadge, Step } from '@/ui/partner-doors';
 import { useMe, useSession } from '@/lib/session';
@@ -35,6 +37,7 @@ export default function OwnerHomeScreen() {
   const owner = useOwner();
   const queryClient = useQueryClient();
   const { choose } = useVertical();
+  const me = useMe();
 
   const shop = owner.shop;
 
@@ -91,6 +94,42 @@ export default function OwnerHomeScreen() {
     queryFn: () => api.ownerDashboard(shop?.id as string),
     enabled: Boolean(shop?.id) && owner.can('order.read'),
     refetchInterval: 60_000,
+  });
+
+  /*
+   * Why the shop is not live, while it is not. Asked again every minute so
+   * the card notices what the owner just did on another screen, and the
+   * moment Jibli switches the shop on — which the shop list, cached from
+   * sign-in, would not learn on its own.
+   */
+  const awaitingActivation = Boolean(shop) && shop?.operational_status !== 'ACTIVE';
+  const readiness = useQuery({
+    queryKey: ['owner-readiness', shop?.id],
+    queryFn: () => api.ownerReadiness(shop?.id as string),
+    enabled: Boolean(shop?.id) && awaitingActivation && owner.can('settings.read'),
+    refetchInterval: 60_000,
+  });
+  // Back from the product form or settings: the card counts what just happened.
+  const refetchReadiness = readiness.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      if (awaitingActivation) void refetchReadiness();
+    }, [awaitingActivation, refetchReadiness]),
+  );
+  const nowLive = readiness.data?.operational_status === 'ACTIVE';
+  const refetchShops = owner.refetch;
+  useEffect(() => {
+    if (awaitingActivation && nowLive) void refetchShops();
+  }, [awaitingActivation, nowLive, refetchShops]);
+
+  const requestActivation = useMutation({
+    mutationFn: () => api.ownerRequestActivation(shop?.id as string),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['owner-readiness', shop?.id] });
+      notify('وصل طلبك', result.note_ar);
+    },
+    onError: (caught) =>
+      notify('تعذّر طلب التفعيل', caught instanceof ApiError ? caught.messageAr : 'حاول مرة أخرى.'),
   });
 
   const acceptsOrders = settings.data?.branch.accepts_orders ?? true;
@@ -189,6 +228,41 @@ export default function OwnerHomeScreen() {
 
         <PushPrompt audience="owner" />
 
+        {/*
+          The password Jibli issued was read out and written down. Until the
+          owner replaces it, this is the first thing on the screen.
+        */}
+        {me?.username && me.must_change_password ? (
+          <Pressable
+            onPress={() => router.push('/(owner)/password')}
+            accessibilityRole="button"
+            accessibilityLabel="غيّر كلمة المرور المؤقتة"
+            style={({ pressed }) => [
+              {
+                flexDirection: ROW,
+                alignItems: 'center',
+                gap: space[3],
+                padding: space[3],
+                borderRadius: radius.lg,
+                backgroundColor: color.warningSoft,
+                borderWidth: 1,
+                borderColor: color.warningStrong,
+              },
+              pressed ? { opacity: 0.85 } : null,
+            ]}
+          >
+            <MaterialCommunityIcons name="lock-reset" size={24} color={color.warningStrong} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="smallBold">غيّر كلمة المرور المؤقتة</Text>
+              <Text variant="caption" tone="secondary">
+                كلمة المرور التي أعطاك إياها فريق جيبلي مؤقتة. اختر كلمتك بعد التحقق من رقم هاتفك
+                المسجّل.
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-left" size={20} color={color.textMuted} />
+          </Pressable>
+        ) : null}
+
         {/* ── The shop ────────────────────────────────────────────────── */}
         <View
           style={{
@@ -238,7 +312,7 @@ export default function OwnerHomeScreen() {
               </Text>
               <Text variant="caption" tone="inverse" style={{ opacity: 0.85 }}>
                 {!live
-                  ? 'بانتظار التفعيل من فريق جيبلي'
+                  ? pendingLine(readiness.data)
                   : acceptsOrders
                     ? settings.data && !settings.data.is_open
                       ? 'مغلق الآن حسب ساعات العمل'
@@ -264,6 +338,13 @@ export default function OwnerHomeScreen() {
               label="تعديل المتجر"
               onPress={() => router.push('/(owner)/settings')}
             />
+            {me?.username ? (
+              <CardPill
+                icon="lock-outline"
+                label="كلمة المرور"
+                onPress={() => router.push('/(owner)/password')}
+              />
+            ) : null}
             {owner.usable.length > 1 ? (
               <CardPill
                 icon="swap-horizontal"
@@ -273,6 +354,28 @@ export default function OwnerHomeScreen() {
             ) : null}
           </Row>
         </View>
+
+        {/* ── Why not live yet, and what to do about it ─────────────── */}
+        {!live && owner.can('settings.read') ? (
+          <ActivationCard
+            readiness={readiness.data}
+            loading={readiness.isLoading}
+            error={readiness.isError}
+            onRetry={() => void readiness.refetch()}
+            onAction={(action) =>
+              router.push(
+                action === 'pin'
+                  ? '/(owner)/settings'
+                  : counts.categories === 0 && !catalog.isLoading
+                    ? '/(owner)/categories'
+                    : '/(owner)/product/new',
+              )
+            }
+            onRequest={() => requestActivation.mutate()}
+            requesting={requestActivation.isPending}
+            canRequest={owner.can('settings.write')}
+          />
+        ) : null}
 
         {/* ── Orders first: an order waits on a customer now. ─────────── */}
         {owner.can('order.read') ? (
@@ -424,14 +527,36 @@ export default function OwnerHomeScreen() {
             variant="secondary"
             block
             icon={<MaterialCommunityIcons name="eye-outline" size={18} color={color.textPrimary} />}
-            disabled={!live}
             onPress={viewAsCustomer}
           />
+          {!live ? (
+            <Text variant="caption" tone="muted" align="center">
+              قبل التفعيل تفتح الصفحة لك وحدك؛ لا يراها الزبائن.
+            </Text>
+          ) : null}
           <LeaveRow parked={parkedAccount === 'customer'} onPress={() => void leaveToApp()} />
         </View>
       </View>
     </Screen>
   );
+}
+
+/** The one line under the shop's name while it is not live. */
+function pendingLine(readiness: OwnerReadiness | undefined): string {
+  if (!readiness) return 'غير مفعّل بعد';
+  const state = activationState(readiness);
+  switch (state.kind) {
+    case 'requested':
+      return 'طُلب التفعيل — بانتظار فريق جيبلي';
+    case 'ready':
+      return 'جاهز للتفعيل';
+    case 'suspended':
+      return 'موقوف مؤقتاً';
+    case 'todo':
+      return state.mine > 0 ? 'غير مفعّل — أكمل الخطوات أدناه' : 'غير مفعّل — بانتظار فريق جيبلي';
+    default:
+      return 'يستقبل الطلبات';
+  }
 }
 
 /** A small white action on the shop card. */

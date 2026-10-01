@@ -7,10 +7,13 @@ import { normalizeDigits } from '@jibli/validation/arabic';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, assetUrl, type OwnerSettingsInput } from '@/lib/api';
 import { notify } from '@/lib/dialog';
+import { captureCurrentLocation, LOCATION_MESSAGES_AR } from '@/lib/location';
 import { useOwner } from '@/lib/owner';
 import { sectionOf } from '@/lib/sections';
 import { describePickOutcome, pickImage, uploadShopImage, type PickSource } from '@/lib/upload';
+import { useMe } from '@/lib/session';
 import { useVertical } from '@/lib/vertical';
+import { MapPicker } from '@/ui/map-picker';
 import { color, INPUT_TEXT_START, radius, ROW, space, TAP_TARGET, text } from '@/theme';
 import {
   Button,
@@ -33,9 +36,13 @@ import { OwnerHeader } from './index';
  * live only on the web portal, and the picture could not be changed from the
  * phone at all — the one device that has a camera pointed at the shop.
  *
- * Working hours, the location and the commission stay on the portal. This is
- * the page an owner opens on the first day and then when something changes,
- * which is not the same page as the one a manager tunes a schedule on.
+ * Working hours and the commission stay on the portal. The location is
+ * placed here once — a shop created from Admin often has none, and without
+ * one no courier finds the door — and moved, later, through the portal's
+ * request, because relocating a live shop is something Jibli reviews.
+ *
+ * This is the page an owner opens on the first day and then when something
+ * changes, which is not the same page as the one a manager tunes a schedule on.
  */
 export default function OwnerSettingsScreen() {
   const router = useRouter();
@@ -43,6 +50,7 @@ export default function OwnerSettingsScreen() {
   const shop = owner.shop;
   const queryClient = useQueryClient();
   const { choose } = useVertical();
+  const me = useMe();
   const canWrite = owner.can('settings.write');
 
   const settings = useQuery({
@@ -58,6 +66,9 @@ export default function OwnerSettingsScreen() {
   const [minimumOrder, setMinimumOrder] = useState('');
   const [acceptsOrders, setAcceptsOrders] = useState(true);
   const [touched, setTouched] = useState(false);
+  const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [pinProblem, setPinProblem] = useState<string | null>(null);
 
   // Fill once the shop arrives, and never over what somebody is typing.
   useEffect(() => {
@@ -141,6 +152,38 @@ export default function OwnerSettingsScreen() {
       ),
   });
 
+  /** The shop's first pin. The server refuses a second one; the portal moves it. */
+  const savePin = useMutation({
+    mutationFn: () =>
+      api.ownerUpdateSettings(shop?.id as string, {
+        latitude: pin?.latitude as number,
+        longitude: pin?.longitude as number,
+      }),
+    onSuccess: async () => {
+      setPin(null);
+      await refresh();
+      // The activation card on the lobby counts this step.
+      await queryClient.invalidateQueries({ queryKey: ['owner-readiness', shop?.id] });
+      notify('تم تثبيت الموقع', 'يصل المندوب إلى متجرك مباشرة من الآن.');
+    },
+    onError: (caught) => notify('تعذّر حفظ الموقع', explain(caught)),
+  });
+
+  const locate = async () => {
+    setLocating(true);
+    const outcome = await captureCurrentLocation();
+    setLocating(false);
+    if (outcome.status !== 'ok') {
+      setPinProblem(LOCATION_MESSAGES_AR[outcome.status]);
+      return;
+    }
+    setPinProblem(null);
+    setPin({
+      latitude: outcome.coordinates.latitude,
+      longitude: outcome.coordinates.longitude,
+    });
+  };
+
   const clearLogo = useMutation({
     mutationFn: () => api.ownerUpdateSettings(shop?.id as string, { logo_asset_id: null }),
     onSuccess: refresh,
@@ -160,6 +203,11 @@ export default function OwnerSettingsScreen() {
   const data = settings.data;
   const logoAssetId = data?.restaurant.logo_asset_id ?? null;
   const live = shop.operational_status === 'ACTIVE';
+  const pinned =
+    data?.branch.latitude !== null &&
+    data?.branch.latitude !== undefined &&
+    data?.branch.longitude !== null &&
+    data?.branch.longitude !== undefined;
 
   const viewAsCustomer = () => {
     // The customer's shop page draws in the shop's section; the Gate needs it chosen.
@@ -449,20 +497,59 @@ export default function OwnerSettingsScreen() {
               </Text>
             )}
 
-            {/* ── Where the shop is, read-only ───────────────────────── */}
+            {/* ── The shop's password ────────────────────────────────── */}
+            {me?.username ? (
+              <Pressable
+                onPress={() => router.push('/(owner)/password')}
+                accessibilityRole="button"
+                accessibilityLabel="تغيير كلمة مرور المتجر"
+                style={({ pressed }) => [
+                  {
+                    flexDirection: ROW,
+                    alignItems: 'center',
+                    gap: space[3],
+                    padding: space[3],
+                    borderRadius: radius.lg,
+                    backgroundColor: me.must_change_password
+                      ? color.warningSoft
+                      : color.surfaceSunken,
+                  },
+                  pressed ? { opacity: 0.85 } : null,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="lock-reset"
+                  size={22}
+                  color={me.must_change_password ? color.warningStrong : color.textSecondary}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text variant="smallBold">تغيير كلمة مرور المتجر</Text>
+                  <Text variant="caption" tone="secondary">
+                    {me.must_change_password
+                      ? 'كلمة المرور الحالية مؤقتة من فريق جيبلي — غيّرها الآن.'
+                      : 'بعد التحقق برمز يصل إلى رقم هاتف المالك المسجّل.'}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-left" size={20} color={color.textMuted} />
+              </Pressable>
+            ) : null}
+
+            {/* ── Where the shop is ──────────────────────────────────── */}
             <View
               style={{
                 padding: space[3],
-                gap: space[1],
+                gap: space[2],
                 borderRadius: radius.lg,
-                backgroundColor: color.surfaceSunken,
+                backgroundColor: pinned || !canWrite ? color.surfaceSunken : color.brandSoft,
+                borderWidth: pinned || !canWrite ? 0 : 1,
+                borderColor: color.brand,
               }}
             >
               <Row gap={space[2]}>
                 <MaterialCommunityIcons
-                  name="map-marker-outline"
+                  name={pinned ? 'map-marker-check-outline' : 'map-marker-plus-outline'}
                   size={18}
-                  color={color.textSecondary}
+                  color={pinned ? color.textSecondary : color.brand}
                 />
                 <Text variant="smallBold">
                   {[data.branch.city_name_ar, data.branch.governorate_name_ar]
@@ -473,9 +560,65 @@ export default function OwnerSettingsScreen() {
               <Text variant="caption" tone="secondary">
                 {data.branch.address_text}
               </Text>
-              <Text variant="caption" tone="muted">
-                تغيير الموقع وساعات العمل من لوحة التحكم على المتصفّح.
-              </Text>
+
+              {pinned ? (
+                <Text variant="caption" tone="muted">
+                  الموقع مثبّت على الخريطة. تغييره وساعات العمل من لوحة التحكم على المتصفّح.
+                </Text>
+              ) : !canWrite ? (
+                <Text variant="caption" tone="muted">
+                  لم يُثبَّت موقع المتجر على الخريطة بعد. يثبّته صاحب المتجر.
+                </Text>
+              ) : (
+                <>
+                  <Text variant="caption" tone="secondary">
+                    لم يُثبَّت موقع متجرك على الخريطة بعد. حرّك الخريطة حتى يقف الدبوس على باب
+                    المتجر، أو استخدم موقعك الحالي وأنت فيه.
+                  </Text>
+                  <MapPicker
+                    latitude={pin?.latitude}
+                    longitude={pin?.longitude}
+                    onPick={(coordinates) => {
+                      setPin(coordinates);
+                      setPinProblem(null);
+                    }}
+                    height={220}
+                  />
+                  {pinProblem ? (
+                    <Text variant="caption" tone="danger">
+                      {pinProblem}
+                    </Text>
+                  ) : null}
+                  <Row gap={space[2]}>
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        label="موقعي الحالي"
+                        variant="secondary"
+                        block
+                        icon={
+                          <MaterialCommunityIcons
+                            name="crosshairs-gps"
+                            size={18}
+                            color={color.textPrimary}
+                          />
+                        }
+                        loading={locating}
+                        disabled={locating || savePin.isPending}
+                        onPress={() => void locate()}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        label="حفظ الموقع"
+                        block
+                        disabled={!pin || savePin.isPending}
+                        loading={savePin.isPending}
+                        onPress={() => savePin.mutate()}
+                      />
+                    </View>
+                  </Row>
+                </>
+              )}
             </View>
 
             {/* ── As the customer sees it ────────────────────────────── */}
@@ -486,12 +629,11 @@ export default function OwnerSettingsScreen() {
               icon={
                 <MaterialCommunityIcons name="eye-outline" size={18} color={color.textPrimary} />
               }
-              disabled={!live}
               onPress={viewAsCustomer}
             />
             {!live ? (
               <Text variant="caption" tone="muted" align="center">
-                صفحة المتجر تظهر للزبائن بعد التفعيل من فريق جيبلي.
+                قبل التفعيل تفتح الصفحة لك وحدك؛ لا يراها الزبائن حتى يفعّله فريق جيبلي.
               </Text>
             ) : null}
 

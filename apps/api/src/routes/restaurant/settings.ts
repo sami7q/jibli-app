@@ -392,6 +392,9 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
           address_text: z.string().min(5).max(300).optional(),
           district_text: z.string().max(120).optional(),
           accepts_orders: z.boolean().optional(),
+          /** The shop's pin — accepted only while it has none; see below. */
+          latitude: z.number().min(-90).max(90).optional(),
+          longitude: z.number().min(-180).max(180).optional(),
         })
         .parse(request.body);
 
@@ -422,9 +425,37 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
             .where(eq(restaurants.id, restaurantId));
         }
 
+        /*
+         * The first pin, and only the first. A shop created without
+         * coordinates may place itself on the map from the app; one that
+         * already has a pin moves through the location-change request,
+         * because relocating a live shop is a decision Admin reviews (§123).
+         */
+        const pin =
+          body.latitude !== undefined && body.longitude !== undefined
+            ? { latitude: body.latitude, longitude: body.longitude }
+            : null;
+        if (pin) {
+          const [current] = await tx
+            .select({
+              latitude: restaurantBranches.latitude,
+              longitude: restaurantBranches.longitude,
+            })
+            .from(restaurantBranches)
+            .where(eq(restaurantBranches.restaurantId, restaurantId))
+            .limit(1);
+          if (current && current.latitude !== null && current.longitude !== null) {
+            throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+              details: { reason: 'PIN_ALREADY_SET' },
+              messageAr: 'موقع المتجر مثبّت أصلاً. لتغييره استخدم طلب تغيير الموقع من لوحة التحكم.',
+            });
+          }
+        }
+
         await tx
           .update(restaurantBranches)
           .set({
+            ...(pin ?? {}),
             ...(body.delivery_fee_iqd !== undefined
               ? { deliveryFeeIqd: body.delivery_fee_iqd }
               : {}),

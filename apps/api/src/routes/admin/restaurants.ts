@@ -35,6 +35,10 @@ import { requirePrincipal } from '../../plugins/auth.js';
 import { effectiveCapabilitySql } from '../../services/geography-service.js';
 import { jsonbArrayContains } from '../../lib/jsonb.js';
 import { getConfig } from '../../services/config-service.js';
+import {
+  ensureDefaultWorkingHours,
+  isSelfServeMerchant,
+} from '../../services/working-hours-service.js';
 
 /**
  * Admin restaurant management (plan §15.1, §69, §87).
@@ -662,6 +666,11 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           deliveryFeeIqd: body.delivery_fee_iqd,
         });
 
+        // A shop opens on a default week; a kitchen still sets its own.
+        if (isSelfServeMerchant(body.merchant_type)) {
+          await ensureDefaultWorkingHours(tx, branchId);
+        }
+
         await tx.insert(restaurantMembers).values({
           id: uuidv7(),
           restaurantId,
@@ -977,6 +986,7 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           .select({
             operationalStatus: restaurants.operationalStatus,
             onboardingStatus: restaurants.onboardingStatus,
+            merchantType: restaurants.merchantType,
           })
           .from(restaurants)
           .where(eq(restaurants.id, restaurantId))
@@ -992,6 +1002,19 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           throw new AppError(ERROR_CODES.RESTAURANT_NOT_APPROVED, {
             details: { onboardingStatus: current.onboardingStatus },
           });
+        }
+
+        /*
+         * A market or cosmetics shop made before hours were defaulted at
+         * creation goes live on the default week rather than closed.
+         */
+        if (isSelfServeMerchant(current.merchantType)) {
+          const [branch] = await tx
+            .select({ id: restaurantBranches.id })
+            .from(restaurantBranches)
+            .where(eq(restaurantBranches.restaurantId, restaurantId))
+            .limit(1);
+          if (branch) await ensureDefaultWorkingHours(tx, branch.id);
         }
 
         await tx

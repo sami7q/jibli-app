@@ -38,6 +38,8 @@ export interface SessionCapabilities {
   readonly fullName: string | null;
   /** Portal sign-in name. Null for a phone-only customer or driver. */
   readonly username: string | null;
+  /** A password staff issued and nobody has replaced yet. */
+  readonly mustChangePassword: boolean;
   /**
    * Whether a phone number has been proved.
    *
@@ -75,6 +77,7 @@ export async function loadCapabilities(
       profileCompletedAt: users.profileCompletedAt,
       fullName: users.fullName,
       username: users.username,
+      mustChangePassword: users.mustChangePassword,
       phoneVerifiedAt: users.phoneVerifiedAt,
       governorateId: users.profileGovernorateId,
       governorateNameAr: governorates.nameAr,
@@ -123,6 +126,7 @@ export async function loadCapabilities(
     profileCompleted: user?.profileCompletedAt !== null && user?.profileCompletedAt !== undefined,
     fullName: user?.fullName ?? null,
     username: user?.username ?? null,
+    mustChangePassword: user?.mustChangePassword ?? false,
     phoneVerified: user?.phoneVerifiedAt != null,
     modes,
     area:
@@ -245,8 +249,7 @@ export async function refreshSession(
     superseded &&
     session.revokedReason === 'ROTATED' &&
     session.revokedAt !== null &&
-    Date.now() - session.revokedAt.getTime() <=
-      ctx.env.REFRESH_ROTATION_LEEWAY_SECONDS * 1000;
+    Date.now() - session.revokedAt.getTime() <= ctx.env.REFRESH_ROTATION_LEEWAY_SECONDS * 1000;
 
   if (superseded && !withinRotationLeeway) {
     await revokeSessionChain(ctx, session.userId, 'REFRESH_TOKEN_REPLAY');

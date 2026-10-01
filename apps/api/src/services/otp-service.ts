@@ -38,7 +38,7 @@ import type { AppContext } from '../lib/context.js';
  * `LOGIN` is the original OTP sign-in and stays the default, so every existing
  * caller and every challenge already in the table keeps working unchanged.
  */
-export type OtpPurpose = 'LOGIN' | 'REGISTER' | 'PASSWORD_RESET';
+export type OtpPurpose = 'LOGIN' | 'REGISTER' | 'PASSWORD_RESET' | 'PORTAL_PASSWORD';
 
 export interface OtpRequestInput {
   readonly phoneE164: string;

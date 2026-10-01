@@ -74,32 +74,39 @@ export async function computeReadiness(
   const [driverCount] = await ctx.db
     .select({ value: sql<number>`COUNT(*)` })
     .from(restaurantDrivers)
-    .where(and(eq(restaurantDrivers.restaurantId, restaurantId), eq(restaurantDrivers.isActive, true)));
+    .where(
+      and(eq(restaurantDrivers.restaurantId, restaurantId), eq(restaurantDrivers.isActive, true)),
+    );
 
   const [ownerCount] = await ctx.db
     .select({ value: sql<number>`COUNT(*)` })
     .from(restaurantMembers)
-    .where(and(eq(restaurantMembers.restaurantId, restaurantId), eq(restaurantMembers.isActive, true)));
+    .where(
+      and(eq(restaurantMembers.restaurantId, restaurantId), eq(restaurantMembers.isActive, true)),
+    );
 
-  const readiness = evaluateReadiness({
-    applicationApproved: restaurant.onboardingStatus === 'APPROVED',
-    cityOrderingEnabled: Boolean(branch?.cityOrderingEnabled),
-    ownerActive: Number(ownerCount?.value ?? 0) > 0,
-    branchLocationValid: Boolean(branch?.latitude && branch?.longitude),
-    workingHoursConfigured: Number(hoursCount?.value ?? 0) > 0,
-    hasActiveMenuItem: Number(itemCount?.value ?? 0) > 0,
-    commissionConfigured: Number(commissionCount?.value ?? 0) > 0,
-    settlementPolicyConfigured: Number(commissionCount?.value ?? 0) > 0,
-    /*
-     * Not yet derived from anything. Kept as passing rather than failing so the
-     * checklist does not block on a check nothing can satisfy — and named here
-     * so it is obvious which of the twelve are real.
-     */
-    deliveryConfigured: true,
-    hasActiveDriver: Number(driverCount?.value ?? 0) > 0,
-    orderAlertAcknowledged: true,
-    requiredDocumentsPresent: true,
-  });
+  const readiness = evaluateReadiness(
+    {
+      applicationApproved: restaurant.onboardingStatus === 'APPROVED',
+      cityOrderingEnabled: Boolean(branch?.cityOrderingEnabled),
+      ownerActive: Number(ownerCount?.value ?? 0) > 0,
+      branchLocationValid: Boolean(branch?.latitude && branch?.longitude),
+      workingHoursConfigured: Number(hoursCount?.value ?? 0) > 0,
+      hasActiveMenuItem: Number(itemCount?.value ?? 0) > 0,
+      commissionConfigured: Number(commissionCount?.value ?? 0) > 0,
+      settlementPolicyConfigured: Number(commissionCount?.value ?? 0) > 0,
+      /*
+       * Not yet derived from anything. Kept as passing rather than failing so the
+       * checklist does not block on a check nothing can satisfy — and named here
+       * so it is obvious which of the twelve are real.
+       */
+      deliveryConfigured: true,
+      hasActiveDriver: Number(driverCount?.value ?? 0) > 0,
+      orderAlertAcknowledged: true,
+      requiredDocumentsPresent: true,
+    },
+    { merchantType: restaurant.merchantType },
+  );
 
   return {
     ready: readiness.ready,

@@ -131,7 +131,11 @@ export default function OwnerProductScreen() {
   const nameValid = nameAr.trim().length >= 2;
   const canSave = nameValid && priceValid && Boolean(categoryId) && canWrite;
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['owner-catalog', shop?.id] });
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['owner-catalog', shop?.id] });
+    // The lobby's activation card counts products.
+    await queryClient.invalidateQueries({ queryKey: ['owner-readiness', shop?.id] });
+  };
   const explain = (caught: unknown) =>
     caught instanceof ApiError ? caught.messageAr : 'حاول مرة أخرى.';
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { MAP_PICKER_HTML, type MapPickerMessage } from './map-picker-html';
 import { color, radius } from '@/theme';
-import { isSamePoint, type MapPickerProps } from './map-picker';
+import { isSamePoint, type MapPickerProps } from './map-picker-shared';
 
 /**
  * The same map, in a browser.

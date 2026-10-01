@@ -2,6 +2,7 @@ import {
   AppError,
   ERROR_CODES,
   type ErrorCode,
+  type MerchantType,
   type OnboardingStatus,
   type OperationalStatus,
 } from '@jibli/contracts';
@@ -135,8 +136,7 @@ export function distanceMeters(
   const lat1 = toRad(from.latitude);
   const lat2 = toRad(to.latitude);
 
-  const a =
-    Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
@@ -258,18 +258,57 @@ const NON_BLOCKING: ReadonlySet<keyof ReadinessInput> = new Set([
   'orderAlertAcknowledged',
 ]);
 
-export function evaluateReadiness(input: ReadinessInput): {
+/**
+ * A shelf is not a kitchen.
+ *
+ * The checklist was written for restaurants, where hours are a decision and
+ * a pin is where a courier waits for food. A market or a cosmetics shop
+ * created from Admin fell at two of those with no way to pass them from
+ * the app: the hours now come with a default week when the shop is made
+ * or activated, and the pin is asked for but no longer blocks — an order
+ * to a shop without one is allowed and flagged, exactly as an address
+ * without one is (see `checkServiceZone`). The labels change with it so
+ * a grocer is not told to put a dish on the menu.
+ */
+export interface ReadinessOptions {
+  readonly merchantType?: MerchantType;
+}
+
+const SHOP_LABELS_AR: Partial<Record<keyof ReadinessInput, string>> = {
+  hasActiveMenuItem: 'يوجد منتج واحد على الأقل',
+  workingHoursConfigured: 'أوقات العمل (تُضبط افتراضياً عند التفعيل وتُعدَّل من لوحة التحكم)',
+  branchLocationValid: 'موقع المتجر مثبّت على الخريطة (يُستحسن)',
+  hasActiveDriver: 'يوجد مندوب مفعّل',
+};
+
+const SHOP_NON_BLOCKING: ReadonlySet<keyof ReadinessInput> = new Set([
+  ...NON_BLOCKING,
+  'branchLocationValid',
+  'workingHoursConfigured',
+]);
+
+export function isSelfServeMerchantType(merchantType: MerchantType | undefined): boolean {
+  return merchantType === 'MARKET' || merchantType === 'COSMETICS';
+}
+
+export function evaluateReadiness(
+  input: ReadinessInput,
+  options: ReadinessOptions = {},
+): {
   ready: boolean;
   checks: ReadinessCheck[];
   blockingFailures: ReadinessCheck[];
 } {
-  const checks: ReadinessCheck[] = (Object.keys(READINESS_LABELS_AR) as (keyof ReadinessInput)[])
-    .map((key) => ({
-      key,
-      labelAr: READINESS_LABELS_AR[key],
-      passed: input[key],
-      blocking: !NON_BLOCKING.has(key),
-    }));
+  const shop = isSelfServeMerchantType(options.merchantType);
+  const nonBlocking = shop ? SHOP_NON_BLOCKING : NON_BLOCKING;
+  const checks: ReadinessCheck[] = (
+    Object.keys(READINESS_LABELS_AR) as (keyof ReadinessInput)[]
+  ).map((key) => ({
+    key,
+    labelAr: (shop && SHOP_LABELS_AR[key]) || READINESS_LABELS_AR[key],
+    passed: input[key],
+    blocking: !nonBlocking.has(key),
+  }));
 
   const blockingFailures = checks.filter((c) => c.blocking && !c.passed);
   return { ready: blockingFailures.length === 0, checks, blockingFailures };

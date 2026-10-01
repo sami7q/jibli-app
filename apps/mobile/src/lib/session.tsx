@@ -60,6 +60,10 @@ export interface Me {
    * shipped — has no such field, and an owner with no shops is a real state.
    */
   readonly restaurant_roles?: Record<string, string[]>;
+  /** The portal sign-in name of a shop's issued account; absent for a phone account. */
+  readonly username?: string | null;
+  /** The password Jibli issued has not been replaced yet. */
+  readonly must_change_password?: boolean;
 }
 
 export type SessionState =

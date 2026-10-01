@@ -943,6 +943,9 @@ export interface OwnerSettings {
     readonly city_name_ar: string | null;
     readonly governorate_name_ar: string | null;
     readonly phone: string | null;
+    /** Null until somebody puts the shop on the map. */
+    readonly latitude?: number | null;
+    readonly longitude?: number | null;
     readonly is_active: boolean;
     readonly accepts_orders: boolean;
     readonly delivery_fee_iqd: number;
@@ -965,6 +968,27 @@ export interface OwnerSettingsInput {
   readonly base_preparation_minutes?: number;
   readonly phone?: string;
   readonly accepts_orders?: boolean;
+  /** The shop's first pin, from the app. Refused once one exists. */
+  readonly latitude?: number;
+  readonly longitude?: number;
+}
+
+/** One line of the readiness checklist — `GET /restaurant-portal/readiness`. */
+export interface OwnerReadinessCheck {
+  readonly key: string;
+  readonly label_ar: string;
+  readonly passed: boolean;
+  readonly blocking: boolean;
+}
+
+/** Where the shop stands on the way to going live. */
+export interface OwnerReadiness {
+  readonly ready: boolean;
+  readonly checks: OwnerReadinessCheck[];
+  readonly blocking_failures: string[];
+  readonly operational_status: string;
+  readonly activation_requested_at: string | null;
+  readonly activation_request_note: string | null;
 }
 
 /** Today, in the two numbers the lobby shows — `GET /restaurant-portal/dashboard`. */
@@ -1649,6 +1673,41 @@ export const api = {
 
   ownerDashboard: (restaurantId: string) =>
     apiRequest<OwnerDashboard>('/api/v1/restaurant-portal/dashboard/overview', { restaurantId }),
+
+  /** The same checklist Admin reads, for the owner's own shop. */
+  ownerReadiness: (restaurantId: string) =>
+    apiRequest<OwnerReadiness>('/api/v1/restaurant-portal/readiness', { restaurantId }),
+
+  /** Ask Jibli to switch the shop on, once the blocking checks pass. */
+  ownerRequestActivation: (restaurantId: string, note?: string) =>
+    apiRequest<{ requested_at: string; note_ar: string }>(
+      '/api/v1/restaurant-portal/activation-request',
+      { method: 'POST', restaurantId, body: note ? { note } : {} },
+    ),
+
+  /**
+   * A code to the owner's number on file, for changing the shop's password.
+   * The number is chosen by the server; the app only learns its masked form.
+   */
+  ownerPasswordChallenge: (restaurantId: string) =>
+    apiRequest<{ phone_masked: string; expires_in_seconds: number; resend_after_seconds: number }>(
+      '/api/v1/restaurant-portal/password/challenge',
+      { method: 'POST', restaurantId, body: {} },
+    ),
+
+  /** The new password, with the code. Every other session ends; this device gets new tokens. */
+  ownerChangePassword: (restaurantId: string, code: string, newPassword: string) =>
+    apiRequest<{
+      changed: boolean;
+      access_token: string;
+      refresh_token: string;
+      expires_in_seconds: number;
+      note_ar: string;
+    }>('/api/v1/restaurant-portal/password', {
+      method: 'POST',
+      restaurantId,
+      body: { code, new_password: newPassword },
+    }),
 
   /**
    * Store an image and get its id back.

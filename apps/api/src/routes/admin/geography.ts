@@ -23,6 +23,10 @@ import { requirePrincipal } from '../../plugins/auth.js';
 import { getConfig } from '../../services/config-service.js';
 import { computeReadiness } from '../../services/readiness-service.js';
 import {
+  ensureDefaultWorkingHours,
+  isSelfServeMerchant,
+} from '../../services/working-hours-service.js';
+import {
   cityCoverageImpact,
   effectiveCapabilitySql,
   invalidateGeographyCache,
@@ -512,6 +516,11 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
           isActive: false,
           acceptsOrders: false,
         });
+
+        // A shop opens on a default week; a kitchen still sets its own.
+        if (isSelfServeMerchant(application.merchantType)) {
+          await ensureDefaultWorkingHours(tx, branchId);
+        }
 
         /*
          * Who owns this restaurant.

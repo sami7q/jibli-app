@@ -238,15 +238,11 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
     );
   });
 
-  app.post(
-    '/api/v1/auth/logout',
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const principal = requirePrincipal(request);
-      await revokeSession(ctx, principal.sessionId, 'LOGOUT');
-      return reply.send(success({ logged_out: true }, { request_id: request.requestId }));
-    },
-  );
+  app.post('/api/v1/auth/logout', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
+    await revokeSession(ctx, principal.sessionId, 'LOGOUT');
+    return reply.send(success({ logged_out: true }, { request_id: request.requestId }));
+  });
 
   /** Current session state — what the app calls on cold start. */
   /**
@@ -885,6 +881,13 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
           driver_id: capabilities.driverId,
           platform_roles: capabilities.platformRoles,
           restaurant_roles: capabilities.restaurantRoles,
+          /*
+           * Whether this is a shop's issued account, and whether the password
+           * it was issued with is still the one in use — the app offers the
+           * change on both facts.
+           */
+          username: capabilities.username,
+          must_change_password: capabilities.mustChangePassword,
           // The app needs a city id before it can list a single restaurant,
           // and the header shows the area by name.
           governorate_id: capabilities.area?.governorateId ?? null,

@@ -12,6 +12,7 @@ import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useIsGuest } from '@/lib/session';
+import { useVertical } from '@/lib/vertical';
 import { notify } from '@/lib/dialog';
 import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
@@ -53,6 +54,15 @@ const MODIFIERS_ENABLED = false;
 export default function RestaurantScreen() {
   const { id, item: itemToOpen } = useLocalSearchParams<{ id: string; item?: string }>();
   const router = useRouter();
+  /*
+   * The page draws in whichever section the customer is browsing, and a
+   * market or a cosmetics shop is a shop with products — not a restaurant
+   * with a menu. The nouns follow the section.
+   */
+  const { vertical } = useVertical();
+  const isShop = vertical === 'MARKET' || vertical === 'COSMETICS';
+  const place = isShop ? 'المتجر' : 'المطعم';
+  const menuNoun = isShop ? 'المنتجات' : 'المنيو';
   const { cart, itemCount, subtotalIqd } = useCart();
   const serviceFee = useServiceFee();
 
@@ -167,7 +177,9 @@ export default function RestaurantScreen() {
       <Screen edges={['top']}>
         <ErrorState
           message={
-            restaurant.error instanceof ApiError ? restaurant.error.messageAr : 'تعذّر تحميل المطعم'
+            restaurant.error instanceof ApiError
+              ? restaurant.error.messageAr
+              : `تعذّر تحميل ${place}`
           }
           onRetry={() => void restaurant.refetch()}
         />
@@ -228,8 +240,8 @@ export default function RestaurantScreen() {
             <MaterialCommunityIcons name="clock-outline" size={18} color={palette.warning[700]} />
             <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
               {detail.is_open
-                ? 'المطعم لا يستقبل طلبات حالياً. يمكنك تصفّح المنيو.'
-                : 'المطعم مغلق الآن. يمكنك تصفّح المنيو والعودة لاحقاً.'}
+                ? `${place} لا يستقبل طلبات حالياً. يمكنك تصفّح ${menuNoun}.`
+                : `${place} مغلق الآن. يمكنك تصفّح ${menuNoun} والعودة لاحقاً.`}
             </Text>
           </View>
         ) : null}
@@ -237,7 +249,7 @@ export default function RestaurantScreen() {
         {shownCategories.length === 0 ? (
           <View style={{ padding: space[6], alignItems: 'center' }}>
             <Text tone="muted" align="center">
-              لم يُضف المنيو بعد.
+              لم تُضف {menuNoun} بعد.
             </Text>
           </View>
         ) : (

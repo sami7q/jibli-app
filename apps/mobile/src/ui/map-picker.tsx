@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { centerMapScript, MAP_PICKER_HTML, type MapPickerMessage } from './map-picker-html';
+import { isSamePoint, type MapPickerProps } from './map-picker-shared';
 import { Text } from '@/ui';
 import { color, radius, space } from '@/theme';
 
@@ -17,27 +18,7 @@ import { color, radius, space } from '@/theme';
  * the driver's own maps app does the routing, and it is better at it.
  */
 
-export interface MapPickerProps {
-  /** Where the pin is. Falls back to the centre of Baghdad. */
-  readonly latitude?: number | null;
-  readonly longitude?: number | null;
-  readonly onPick: (coordinates: { latitude: number; longitude: number }) => void;
-  readonly height?: number;
-}
-
-/** About a metre: closer than this, a new position is the map's own echo. */
-const SAME_POINT_DEGREES = 1e-5;
-
-export function isSamePoint(
-  a: { latitude: number; longitude: number } | null,
-  b: { latitude: number; longitude: number },
-): boolean {
-  return (
-    a !== null &&
-    Math.abs(a.latitude - b.latitude) < SAME_POINT_DEGREES &&
-    Math.abs(a.longitude - b.longitude) < SAME_POINT_DEGREES
-  );
-}
+export { isSamePoint, type MapPickerProps } from './map-picker-shared';
 
 export function MapPicker({ latitude, longitude, onPick, height = 280 }: MapPickerProps) {
   const [ready, setReady] = useState(false);
