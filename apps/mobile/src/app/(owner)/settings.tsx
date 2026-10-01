@@ -9,6 +9,7 @@ import { api, ApiError, assetUrl, type OwnerSettingsInput } from '@/lib/api';
 import { notify } from '@/lib/dialog';
 import { captureCurrentLocation, LOCATION_MESSAGES_AR } from '@/lib/location';
 import { useOwner } from '@/lib/owner';
+import { summarizeWeek, weekFromServer } from '@/lib/owner-hours';
 import { sectionOf } from '@/lib/sections';
 import { describePickOutcome, pickImage, uploadShopImage, type PickSource } from '@/lib/upload';
 import { useMe } from '@/lib/session';
@@ -203,6 +204,9 @@ export default function OwnerSettingsScreen() {
   const data = settings.data;
   const logoAssetId = data?.restaurant.logo_asset_id ?? null;
   const live = shop.operational_status === 'ACTIVE';
+  const hoursWeek = weekFromServer(data?.working_hours);
+  const hoursConfigured = hoursWeek.configured;
+  const hoursSummary = summarizeWeek(hoursWeek.week);
   const pinned =
     data?.branch.latitude !== null &&
     data?.branch.latitude !== undefined &&
@@ -497,6 +501,39 @@ export default function OwnerSettingsScreen() {
               </Text>
             )}
 
+            {/* ── When the shop is open ──────────────────────────────── */}
+            <Pressable
+              onPress={() => router.push('/(owner)/hours')}
+              accessibilityRole="button"
+              accessibilityLabel="أوقات العمل"
+              style={({ pressed }) => [
+                {
+                  flexDirection: ROW,
+                  alignItems: 'center',
+                  gap: space[3],
+                  padding: space[3],
+                  borderRadius: radius.lg,
+                  backgroundColor: hoursConfigured ? color.surfaceSunken : color.brandSoft,
+                  borderWidth: hoursConfigured ? 0 : 1,
+                  borderColor: color.brand,
+                },
+                pressed ? { opacity: 0.85 } : null,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="clock-outline"
+                size={22}
+                color={hoursConfigured ? color.textSecondary : color.brand}
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="smallBold">أوقات العمل</Text>
+                <Text variant="caption" tone={hoursConfigured ? 'secondary' : 'brand'}>
+                  {hoursConfigured ? hoursSummary : 'لم تُضبط بعد — اضبطها بضغطة'}
+                </Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-left" size={20} color={color.textMuted} />
+            </Pressable>
+
             {/* ── The shop's password ────────────────────────────────── */}
             {me?.username ? (
               <Pressable
@@ -563,7 +600,7 @@ export default function OwnerSettingsScreen() {
 
               {pinned ? (
                 <Text variant="caption" tone="muted">
-                  الموقع مثبّت على الخريطة. تغييره وساعات العمل من لوحة التحكم على المتصفّح.
+                  الموقع مثبّت على الخريطة. تغييره من لوحة التحكم على المتصفّح.
                 </Text>
               ) : !canWrite ? (
                 <Text variant="caption" tone="muted">

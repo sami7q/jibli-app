@@ -49,6 +49,19 @@ describe('activationSteps', () => {
     expect(steps.map((step) => step.action)).toEqual(['product', 'pin', 'admin']);
   });
 
+  it('leaves out the checks it is told to', () => {
+    const steps = activationSteps(
+      { checks: [check('hasActiveDriver', false, false), check('hasActiveMenuItem', false)] },
+      { omit: ['hasActiveDriver'] },
+    );
+    expect(steps.map((step) => step.key)).toEqual(['hasActiveMenuItem']);
+  });
+
+  it('opens the hours screen for the hours check', () => {
+    const [step] = activationSteps({ checks: [check('workingHoursConfigured', false)] });
+    expect(step?.action).toBe('hours');
+  });
+
   it('has words for a check it has never heard of', () => {
     const [step] = activationSteps({ checks: [check('somethingNew', false)] });
     expect(step?.action).toBe('admin');

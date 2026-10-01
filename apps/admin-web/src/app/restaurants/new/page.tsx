@@ -338,9 +338,7 @@ export default function NewRestaurantPage() {
               </div>
 
               <div className="field">
-                <label htmlFor="display_name">
-                  {KIND_COPY[form.merchant_type].nameLabel}
-                </label>
+                <label htmlFor="display_name">{KIND_COPY[form.merchant_type].nameLabel}</label>
                 <input
                   id="display_name"
                   value={form.display_name}
@@ -474,6 +472,12 @@ export default function NewRestaurantPage() {
           </Card>
 
           <Card title="الموقع" icon="geography">
+            {form.merchant_type !== 'RESTAURANT' ? (
+              <p className="field__hint" style={{ marginBlockStart: 0 }}>
+                الموقع على الخريطة يثبّته صاحب المتجر من التطبيق لاحقاً، وأوقات العمل تُكتب
+                08:00–23:00 تلقائياً ويعدّلها من التطبيق. لا يمنع أيٌّ منهما التفعيل.
+              </p>
+            ) : null}
             <div className="form-grid">
               <div className="form-grid form-grid--pair">
                 <div className="field">
@@ -640,7 +644,9 @@ export default function NewRestaurantPage() {
                 )}
               </div>
               <div className="preview__text">
-                <strong>{form.display_name.trim() || KIND_COPY[form.merchant_type].nameLabel}</strong>
+                <strong>
+                  {form.display_name.trim() || KIND_COPY[form.merchant_type].nameLabel}
+                </strong>
                 <span>
                   {form.cuisine_tags.length > 0
                     ? categoriesFor(form.merchant_type)

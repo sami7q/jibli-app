@@ -13,7 +13,7 @@ import type { OwnerReadiness } from './api';
  */
 
 /** Where a step is completed: in the app, on the portal, or by Jibli. */
-export type ActivationAction = 'product' | 'pin' | 'portal' | 'admin';
+export type ActivationAction = 'product' | 'pin' | 'hours' | 'portal' | 'admin';
 
 export interface ActivationStep {
   readonly key: string;
@@ -32,8 +32,8 @@ const STEP_META: Record<string, { action: ActivationAction; hint: string }> = {
     hint: 'ثبّت موقع المتجر على الخريطة ليصل المندوب إلى بابك مباشرة.',
   },
   workingHoursConfigured: {
-    action: 'portal',
-    hint: 'تُضبط تلقائياً عند التفعيل (٨ صباحاً – ١١ مساءً)، وتعدّلها من لوحة التحكم.',
+    action: 'hours',
+    hint: 'اختر وقت الفتح والإغلاق بضغطة، وأغلق ما تشاء من الأيام.',
   },
   hasActiveDriver: {
     action: 'portal',
@@ -49,9 +49,18 @@ const STEP_META: Record<string, { action: ActivationAction; hint: string }> = {
   requiredDocumentsPresent: { action: 'admin', hint: 'يستكملها فريق جيبلي معك.' },
 };
 
-/** Every check the owner should see, failing ones first and the blocking ones before the rest. */
-export function activationSteps(readiness: Pick<OwnerReadiness, 'checks'>): ActivationStep[] {
+/**
+ * Every check the owner should see, failing ones first and the blocking ones
+ * before the rest. `omit` leaves out checks that mean nothing to this shop —
+ * a market's deliveries are Jibli's couriers, so "a driver" is noise there.
+ */
+export function activationSteps(
+  readiness: Pick<OwnerReadiness, 'checks'>,
+  options: { readonly omit?: readonly string[] } = {},
+): ActivationStep[] {
+  const omitted = new Set(options.omit ?? []);
   return readiness.checks
+    .filter((check) => !omitted.has(check.key))
     .map((check) => ({
       key: check.key,
       label: check.label_ar,
@@ -95,6 +104,6 @@ export function activationState(
   return {
     kind: 'todo',
     remaining: steps.length,
-    mine: steps.filter((step) => step.action === 'product' || step.action === 'pin').length,
+    mine: steps.filter((step) => step.action !== 'admin' && step.action !== 'portal').length,
   };
 }

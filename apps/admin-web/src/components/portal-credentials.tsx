@@ -69,10 +69,16 @@ export function PortalCredentials({
   token,
   restaurantId,
   restaurantName,
+  recoveryPhone = null,
+  isShop = false,
 }: {
   token: string;
   restaurantId: string;
   restaurantName: string;
+  /** Where the app sends the code when the owner changes the password; null when nobody has a number. */
+  recoveryPhone?: string | null;
+  /** A market or a cosmetics shop, whose owner can change the password from the app. */
+  isShop?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
@@ -100,8 +106,15 @@ export function PortalCredentials({
   });
 
   const setActive = useMutation({
-    mutationFn: ({ userId, isActive, reason }: { userId: string; isActive: boolean; reason: string }) =>
-      admin.setPortalUserActive(token, userId, isActive, reason),
+    mutationFn: ({
+      userId,
+      isActive,
+      reason,
+    }: {
+      userId: string;
+      isActive: boolean;
+      reason: string;
+    }) => admin.setPortalUserActive(token, userId, isActive, reason),
     onSuccess: () => {
       setToggling(null);
       invalidate();
@@ -114,7 +127,11 @@ export function PortalCredentials({
       icon="roles"
       subtitle="اسم المستخدم وكلمة المرور التي يدخل بها المطعم"
       actions={
-        <button type="button" className="btn btn--primary btn--sm" onClick={() => setCreating(true)}>
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          onClick={() => setCreating(true)}
+        >
           إنشاء حساب دخول
         </button>
       }
@@ -131,6 +148,32 @@ export function PortalCredentials({
       ) : null}
 
       {portalUsers.isLoading ? <Skeleton height={160} /> : null}
+
+      {/*
+        The owner can replace a password from the app after a code reaches
+        the number on file. Showing the number here is what lets support
+        answer "the code never came" — and the warning is what stops a shop
+        being issued an account nobody can ever recover.
+      */}
+      {isShop && (portalUsers.data?.length ?? 0) > 0 ? (
+        recoveryPhone ? (
+          <p className="alert-bar alert-bar--info" style={{ marginBlockEnd: 'var(--space-3)' }}>
+            <Icon name="roles" className="nav__icon" aria-hidden />
+            <span style={{ flex: 1 }}>
+              يستطيع صاحب المتجر تغيير كلمة المرور من التطبيق بعد رمز تحقق يصل إلى{' '}
+              <strong className="ltr-inline">{recoveryPhone}</strong> (رقم المالك المسجّل).
+            </span>
+          </p>
+        ) : (
+          <p className="alert-bar alert-bar--warning" style={{ marginBlockEnd: 'var(--space-3)' }}>
+            <Icon name="alert" className="nav__icon" aria-hidden />
+            <span style={{ flex: 1 }}>
+              لا رقم هاتف للمالك ولا للمتجر، فلن يستطيع صاحب المتجر تغيير كلمة المرور من التطبيق.
+              أضف هاتف المتجر من إعداداته في التطبيق، أو أعد تعيين كلمة المرور من هنا عند الحاجة.
+            </span>
+          </p>
+        )
+      ) : null}
 
       {portalUsers.data ? (
         portalUsers.data.length === 0 ? (
@@ -160,9 +203,7 @@ export function PortalCredentials({
                       <strong className="ltr-inline">{user.username}</strong>
                     </td>
                     <td>{user.full_name ?? '—'}</td>
-                    <td>
-                      {RESTAURANT_ROLE_LABELS[user.role as RestaurantRole] ?? user.role}
-                    </td>
+                    <td>{RESTAURANT_ROLE_LABELS[user.role as RestaurantRole] ?? user.role}</td>
                     <td>
                       <StatusBadges user={user} />
                     </td>
@@ -229,12 +270,10 @@ export function PortalCredentials({
           body={
             <div style={{ color: 'var(--text-secondary)' }}>
               <p style={{ marginBlockStart: 0 }}>
-                تُلغى كلمة المرور الحالية فوراً وتُنهى كل الجلسات المفتوحة، وسيُطلب من المطعم
-                تغيير الكلمة الجديدة عند أول دخول.
+                تُلغى كلمة المرور الحالية فوراً وتُنهى كل الجلسات المفتوحة، وسيُطلب من المطعم تغيير
+                الكلمة الجديدة عند أول دخول.
               </p>
-              <p style={{ marginBlockEnd: 0 }}>
-                ستظهر كلمة المرور الجديدة مرة واحدة فقط.
-              </p>
+              <p style={{ marginBlockEnd: 0 }}>ستظهر كلمة المرور الجديدة مرة واحدة فقط.</p>
             </div>
           }
           onConfirm={(reason) => resetPassword.mutate({ userId: resetting.user_id, reason })}
@@ -348,7 +387,9 @@ function CreateDialog({
             أحرف إنجليزية صغيرة وأرقام و . _ - فقط. هذا ما سيكتبه المطعم عند الدخول.
           </span>
           {username !== '' && !usernameValid ? (
-            <span className="field__error">صيغة غير صالحة — من ٣ إلى ٣٢ حرفاً، تبدأ بحرف أو رقم</span>
+            <span className="field__error">
+              صيغة غير صالحة — من ٣ إلى ٣٢ حرفاً، تبدأ بحرف أو رقم
+            </span>
           ) : null}
         </div>
 
@@ -458,7 +499,11 @@ function IssuedDialog({
           <span className="figure__label">كلمة المرور</span>
           <span
             className="figure__value ltr-inline"
-            style={{ userSelect: 'all', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-base)' }}
+            style={{
+              userSelect: 'all',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-base)',
+            }}
           >
             {issued.password}
           </span>

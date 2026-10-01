@@ -955,6 +955,29 @@ export interface OwnerSettings {
   readonly accepts_orders_now: boolean;
   readonly closed_reason: string | null;
   readonly estimated_preparation_minutes: number;
+  /** The weekly schedule; only the days that have a row. Empty until somebody sets it. */
+  readonly working_hours?: OwnerWorkingHour[];
+}
+
+/** One day of the schedule, as `GET /restaurant-portal/settings` lists it. */
+export interface OwnerWorkingHour {
+  readonly id: string;
+  readonly day_of_week: number;
+  readonly day_name_ar: string;
+  readonly opens_at: string;
+  readonly closes_at: string;
+  readonly opens_at_minute: number;
+  readonly closes_at_minute: number;
+  readonly is_closed: boolean;
+  readonly is_overnight: boolean;
+}
+
+/** A row of `PUT /restaurant-portal/settings/working-hours`. */
+export interface OwnerWorkingHourInput {
+  readonly day_of_week: number;
+  readonly opens_at_minute: number;
+  readonly closes_at_minute: number;
+  readonly is_closed: boolean;
 }
 
 /** What `PATCH /restaurant-portal/settings` accepts. Only what changed is sent. */
@@ -1673,6 +1696,14 @@ export const api = {
 
   ownerDashboard: (restaurantId: string) =>
     apiRequest<OwnerDashboard>('/api/v1/restaurant-portal/dashboard/overview', { restaurantId }),
+
+  /** The whole week at once — the server replaces the schedule wholesale. */
+  ownerUpdateWorkingHours: (restaurantId: string, hours: OwnerWorkingHourInput[]) =>
+    apiRequest<{ updated: boolean }>('/api/v1/restaurant-portal/settings/working-hours', {
+      method: 'PUT',
+      restaurantId,
+      body: { hours },
+    }),
 
   /** The same checklist Admin reads, for the owner's own shop. */
   ownerReadiness: (restaurantId: string) =>

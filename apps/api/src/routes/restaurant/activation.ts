@@ -3,12 +3,16 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, EVENT_TYPES, success } from '@jibli/contracts';
 import { AUDIT_ACTIONS, enqueueOutboxEvent, writeAudit } from '@jibli/domain';
-import { restaurants } from '@jibli/db';
+import { restaurantBranches, restaurants } from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
 import { clientIp, userAgent } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
 import { assertRestaurantPermission } from '@jibli/auth';
 import { computeReadiness } from '../../services/readiness-service.js';
+import {
+  ensureDefaultWorkingHours,
+  isSelfServeMerchant,
+} from '../../services/working-hours-service.js';
 import { notifyAdmins } from '../../services/admin-notification-service.js';
 
 /**
@@ -87,12 +91,31 @@ export function registerRestaurantActivationRoutes(app: FastifyInstance, ctx: Ap
           id: restaurants.id,
           displayName: restaurants.displayName,
           operationalStatus: restaurants.operationalStatus,
+          merchantType: restaurants.merchantType,
         })
         .from(restaurants)
         .where(and(eq(restaurants.id, restaurantId), isNull(restaurants.deletedAt)))
         .limit(1);
 
       if (!restaurant) throw new AppError(ERROR_CODES.NOT_FOUND);
+
+      /*
+       * A shop that never opened the hours screen asks to go live on the
+       * default week, so the request and the checklist Admin reads agree.
+       */
+      if (isSelfServeMerchant(restaurant.merchantType)) {
+        const [branch] = await ctx.db
+          .select({ id: restaurantBranches.id })
+          .from(restaurantBranches)
+          .where(
+            and(
+              eq(restaurantBranches.restaurantId, restaurantId),
+              isNull(restaurantBranches.deletedAt),
+            ),
+          )
+          .limit(1);
+        if (branch) await ensureDefaultWorkingHours(ctx.db, branch.id);
+      }
 
       if (restaurant.operationalStatus === 'ACTIVE') {
         throw new AppError(ERROR_CODES.CONFLICT, {

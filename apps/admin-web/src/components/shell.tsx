@@ -26,6 +26,7 @@ export function AdminShell({
   userName,
   userRoleAr,
   pendingApplications = 0,
+  pendingActivations = 0,
   liveOrders = 0,
   actions,
 }: {
@@ -35,6 +36,8 @@ export function AdminShell({
   userName: string;
   userRoleAr: string;
   pendingApplications?: number;
+  /** Shops that asked, from the app, to go live. Shown on the directory. */
+  pendingActivations?: number;
   liveOrders?: number;
   actions?: React.ReactNode;
 }) {
@@ -55,13 +58,15 @@ export function AdminShell({
   const driverApplications = useQuery({
     queryKey: ['admin-driver-applications'],
     queryFn: () => admin.driverApplications(bellToken),
-    enabled: bellToken !== '' && session.status === 'authenticated' && session.can('driver.read.global'),
+    enabled:
+      bellToken !== '' && session.status === 'authenticated' && session.can('driver.read.global'),
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
 
   const badges: Record<string, number> = {
     '/applications': pendingApplications,
+    '/restaurants': pendingActivations,
     '/orders/live': liveOrders,
     '/drivers': driverApplications.data?.length ?? 0,
   };
@@ -74,7 +79,10 @@ export function AdminShell({
           <span className="brand__tagline">جيبلي اللي تريده</span>
         </div>
 
-        <nav aria-label="القائمة الرئيسية" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <nav
+          aria-label="القائمة الرئيسية"
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}
+        >
           {ADMIN_NAV.map((section, index) => (
             <div className="nav-group" key={section.group ?? `root-${index}`}>
               {section.group ? <div className="nav-group__title">{section.group}</div> : null}
@@ -121,7 +129,6 @@ export function AdminShell({
           <NotificationBell token={bellToken} />
 
           <SessionMenu userName={userName} userRoleAr={userRoleAr} />
-
         </header>
 
         {children}

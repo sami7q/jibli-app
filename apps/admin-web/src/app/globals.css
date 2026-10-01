@@ -688,6 +688,18 @@ html {
   border: 1px solid #fecdca;
 }
 
+.alert-bar--success {
+  background: var(--jibli-success-50, #ecfdf3);
+  color: var(--jibli-success-700, #027a48);
+  border: 1px solid #abefc6;
+}
+
+.alert-bar--info {
+  background: var(--surface-sunken, #f2f4f7);
+  color: var(--text-secondary, #475467);
+  border: 1px solid var(--border-subtle, #e4e7ec);
+}
+
 .alert-bar--warning {
   background: var(--jibli-warning-50);
   color: var(--jibli-warning-700);

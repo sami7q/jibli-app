@@ -17,7 +17,7 @@ import {
   RankedBar,
   relativeAr,
 } from '@jibli/ui-web';
-import type { OrderStatus } from '@jibli/contracts';
+import { MERCHANT_TYPE_LABELS, type OrderStatus } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import { Icon, type IconName } from '@/components/icon';
 import { ErrorState, Skeleton } from '@/components/ui';
@@ -70,6 +70,7 @@ export default function AdminDashboardPage() {
       userName={session.userName}
       userRoleAr={session.roleAr}
       pendingApplications={data?.open_applications ?? 0}
+      pendingActivations={data?.open_activations ?? 0}
       liveOrders={data?.live_orders ?? 0}
     >
       {overview.isError ? (
@@ -101,9 +102,13 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="panels">
-            <CategoriesPanel data={data} />
+            <ActivationsPanel data={data} />
             <ApplicationsPanel data={data} />
             <RecentOrdersPanel data={data} />
+          </div>
+
+          <div className="panels">
+            <CategoriesPanel data={data} />
           </div>
 
           <div className="panels">
@@ -267,7 +272,11 @@ function StatusPanel({ data }: { data: AdminOverview }) {
   const distribution = data.status_distribution;
 
   return (
-    <Panel title="توزيع الطلبات حسب الحالة" icon="chart" action={{ href: '/orders', label: 'عرض الكل' }}>
+    <Panel
+      title="توزيع الطلبات حسب الحالة"
+      icon="chart"
+      action={{ href: '/orders', label: 'عرض الكل' }}
+    >
       <DonutChart
         caption="توزيع طلبات اليوم حسب الحالة"
         total={distribution.total}
@@ -275,7 +284,11 @@ function StatusPanel({ data }: { data: AdminOverview }) {
         slices={[
           { label: 'مكتمل', value: distribution.completed, color: 'var(--jibli-success-500)' },
           { label: 'في التوصيل', value: distribution.delivering, color: 'var(--jibli-orange-500)' },
-          { label: 'قيد التحضير', value: distribution.preparing, color: 'var(--jibli-warning-500)' },
+          {
+            label: 'قيد التحضير',
+            value: distribution.preparing,
+            color: 'var(--jibli-warning-500)',
+          },
           { label: 'ملغي', value: distribution.cancelled, color: 'var(--jibli-danger-500)' },
         ]}
       />
@@ -308,7 +321,11 @@ function PerformancePanel({ data }: { data: AdminOverview }) {
   const performance = data.performance;
 
   return (
-    <Panel title="أداء المنصة" icon="reports" action={{ href: '/finance/reports', label: 'التقارير' }}>
+    <Panel
+      title="أداء المنصة"
+      icon="reports"
+      action={{ href: '/finance/reports', label: 'التقارير' }}
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         <PerformanceRow label="متوسط قيمة الطلب" value={money(performance.average_order_iqd)} />
         <PerformanceRow
@@ -381,7 +398,11 @@ function CategoriesPanel({ data }: { data: AdminOverview }) {
   const max = Math.max(1, ...data.top_categories.map((category) => category.order_count));
 
   return (
-    <Panel title="أكثر التصنيفات طلباً" icon="categories" action={{ href: '/categories', label: 'عرض الكل' }}>
+    <Panel
+      title="أكثر التصنيفات طلباً"
+      icon="categories"
+      action={{ href: '/categories', label: 'عرض الكل' }}
+    >
       {data.top_categories.length === 0 ? (
         <p className="empty">لا توجد طلبات خلال آخر ٣٠ يوماً</p>
       ) : (
@@ -415,6 +436,74 @@ function CategoriesPanel({ data }: { data: AdminOverview }) {
     </Panel>
   );
 }
+
+/**
+ * Shops whose owner pressed «اطلب التفعيل» in the app. Each one is a shop
+ * that has done its part — products, hours, maybe a pin — and is waiting on
+ * one click here. Oldest first, so nobody waits because they were quiet.
+ */
+function ActivationsPanel({ data }: { data: AdminOverview }) {
+  const pending = data.pending_activations ?? [];
+  return (
+    <Panel
+      title="طلبات تفعيل من التطبيق"
+      icon="restaurants"
+      action={{ href: '/restaurants?activation=requested', label: 'عرض الكل' }}
+    >
+      {pending.length === 0 ? (
+        <p className="empty">لا متاجر بانتظار التفعيل</p>
+      ) : (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {pending.map((shop) => (
+            <li
+              key={shop.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-3) 0',
+                borderBlockEnd: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <strong style={{ display: 'block' }}>
+                  {shop.display_name}{' '}
+                  <span className={`badge badge--${KIND_TONE[shop.merchant_type] ?? 'neutral'}`}>
+                    {MERCHANT_TYPE_LABELS[shop.merchant_type]?.nameAr ?? shop.merchant_type}
+                  </span>
+                </strong>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                  {[shop.governorate_name_ar, shop.city_name_ar].filter(Boolean).join(' — ')}
+                  {shop.requested_at ? ` · ${relativeAr(new Date(shop.requested_at))}` : ''}
+                </span>
+                {shop.note ? (
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    «{shop.note}»
+                  </span>
+                ) : null}
+              </div>
+              <Link className="btn btn--primary btn--sm" href={`/restaurants/${shop.id}`}>
+                مراجعة وتفعيل
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+const KIND_TONE: Record<string, 'neutral' | 'success' | 'rose'> = {
+  RESTAURANT: 'neutral',
+  MARKET: 'success',
+  COSMETICS: 'rose',
+};
 
 function ApplicationsPanel({ data }: { data: AdminOverview }) {
   return (
@@ -636,7 +725,9 @@ function TopRestaurantsPanel({ data }: { data: AdminOverview }) {
                   screen reader and a monochrome print. */}
               <span
                 className="rank"
-                style={index === 0 ? { background: 'var(--jibli-orange-500)', color: '#fff' } : undefined}
+                style={
+                  index === 0 ? { background: 'var(--jibli-orange-500)', color: '#fff' } : undefined
+                }
               >
                 {index + 1}
               </span>
@@ -645,7 +736,11 @@ function TopRestaurantsPanel({ data }: { data: AdminOverview }) {
                   {restaurant.name}
                 </Link>
                 <span
-                  style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--text-muted)',
+                  }}
                 >
                   {restaurant.order_count} طلب
                 </span>

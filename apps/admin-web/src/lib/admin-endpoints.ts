@@ -25,6 +25,8 @@ export interface AdminRestaurant {
   partner_code: string;
   onboarding_status: string;
   operational_status: string;
+  /** When the owner asked, from the app, to go live; null once answered. */
+  activation_requested_at?: string | null;
   rating: number | null;
   rating_count: number;
   city_name_ar: string | null;
@@ -250,6 +252,22 @@ export interface AdminRestaurantDetail {
   minimum_order_iqd: number;
   suspended_reason: string | null;
   approved_at: string | null;
+  /** The owner's request to go live, made from the app. Null until asked, and again once answered. */
+  activation_requested_at?: string | null;
+  activation_request_note?: string | null;
+  /** Where the app sends the code when the owner changes the shop's password; null when nobody has a number. */
+  password_recovery_phone?: string | null;
+  working_hours?: {
+    configured: boolean;
+    summary_ar: string;
+    rows: {
+      day_of_week: number;
+      day_name_ar: string;
+      opens_at: string;
+      closes_at: string;
+      is_closed: boolean;
+    }[];
+  };
   branch: {
     id: string;
     name: string;
@@ -534,6 +552,8 @@ export interface AdminOverview {
   restaurants_delta: number | null;
   live_orders: number;
   open_applications: number;
+  /** Shops waiting on «تفعيل» after asking from the app. Absent on an older API. */
+  open_activations?: number;
   status_distribution: {
     completed: number;
     delivering: number;
@@ -565,6 +585,15 @@ export interface AdminOverview {
     city_name_ar: string;
     governorate_name_ar: string;
     submitted_at: string;
+  }[];
+  pending_activations?: {
+    id: string;
+    display_name: string;
+    merchant_type: MerchantType;
+    city_name_ar: string | null;
+    governorate_name_ar: string | null;
+    requested_at: string | null;
+    note: string | null;
   }[];
   activity: {
     id: string;

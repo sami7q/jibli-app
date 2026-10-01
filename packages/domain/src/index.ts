@@ -6,6 +6,7 @@ export * from './shared/idempotency.js';
 
 // Restaurants
 export * from './restaurants/working-hours.js';
+export * from './restaurants/hours-summary.js';
 export * from './restaurants/eligibility.js';
 
 // Ordering

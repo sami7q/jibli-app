@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RESTAURANT_ROLE_LABELS, dateAr, NumberField } from '@jibli/ui-web';
+import { RESTAURANT_ROLE_LABELS, dateAr, NumberField, relativeAr } from '@jibli/ui-web';
 import {
   MERCHANT_TYPES,
   MERCHANT_TYPE_LABELS,
@@ -89,6 +89,8 @@ export default function RestaurantDetailPage() {
   // An older API says nothing; the column's default is what it holds then.
   const kind: MerchantType = data?.merchant_type ?? 'RESTAURANT';
   const canActivate = readiness.data?.ready === true && !isActive;
+  const isShop = kind === 'MARKET' || kind === 'COSMETICS';
+  const requested = !isActive && Boolean(data?.activation_requested_at);
 
   return (
     <AdminShell
@@ -104,7 +106,7 @@ export default function RestaurantDetailPage() {
         data ? (
           isActive ? (
             <button type="button" className="btn btn--danger" onClick={() => setSuspending(true)}>
-              إيقاف المطعم
+              {isShop ? 'إيقاف المتجر' : 'إيقاف المطعم'}
             </button>
           ) : (
             <button
@@ -114,7 +116,7 @@ export default function RestaurantDetailPage() {
               onClick={() => activate.mutate()}
               title={canActivate ? undefined : 'أكمل قائمة الجاهزية أولاً'}
             >
-              {activate.isPending ? 'جاري التفعيل…' : 'تفعيل المطعم'}
+              {activate.isPending ? 'جاري التفعيل…' : isShop ? 'تفعيل المتجر' : 'تفعيل المطعم'}
             </button>
           )
         ) : undefined
@@ -135,6 +137,30 @@ export default function RestaurantDetailPage() {
             <div className="alert-bar alert-bar--danger" role="alert">
               <Icon name="alert" className="nav__icon" aria-hidden />
               <span>المطعم موقوف. السبب: {data.suspended_reason}</span>
+            </div>
+          ) : null}
+
+          {/*
+            The owner pressed «اطلب التفعيل» in the app. This is the one line
+            that turns the page from a record into a task: everything the
+            owner could do is done, and the button at the top is what is left.
+          */}
+          {requested ? (
+            <div
+              className={`alert-bar ${canActivate ? 'alert-bar--success' : 'alert-bar--warning'}`}
+              role="status"
+            >
+              <Icon name="applications" className="nav__icon" aria-hidden />
+              <span style={{ flex: 1 }}>
+                طلب صاحب المتجر التفعيل من التطبيق{' '}
+                {data.activation_requested_at
+                  ? relativeAr(new Date(data.activation_requested_at))
+                  : ''}
+                {data.activation_request_note ? ` — «${data.activation_request_note}»` : ''}
+                {canActivate
+                  ? '. قائمة الجاهزية مكتملة؛ اضغط «تفعيل» في الأعلى ليبدأ باستقبال الطلبات.'
+                  : '. بقي في قائمة الجاهزية ما يمنع التفعيل؛ راجعها أدناه.'}
+              </span>
             </div>
           ) : null}
 
@@ -191,7 +217,15 @@ export default function RestaurantDetailPage() {
             </div>
           </Card>
 
-          <Card title="قائمة الجاهزية" icon="applications" subtitle="ما يلزم قبل استقبال الطلبات">
+          <Card
+            title="قائمة الجاهزية"
+            icon="applications"
+            subtitle={
+              isShop
+                ? 'ما يلزم قبل استقبال الطلبات. للماركت والكوزمتك: الموقع وأوقات العمل لا يمنعان التفعيل — صاحب المتجر يكملهما من التطبيق، وتُكتب أوقات افتراضية عند التفعيل إن لم يضبطها.'
+                : 'ما يلزم قبل استقبال الطلبات'
+            }
+          >
             {readiness.isLoading ? (
               <Skeleton height={200} />
             ) : (
@@ -217,7 +251,20 @@ export default function RestaurantDetailPage() {
                       className="nav__icon"
                       aria-hidden
                     />
-                    <span style={{ flex: 1 }}>{check.label_ar}</span>
+                    <span style={{ flex: 1 }}>
+                      {check.label_ar}
+                      {!check.passed ? (
+                        <span
+                          style={{
+                            display: 'block',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--text-muted)',
+                          }}
+                        >
+                          {checkHint(check.key, isShop)}
+                        </span>
+                      ) : null}
+                    </span>
                     {!check.blocking ? <Badge tone="neutral">غير مانع</Badge> : null}
                   </div>
                 ))}
@@ -317,10 +364,32 @@ export default function RestaurantDetailPage() {
                   <Money amount={data.minimum_order_iqd} />
                 </dd>
                 <dt style={{ color: 'var(--text-muted)' }}>الإحداثيات</dt>
-                <dd style={{ margin: 0 }} className="ltr-inline">
-                  {data.branch.latitude && data.branch.longitude
-                    ? `${data.branch.latitude}, ${data.branch.longitude}`
-                    : 'غير محددة'}
+                <dd style={{ margin: 0 }}>
+                  {data.branch.latitude && data.branch.longitude ? (
+                    <span className="ltr-inline">
+                      {data.branch.latitude}, {data.branch.longitude}
+                    </span>
+                  ) : isShop ? (
+                    'غير محددة — يثبّتها صاحب المتجر من التطبيق (اختياري)'
+                  ) : (
+                    'غير محددة'
+                  )}
+                </dd>
+                <dt style={{ color: 'var(--text-muted)' }}>ساعات العمل</dt>
+                <dd style={{ margin: 0 }}>
+                  {data.working_hours ? (
+                    data.working_hours.configured ? (
+                      <span className="ltr-inline" dir="auto">
+                        {data.working_hours.summary_ar}
+                      </span>
+                    ) : isShop ? (
+                      'لم تُضبط بعد — يضبطها صاحب المتجر من التطبيق، أو تُكتب 08:00–23:00 تلقائياً عند التفعيل'
+                    ) : (
+                      'لم تُضبط بعد — من لوحة التحكم'
+                    )
+                  ) : (
+                    '—'
+                  )}
                 </dd>
               </dl>
             ) : (
@@ -337,6 +406,8 @@ export default function RestaurantDetailPage() {
             token={token}
             restaurantId={restaurantId}
             restaurantName={data.display_name}
+            recoveryPhone={data.password_recovery_phone ?? null}
+            isShop={isShop}
           />
 
           <Card title="الموظفون" icon="staff">
@@ -541,6 +612,40 @@ const KIND_TONE: Record<MerchantType, 'neutral' | 'success' | 'rose'> = {
   MARKET: 'success',
   COSMETICS: 'rose',
 };
+
+/**
+ * Who completes a failing check, and where. The owner of a market or a
+ * cosmetics shop does their part from the app; a restaurant's from the web
+ * portal; the rest is this page or another one of Admin's.
+ */
+function checkHint(key: string, isShop: boolean): string {
+  const ownerFrom = isShop ? 'صاحب المتجر من التطبيق' : 'المطعم من لوحة التحكم';
+  switch (key) {
+    case 'hasActiveMenuItem':
+      return `يضيفه ${ownerFrom}.`;
+    case 'branchLocationValid':
+      return isShop
+        ? 'اختياري — يثبّته صاحب المتجر من التطبيق (إعدادات المتجر).'
+        : 'يضبطه المطعم من لوحة التحكم عبر طلب تغيير الموقع.';
+    case 'workingHoursConfigured':
+      return isShop
+        ? 'يضبطها صاحب المتجر من التطبيق، أو تُكتب تلقائياً عند التفعيل.'
+        : `يضبطها ${ownerFrom}.`;
+    case 'commissionConfigured':
+    case 'settlementPolicyConfigured':
+      return 'من بطاقة «العمولة» في هذه الصفحة.';
+    case 'cityOrderingEnabled':
+      return 'من صفحة الجغرافيا — فعّل الطلبات في المدينة.';
+    case 'ownerActive':
+      return 'حساب المالك موقوف أو محذوف — راجع بيانات الدخول أدناه.';
+    case 'applicationApproved':
+      return 'من صفحة طلبات الانضمام.';
+    case 'hasActiveDriver':
+      return isShop ? 'لا يلزم — يوصّل مندوبو جيبلي.' : 'اختياري — من لوحة التحكم.';
+    default:
+      return 'يتولاه فريق جيبلي.';
+  }
+}
 
 /** Where the owner of each kind does their work — the consequence of the choice. */
 const KIND_MANAGED: Record<MerchantType, string> = {

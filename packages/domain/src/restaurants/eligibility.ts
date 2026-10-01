@@ -276,7 +276,7 @@ export interface ReadinessOptions {
 
 const SHOP_LABELS_AR: Partial<Record<keyof ReadinessInput, string>> = {
   hasActiveMenuItem: 'يوجد منتج واحد على الأقل',
-  workingHoursConfigured: 'أوقات العمل (تُضبط افتراضياً عند التفعيل وتُعدَّل من لوحة التحكم)',
+  workingHoursConfigured: 'أوقات العمل مضبوطة',
   branchLocationValid: 'موقع المتجر مثبّت على الخريطة (يُستحسن)',
   hasActiveDriver: 'يوجد مندوب مفعّل',
 };

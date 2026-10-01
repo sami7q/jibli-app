@@ -338,6 +338,11 @@ export default function OwnerHomeScreen() {
               label="تعديل المتجر"
               onPress={() => router.push('/(owner)/settings')}
             />
+            <CardPill
+              icon="clock-outline"
+              label="أوقات العمل"
+              onPress={() => router.push('/(owner)/hours')}
+            />
             {me?.username ? (
               <CardPill
                 icon="lock-outline"
@@ -366,11 +371,15 @@ export default function OwnerHomeScreen() {
               router.push(
                 action === 'pin'
                   ? '/(owner)/settings'
-                  : counts.categories === 0 && !catalog.isLoading
-                    ? '/(owner)/categories'
-                    : '/(owner)/product/new',
+                  : action === 'hours'
+                    ? '/(owner)/hours'
+                    : counts.categories === 0 && !catalog.isLoading
+                      ? '/(owner)/categories'
+                      : '/(owner)/product/new',
               )
             }
+            // A market or a cosmetics shop is delivered by Jibli's couriers.
+            hide={shop.merchant_type === 'RESTAURANT' ? [] : ['hasActiveDriver']}
             onRequest={() => requestActivation.mutate()}
             requesting={requestActivation.isPending}
             canRequest={owner.can('settings.write')}

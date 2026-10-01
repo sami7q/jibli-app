@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { success, type OrderStatus } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
@@ -9,6 +9,7 @@ import {
   governorates,
   orders,
   restaurantApplications,
+  restaurantBranches,
   restaurants,
   users,
 } from '@jibli/db';
@@ -271,9 +272,34 @@ export function registerAdminDashboardRoutes(app: FastifyInstance, ctx: AppConte
       const [openApplications] = await ctx.db
         .select({ count: sql<number>`COUNT(*)` })
         .from(restaurantApplications)
-        .where(
-          inArray(restaurantApplications.status, ['UNDER_REVIEW', 'INFO_REQUESTED']),
-        );
+        .where(inArray(restaurantApplications.status, ['UNDER_REVIEW', 'INFO_REQUESTED']));
+
+      /*
+       * Shops whose owner pressed «اطلب التفعيل» in the app and is waiting.
+       * The request used to land only in a notification; a queue on the
+       * home page is what makes it somebody's job.
+       */
+      const pendingActivations = await ctx.db
+        .select({
+          id: restaurants.id,
+          displayName: restaurants.displayName,
+          merchantType: restaurants.merchantType,
+          requestedAt: restaurants.activationRequestedAt,
+          note: restaurants.activationRequestNote,
+          cityNameAr: cities.nameAr,
+          governorateNameAr: governorates.nameAr,
+        })
+        .from(restaurants)
+        .leftJoin(restaurantBranches, eq(restaurantBranches.restaurantId, restaurants.id))
+        .leftJoin(cities, eq(restaurantBranches.cityId, cities.id))
+        .leftJoin(governorates, eq(cities.governorateId, governorates.id))
+        .where(and(isNotNull(restaurants.activationRequestedAt), isNull(restaurants.deletedAt)))
+        .orderBy(asc(restaurants.activationRequestedAt))
+        .limit(5);
+      const [openActivations] = await ctx.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(restaurants)
+        .where(and(isNotNull(restaurants.activationRequestedAt), isNull(restaurants.deletedAt)));
 
       const todaySales = Number(today?.salesIqd ?? 0);
       const todayOrders = Number(today?.orderCount ?? 0);
@@ -302,6 +328,7 @@ export function registerAdminDashboardRoutes(app: FastifyInstance, ctx: AppConte
 
             live_orders: Number(liveOrders?.count ?? 0),
             open_applications: Number(openApplications?.count ?? 0),
+            open_activations: Number(openActivations?.count ?? 0),
 
             status_distribution: { ...statusDistribution, total: statusTotal },
 
@@ -316,8 +343,7 @@ export function registerAdminDashboardRoutes(app: FastifyInstance, ctx: AppConte
               cancellation_rate_percent:
                 cancelledTotal === 0
                   ? 0
-                  : Math.round((Number(cancellation?.cancelled ?? 0) / cancelledTotal) * 1000) /
-                    10,
+                  : Math.round((Number(cancellation?.cancelled ?? 0) / cancelledTotal) * 1000) / 10,
             },
 
             top_restaurants: topRestaurants.map((row) => ({
@@ -348,6 +374,16 @@ export function registerAdminDashboardRoutes(app: FastifyInstance, ctx: AppConte
               city_name_ar: row.cityNameAr,
               governorate_name_ar: row.governorateNameAr,
               submitted_at: row.submittedAt.toISOString(),
+            })),
+
+            pending_activations: pendingActivations.map((row) => ({
+              id: row.id,
+              display_name: row.displayName,
+              merchant_type: row.merchantType,
+              city_name_ar: row.cityNameAr,
+              governorate_name_ar: row.governorateNameAr,
+              requested_at: row.requestedAt?.toISOString() ?? null,
+              note: row.note,
             })),
 
             activity: activity.map((row) => ({

@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
@@ -11,11 +11,12 @@ import {
 } from '@jibli/auth';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
 import { maskPhone } from '@jibli/validation';
-import { restaurantBranches, restaurantMembers, users } from '@jibli/db';
+import { users } from '@jibli/db';
 import { otpCodeSchema } from '@jibli/validation';
 import type { AppContext } from '../../lib/context.js';
 import { clientIp, userAgent } from '../../lib/context.js';
 import { consumeOtpChallenge, requestOtp } from '../../services/otp-service.js';
+import { findOwnerPhone } from '../../services/owner-phone-service.js';
 import { issueSession, revokeSessionChain } from '../../services/session-service.js';
 import { restaurantScope } from './scope.js';
 
@@ -42,38 +43,10 @@ const changeSchema = z.object({
   new_password: z.string().min(1).max(256),
 });
 
-/**
- * The number that speaks for the shop: an active OWNER member's, the oldest
- * first, and the branch's own number when no owner carries one.
- */
+/** The number that speaks for the shop — see `findOwnerPhone`; here its absence is an error. */
 async function ownerPhoneFor(ctx: AppContext, restaurantId: string): Promise<string> {
-  const [owner] = await ctx.db
-    .select({ phone: users.phoneE164 })
-    .from(restaurantMembers)
-    .innerJoin(users, eq(restaurantMembers.userId, users.id))
-    .where(
-      and(
-        eq(restaurantMembers.restaurantId, restaurantId),
-        eq(restaurantMembers.role, 'OWNER'),
-        eq(restaurantMembers.isActive, true),
-        isNotNull(users.phoneE164),
-        isNull(users.deletedAt),
-      ),
-    )
-    .orderBy(asc(restaurantMembers.createdAt))
-    .limit(1);
-
-  if (owner?.phone) return owner.phone;
-
-  const [branch] = await ctx.db
-    .select({ phone: restaurantBranches.phone })
-    .from(restaurantBranches)
-    .where(
-      and(eq(restaurantBranches.restaurantId, restaurantId), isNull(restaurantBranches.deletedAt)),
-    )
-    .limit(1);
-
-  if (branch?.phone) return branch.phone;
+  const phone = await findOwnerPhone(ctx.db, restaurantId);
+  if (phone) return phone;
 
   throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
     details: { reason: 'NO_OWNER_PHONE' },

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MERCHANT_TYPES,
@@ -12,6 +13,7 @@ import {
   type OperationalStatus,
 } from '@jibli/contracts';
 import { formatIraqiPhoneNational } from '@jibli/validation';
+import { relativeAr } from '@jibli/ui-web';
 import { AdminShell } from '@/components/shell';
 import { AreaCoverageCard } from '@/components/area-coverage';
 import { IssuePortalAccess } from '@/components/portal-credentials';
@@ -123,6 +125,14 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
    * because they rarely remember which of the two a partner is.
    */
   const [merchantType, setMerchantType] = useState<MerchantType | ''>(only ?? '');
+  /*
+   * The activation queue: shops whose owner pressed «اطلب التفعيل» in the
+   * app. The home page links here with it switched on.
+   */
+  const searchParams = useSearchParams();
+  const [activation, setActivation] = useState<'' | 'requested'>(
+    searchParams.get('activation') === 'requested' ? 'requested' : '',
+  );
 
   /*
    * What this screen is called. A directory fixed to one kind describes itself
@@ -149,12 +159,14 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
       governorateId,
       cityId,
       cuisine,
+      activation,
     ],
     queryFn: () =>
       admin.restaurants(token, {
         q: debouncedSearch || undefined,
         status: status || undefined,
         merchant_type: merchantType || undefined,
+        activation_requested: activation === 'requested' ? 'true' : undefined,
         governorate_id: governorateId || undefined,
         city_id: cityId || undefined,
         cuisine: cuisine || undefined,
@@ -200,7 +212,9 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
           className="btn btn--primary"
           // The create form reads this and opens on the right kind, so the
           // button on the markets screen cannot land on a restaurant form.
-          href={only && only !== 'RESTAURANT' ? `/restaurants/new?type=${only}` : '/restaurants/new'}
+          href={
+            only && only !== 'RESTAURANT' ? `/restaurants/new?type=${only}` : '/restaurants/new'
+          }
         >
           {copy.add}
         </Link>
@@ -287,14 +301,19 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
               label: STATUS_LABELS[value],
             }))}
           />
+          <Select
+            value={activation}
+            onChange={(value) => setActivation(value === 'requested' ? 'requested' : '')}
+            label="طلبات التفعيل"
+            allLabel="الكل"
+            options={[{ value: 'requested', label: 'بانتظار التفعيل (طلب من التطبيق)' }]}
+          />
         </FilterBar>
 
         {restaurants.isError ? (
           <ErrorState
             message={
-              restaurants.error instanceof ApiError
-                ? restaurants.error.messageAr
-                : copy.loadError
+              restaurants.error instanceof ApiError ? restaurants.error.messageAr : copy.loadError
             }
             code={restaurants.error instanceof ApiError ? restaurants.error.code : undefined}
             onRetry={() => void restaurants.refetch()}
@@ -306,9 +325,7 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
             caption={copy.caption}
             rows={restaurants.data ?? []}
             keyOf={(row) => row.id}
-            emptyMessage={
-              merchantType ? COPY[merchantType].empty : copy.empty
-            }
+            emptyMessage={merchantType ? COPY[merchantType].empty : copy.empty}
             columns={[
               {
                 key: 'name',
@@ -370,25 +387,30 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
               },
               ...(only
                 ? []
-                : [{
-                key: 'kind',
-                header: 'النوع',
-                /*
-                 * Beside the name rather than at the end of the row.
-                 *
-                 * An operator scanning the directory is asking "which of these
-                 * is a market" as they read the names, and a badge four
-                 * columns away is answered by scrolling instead of looking.
-                 */
-                render: (row: AdminRestaurant) => (
-                  <Badge tone={KIND_TONE[(row.merchant_type ?? 'RESTAURANT') as MerchantType]}>
+                : [
                     {
-                      MERCHANT_TYPE_LABELS[(row.merchant_type ?? 'RESTAURANT') as MerchantType]
-                        .nameAr
-                    }
-                  </Badge>
-                ),
-              }]),
+                      key: 'kind',
+                      header: 'النوع',
+                      /*
+                       * Beside the name rather than at the end of the row.
+                       *
+                       * An operator scanning the directory is asking "which of these
+                       * is a market" as they read the names, and a badge four
+                       * columns away is answered by scrolling instead of looking.
+                       */
+                      render: (row: AdminRestaurant) => (
+                        <Badge
+                          tone={KIND_TONE[(row.merchant_type ?? 'RESTAURANT') as MerchantType]}
+                        >
+                          {
+                            MERCHANT_TYPE_LABELS[
+                              (row.merchant_type ?? 'RESTAURANT') as MerchantType
+                            ].nameAr
+                          }
+                        </Badge>
+                      ),
+                    },
+                  ]),
               {
                 key: 'location',
                 header: 'الموقع',
@@ -411,6 +433,23 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
                     {STATUS_LABELS[row.operational_status as OperationalStatus]}
                   </Badge>
                 ),
+              },
+              {
+                key: 'activation',
+                header: 'التفعيل',
+                /*
+                 * The owner has done their part and pressed the button in the
+                 * app. Without this column the request was a notification
+                 * somebody may have read, and the shop a row like any other.
+                 */
+                render: (row: AdminRestaurant) =>
+                  row.activation_requested_at && row.operational_status !== 'ACTIVE' ? (
+                    <Link href={`/restaurants/${row.id}`} className="badge badge--rose">
+                      طلب تفعيل · {relativeAr(new Date(row.activation_requested_at))}
+                    </Link>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>—</span>
+                  ),
               },
               {
                 key: 'orderable',

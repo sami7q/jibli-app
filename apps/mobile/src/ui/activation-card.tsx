@@ -10,7 +10,7 @@ import {
 } from '@/lib/owner-activation';
 
 /** The steps the app itself can open a door to. */
-export type DoorAction = 'product' | 'pin';
+export type DoorAction = 'product' | 'pin' | 'hours';
 import { color, radius, ROW, space, TAP_TARGET } from '@/theme';
 import { Button, Row, Skeleton, Text } from '@/ui';
 
@@ -33,6 +33,7 @@ export function ActivationCard({
   onRequest,
   requesting,
   canRequest,
+  hide = [],
 }: {
   readiness: OwnerReadiness | undefined;
   loading: boolean;
@@ -43,6 +44,8 @@ export function ActivationCard({
   onRequest: () => void;
   requesting: boolean;
   canRequest: boolean;
+  /** Check keys that mean nothing to this shop and are not shown. */
+  hide?: readonly string[];
 }) {
   const [showDone, setShowDone] = useState(false);
 
@@ -90,7 +93,7 @@ export function ActivationCard({
     );
   }
 
-  const steps = activationSteps(readiness);
+  const steps = activationSteps(readiness, { omit: hide });
   const todo = steps.filter((step) => !step.done);
   const done = steps.filter((step) => step.done);
 
@@ -231,6 +234,7 @@ function StepList({
 const DOOR_LABEL: Record<ActivationAction, string | null> = {
   product: 'أضف منتجاً',
   pin: 'ثبّت الموقع',
+  hours: 'اضبط الأوقات',
   portal: 'لوحة التحكم',
   admin: null,
 };
@@ -306,7 +310,9 @@ function StepRow({
 /** The door for a step that is not done and that the app can open. */
 function doorOf(step: ActivationStep): DoorAction | null {
   if (step.done) return null;
-  return step.action === 'product' || step.action === 'pin' ? step.action : null;
+  return step.action === 'product' || step.action === 'pin' || step.action === 'hours'
+    ? step.action
+    : null;
 }
 
 function formatDay(iso: string): string {

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -16,8 +16,16 @@ import {
 import { assertAdminPermission } from '@jibli/auth';
 import { commissionFeeDisplay } from '@jibli/money';
 import { displayNameSchema, iraqiPhoneSchema, reasonSchema, uuidSchema } from '@jibli/validation';
-import { AUDIT_ACTIONS, enqueueOutboxEvent, writeAudit } from '@jibli/domain';
 import {
+  AUDIT_ACTIONS,
+  describeWeekAr,
+  enqueueOutboxEvent,
+  formatMinuteOfDay,
+  WEEKDAY_NAMES_AR,
+  writeAudit,
+} from '@jibli/domain';
+import {
+  branchWorkingHours,
   cities,
   governorates,
   orders,
@@ -35,6 +43,7 @@ import { requirePrincipal } from '../../plugins/auth.js';
 import { effectiveCapabilitySql } from '../../services/geography-service.js';
 import { jsonbArrayContains } from '../../lib/jsonb.js';
 import { getConfig } from '../../services/config-service.js';
+import { findOwnerPhone } from '../../services/owner-phone-service.js';
 import {
   ensureDefaultWorkingHours,
   isSelfServeMerchant,
@@ -62,6 +71,8 @@ const listQuerySchema = z.object({
    * by name still wants.
    */
   merchant_type: z.enum(MERCHANT_TYPES).optional(),
+  /** Only the shops whose owner has asked, from the app, to go live. */
+  activation_requested: z.enum(['true']).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });
@@ -141,6 +152,9 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
       conditions.push(eq(restaurantBranches.governorateId, query.governorate_id));
     }
     if (query.city_id) conditions.push(eq(restaurantBranches.cityId, query.city_id));
+    if (query.activation_requested) {
+      conditions.push(isNotNull(restaurants.activationRequestedAt));
+    }
     if (query.cuisine) {
       // `cuisine_tags` is jsonb, not text[]; see lib/jsonb.ts for why that
       // distinction costs a helper.
@@ -244,7 +258,12 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         ),
       )
       .where(and(...conditions))
-      .orderBy(desc(restaurants.createdAt))
+      // The queue is read oldest first: whoever has waited longest is next.
+      .orderBy(
+        query.activation_requested
+          ? asc(restaurants.activationRequestedAt)
+          : desc(restaurants.createdAt),
+      )
       .limit(query.limit)
       .offset(query.offset);
 
@@ -469,7 +488,27 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         })
         .from(restaurantMembers)
         .innerJoin(users, eq(restaurantMembers.userId, users.id))
-        .where(eq(restaurantMembers.restaurantId, restaurantId));
+        .where(eq(restaurantMembers.restaurantId, restaurantId))
+        .orderBy(asc(restaurantMembers.createdAt));
+
+      /*
+       * The week, the number a password code would go to, and whether the
+       * owner has asked to go live — the three facts the page used to lack
+       * when an operator asked "why is this shop not open yet?".
+       */
+      const hours = row.branch
+        ? await ctx.db
+            .select({
+              dayOfWeek: branchWorkingHours.dayOfWeek,
+              opensAtMinute: branchWorkingHours.opensAtMinute,
+              closesAtMinute: branchWorkingHours.closesAtMinute,
+              isClosed: branchWorkingHours.isClosed,
+            })
+            .from(branchWorkingHours)
+            .where(eq(branchWorkingHours.branchId, row.branch.id))
+            .orderBy(asc(branchWorkingHours.dayOfWeek))
+        : [];
+      const recoveryPhone = await findOwnerPhone(ctx.db, restaurantId);
 
       return reply.send(
         success(
@@ -488,6 +527,21 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
             minimum_order_iqd: row.restaurant.minimumOrderIqd,
             suspended_reason: row.restaurant.suspendedReason,
             approved_at: row.restaurant.approvedAt?.toISOString() ?? null,
+            activation_requested_at: row.restaurant.activationRequestedAt?.toISOString() ?? null,
+            activation_request_note: row.restaurant.activationRequestNote,
+            /** Where the app sends the code when the owner changes the shop's password. */
+            password_recovery_phone: recoveryPhone,
+            working_hours: {
+              configured: hours.length > 0,
+              summary_ar: describeWeekAr(hours),
+              rows: hours.map((hour) => ({
+                day_of_week: hour.dayOfWeek,
+                day_name_ar: WEEKDAY_NAMES_AR[hour.dayOfWeek],
+                opens_at: formatMinuteOfDay(hour.opensAtMinute),
+                closes_at: formatMinuteOfDay(hour.closesAtMinute),
+                is_closed: hour.isClosed,
+              })),
+            },
             branch: row.branch
               ? {
                   id: row.branch.id,
