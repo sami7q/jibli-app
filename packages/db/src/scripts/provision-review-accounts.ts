@@ -369,6 +369,7 @@ async function upsertCustomer(
     .select({
       id: users.id,
       username: users.username,
+      fullName: users.fullName,
       phoneVerifiedAt: users.phoneVerifiedAt,
       profileCompletedAt: users.profileCompletedAt,
     })
@@ -377,6 +378,18 @@ async function upsertCustomer(
     .limit(1);
 
   if (existing) {
+    /*
+     * A number that already belongs to somebody is refused unless it is
+     * already the review account. Updating it would rename a real customer
+     * and point their profile at the review address — on a database the
+     * script has no other way to tell apart from a fresh one.
+     */
+    if (existing.fullName !== CUSTOMER_NAME) {
+      fail(
+        'The review number already belongs to an account that is not the review customer. ' +
+          'Pick a number nobody uses.',
+      );
+    }
     if (existing.username) {
       fail(
         'The review number belongs to an account with a username — a staff or portal account. ' +

@@ -12,9 +12,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The pnpm version comes from `packageManager` in package.json and nowhere
+# else: pnpm/action-setup refuses to run when both it and a `version` input
+# are set ("Multiple versions of pnpm specified"), which is how every job
+# started failing before the first install.
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '10'
 
 jobs:
   quality:
@@ -24,8 +27,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -88,8 +89,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -134,8 +133,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:

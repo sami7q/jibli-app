@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { MerchantDirectory } from '@/components/merchant-directory';
 
 /**
@@ -15,5 +16,14 @@ import { MerchantDirectory } from '@/components/merchant-directory';
  * same capability and it reads as an absence.
  */
 export default function MarketsPage() {
-  return <MerchantDirectory only="MARKET" />;
+  /*
+   * The directory reads `?activation=requested` with `useSearchParams`,
+   * and Next refuses to prerender a page that does so outside a Suspense
+   * boundary — the whole Vercel build stopped on this page for it.
+   */
+  return (
+    <Suspense fallback={null}>
+      <MerchantDirectory only="MARKET" />
+    </Suspense>
+  );
 }

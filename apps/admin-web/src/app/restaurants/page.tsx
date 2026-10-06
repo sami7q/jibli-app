@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { MerchantDirectory } from '@/components/merchant-directory';
 
 /**
@@ -12,5 +13,14 @@ import { MerchantDirectory } from '@/components/merchant-directory';
  * screen with that answer built in.
  */
 export default function RestaurantsPage() {
-  return <MerchantDirectory />;
+  /*
+   * The directory reads `?activation=requested` with `useSearchParams`,
+   * and Next refuses to prerender a page that does so outside a Suspense
+   * boundary — the whole Vercel build stopped on this page for it.
+   */
+  return (
+    <Suspense fallback={null}>
+      <MerchantDirectory />
+    </Suspense>
+  );
 }
