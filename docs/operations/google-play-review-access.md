@@ -41,7 +41,9 @@ sign-in (`apps/api/src/services/otp-service.ts`):
 - the challenge is stored, hashed with the pepper and salted by its own id
 - it expires after `OTP_TTL_SECONDS` and allows `OTP_MAX_VERIFY_ATTEMPTS` guesses
 - verification and session issuance are the same code path as every customer's
-- the per-IP rate limit still applies
+- the per-IP rate limit still applies; the per-number cooldown and caps do
+  not, because they protect a message budget this number never spends, and
+  the only thing they could do is lock the reviewer out
 - wrong guesses on the review number are counted across challenges, and
   after `GOOGLE_PLAY_REVIEW_MAX_FAILURES` of them in a day (default 10) the
   number is refused new codes until the day passes — a fixed code must not
@@ -259,8 +261,27 @@ Notes
 
 Google keeps the credentials on file for future reviews of updates; if the
 switch is off when an update is reviewed, the customer sign-in fails and the
-update is rejected. Either leave the switch on between releases — it opens one
-number and nothing else — or turn it on before each submission.
+update is rejected. Turn it on before each submission and off after each
+approval, rather than leaving it on: the code is fixed, so every day it stays
+on is another day's worth of guesses against the same four digits. Ten a day
+is nothing over a review window and something over a year.
+
+## If the reviewer is locked out
+
+The wrong-guess budget is the one way the review number can refuse the
+reviewer: somebody who knows the number can spend it on purpose, or a
+reviewer can mistype ten times. The API log then shows
+`otp.review_locked`, and the app says the number must wait. To clear it
+before the day passes, delete the counter on the API's Redis:
+
+```
+redis-cli -u "$REDIS_URL" DEL otp:review:failures
+```
+
+(On Render, the `jibli-cache` Key Value instance; its connection string is
+on the service's environment page.) Keep the review number out of anything
+public — it is a credential, like the code — and nobody but Google has a
+reason to type it.
 
 ## Security notes, for whoever audits this
 
