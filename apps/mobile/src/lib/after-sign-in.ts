@@ -9,7 +9,7 @@
  * on the customer home with no trace of what they came to do. That is the
  * "it just brings me back" the feature exists to end.
  *
- * Memory only, like `pending-credentials`: a restart forgets it, which is the
+ * Memory only: a restart forgets it, which is the
  * right lifetime for "I was in the middle of this". It is read by every screen
  * that finishes a sign-in (and by the gate, so the two can never disagree), and
  * cleared by the screen it points at once that screen is open — never by the

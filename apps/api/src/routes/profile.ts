@@ -235,9 +235,9 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
           // unavailable for ordering (plan §8.7).
           orderable: Boolean(
             row.governorateIsEnabled &&
-              row.governorateOrderingEnabled &&
-              row.cityIsEnabled &&
-              row.cityOrderingEnabled,
+            row.governorateOrderingEnabled &&
+            row.cityIsEnabled &&
+            row.cityOrderingEnabled,
           ),
         })),
         { request_id: request.requestId },
@@ -296,34 +296,36 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
       return id;
     });
 
-    return reply
-      .status(201)
-      .send(success({ id: addressId }, { request_id: request.requestId }));
+    return reply.status(201).send(success({ id: addressId }, { request_id: request.requestId }));
   });
 
-  app.delete('/api/v1/addresses/:addressId', { preHandler: app.authenticate }, async (request, reply) => {
-    const principal = requirePrincipal(request);
-    const { addressId } = z.object({ addressId: uuidSchema }).parse(request.params);
+  app.delete(
+    '/api/v1/addresses/:addressId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      const { addressId } = z.object({ addressId: uuidSchema }).parse(request.params);
 
-    // Soft delete: historical orders reference this row (plan §4.7).
-    const deleted = await ctx.db
-      .update(userAddresses)
-      .set({ deletedAt: new Date(), isDefault: false })
-      .where(
-        and(
-          eq(userAddresses.id, addressId),
-          eq(userAddresses.userId, principal.userId),
-          isNull(userAddresses.deletedAt),
-        ),
-      )
-      .returning({ id: userAddresses.id });
+      // Soft delete: historical orders reference this row (plan §4.7).
+      const deleted = await ctx.db
+        .update(userAddresses)
+        .set({ deletedAt: new Date(), isDefault: false })
+        .where(
+          and(
+            eq(userAddresses.id, addressId),
+            eq(userAddresses.userId, principal.userId),
+            isNull(userAddresses.deletedAt),
+          ),
+        )
+        .returning({ id: userAddresses.id });
 
-    if (deleted.length === 0) {
-      throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'address' } });
-    }
+      if (deleted.length === 0) {
+        throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'address' } });
+      }
 
-    return reply.send(success({ deleted: true }, { request_id: request.requestId }));
-  });
+      return reply.send(success({ deleted: true }, { request_id: request.requestId }));
+    },
+  );
 
   /**
    * Push device registration (plan §68).
@@ -425,7 +427,9 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
     const [staff] = await ctx.db
       .select({ role: userPlatformRoles.role })
       .from(userPlatformRoles)
-      .where(and(eq(userPlatformRoles.userId, principal.userId), isNull(userPlatformRoles.revokedAt)))
+      .where(
+        and(eq(userPlatformRoles.userId, principal.userId), isNull(userPlatformRoles.revokedAt)),
+      )
       .limit(1);
 
     const [member] = await ctx.db
@@ -496,6 +500,18 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
       await tx.delete(userAddresses).where(eq(userAddresses.userId, principal.userId));
       await tx.delete(userDevices).where(eq(userDevices.userId, principal.userId));
       await tx.delete(customerFavorites).where(eq(customerFavorites.userId, principal.userId));
+
+      /*
+       * Past orders stay, as the public deletion page says — a delivered order
+       * is a financial record for the shop and the platform — but not with the
+       * name and number on them. The row remains a record of a sale and stops
+       * being a record of a person; the delivery snapshot keeps the address a
+       * dispute would need, without anyone to attach it to.
+       */
+      await tx
+        .update(orders)
+        .set({ customerNameSnapshot: 'عميل محذوف', customerPhoneSnapshot: '' })
+        .where(eq(orders.userId, principal.userId));
 
       // Every device signed out, including ones not holding this request.
       await tx

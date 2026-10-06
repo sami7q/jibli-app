@@ -1160,69 +1160,6 @@ export const api = {
       authenticated: false,
     }),
 
-  /*
-   * Registration and password sign-in.
-   *
-   * A one-time code is still what proves a number — `register` only sends one,
-   * and no account exists until `registerVerify` spends it. The password is a
-   * second key to the same door, so that a returning customer does not wait for
-   * an SMS on a network where it may not arrive.
-   *
-   * The name and password are sent twice, once to each call, deliberately: the
-   * server keeps nothing between them, so there is never an unverified
-   * stranger's password stored against a number they may not own.
-   */
-  register: (fullName: string, phone: string, password: string) =>
-    apiRequest<{ resend_after_seconds: number; expires_in_seconds: number; dev_code?: string }>(
-      '/api/v1/auth/register',
-      {
-        method: 'POST',
-        body: { full_name: fullName, phone, password },
-        authenticated: false,
-      },
-    ),
-
-  registerVerify: (
-    fullName: string,
-    phone: string,
-    password: string,
-    code: string,
-    deviceId?: string,
-  ) =>
-    apiRequest<AuthSessionResponse>('/api/v1/auth/register/verify', {
-      method: 'POST',
-      body: { full_name: fullName, phone, password, code, deviceId },
-      authenticated: false,
-    }),
-
-  phonePasswordSignIn: (phone: string, password: string, deviceId?: string) =>
-    apiRequest<AuthSessionResponse>('/api/v1/auth/password/login', {
-      method: 'POST',
-      body: { phone, password, deviceId },
-      authenticated: false,
-    }),
-
-  /**
-   * Ask for a reset code.
-   *
-   * Answers the same way whether or not the number has an account, so the
-   * screen must say «إن كان الرقم مسجّلاً فقد أرسلنا رمزاً» rather than
-   * «أرسلنا رمزاً» — the difference is the whole point of the endpoint.
-   */
-  forgotPassword: (phone: string) =>
-    apiRequest<{ sent: boolean; expires_in_seconds: number }>('/api/v1/auth/password/forgot', {
-      method: 'POST',
-      body: { phone },
-      authenticated: false,
-    }),
-
-  resetPassword: (phone: string, code: string, password: string, deviceId?: string) =>
-    apiRequest<AuthSessionResponse>('/api/v1/auth/password/reset', {
-      method: 'POST',
-      body: { phone, code, password, deviceId },
-      authenticated: false,
-    }),
-
   /**
    * Sign in with a Google ID token obtained on the device.
    *

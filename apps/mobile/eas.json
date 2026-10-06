@@ -13,6 +13,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://jibli-api.onrender.com",
+        "EXPO_PUBLIC_PRIVACY_URL": "https://legal-weld-seven.vercel.app/privacy",
+        "EXPO_PUBLIC_TERMS_URL": "https://legal-weld-seven.vercel.app/terms",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
         "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,armeabi-v7a"
       }
@@ -25,6 +27,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://jibli-api.onrender.com",
+        "EXPO_PUBLIC_PRIVACY_URL": "https://legal-weld-seven.vercel.app/privacy",
+        "EXPO_PUBLIC_TERMS_URL": "https://legal-weld-seven.vercel.app/terms",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }

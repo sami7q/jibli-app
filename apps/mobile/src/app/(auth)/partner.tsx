@@ -106,6 +106,21 @@ export default function PartnerDoorsScreen() {
           onPress={() => router.push('/(auth)/owner-login')}
         />
 
+        {/*
+          The courier's door. A driver's username and password are issued by
+          the shop that hired them, and the screen that takes them existed
+          with nothing leading to it — reachable by deep link and by nobody
+          who had not been told the link. The welcome screen's seller door is
+          where somebody who is not a customer looks first, so it is here.
+        */}
+        <Door
+          icon="motorbike"
+          title="مندوب توصيل؟"
+          body="أصدر لك المطعم أو المتجر الذي تعمل معه اسم مستخدم وكلمة مرور؟ ادخل بهما لتستلم التوصيلات وتتابعها من هذا التطبيق."
+          cta="دخول المندوبين"
+          onPress={() => router.push('/(auth)/driver-login')}
+        />
+
         <Text variant="caption" tone="muted" align="center">
           صاحب مطعم؟ قوائم المطاعم تُدار من لوحة التحكم على المتصفّح.
         </Text>

@@ -54,7 +54,11 @@ const authSchema = z.object({
   /** Signs rotating refresh tokens. Must differ from the access secret. */
   JWT_REFRESH_SECRET: secret,
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).default(900),
-  REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().int().min(3600).default(60 * 60 * 24 * 30),
+  REFRESH_TOKEN_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(3600)
+    .default(60 * 60 * 24 * 30),
   /**
    * How long a just-rotated refresh token still works.
    *
@@ -98,7 +102,10 @@ const otpSchema = z.object({
    * accepting a token minted for somebody else's app.
    */
   GOOGLE_CLIENT_IDS: z.string().optional(),
-  OTP_MOCK_CODE: z.string().regex(/^\d{4,8}$/).default('0000'),
+  OTP_MOCK_CODE: z
+    .string()
+    .regex(/^\d{4,8}$/)
+    .default('0000'),
   /**
    * Numbers that receive `OTP_MOCK_CODE` instead of a random one.
    *
@@ -115,6 +122,49 @@ const otpSchema = z.object({
    * Refused in production by the schema below.
    */
   OTP_TEST_PHONES: z.string().optional(),
+  /**
+   * Google Play review access: one customer number that signs in with a
+   * fixed code and is never sent a message.
+   *
+   * Play's reviewers sit outside Iraq and cannot read a WhatsApp code sent
+   * to an Iraqi number, and the Console's «Sign in details» wants a number
+   * and a code that work from anywhere. `OTP_TEST_PHONES` is refused in
+   * production and opens whatever is listed; this names exactly one number
+   * and is allowed in production on purpose, because the review window is
+   * production. Every other number is untouched. The challenge is the
+   * ordinary one — stored, hashed, expiring, attempt-counted — only the
+   * digits are fixed, nothing is sent, and the code is never returned or
+   * logged. All three come from the environment; none is committed. Switch
+   * it off after approval: docs/operations/google-play-review-access.md.
+   */
+  GOOGLE_PLAY_REVIEW_ENABLED: booleanish.default(false),
+  /** E.164 Iraqi mobile, e.g. +9647XXXXXXXXX. */
+  // An empty value in the environment means unset, not a malformed number.
+  GOOGLE_PLAY_REVIEW_PHONE: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^\+9647\d{9}$/, 'GOOGLE_PLAY_REVIEW_PHONE must be an Iraqi mobile in E.164')
+      .optional(),
+  ),
+  /** Exactly OTP_LENGTH digits; checked below. */
+  GOOGLE_PLAY_REVIEW_OTP_CODE: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^\d{4,8}$/)
+      .optional(),
+  ),
+  /**
+   * How many wrong guesses the review number tolerates in a day, across
+   * every challenge. A random code is new on every request, so guessing
+   * across challenges gains nothing; a fixed one is the same secret each
+   * time, and without this a patient attacker could ask again whenever a
+   * challenge's five attempts ran out. Past the budget, the number refuses
+   * new codes until the window passes. The reviewer, who types the right
+   * code, never spends any of it.
+   */
+  GOOGLE_PLAY_REVIEW_MAX_FAILURES: z.coerce.number().int().min(3).max(50).default(10),
   SMS_GATEWAY_URL: z.string().url().optional(),
   SMS_GATEWAY_API_KEY: z.string().optional(),
   SMS_GATEWAY_SENDER_ID: z.string().optional(),
@@ -233,7 +283,10 @@ const storageSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: booleanish.default(true),
   CDN_PUBLIC_BASE_URL: z.string().url().optional(),
-  UPLOAD_MAX_BYTES: z.coerce.number().int().default(5 * 1024 * 1024),
+  UPLOAD_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .default(5 * 1024 * 1024),
 });
 
 /**
@@ -256,7 +309,10 @@ const apiSchema = z.object({
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3001'),
   TRUST_PROXY: booleanish.default(false),
   RATE_LIMIT_GLOBAL_PER_MINUTE: z.coerce.number().int().default(300),
-  REQUEST_BODY_LIMIT_BYTES: z.coerce.number().int().default(1024 * 1024),
+  REQUEST_BODY_LIMIT_BYTES: z.coerce
+    .number()
+    .int()
+    .default(1024 * 1024),
 
   /**
    * Apply pending migrations at boot, before the first request is served.
@@ -332,6 +388,40 @@ export const apiEnvSchema = baseSchema
         path: ['JWT_REFRESH_SECRET'],
         message: 'JWT_REFRESH_SECRET must differ from JWT_ACCESS_SECRET',
       });
+    }
+    /*
+     * Review mode fails closed: switched on without both halves, it refuses
+     * to boot rather than silently doing nothing — or silently accepting a
+     * code nobody chose. A guessable code is refused for the same reason.
+     */
+    if (env.GOOGLE_PLAY_REVIEW_ENABLED) {
+      if (!env.GOOGLE_PLAY_REVIEW_PHONE || !env.GOOGLE_PLAY_REVIEW_OTP_CODE) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['GOOGLE_PLAY_REVIEW_ENABLED'],
+          message:
+            'GOOGLE_PLAY_REVIEW_ENABLED requires both GOOGLE_PLAY_REVIEW_PHONE and GOOGLE_PLAY_REVIEW_OTP_CODE',
+        });
+      } else {
+        if (env.GOOGLE_PLAY_REVIEW_OTP_CODE.length !== env.OTP_LENGTH) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['GOOGLE_PLAY_REVIEW_OTP_CODE'],
+            message: `GOOGLE_PLAY_REVIEW_OTP_CODE must be exactly OTP_LENGTH (${env.OTP_LENGTH}) digits`,
+          });
+        }
+        if (
+          env.GOOGLE_PLAY_REVIEW_OTP_CODE === env.OTP_MOCK_CODE ||
+          /^(\d)\1*$/.test(env.GOOGLE_PLAY_REVIEW_OTP_CODE)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['GOOGLE_PLAY_REVIEW_OTP_CODE'],
+            message:
+              'GOOGLE_PLAY_REVIEW_OTP_CODE must not be OTP_MOCK_CODE or a single repeated digit',
+          });
+        }
+      }
     }
     if (env.APP_ENV === 'production') {
       if (env.REDIS_URL.startsWith('memory:')) {
@@ -439,7 +529,9 @@ export type WorkerEnv = z.infer<typeof workerEnvSchema>;
 
 export class EnvValidationError extends Error {
   constructor(public readonly issues: z.ZodIssue[]) {
-    const detail = issues.map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`).join('\n');
+    const detail = issues
+      .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('\n');
     super(`Invalid environment configuration:\n${detail}`);
     this.name = 'EnvValidationError';
   }

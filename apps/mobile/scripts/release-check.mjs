@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promises as dns } from 'node:dns';
@@ -20,6 +20,22 @@ import { promises as dns } from 'node:dns';
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, '..');
+
+/*
+ * What a store build will actually see. EAS exports the profile's `env`
+ * before evaluating app.config.ts, so a value that lives only in eas.json is
+ * baked in just the same — and this check, run from a shell that has not
+ * exported it, used to call that a failure.
+ */
+const easProductionEnv = (() => {
+  try {
+    const eas = JSON.parse(readFileSync(path.join(projectRoot, 'eas.json'), 'utf8'));
+    return eas.build?.production?.env ?? {};
+  } catch {
+    return {};
+  }
+})();
+const buildEnv = (name) => process.env[name] ?? easProductionEnv[name];
 
 let failures = 0;
 let warnings = 0;
@@ -51,8 +67,8 @@ console.log('Links App Review will open');
  * and it also verifies that whatever replaced it actually resolves.
  */
 const links = [
-  ['EXPO_PUBLIC_PRIVACY_URL', process.env.EXPO_PUBLIC_PRIVACY_URL, 'https://jibli.iq/privacy'],
-  ['EXPO_PUBLIC_TERMS_URL', process.env.EXPO_PUBLIC_TERMS_URL, 'https://jibli.iq/terms'],
+  ['EXPO_PUBLIC_PRIVACY_URL', buildEnv('EXPO_PUBLIC_PRIVACY_URL'), 'https://jibli.iq/privacy'],
+  ['EXPO_PUBLIC_TERMS_URL', buildEnv('EXPO_PUBLIC_TERMS_URL'), 'https://jibli.iq/terms'],
 ];
 
 for (const [name, value, placeholder] of links) {

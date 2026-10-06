@@ -84,7 +84,6 @@
   "loading": 984946,
   "lock-outline": 983873,
   "lock-reset": 984947,
-  "login": 983874,
   "logout": 983875,
   "longitude": 986970,
   "magnify": 983881,
@@ -153,6 +152,7 @@
   "walk": 984451,
   "weather-night": 984468,
   "web": 984479,
+  "whatsapp": 984483,
   "white-balance-sunny": 984488,
   "wrap": 984502
 }

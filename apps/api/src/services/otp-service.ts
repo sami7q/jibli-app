@@ -37,6 +37,9 @@ import type { AppContext } from '../lib/context.js';
  *
  * `LOGIN` is the original OTP sign-in and stays the default, so every existing
  * caller and every challenge already in the table keeps working unchanged.
+ * `REGISTER` and `PASSWORD_RESET` have no customer flow any more — the app
+ * signs customers in with a code and nothing else — and stay only so a
+ * challenge stored before that change is still read correctly.
  */
 export type OtpPurpose = 'LOGIN' | 'REGISTER' | 'PASSWORD_RESET' | 'PORTAL_PASSWORD';
 
@@ -63,7 +66,17 @@ const keys = {
   perPhoneHour: (phone: string) => `otp:phone:h:${phone}`,
   perPhoneDay: (phone: string) => `otp:phone:d:${phone}`,
   perIpHour: (ip: string) => `otp:ip:h:${ip}`,
+  /** Wrong guesses on the Google Play review number, across challenges. */
+  reviewFailures: 'otp:review:failures',
 };
+
+/** A day: long enough that a budget of ten guesses is a wall, not a speed bump. */
+const REVIEW_FAILURE_WINDOW_SECONDS = 24 * 60 * 60;
+
+/** The Google Play review number, while review mode is on. */
+function isGooglePlayReviewPhone(env: AppContext['env'], phone: string): boolean {
+  return env.GOOGLE_PLAY_REVIEW_ENABLED && env.GOOGLE_PLAY_REVIEW_PHONE === phone;
+}
 
 /**
  * Increment a counter with a TTL, returning the new value.
@@ -105,8 +118,41 @@ export async function requestOtp(
    */
   const isTestPhone = parseCsv(env.OTP_TEST_PHONES).includes(phone);
 
+  /*
+   * The Google Play review number — GOOGLE_PLAY_REVIEW_* in the env schema.
+   *
+   * One number, named in configuration, that gets a fixed code and no
+   * message, so a reviewer outside Iraq can sign in. For the per-number
+   * limits it is a test number: nothing is sent, so there is no budget to
+   * protect, and the only thing the cap could do is lock the reviewer out.
+   * For the response it is the opposite of one: the code is never handed
+   * back, because the reviewer already has it and nobody else should.
+   * The switch is off by default and the schema refuses it half-set, so
+   * on every deployment that is not mid-review this is simply `false`.
+   */
+  const isReviewPhone = isGooglePlayReviewPhone(env, phone);
+  const skipsPhoneLimits = isTestPhone || isReviewPhone;
+
+  /*
+   * The one limit the review number does carry: a budget of wrong guesses
+   * for the day, counted across challenges in `consumeOtpChallenge`. The
+   * code is the same on every challenge, so a fresh challenge must not be
+   * a fresh set of attempts. Once it is spent, no new code is issued until
+   * the window passes — the right code never spends it.
+   */
+  if (isReviewPhone) {
+    const failures = Number((await ctx.redis.get(keys.reviewFailures)) ?? 0);
+    if (failures >= env.GOOGLE_PLAY_REVIEW_MAX_FAILURES) {
+      ctx.logger.warn(
+        { event: 'otp.review_locked', failures, requestId: input.requestId },
+        'Google Play review sign-in locked after repeated wrong codes',
+      );
+      throw new AppError(ERROR_CODES.OTP_RATE_LIMITED, { details: { window: 'review_day' } });
+    }
+  }
+
   // 1. Cooldown — stops a tap-happy user (or a script) from burning SMS budget.
-  if (!isTestPhone) {
+  if (!skipsPhoneLimits) {
     const cooldownTtl = await ctx.redis.ttl(keys.cooldown(phone));
     if (cooldownTtl > 0) {
       throw new AppError(ERROR_CODES.OTP_COOLDOWN_ACTIVE, {
@@ -170,9 +216,13 @@ export async function requestOtp(
    * enough, and it is refused in production too.
    */
   const fixedCode = env.OTP_PROVIDER === 'mock' || isTestPhone;
-  const code = fixedCode
-    ? env.OTP_MOCK_CODE.slice(0, env.OTP_LENGTH).padEnd(env.OTP_LENGTH, '0')
-    : generateNumericCode(env.OTP_LENGTH);
+  // The schema guarantees the review code is present and OTP_LENGTH long
+  // whenever the switch is on; the cast only states that.
+  const code = isReviewPhone
+    ? (env.GOOGLE_PLAY_REVIEW_OTP_CODE as string)
+    : fixedCode
+      ? env.OTP_MOCK_CODE.slice(0, env.OTP_LENGTH).padEnd(env.OTP_LENGTH, '0')
+      : generateNumericCode(env.OTP_LENGTH);
   const challengeId = uuidv7();
   const expiresAt = new Date(Date.now() + env.OTP_TTL_SECONDS * 1000);
 
@@ -199,26 +249,42 @@ export async function requestOtp(
    *    exists to allow. It still goes through a provider rather than around
    *    one, so the path is the same path.
    */
-  const allowlist = parseCsv(env.OTP_PHONE_ALLOWLIST);
-  const base: SmsProvider = isTestPhone ? new ConsoleSmsProvider(ctx.logger) : ctx.sms;
-  const provider: SmsProvider =
-    allowlist.length > 0 && !isTestPhone
-      ? new AllowlistSmsProvider(base, allowlist, ctx.logger)
-      : base;
-
-  const template = NOTIFICATION_TEMPLATES.otpCode(code);
-  const delivery = await provider.send({ toE164: phone, body: template.bodyAr });
-
-  if (!delivery.ok) {
-    ctx.logger.error(
-      { event: 'otp.delivery_failed', phone: maskPhoneForLog(phone), reason: delivery.error },
-      'OTP delivery failed',
+  if (isReviewPhone) {
+    /*
+     * Nothing is sent. The reviewer was handed the code with the listing, a
+     * message would reach a number nobody is reading, and the body would
+     * put the code into a provider's log. Only the fact is recorded.
+     */
+    ctx.logger.info(
+      {
+        event: 'otp.review_challenge_issued',
+        phone: maskPhoneForLog(phone),
+        requestId: input.requestId,
+      },
+      'Google Play review challenge issued without delivery',
     );
-    throw new AppError(ERROR_CODES.OTP_DELIVERY_FAILED);
+  } else {
+    const allowlist = parseCsv(env.OTP_PHONE_ALLOWLIST);
+    const base: SmsProvider = isTestPhone ? new ConsoleSmsProvider(ctx.logger) : ctx.sms;
+    const provider: SmsProvider =
+      allowlist.length > 0 && !isTestPhone
+        ? new AllowlistSmsProvider(base, allowlist, ctx.logger)
+        : base;
+
+    const template = NOTIFICATION_TEMPLATES.otpCode(code);
+    const delivery = await provider.send({ toE164: phone, body: template.bodyAr });
+
+    if (!delivery.ok) {
+      ctx.logger.error(
+        { event: 'otp.delivery_failed', phone: maskPhoneForLog(phone), reason: delivery.error },
+        'OTP delivery failed',
+      );
+      throw new AppError(ERROR_CODES.OTP_DELIVERY_FAILED);
+    }
   }
 
-  // No cooldown is armed for a test number, so the next tap is not refused.
-  if (!isTestPhone) {
+  // No cooldown is armed for a test or review number, so the next tap is not refused.
+  if (!skipsPhoneLimits) {
     await ctx.redis.set(keys.cooldown(phone), '1', 'EX', env.OTP_RESEND_COOLDOWN_SECONDS);
   }
 
@@ -230,15 +296,17 @@ export async function requestOtp(
   return {
     // Zero for a test number: the screen's countdown mirrors the server's
     // cooldown, and there is none to mirror.
-    resendAfterSeconds: isTestPhone ? 0 : env.OTP_RESEND_COOLDOWN_SECONDS,
+    resendAfterSeconds: skipsPhoneLimits ? 0 : env.OTP_RESEND_COOLDOWN_SECONDS,
     expiresInSeconds: env.OTP_TTL_SECONDS,
     /*
      * Returned when a developer is meant to see it: local development, the
      * mock provider, or a listed test number — in all three the code is fixed
      * and already written down, so hiding it protects nothing and only makes
-     * testing slower. A real generated code is never returned.
+     * testing slower. A real generated code is never returned — and neither
+     * is the review code, in any environment: it was given to one reviewer
+     * through the Console, and the API is not a second place to read it.
      */
-    ...(env.APP_ENV === 'local' || fixedCode ? { devCode: code } : {}),
+    ...(!isReviewPhone && (env.APP_ENV === 'local' || fixedCode) ? { devCode: code } : {}),
   };
 }
 
@@ -310,6 +378,12 @@ export async function consumeOtpChallenge(
       .update(otpChallenges)
       .set({ attemptCount: sql`${otpChallenges.attemptCount} + 1` })
       .where(eq(otpChallenges.id, challenge.id));
+
+    // The review number's code is fixed, so its wrong guesses are counted
+    // for the day as well as for this challenge — see `requestOtp`.
+    if (isGooglePlayReviewPhone(ctx.env, input.phoneE164)) {
+      await incrementWithWindow(ctx, keys.reviewFailures, REVIEW_FAILURE_WINDOW_SECONDS);
+    }
 
     ctx.logger.info(
       {

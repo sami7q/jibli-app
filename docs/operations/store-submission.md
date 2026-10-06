@@ -8,24 +8,24 @@ before each one after.
 
 Each of these is a documented rejection reason that has already been closed.
 
-| Requirement                                                                      | Where                                                                                 |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| **App Store 5.1.1(ii)** — no account required for content that does not need one | `(auth)/welcome.tsx` offers browsing as a guest; the number is asked for at checkout  |
-| **App Store 5.1.1(v)** — account deletion inside the app                         | `(tabs)/account.tsx` → `DeleteAccountSheet`, `DELETE /api/v1/profile`                 |
-| **App Store 4.8** — a privacy-respecting login beside any third-party one        | No third-party login ships. See "Google sign-in" below before changing that           |
-| **Play target API level** — API 36 since 31 August 2026                          | Expo SDK 57, which targets 36 and above                                               |
-| **Export compliance**                                                            | `ITSAppUsesNonExemptEncryption: false` in `app.config.ts`                             |
-| **Permission purpose strings**                                                   | `NSLocationWhenInUseUsageDescription`, in Arabic, naming the one screen that uses it  |
+| Requirement                                                                      | Where                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **App Store 5.1.1(ii)** — no account required for content that does not need one | `(auth)/welcome.tsx` offers browsing as a guest; the number is asked for at checkout                                                                                                                                                                        |
+| **App Store 5.1.1(v)** — account deletion inside the app                         | `(tabs)/account.tsx` → `DeleteAccountSheet`, `DELETE /api/v1/profile`                                                                                                                                                                                       |
+| **App Store 4.8** — a privacy-respecting login beside any third-party one        | No third-party login ships. See "Google sign-in" below before changing that                                                                                                                                                                                 |
+| **Play target API level** — API 36 since 31 August 2026                          | Expo SDK 57, which targets 36 and above                                                                                                                                                                                                                     |
+| **Export compliance**                                                            | `ITSAppUsesNonExemptEncryption: false` in `app.config.ts`                                                                                                                                                                                                   |
+| **Permission purpose strings**                                                   | `NSLocationWhenInUseUsageDescription`, in Arabic, naming the one screen that uses it                                                                                                                                                                        |
 | **Least privilege**                                                              | Android asks for notifications, foreground location and the camera (product and shop photos). The microphone, storage and biometric permissions the media modules would add are blocked in `android.blockedPermissions`; never `ACCESS_BACKGROUND_LOCATION` |
-| **Camera and photo purpose strings**                                             | `expo-image-picker` plugin options in `app.config.ts`, localised in `locales/*.json`; the microphone is off on both media plugins |
-| **Smaller release APK**                                                          | `expo-build-properties`: R8 minification and resource shrinking on for Android release builds |
-| **No capabilities the app does not use**                                         | `expo-audio` with background playback off (no `UIBackgroundModes: audio`, no media foreground service), `expo-location` with the «always» and motion strings off, `expo-secure-store` without the Face ID string; `NSAllowsArbitraryLoads: false` |
-| **Privacy policy and terms reachable in-app**                                    | Two rows in `(tabs)/account.tsx`, from `extra.privacyPolicyUrl` / `extra.termsUrl`    |
-| **RTL on first launch**                                                          | `['expo-localization', { forcesRTL: true }]` — see "The first launch was mirrored"   |
-| **iOS privacy manifest**                                                         | `ios.privacyManifests` in `app.config.ts`, `NSPrivacyTracking: false`                |
-| **Android 12+ splash**                                                           | A square `assets/splash-android.png`; the tall one is masked to a circle             |
-| **Forced update path**                                                           | `APP_VERSION_UNSUPPORTED` → `src/ui/update-gate.tsx`                                 |
-| **Store build cannot bake a placeholder URL**                                    | `requireForStore()` in `app.config.ts` throws on `EAS_BUILD_PROFILE=production`      |
+| **Camera and photo purpose strings**                                             | `expo-image-picker` plugin options in `app.config.ts`, localised in `locales/*.json`; the microphone is off on both media plugins                                                                                                                           |
+| **Smaller release APK**                                                          | `expo-build-properties`: R8 minification and resource shrinking on for Android release builds                                                                                                                                                               |
+| **No capabilities the app does not use**                                         | `expo-audio` with background playback off (no `UIBackgroundModes: audio`, no media foreground service), `expo-location` with the «always» and motion strings off, `expo-secure-store` without the Face ID string; `NSAllowsArbitraryLoads: false`           |
+| **Privacy policy and terms reachable in-app**                                    | Two rows in `(tabs)/account.tsx`, from `extra.privacyPolicyUrl` / `extra.termsUrl`                                                                                                                                                                          |
+| **RTL on first launch**                                                          | `['expo-localization', { forcesRTL: true }]` — see "The first launch was mirrored"                                                                                                                                                                          |
+| **iOS privacy manifest**                                                         | `ios.privacyManifests` in `app.config.ts`, `NSPrivacyTracking: false`                                                                                                                                                                                       |
+| **Android 12+ splash**                                                           | A square `assets/splash-android.png`; the tall one is masked to a circle                                                                                                                                                                                    |
+| **Forced update path**                                                           | `APP_VERSION_UNSUPPORTED` → `src/ui/update-gate.tsx`                                                                                                                                                                                                        |
+| **Store build cannot bake a placeholder URL**                                    | `requireForStore()` in `app.config.ts` throws on `EAS_BUILD_PROFILE=production`                                                                                                                                                                             |
 
 ### The first launch was mirrored, and that is what review would have seen
 
@@ -127,16 +127,16 @@ Two things to check on Render afterwards, both of which fail silently:
 - **`OTP_PHONE_ALLOWLIST` must be empty.** While `APP_ENV` is anything but
   `production`, a non-empty allowlist refuses delivery to every number not in
   it — which looks exactly like a broken gateway.
-- **`OTP_TEST_PHONES` has been removed, and App Review still has to sign in.**
+- **`OTP_TEST_PHONES` has been removed; review access has its own switch.**
   It was the fixed-code number a reviewer used, and with a real gateway
-  connected it became a back door rather than a necessity. That leaves a gap
-  which has to be closed deliberately before submitting — see "The reviewer
-  must be able to sign in" below.
+  connected it became a back door rather than a necessity. Store review now
+  uses `GOOGLE_PLAY_REVIEW_*` — one number, allowed in production, never
+  returned or logged — see `docs/operations/google-play-review-access.md`.
 
 ### `APP_ENV=production` is a separate, later step
 
 It is tempting to set it at the same time. Do not: the schema refuses to boot
-production unless *all* of real Redis, a real OTP provider, a real push
+production unless _all_ of real Redis, a real OTP provider, a real push
 provider, TLS on the database, no test phones, and no localhost in CORS are
 satisfied — and `PUSH_PROVIDER` is still `console`. Switching the OTP provider
 while staying on `staging` makes sign-in work for real customers today; the
@@ -216,12 +216,12 @@ context orders differently between the two platforms.
 scripts belong. Set per-locale in App Store Connect and Play Console, 30
 characters each:
 
-| Store     | Locale  | Name                          |
-| --------- | ------- | ----------------------------- |
-| App Store | ar      | `جيبلي Jibli — توصيل طعام`    |
-| App Store | en      | `Jibli جيبلي — Food Delivery` |
-| Play      | ar      | `جيبلي Jibli: توصيل طلبات`    |
-| Play      | en      | `Jibli — Food Delivery Iraq`  |
+| Store     | Locale | Name                          |
+| --------- | ------ | ----------------------------- |
+| App Store | ar     | `جيبلي Jibli — توصيل طعام`    |
+| App Store | en     | `Jibli جيبلي — Food Delivery` |
+| Play      | ar     | `جيبلي Jibli: توصيل طلبات`    |
+| Play      | en     | `Jibli — Food Delivery Iraq`  |
 
 Apple's keyword field (100 characters, comma-separated, no spaces after commas):
 `توصيل,طعام,مطاعم,ماركت,اكل,طلبات,بغداد,العراق,delivery,food,iraq,baghdad`.
@@ -304,21 +304,15 @@ write them, which is the moment to let it.
   and takes a minute to wake. A reviewer opening a cold app sees a blank list
   or an error, and that is 2.1. Move `jibli-api` off the free plan for the
   review window at minimum.
-- **The reviewer must be able to sign in, and right now they cannot.** App
-  Review sits outside Iraq and cannot receive an Iraqi SMS. The fixed-code
-  number that solved this is gone, so pick one of these before submitting and
-  say which in the review notes:
-
-  1. **A real Iraqi number somebody can read codes from** during the review
-     window — a handset on a desk. Simplest, and nothing in the platform
-     changes.
-  2. **A password on a pre-made account.** Customers can now sign in with
-     `POST /auth/password/login`, which needs no SMS at all, so an account
-     created in advance with a known password lets a reviewer in from
-     anywhere. This is the cleanest answer and it did not exist before.
-  3. **Put `OTP_TEST_PHONES` and `OTP_MOCK_CODE` back for the review window
-     only**, then remove them again. The env schema forbids them once
-     `APP_ENV=production`, so this also pins the order of those two changes.
+- **The reviewer must be able to sign in.** App Review sits outside Iraq and
+  cannot receive an Iraqi WhatsApp code, and customers sign in with a code
+  and nothing else — there is no customer password. The answer is the
+  dedicated review switch: `GOOGLE_PLAY_REVIEW_ENABLED`, `_PHONE` and
+  `_OTP_CODE` on the API for the review window, and `pnpm review:provision`
+  to create the review customer, the review shop owner and the review
+  courier. The number and code go into the store's sign-in details, never
+  into Git. Step by step, with the text to paste into the Console:
+  `docs/operations/google-play-review-access.md`.
 
 ## Still a form
 
@@ -333,11 +327,12 @@ here is a common rejection.
   advertising SDK and no third-party analytics, so **App Tracking Transparency
   does not apply** and no `NSUserTrackingUsageDescription` should be added.
 - **Age rating.** No objectionable content; food delivery is 4+.
-- **Demo account.** Review needs one that works from anywhere. Since customers
-  can sign in with a password, the simplest is an account created in advance
-  with a known number and password — no SMS, no timezone problem. Say in the
-  review notes which method it is, because a reviewer who cannot sign in
-  rejects on 2.1 without asking.
+- **Demo account.** Review needs one that works from anywhere. Customers sign
+  in with a code only, so the demo account is the review number with its
+  fixed code (`GOOGLE_PLAY_REVIEW_*`, created by `pnpm review:provision`) —
+  no message, no timezone problem. Say in the review notes that the code is
+  fixed for that one account, because a reviewer who cannot sign in rejects
+  on 2.1 without asking.
 - **Review notes.** State that the service operates in Iraq only, and that
   restaurants and coverage are set per-city, so an empty list outside a covered
   area is the product working.

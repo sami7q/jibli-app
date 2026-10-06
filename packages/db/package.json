@@ -23,6 +23,7 @@
     "seed": "tsx src/seed/run.ts",
     "reset": "tsx src/scripts/reset.ts",
     "studio": "drizzle-kit studio",
+    "review:provision": "tsx src/scripts/provision-review-accounts.ts",
     "bootstrap-admin": "tsx src/scripts/bootstrap-admin.ts"
   },
   "dependencies": {

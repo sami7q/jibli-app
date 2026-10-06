@@ -250,16 +250,23 @@ services:
 
       # OTP_TEST_PHONES and OTP_MOCK_CODE used to sit here, opening one number
       # with a fixed code because `console` could not deliver to any other.
+      # Gone, because the gateway is real now, and the schema refuses them
+      # under `APP_ENV=production` anyway.
       #
-      # Gone, because the gateway is real now: every number receives its own
-      # code, so a number that signs in without one is a back door rather than
-      # a necessity. It was also the last thing blocking `APP_ENV=production` —
-      # the schema refuses fixed-code test numbers there.
+      # Store review is the one case that still needs a number that signs in
+      # from outside Iraq, and it has its own switch — allowed in production,
+      # scoped to exactly one number, never returned or logged:
       #
-      # ⚠️ It was also how App Review signed in. A reviewer sits outside Iraq
-      # and cannot receive an Iraqi SMS, so before submitting, either give them
-      # a real number somebody can read codes from and say so in the review
-      # notes, or put this back for the review window only.
+      #   GOOGLE_PLAY_REVIEW_ENABLED=true
+      #   GOOGLE_PLAY_REVIEW_PHONE=+9647XXXXXXXXX     (the review account's number)
+      #   GOOGLE_PLAY_REVIEW_OTP_CODE=NNNN            (OTP_LENGTH digits, not 0000)
+      #
+      # Set all three in the dashboard for the review window and delete them
+      # after approval; the API refuses to boot with the switch on and either
+      # value missing. The reviewer's accounts themselves are created with
+      # `pnpm review:provision`. Everything is written up, with the text to
+      # paste into the Play Console, in
+      # docs/operations/google-play-review-access.md.
 
       # The API never calls ctx.push — only the worker sends notifications —
       # but the value is read by the same env schema, so it is kept aligned

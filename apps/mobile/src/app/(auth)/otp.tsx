@@ -16,7 +16,6 @@ import { normalizeDigits } from '@jibli/validation/arabic';
 import { formatIraqiPhoneDisplay } from '@jibli/validation/phone';
 import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
-import { clearPendingCredentials, readPendingCredentials } from '@/lib/pending-credentials';
 import { signedInDestination } from '@/lib/after-sign-in';
 import { useSession } from '@/lib/session';
 import {
@@ -45,22 +44,7 @@ const OTP_LENGTH = 4;
 export default function OtpScreen() {
   const router = useRouter();
   const { signIn } = useSession();
-  /**
-   * Which flow spent the code, and therefore what proving the number buys.
-   *
-   * One screen for three outcomes — sign in, finish a registration, set a new
-   * password — because the *question* is identical in all three: does this
-   * person hold this number? Only the answer's consequence differs, and that
-   * is one call at the bottom of `submit`.
-   *
-   * `login` when absent, so every existing link into this screen is unchanged.
-   */
-  const { phone, mode } = useLocalSearchParams<{
-    phone: string;
-    mode?: 'register' | 'reset';
-  }>();
-
-  const flow: 'login' | 'register' | 'reset' = mode ?? 'login';
+  const { phone } = useLocalSearchParams<{ phone: string }>();
 
   /*
    * One field, drawn as four boxes.
@@ -121,36 +105,7 @@ export default function OtpScreen() {
     setError(null);
 
     try {
-      /*
-       * Three endpoints, one answer shape.
-       *
-       * Registration and reset need the password back, and it was never sent
-       * to the server in the first place — it has been held in memory on this
-       * device since the previous screen. If it is gone, the process was
-       * restarted mid-flow and there is nothing to complete: the customer is
-       * sent back to start rather than shown a code box that cannot succeed.
-       */
-      const held =
-        flow === 'login'
-          ? null
-          : readPendingCredentials(flow === 'register' ? 'REGISTER' : 'RESET', phone);
-
-      if (flow !== 'login' && !held) {
-        setError('انتهت الجلسة. ابدأ من جديد.');
-        setSubmitting(false);
-        router.replace('/(auth)/phone');
-        return;
-      }
-
-      const result =
-        flow === 'register'
-          ? await api.registerVerify(held?.fullName ?? '', phone, held?.password ?? '', value)
-          : flow === 'reset'
-            ? await api.resetPassword(phone, value, held?.password ?? '')
-            : await api.verifyOtp(phone, value);
-
-      // The account exists, or the password is set. Nothing left to hold.
-      clearPendingCredentials();
+      const result = await api.verifyOtp(phone, value);
 
       /*
        * Through the session provider, not straight to storage.
@@ -204,29 +159,7 @@ export default function OtpScreen() {
   const resend = async () => {
     if (resendIn > 0 || !phone) return;
     try {
-      /*
-       * Resend through the endpoint this flow started at.
-       *
-       * A code carries the purpose it was issued for, and only spends on that
-       * purpose. Resending a registration through `requestOtp` would deliver a
-       * perfectly valid *sign-in* code that the register step then refuses —
-       * a dead end whose only symptom is "the code you just received is wrong".
-       */
-      const held =
-        flow === 'login'
-          ? null
-          : readPendingCredentials(flow === 'register' ? 'REGISTER' : 'RESET', phone);
-
-      const result =
-        flow === 'register' && held
-          ? await api.register(held.fullName ?? '', phone, held.password)
-          : flow === 'reset'
-            ? await api
-                .forgotPassword(phone)
-                // That endpoint answers the same way for every number and so
-                // reports no cooldown; the local one is what the button uses.
-                .then(() => ({ resend_after_seconds: 45 }))
-            : await api.requestOtp(phone);
+      const result = await api.requestOtp(phone);
 
       setResendIn(result.resend_after_seconds);
       setError(null);

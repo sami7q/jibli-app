@@ -25,6 +25,7 @@
     "db:verify": "pnpm --filter @jibli/db verify",
     "db:seed": "pnpm --filter @jibli/db seed",
     "db:reset": "pnpm --filter @jibli/db reset",
+    "review:provision": "pnpm --filter @jibli/db review:provision",
     "dev:api": "pnpm --filter @jibli/api dev",
     "dev:worker": "pnpm --filter @jibli/worker dev",
     "dev:admin": "pnpm --filter @jibli/admin-web dev",

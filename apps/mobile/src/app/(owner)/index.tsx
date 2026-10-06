@@ -846,6 +846,15 @@ function PartnerHub({
         cta="الدخول باسم المستخدم"
         onPress={() => router.push('/(auth)/owner-login')}
       />
+
+      {/* The courier's door, as on the welcome screen's version of this hub. */}
+      <Door
+        icon="motorbike"
+        title="مندوب توصيل؟"
+        body="أصدر لك المطعم أو المتجر الذي تعمل معه اسم مستخدم وكلمة مرور؟ ادخل بهما لتستلم التوصيلات وتتابعها من هذا التطبيق."
+        cta="دخول المندوبين"
+        onPress={() => router.push('/(auth)/driver-login')}
+      />
     </View>
   );
 }
