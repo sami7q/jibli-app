@@ -104,18 +104,8 @@ export default function UsersPage() {
 
   return (
     <AdminShell
-      title={
-        audience === 'CUSTOMERS'
-          ? 'العملاء'
-          : audience === ''
-            ? 'الأشخاص'
-            : 'ملاك المطاعم'
-      }
-      subtitle={
-        audience === 'OWNERS'
-          ? 'من يدير المطاعم على المنصة، وما يديره كل منهم'
-          : undefined
-      }
+      title={audience === 'CUSTOMERS' ? 'العملاء' : audience === '' ? 'الأشخاص' : 'ملاك المطاعم'}
+      subtitle={audience === 'OWNERS' ? 'من يدير المطاعم على المنصة، وما يديره كل منهم' : undefined}
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >
@@ -163,15 +153,14 @@ export default function UsersPage() {
             rows={customers.data ?? []}
             keyOf={(row) => row.id}
             emptyMessage={
-              audience === 'OWNERS'
-                ? 'لا يوجد ملاك مطاعم مطابقون'
-                : 'لا يوجد أشخاص مطابقون'
+              audience === 'OWNERS' ? 'لا يوجد ملاك مطاعم مطابقون' : 'لا يوجد أشخاص مطابقون'
             }
             columns={[
               {
                 key: 'name',
                 header: 'الاسم',
-                render: (row) => row.full_name ?? <span style={{ color: 'var(--text-muted)' }}>—</span>,
+                render: (row) =>
+                  row.full_name ?? <span style={{ color: 'var(--text-muted)' }}>—</span>,
               },
               {
                 key: 'restaurant',
@@ -317,8 +306,8 @@ export default function UsersPage() {
           error={unmask.error instanceof ApiError ? unmask.error.messageAr : null}
           body={
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              يُسجَّل هذا الإجراء في سجل الأنشطة مع اسمك والسبب. أظهر الرقم فقط عند الحاجة
-              التشغيلية الفعلية.
+              يُسجَّل هذا الإجراء في سجل الأنشطة مع اسمك والسبب. أظهر الرقم فقط عند الحاجة التشغيلية
+              الفعلية.
             </p>
           }
           onConfirm={(reason) => unmask.mutate({ id: unmasking.id, reason })}

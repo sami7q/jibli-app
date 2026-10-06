@@ -48,78 +48,76 @@ export type RestaurantPermission = (typeof RESTAURANT_PERMISSIONS)[number];
  * Plan §86. Cashier deliberately excludes cost and profit; Kitchen sees only the
  * preparation lane; Accountant gets finance but not operational state changes.
  */
-export const RESTAURANT_ROLE_PERMISSIONS: Record<
-  RestaurantRole,
-  readonly RestaurantPermission[]
-> = {
-  OWNER: RESTAURANT_PERMISSIONS,
+export const RESTAURANT_ROLE_PERMISSIONS: Record<RestaurantRole, readonly RestaurantPermission[]> =
+  {
+    OWNER: RESTAURANT_PERMISSIONS,
 
-  MANAGER: [
-    'order.read',
-    'order.accept',
-    'order.reject',
-    'order.prepare',
-    'order.ready',
-    'order.cancel',
-    'menu.read',
-    'menu.write',
-    'inventory.read',
-    'inventory.adjust',
-    'inventory.waste',
-    'inventory.cost.read',
-    'driver.read',
-    'driver.manage',
-    'driver.assign',
-    'driver.cash.read',
-    'driver.cash.handover',
-    'finance.read',
-    'finance.settlement.read',
-    'expense.read',
-    'expense.write',
-    'profit.read',
-    'staff.read',
-    'settings.read',
-    'settings.write',
-    'reports.read',
-  ],
+    MANAGER: [
+      'order.read',
+      'order.accept',
+      'order.reject',
+      'order.prepare',
+      'order.ready',
+      'order.cancel',
+      'menu.read',
+      'menu.write',
+      'inventory.read',
+      'inventory.adjust',
+      'inventory.waste',
+      'inventory.cost.read',
+      'driver.read',
+      'driver.manage',
+      'driver.assign',
+      'driver.cash.read',
+      'driver.cash.handover',
+      'finance.read',
+      'finance.settlement.read',
+      'expense.read',
+      'expense.write',
+      'profit.read',
+      'staff.read',
+      'settings.read',
+      'settings.write',
+      'reports.read',
+    ],
 
-  CASHIER: [
-    'order.read',
-    'order.accept',
-    'order.reject',
-    'order.prepare',
-    'order.ready',
-    'menu.read',
-    'driver.read',
-    'driver.assign',
-  ],
+    CASHIER: [
+      'order.read',
+      'order.accept',
+      'order.reject',
+      'order.prepare',
+      'order.ready',
+      'menu.read',
+      'driver.read',
+      'driver.assign',
+    ],
 
-  KITCHEN: ['order.read', 'order.prepare', 'order.ready', 'menu.read', 'inventory.read'],
+    KITCHEN: ['order.read', 'order.prepare', 'order.ready', 'menu.read', 'inventory.read'],
 
-  INVENTORY_MANAGER: [
-    'order.read',
-    'menu.read',
-    'inventory.read',
-    'inventory.adjust',
-    'inventory.waste',
-    'inventory.cost.read',
-    'reports.read',
-  ],
+    INVENTORY_MANAGER: [
+      'order.read',
+      'menu.read',
+      'inventory.read',
+      'inventory.adjust',
+      'inventory.waste',
+      'inventory.cost.read',
+      'reports.read',
+    ],
 
-  ACCOUNTANT: [
-    'order.read',
-    'finance.read',
-    'finance.settlement.read',
-    'finance.settlement.dispute',
-    'expense.read',
-    'expense.write',
-    'profit.read',
-    'inventory.cost.read',
-    'driver.cash.read',
-    'driver.cash.handover',
-    'reports.read',
-  ],
-};
+    ACCOUNTANT: [
+      'order.read',
+      'finance.read',
+      'finance.settlement.read',
+      'finance.settlement.dispute',
+      'expense.read',
+      'expense.write',
+      'profit.read',
+      'inventory.cost.read',
+      'driver.cash.read',
+      'driver.cash.handover',
+      'reports.read',
+    ],
+  };
 
 // ── Platform-scoped permissions (plan §85, §87) ──────────────────────────────
 
@@ -246,7 +244,9 @@ export const REAUTHENTICATION_REQUIRED_PERMISSIONS: readonly AdminPermission[] =
 /** Roles for which MFA must be enrolled before production launch (plan §88). */
 export const MFA_MANDATORY_ROLES: readonly PlatformRole[] = ['SUPER_ADMIN', 'FINANCE_ADMIN'];
 
-export function restaurantPermissionsFor(roles: readonly RestaurantRole[]): Set<RestaurantPermission> {
+export function restaurantPermissionsFor(
+  roles: readonly RestaurantRole[],
+): Set<RestaurantPermission> {
   const granted = new Set<RestaurantPermission>();
   for (const role of roles) {
     for (const permission of RESTAURANT_ROLE_PERMISSIONS[role] ?? []) granted.add(permission);

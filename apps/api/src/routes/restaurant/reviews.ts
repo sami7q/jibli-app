@@ -72,9 +72,7 @@ export function registerRestaurantReviewRoutes(app: FastifyInstance, ctx: AppCon
           total: sql<number>`COUNT(*)`,
         })
         .from(orderReviews)
-        .where(
-          and(eq(orderReviews.restaurantId, restaurantId), eq(orderReviews.isHidden, false)),
-        )
+        .where(and(eq(orderReviews.restaurantId, restaurantId), eq(orderReviews.isHidden, false)))
         .groupBy(orderReviews.rating);
 
       const [restaurant] = await ctx.db

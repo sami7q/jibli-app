@@ -326,10 +326,7 @@ export class OrderAlertManager {
     const count = this.pending.size;
     try {
       new Notification(escalated ? 'طلبات بانتظار القبول!' : 'طلب جديد', {
-        body:
-          count === 1
-            ? 'وصل طلب جديد بانتظار القبول'
-            : `${count} طلبات بانتظار القبول`,
+        body: count === 1 ? 'وصل طلب جديد بانتظار القبول' : `${count} طلبات بانتظار القبول`,
         // A tag replaces the previous notification instead of stacking them.
         tag: 'jibli-new-orders',
         requireInteraction: escalated,
@@ -343,7 +340,8 @@ export class OrderAlertManager {
   private updateTitle(): void {
     if (typeof document === 'undefined') return;
     const count = this.pending.size;
-    document.title = count > 0 ? `(${count}) طلبات جديدة — ${this.originalTitle}` : this.originalTitle;
+    document.title =
+      count > 0 ? `(${count}) طلبات جديدة — ${this.originalTitle}` : this.originalTitle;
   }
 
   private restoreTitle(): void {

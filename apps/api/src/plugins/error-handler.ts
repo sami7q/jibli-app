@@ -47,12 +47,18 @@ function fromDatabaseError(error: unknown): AppError | null {
       });
     case PG_FOREIGN_KEY_VIOLATION:
       return new AppError(ERROR_CODES.VALIDATION_FAILED, {
-        details: { reason: 'REFERENCED_ENTITY_MISSING', ...(constraintName ? { constraint: constraintName } : {}) },
+        details: {
+          reason: 'REFERENCED_ENTITY_MISSING',
+          ...(constraintName ? { constraint: constraintName } : {}),
+        },
         cause: error,
       });
     case PG_CHECK_VIOLATION:
       return new AppError(ERROR_CODES.VALIDATION_FAILED, {
-        details: { reason: 'CHECK_CONSTRAINT_FAILED', ...(constraintName ? { constraint: constraintName } : {}) },
+        details: {
+          reason: 'CHECK_CONSTRAINT_FAILED',
+          ...(constraintName ? { constraint: constraintName } : {}),
+        },
         cause: error,
       });
     default:
@@ -88,7 +94,12 @@ export function registerErrorHandler(app: FastifyInstance): void {
     const dbError = fromDatabaseError(error);
     if (dbError) {
       request.log.warn(
-        { event: 'request.database_error', requestId, code: dbError.code, details: dbError.details },
+        {
+          event: 'request.database_error',
+          requestId,
+          code: dbError.code,
+          details: dbError.details,
+        },
         'Database constraint rejected the request',
       );
       return reply.status(dbError.httpStatus).send(toErrorEnvelope(dbError, requestId));

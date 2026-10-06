@@ -39,8 +39,7 @@ const REQUIREMENTS: readonly Requirement[] = [
   { label: 'ليست متكررة أو متسلسلة', met: (v) => new Set(v).size >= 5 },
   {
     label: 'لا تحتوي على اسم المستخدم',
-    met: (v, username) =>
-      username.length < 3 || !v.toLowerCase().includes(username.toLowerCase()),
+    met: (v, username) => username.length < 3 || !v.toLowerCase().includes(username.toLowerCase()),
   },
 ];
 
@@ -187,7 +186,11 @@ export default function ChangePasswordPage() {
             </div>
 
             {capsLock ? (
-              <span className="field__hint" role="status" style={{ color: 'var(--jibli-warning-700)' }}>
+              <span
+                className="field__hint"
+                role="status"
+                style={{ color: 'var(--jibli-warning-700)' }}
+              >
                 تنبيه: مفتاح Caps Lock مُفعّل
               </span>
             ) : null}
@@ -222,9 +225,7 @@ export default function ChangePasswordPage() {
               aria-invalid={mismatch}
               required
             />
-            {mismatch ? (
-              <span className="field__error">كلمتا المرور غير متطابقتين</span>
-            ) : null}
+            {mismatch ? <span className="field__error">كلمتا المرور غير متطابقتين</span> : null}
           </div>
 
           {error ? (

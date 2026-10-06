@@ -3,13 +3,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { uuidSchema } from '@jibli/validation';
-import {
-  restaurants,
-  supportMessages,
-  supportThreads,
-  users,
-  uuidv7,
-} from '@jibli/db';
+import { restaurants, supportMessages, supportThreads, users, uuidv7 } from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
 import { notifyAdmins } from '../../services/admin-notification-service.js';
@@ -159,10 +153,7 @@ export function registerRestaurantSupportRoutes(app: FastifyInstance, ctx: AppCo
         .select({ value: sql<number>`COUNT(*)` })
         .from(supportThreads)
         .where(
-          and(
-            eq(supportThreads.restaurantId, restaurantId),
-            ne(supportThreads.status, 'RESOLVED'),
-          ),
+          and(eq(supportThreads.restaurantId, restaurantId), ne(supportThreads.status, 'RESOLVED')),
         );
 
       /*

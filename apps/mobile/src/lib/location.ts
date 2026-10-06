@@ -164,7 +164,11 @@ const ASKED_KEY = 'jibli.location.asked';
 
 export async function ensureLocationPermissionAsked(): Promise<void> {
   try {
-    if (isWeb ? globalThis.localStorage?.getItem(ASKED_KEY) : await SecureStore.getItemAsync(ASKED_KEY)) {
+    if (
+      isWeb
+        ? globalThis.localStorage?.getItem(ASKED_KEY)
+        : await SecureStore.getItemAsync(ASKED_KEY)
+    ) {
       return;
     }
   } catch {

@@ -1,19 +1,8 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import {
-  AppError,
-  ERROR_CODES,
-  type PlatformRole,
-  type RestaurantRole,
-} from '@jibli/contracts';
+import { AppError, ERROR_CODES, type PlatformRole, type RestaurantRole } from '@jibli/contracts';
 import { verifyAccessToken, type Principal } from '@jibli/auth';
-import {
-  drivers,
-  restaurantMembers,
-  sessions,
-  userPlatformRoles,
-  users,
-} from '@jibli/db';
+import { drivers, restaurantMembers, sessions, userPlatformRoles, users } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { getConfig } from '../services/config-service.js';
 

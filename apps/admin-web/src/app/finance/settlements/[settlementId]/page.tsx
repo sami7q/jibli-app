@@ -105,7 +105,9 @@ export default function SettlementDetailPage() {
     <AdminShell
       title={data ? `كشف ${data.restaurant_name}` : 'كشف العمولة'}
       subtitle={
-        data ? `${dateAr(data.period_start)} — ${dateAr(data.period_end)} · #${data.partner_code}` : undefined
+        data
+          ? `${dateAr(data.period_start)} — ${dateAr(data.period_end)} · #${data.partner_code}`
+          : undefined
       }
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
@@ -222,7 +224,10 @@ export default function SettlementDetailPage() {
               <Figure label="المتبقي">
                 <strong
                   style={{
-                    color: data.remaining_iqd > 0 ? 'var(--jibli-warning-700)' : 'var(--jibli-success-700)',
+                    color:
+                      data.remaining_iqd > 0
+                        ? 'var(--jibli-warning-700)'
+                        : 'var(--jibli-success-700)',
                   }}
                 >
                   <Money amount={data.remaining_iqd} />
@@ -288,7 +293,9 @@ export default function SettlementDetailPage() {
                   header: 'المبلغ',
                   numeric: true,
                   render: (row) => (
-                    <span style={{ color: row.is_reversal ? 'var(--jibli-danger-700)' : undefined }}>
+                    <span
+                      style={{ color: row.is_reversal ? 'var(--jibli-danger-700)' : undefined }}
+                    >
                       <Money amount={row.amount_iqd} />
                       {row.is_reversal ? ' (عكس قيد)' : ''}
                     </span>
@@ -452,12 +459,20 @@ function PaymentDialog({
   const exceedsRemaining = amount > remaining;
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+    <div
+      className="dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payment-title"
+    >
       <div className="dialog">
         <h2 id="payment-title">تسجيل دفعة</h2>
 
         <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-          المتبقي على المطعم: <strong><Money amount={remaining} /></strong>
+          المتبقي على المطعم:{' '}
+          <strong>
+            <Money amount={remaining} />
+          </strong>
         </p>
 
         <div className="field">
@@ -603,9 +618,7 @@ function AdjustmentDialog({
             onChange={(event) => setReason(event.target.value)}
             placeholder="مثال: تعويض عن طلب أُلغي بعد التحضير بخطأ من المنصة"
           />
-          <span className="field__hint">
-            يظهر السبب للمطعم في كشفه ويُسجَّل في سجل الأنشطة.
-          </span>
+          <span className="field__hint">يظهر السبب للمطعم في كشفه ويُسجَّل في سجل الأنشطة.</span>
         </div>
 
         <div className="dialog__impact">

@@ -63,8 +63,10 @@ function draftFor(value: number): string {
   return value === 0 || !Number.isFinite(value) ? '' : String(value);
 }
 
-export interface NumberFieldProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange' | 'inputMode'> {
+export interface NumberFieldProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'value' | 'onChange' | 'inputMode'
+> {
   readonly value: number;
   readonly onChange: (value: number) => void;
   /** Allow a fractional part. Off by default: IQD has no minor unit. */

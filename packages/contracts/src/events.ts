@@ -60,7 +60,8 @@ export interface DomainEvent<TType extends EventType, TPayload> {
   /** Correlates the event with the HTTP request that caused it (plan §89). */
   readonly requestId: string | null;
   /** Aggregate the event belongs to, used for ordered per-entity delivery. */
-  readonly aggregateType: 'order' | 'delivery' | 'restaurant' | 'settlement' | 'inventory' | 'geography' | 'driver';
+  readonly aggregateType:
+    'order' | 'delivery' | 'restaurant' | 'settlement' | 'inventory' | 'geography' | 'driver';
   readonly aggregateId: string;
   /** Aggregate version at the time of the event; lets a client drop stale events. */
   readonly aggregateVersion: number;
@@ -193,7 +194,10 @@ export const channels = {
 } as const;
 
 /** Which events reach which audience — used by the outbox publisher. */
-export const EVENT_AUDIENCE: Record<EventType, readonly ('customer' | 'restaurant' | 'driver' | 'admin')[]> = {
+export const EVENT_AUDIENCE: Record<
+  EventType,
+  readonly ('customer' | 'restaurant' | 'driver' | 'admin')[]
+> = {
   'order.placed': ['restaurant', 'admin'],
   'order.accepted': ['customer', 'restaurant'],
   'order.rejected': ['customer', 'restaurant', 'admin'],

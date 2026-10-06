@@ -9,11 +9,7 @@ import {
   success,
 } from '@jibli/contracts';
 import { assertPhoneVerified, assertProfileComplete } from '@jibli/auth';
-import {
-  idempotencyKeySchema,
-  quantitySchema,
-  uuidSchema,
-} from '@jibli/validation';
+import { idempotencyKeySchema, quantitySchema, uuidSchema } from '@jibli/validation';
 import {
   claimIdempotencyKey,
   completeIdempotencyKey,
@@ -153,9 +149,7 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
     assertProfileComplete(principal);
 
     const body = placeOrderSchema.parse(request.body);
-    const idempotencyKey = idempotencyKeySchema.parse(
-      request.headers['x-idempotency-key'] ?? '',
-    );
+    const idempotencyKey = idempotencyKeySchema.parse(request.headers['x-idempotency-key'] ?? '');
 
     const claim = await claimIdempotencyKey<PlaceOrderResult>(ctx.db, {
       key: idempotencyKey,
@@ -166,9 +160,9 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
 
     if (claim.kind === 'REPLAYED') {
       // Return the original result, not a new order.
-      return reply.status(200).send(
-        success(claim.response, { request_id: request.requestId, idempotent_replay: true }),
-      );
+      return reply
+        .status(200)
+        .send(success(claim.response, { request_id: request.requestId, idempotent_replay: true }));
     }
 
     if (claim.kind === 'IN_PROGRESS') {

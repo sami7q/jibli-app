@@ -88,9 +88,7 @@ export function ErrorState({
       <Icon name="alert" className="nav__icon" aria-hidden />
       <span style={{ flex: 1 }}>
         {message}
-        {code ? (
-          <span style={{ opacity: 0.7, fontSize: 'var(--text-xs)' }}> ({code})</span>
-        ) : null}
+        {code ? <span style={{ opacity: 0.7, fontSize: 'var(--text-xs)' }}> ({code})</span> : null}
       </span>
       {onRetry ? (
         <button type="button" className="btn btn--danger btn--sm" onClick={onRetry}>
@@ -113,9 +111,7 @@ export function Badge({
 
 /** Money cell. Always tabular, always LTR inside an RTL table. */
 export function Money({ amount }: { amount: number }) {
-  return (
-    <span className="numeric">{new Intl.NumberFormat('en-US').format(amount)} د.ع</span>
-  );
+  return <span className="numeric">{new Intl.NumberFormat('en-US').format(amount)} د.ع</span>;
 }
 
 export function DataTable<T>({
@@ -196,7 +192,12 @@ export function ConfirmDialog({
   const reasonTooShort = requireReason && reason.trim().length < 5;
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div
+      className="dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+    >
       <div className="dialog">
         <h2 id="confirm-title">{title}</h2>
         <div>{body}</div>

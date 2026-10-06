@@ -1,6 +1,9 @@
 # Jibli — Complete Production Engineering Plan
+
 ## Iraqi Food Delivery Platform
+
 ### Customer App + Driver Mode + Restaurant Portal + Admin Portal
+
 ### React Native + Next.js + TypeScript + PostgreSQL
 
 **Document language:** English  
@@ -11,7 +14,7 @@
 **Delivery model in Release 1:** Restaurant-owned drivers  
 **Default navigation:** Google Maps, with Waze as an alternative  
 **Architecture:** Modular monolith with independent worker/realtime responsibilities  
-**Security target:** OWASP ASVS 5.0 Level 2-oriented verification, adjusted to the product risk profile  
+**Security target:** OWASP ASVS 5.0 Level 2-oriented verification, adjusted to the product risk profile
 
 ---
 

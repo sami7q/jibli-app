@@ -65,9 +65,7 @@ export function reduceCart(cart: Cart | null, action: CartAction): Cart | null {
       const existing = base.lines.find((line) => line.key === key);
       const lines = existing
         ? base.lines.map((line) =>
-            line.key === key
-              ? { ...line, quantity: line.quantity + action.line.quantity }
-              : line,
+            line.key === key ? { ...line, quantity: line.quantity + action.line.quantity } : line,
           )
         : [...base.lines, { ...action.line, key }];
 

@@ -44,14 +44,11 @@ function StaffScreen({ auth, canManage }: { auth: PortalAuth; canManage: boolean
   const session = useSession();
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [changing, setChanging] = useState<{ member: StaffMember; activate: boolean } | null>(
-    null,
-  );
+  const [changing, setChanging] = useState<{ member: StaffMember; activate: boolean } | null>(null);
 
   // Only an OWNER may mint another OWNER; hiding the option keeps the person
   // from composing a request the server will refuse.
-  const isOwner =
-    session.status === 'authenticated' && session.roles.includes('OWNER');
+  const isOwner = session.status === 'authenticated' && session.roles.includes('OWNER');
   const currentUserId = session.status === 'authenticated' ? session.userId : null;
 
   const staff = useQuery({
@@ -113,7 +110,10 @@ function StaffScreen({ auth, canManage }: { auth: PortalAuth; canManage: boolean
         </div>
 
         {activeOwners === 1 ? (
-          <p className="alert-bar alert-bar--warning" style={{ marginBlockStart: 'var(--space-4)' }}>
+          <p
+            className="alert-bar alert-bar--warning"
+            style={{ marginBlockStart: 'var(--space-4)' }}
+          >
             <span style={{ flex: 1 }}>
               يوجد مالك واحد فعّال فقط. لا يمكن إيقافه — إضافة مالك ثانٍ تحمي الحساب إذا تعذّر
               الوصول إلى الأول.
@@ -201,9 +201,7 @@ function StaffScreen({ auth, canManage }: { auth: PortalAuth; canManage: boolean
                               type="button"
                               className="btn btn--ghost btn--sm"
                               disabled={setActive.isPending}
-                              onClick={() =>
-                                setActive.mutate({ id: member.id, isActive: true })
-                              }
+                              onClick={() => setActive.mutate({ id: member.id, isActive: true })}
                             >
                               إعادة تفعيل
                             </button>

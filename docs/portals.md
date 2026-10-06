@@ -16,13 +16,13 @@ Both portals use **username and password**. Neither uses the phone-and-OTP flow
 the mobile apps use, and that separation is deliberate: the portals must keep
 working when no SMS gateway exists, which is exactly the situation today.
 
-| | Admin | Restaurant |
-|---|---|---|
+|                    | Admin                                        | Restaurant                              |
+| ------------------ | -------------------------------------------- | --------------------------------------- |
 | Account created by | `bootstrap-admin` script, then Admin → Users | Admin → Restaurant → portal credentials |
-| Minimum password | 14 characters | 12 characters |
-| First sign-in | forced password change | forced password change |
-| MFA | required before sensitive routes | required before sensitive routes |
-| Lockout | 6 failures → 15 minutes | 6 failures → 15 minutes |
+| Minimum password   | 14 characters                                | 12 characters                           |
+| First sign-in      | forced password change                       | forced password change                  |
+| MFA                | required before sensitive routes             | required before sensitive routes        |
+| Lockout            | 6 failures → 15 minutes                      | 6 failures → 15 minutes                 |
 
 Password policy follows NIST SP 800-63B: length over composition, and **no
 forced periodic expiry** — rotation on a schedule makes people pick weaker
@@ -41,7 +41,7 @@ enters the picture.
 
 `packages/ui-web/src/middleware.ts` guards routes at the edge before any page
 renders. It separates paths reachable while signed out from paths reachable
-*only* while signed out, and validates the return parameter against open
+_only_ while signed out, and validates the return parameter against open
 redirects: protocol-relative URLs, backslash-prefixed hosts, `javascript:` and
 control characters are all rejected.
 
@@ -66,21 +66,21 @@ kitchen screen cannot see money.
 
 ## 3. Admin portal
 
-| Route | What it does |
-|---|---|
-| `/` | Headline tiles, order status split, 30-day sales and 7-day commission series |
-| `/orders` · `/orders/live` · `/orders/cancelled` | All orders; the live board; cancellations with reasons |
-| `/restaurants` · `/new` · `/[id]` | Directory, onboarding, and the full file for one restaurant |
-| `/applications` | Onboarding applications — approve or reject |
-| `/categories` | Cuisine categories |
-| `/users` · `/drivers` | Platform-wide people; driver suspension |
-| `/finance/settlements` · `/[id]` | Settlement periods and one settlement's detail |
-| `/finance/invoices` · `/finance/reports` | Invoices; revenue and commission reporting |
-| `/coupons` | Create and schedule coupons — see §7, they do not reach checkout yet |
-| `/geography` | Governorates and cities, and the three capability switches |
-| `/settings` | All 11 platform config keys |
-| `/settings/roles` · `/settings/mfa` | Who holds what; MFA enrolment |
-| `/audit` | Every privileged action, who did it and when |
+| Route                                            | What it does                                                                 |
+| ------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `/`                                              | Headline tiles, order status split, 30-day sales and 7-day commission series |
+| `/orders` · `/orders/live` · `/orders/cancelled` | All orders; the live board; cancellations with reasons                       |
+| `/restaurants` · `/new` · `/[id]`                | Directory, onboarding, and the full file for one restaurant                  |
+| `/applications`                                  | Onboarding applications — approve or reject                                  |
+| `/categories`                                    | Cuisine categories                                                           |
+| `/users` · `/drivers`                            | Platform-wide people; driver suspension                                      |
+| `/finance/settlements` · `/[id]`                 | Settlement periods and one settlement's detail                               |
+| `/finance/invoices` · `/finance/reports`         | Invoices; revenue and commission reporting                                   |
+| `/coupons`                                       | Create and schedule coupons — see §7, they do not reach checkout yet         |
+| `/geography`                                     | Governorates and cities, and the three capability switches                   |
+| `/settings`                                      | All 11 platform config keys                                                  |
+| `/settings/roles` · `/settings/mfa`              | Who holds what; MFA enrolment                                                |
+| `/audit`                                         | Every privileged action, who did it and when                                 |
 
 ### Geography is the master switch
 
@@ -96,18 +96,18 @@ anyone order from a city that has none.
 
 ## 4. Restaurant portal
 
-| Route | What it does |
-|---|---|
-| `/` | Today's orders, revenue, commission owed, low stock |
-| `/orders` | The live board — accept, reject, assign a driver |
-| `/menu` | Categories, items, availability, modifier groups |
-| `/inventory` | Stock, movements, recipes, low-stock thresholds |
-| `/drivers` | Add a driver, activate or deactivate, cash custody |
-| `/staff` | Portal users for this restaurant and their roles |
-| `/commissions` · `/profits` | What is owed; profit after commission and expenses |
-| `/settlements` · `/[id]` | Settlement periods, and disputing one |
-| `/settings` | Working hours, exceptions, busy mode |
-| `/alert-test` | Order-alert QA harness — see below |
+| Route                       | What it does                                        |
+| --------------------------- | --------------------------------------------------- |
+| `/`                         | Today's orders, revenue, commission owed, low stock |
+| `/orders`                   | The live board — accept, reject, assign a driver    |
+| `/menu`                     | Categories, items, availability, modifier groups    |
+| `/inventory`                | Stock, movements, recipes, low-stock thresholds     |
+| `/drivers`                  | Add a driver, activate or deactivate, cash custody  |
+| `/staff`                    | Portal users for this restaurant and their roles    |
+| `/commissions` · `/profits` | What is owed; profit after commission and expenses  |
+| `/settlements` · `/[id]`    | Settlement periods, and disputing one               |
+| `/settings`                 | Working hours, exceptions, busy mode                |
+| `/alert-test`               | Order-alert QA harness — see below                  |
 
 `/alert-test` is not a leftover. Browser autoplay policy cannot be verified by a
 unit test, so this page drives the real `OrderAlertManager` on the restaurant's
@@ -165,17 +165,17 @@ handover; the driver sees what they are holding.
 The portals are where an operator changes what the phone sees. These levers
 exist today.
 
-| Lever | Where | Why it matters on a phone |
-|---|---|---|
-| `minimum_app_version` | Admin → Settings | Below it, the app is told to force an update. This is how a breaking API change survives customers who never update |
-| `latest_app_version` | Admin → Settings | Offers a non-blocking update prompt |
-| `global_checkout_enabled` | Admin → Settings | Platform-wide kill switch, with its own danger banner |
-| `support_phone` | Admin → Settings | The number the app shows when something goes wrong |
-| `order_acceptance_timeout_minutes` | Admin → Settings | How long a restaurant has before an order escalates |
-| `delivery_pin_enabled` | Admin → Settings | Whether the customer reads a PIN to the driver at handover |
-| `max_active_deliveries_per_driver` | Admin → Settings | Assignment capacity |
-| Customer signup, per city | Admin → Geography | Whether a phone in that city can register at all |
-| Ordering, per city | Admin → Geography | Whether checkout is offered there |
+| Lever                              | Where             | Why it matters on a phone                                                                                           |
+| ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `minimum_app_version`              | Admin → Settings  | Below it, the app is told to force an update. This is how a breaking API change survives customers who never update |
+| `latest_app_version`               | Admin → Settings  | Offers a non-blocking update prompt                                                                                 |
+| `global_checkout_enabled`          | Admin → Settings  | Platform-wide kill switch, with its own danger banner                                                               |
+| `support_phone`                    | Admin → Settings  | The number the app shows when something goes wrong                                                                  |
+| `order_acceptance_timeout_minutes` | Admin → Settings  | How long a restaurant has before an order escalates                                                                 |
+| `delivery_pin_enabled`             | Admin → Settings  | Whether the customer reads a PIN to the driver at handover                                                          |
+| `max_active_deliveries_per_driver` | Admin → Settings  | Assignment capacity                                                                                                 |
+| Customer signup, per city          | Admin → Geography | Whether a phone in that city can register at all                                                                    |
+| Ordering, per city                 | Admin → Geography | Whether checkout is offered there                                                                                   |
 
 The app sends `X-App-Version`; `GET /api/v1/app/config` answers with
 `minimum_version`, `latest_version`, `update_required`, `update_available`. A
@@ -201,12 +201,12 @@ built and signed into with no SMS provider at all.
 
 ## 7. Gaps, stated so nobody finds them the hard way
 
-| Gap | Consequence |
-|---|---|
-| No SMS gateway | No customer and no driver can sign in. The portals are unaffected |
-| Coupons never reach checkout | `coupon_redemptions` exists with a unique index on the order, `calculateOrderTotals` accepts a discount, and Admin creates coupons — but no code path applies one at quote or order time. Coupons can be created and never used |
-| No upload endpoint | The `assets` table and its keys exist. No restaurant logo, no dish photo, anywhere |
-| No push provider | Tokens register; nothing sends |
-| `INVALID_CREDENTIALS` names the phone | Shared with the phone-OTP flow, so a failed *username* sign-in names the wrong field |
-| Restaurant portal never run with a real account | It builds, deploys and reaches the API. No restaurant exists yet, so no page has been exercised against real data |
-| No automated test touches a database | 309 tests pass and none runs a query. `raw-sql.test.ts` refuses two shapes known to fail at runtime; it cannot prove a query works |
+| Gap                                             | Consequence                                                                                                                                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No SMS gateway                                  | No customer and no driver can sign in. The portals are unaffected                                                                                                                                                               |
+| Coupons never reach checkout                    | `coupon_redemptions` exists with a unique index on the order, `calculateOrderTotals` accepts a discount, and Admin creates coupons — but no code path applies one at quote or order time. Coupons can be created and never used |
+| No upload endpoint                              | The `assets` table and its keys exist. No restaurant logo, no dish photo, anywhere                                                                                                                                              |
+| No push provider                                | Tokens register; nothing sends                                                                                                                                                                                                  |
+| `INVALID_CREDENTIALS` names the phone           | Shared with the phone-OTP flow, so a failed _username_ sign-in names the wrong field                                                                                                                                            |
+| Restaurant portal never run with a real account | It builds, deploys and reaches the API. No restaurant exists yet, so no page has been exercised against real data                                                                                                               |
+| No automated test touches a database            | 309 tests pass and none runs a query. `raw-sql.test.ts` refuses two shapes known to fail at runtime; it cannot prove a query works                                                                                              |

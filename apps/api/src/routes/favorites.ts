@@ -4,13 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { uuidSchema } from '@jibli/validation';
 import { evaluateOpenState } from '@jibli/domain';
-import {
-  cities,
-  customerFavorites,
-  restaurantBranches,
-  restaurants,
-  uuidv7,
-} from '@jibli/db';
+import { cities, customerFavorites, restaurantBranches, restaurants, uuidv7 } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { loadHours } from './catalog.js';

@@ -10,7 +10,7 @@ Each file is one language. Keys **must** sit under `"ios"` or `"android"`:
 ```
 
 **Never put a key at the top level.** `@expo/config-plugins` applies top-level
-keys to *both* platforms. This directory used to hold flat iOS keys on the
+keys to _both_ platforms. This directory used to hold flat iOS keys on the
 belief that Expo only read it for iOS — true once, not on SDK 57 — and Android
 received `CFBundleDisplayName`, `CFBundleName` and
 `NSLocationWhenInUseUsageDescription` as `res/values-b+<lang>/strings.xml`.

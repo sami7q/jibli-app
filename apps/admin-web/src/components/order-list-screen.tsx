@@ -111,15 +111,17 @@ export function OrderListScreen({
             caption="قائمة الطلبات"
             rows={orders.data ?? []}
             keyOf={(row) => row.id}
-            emptyMessage={
-              scope === 'live' ? 'لا توجد طلبات نشطة الآن' : 'لا توجد طلبات مطابقة'
-            }
+            emptyMessage={scope === 'live' ? 'لا توجد طلبات نشطة الآن' : 'لا توجد طلبات مطابقة'}
             columns={[
               {
                 key: 'number',
                 header: 'رقم الطلب',
                 render: (row) => (
-                  <Link href={`/orders/${row.id}`} className="ltr-inline" style={{ fontWeight: 700, color: 'inherit' }}>
+                  <Link
+                    href={`/orders/${row.id}`}
+                    className="ltr-inline"
+                    style={{ fontWeight: 700, color: 'inherit' }}
+                  >
                     #{row.public_order_number}
                   </Link>
                 ),

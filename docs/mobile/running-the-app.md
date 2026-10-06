@@ -16,15 +16,15 @@ pnpm install            # from the repo root
 
 Then a way to see the app. Pick one:
 
-| | What it runs | Needs | Good for |
-|---|---|---|---|
-| **Expo Go** | JavaScript only, inside Expo's own app | a phone, Expo Go from the store, **and a free Expo account signed in on both the phone and the CLI** | seeing screens today |
-| **Development build** | a real Jibli binary on your device | Xcode (iOS) or Android Studio; no account | anything native — push, the real icon, store testing |
+|                       | What it runs                           | Needs                                                                                                | Good for                                             |
+| --------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Expo Go**           | JavaScript only, inside Expo's own app | a phone, Expo Go from the store, **and a free Expo account signed in on both the phone and the CLI** | seeing screens today                                 |
+| **Development build** | a real Jibli binary on your device     | Xcode (iOS) or Android Studio; no account                                                            | anything native — push, the real icon, store testing |
 
 Expo Go is the fast path and is enough for everything the app currently does.
 
 > **The account is not optional any more.** Since SDK 57, Expo requires you to
-> be signed in on *both* the Expo CLI and the Expo Go app, to the same account,
+> be signed in on _both_ the Expo CLI and the Expo Go app, to the same account,
 > before it will open a development server. Without it the phone answers «You
 > need to be signed in to Expo Go and Expo CLI to open your project» — an error
 > that appears on the phone for a cause that lives on the computer. It applies
@@ -103,10 +103,10 @@ so no real number can receive a code.
 **One number can sign in, and it is the one to test with.** `OTP_TEST_PHONES`
 names it and `OTP_MOCK_CODE` fixes its code, so it needs no SMS at all:
 
-| | |
-|---|---|
+|       |                                  |
+| ----- | -------------------------------- |
 | Phone | `07712345678` (`+9647712345678`) |
-| Code | `1234` |
+| Code  | `1234`                           |
 
 Verified against the deployed API on 2026-09-15: `POST /auth/otp/request` for
 that number answers `{"sent":true,...,"dev_code":"1234"}`. Every other number
@@ -164,11 +164,11 @@ Runs Metro over both platforms and writes `.expo-export/`. It is part of
 class of failure**: before this change the app typechecked cleanly and could not
 bundle at all — three separate reasons, none visible to `tsc`.
 
-| What was wrong | Why `tsc` could not see it |
-|---|---|
-| `@babel/runtime` was not a dependency | it is injected by the Babel preset, not imported in source |
-| `tsconfig`'s `react` path mapping was applied by Metro to *runtime* resolution, so `import 'react'` resolved to `@types/react` — a package with no JavaScript | the mapping exists precisely to make `tsc` happy |
-| workspace packages import `./arabic.js` while the file on disk is `arabic.ts` | TypeScript resolves those itself; bundlers must be told |
+| What was wrong                                                                                                                                                | Why `tsc` could not see it                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `@babel/runtime` was not a dependency                                                                                                                         | it is injected by the Babel preset, not imported in source |
+| `tsconfig`'s `react` path mapping was applied by Metro to _runtime_ resolution, so `import 'react'` resolved to `@types/react` — a package with no JavaScript | the mapping exists precisely to make `tsc` happy           |
+| workspace packages import `./arabic.js` while the file on disk is `arabic.ts`                                                                                 | TypeScript resolves those itself; bundlers must be told    |
 
 Fixed by, respectively: a direct dependency, `experiments.tsconfigPaths: false`
 plus a Babel alias for `@/`, and a Metro resolver that retries `.js` as `.ts`.
@@ -178,17 +178,17 @@ Both platforms bundle: **1224 modules (iOS), 1220 (Android)**.
 
 ## 6. Troubleshooting
 
-| What you see | What it is |
-|---|---|
-| First load hangs ~1 min, then works | Render cold start. §2. |
-| "تعذّر الاتصال بالإنترنت" on every screen | `EXPO_PUBLIC_API_URL` points at `localhost`, or the local API binds `127.0.0.1`. §2. |
-| The app opens on a welcome screen, not the home | Correct. First launch asks once: sign in, or browse as a guest. |
-| Home says «اختر منطقتك» and lists nothing | No delivery area chosen yet. Tap the location row in the header. If an area is chosen and the list is still empty, see §8. |
-| Sign-in never arrives | No SMS gateway on staging. §3. |
-| Metro cannot resolve a module after pulling, or the phone shows a screen you have already changed | `pnpm install`, then `pnpm dev:mobile` — it starts Metro with `--clear`, so nothing transformed by an earlier run survives. |
-| `CommandError: No Android connected device found` | You pressed **a** with no device or emulator attached. Nothing is wrong: scan the QR with Expo Go instead, or press **w** for the browser (§9). An emulator needs Android Studio. |
-| Expo warns a package version is wrong | `pnpm --filter @jibli/mobile exec expo install --fix`, then restart Metro. Worth doing: `expo-splash-screen` was once pinned to a version from a *later* SDK, whose native API differs. |
-| Arabic renders left-to-right on a fresh install | RTL is forced at startup and Android applies it after one restart. Close and reopen. |
+| What you see                                                                                      | What it is                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First load hangs ~1 min, then works                                                               | Render cold start. §2.                                                                                                                                                                  |
+| "تعذّر الاتصال بالإنترنت" on every screen                                                         | `EXPO_PUBLIC_API_URL` points at `localhost`, or the local API binds `127.0.0.1`. §2.                                                                                                    |
+| The app opens on a welcome screen, not the home                                                   | Correct. First launch asks once: sign in, or browse as a guest.                                                                                                                         |
+| Home says «اختر منطقتك» and lists nothing                                                         | No delivery area chosen yet. Tap the location row in the header. If an area is chosen and the list is still empty, see §8.                                                              |
+| Sign-in never arrives                                                                             | No SMS gateway on staging. §3.                                                                                                                                                          |
+| Metro cannot resolve a module after pulling, or the phone shows a screen you have already changed | `pnpm install`, then `pnpm dev:mobile` — it starts Metro with `--clear`, so nothing transformed by an earlier run survives.                                                             |
+| `CommandError: No Android connected device found`                                                 | You pressed **a** with no device or emulator attached. Nothing is wrong: scan the QR with Expo Go instead, or press **w** for the browser (§9). An emulator needs Android Studio.       |
+| Expo warns a package version is wrong                                                             | `pnpm --filter @jibli/mobile exec expo install --fix`, then restart Metro. Worth doing: `expo-splash-screen` was once pinned to a version from a _later_ SDK, whose native API differs. |
+| Arabic renders left-to-right on a fresh install                                                   | RTL is forced at startup and Android applies it after one restart. Close and reopen.                                                                                                    |
 
 ---
 
@@ -196,11 +196,11 @@ Both platforms bundle: **1224 modules (iOS), 1220 (Android)**.
 
 Fetched live from the deployed API, so this is what the app renders right now:
 
-| Part of the home screen | State |
-|---|---|
-| Category strip | **22 categories**, Arabic names, emoji — from Admin → التصنيفات. None has an image, so each falls back to its emoji. That is not a gap: the emoji are sharper than any placeholder that could be drawn for them, and a category image uploaded in Admin replaces one without a release. |
-| Banner carousel | **3 banners**, with art, rotating every 5 seconds — all of it from Admin → شكل التطبيق. Two of them link to a category. |
-| Restaurant list | **6 restaurants in بغداد**, each with a generated cover and logo. See below. |
+| Part of the home screen | State                                                                                                                                                                                                                                                                                   |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Category strip          | **22 categories**, Arabic names, emoji — from Admin → التصنيفات. None has an image, so each falls back to its emoji. That is not a gap: the emoji are sharper than any placeholder that could be drawn for them, and a category image uploaded in Admin replaces one without a release. |
+| Banner carousel         | **3 banners**, with art, rotating every 5 seconds — all of it from Admin → شكل التطبيق. Two of them link to a category.                                                                                                                                                                 |
+| Restaurant list         | **6 restaurants in بغداد**, each with a generated cover and logo. See below.                                                                                                                                                                                                            |
 
 Those strings exist nowhere in the app. They came out of the database Admin
 writes to, which is what "connected" means here.
@@ -213,14 +213,14 @@ writes to, which is what "connected" means here.
 `APP_ENV` is not `production`. They are not six of the same thing: each one
 exists to make a different state of the app reachable.
 
-| Restaurant | What it proves |
-|---|---|
-| **مندي حضرموت** | The full path. Open around the clock, 10 dishes in 3 categories, a **required** option group (الحجم) and an optional one (إضافات) — so the item sheet's "you must choose a size" rule is testable at any hour. |
-| **برجر بغداد** | Free delivery. The card shows «توصيل مجاني» and the cart shows «التوصيل مجاني» instead of a fee. Also open around the clock. |
-| **شاورما الأصيل** | No ratings yet, so the card must show «جديد» rather than a fake `0.0`. Opens 09:00 and closes at 02:00 the next morning — the overnight wrap. |
-| **بيتزا روما** | Three option sizes with different prices. Closed outside 12:00–23:00. |
-| **حلويات أبو عفيف** | Closed most of the day (08:00–16:00, shut on Friday), which is how the «مغلق الآن» overlay and the faded menu get exercised. |
-| **مشاوي الخيمة** | A 25,000 IQD minimum, so the cart's "add 12,000 more" warning is reachable. Two items marked unavailable. |
+| Restaurant          | What it proves                                                                                                                                                                                                 |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **مندي حضرموت**     | The full path. Open around the clock, 10 dishes in 3 categories, a **required** option group (الحجم) and an optional one (إضافات) — so the item sheet's "you must choose a size" rule is testable at any hour. |
+| **برجر بغداد**      | Free delivery. The card shows «توصيل مجاني» and the cart shows «التوصيل مجاني» instead of a fee. Also open around the clock.                                                                                   |
+| **شاورما الأصيل**   | No ratings yet, so the card must show «جديد» rather than a fake `0.0`. Opens 09:00 and closes at 02:00 the next morning — the overnight wrap.                                                                  |
+| **بيتزا روما**      | Three option sizes with different prices. Closed outside 12:00–23:00.                                                                                                                                          |
+| **حلويات أبو عفيف** | Closed most of the day (08:00–16:00, shut on Friday), which is how the «مغلق الآن» overlay and the faded menu get exercised.                                                                                   |
+| **مشاوي الخيمة**    | A 25,000 IQD minimum, so the cart's "add 12,000 more" warning is reachable. Two items marked unavailable.                                                                                                      |
 
 **45 menu items, 15 categories, 8 option groups**, and one unavailable dish per
 restaurant where it makes sense — because an item that is out of stock today has
@@ -245,14 +245,14 @@ second run reports `0 inserted, 6 updated`.
 
 Each demo restaurant has an owner who can sign into the restaurant portal:
 
-| Username | Password | Restaurant |
-|---|---|---|
-| `demo.mandi` | `Jibli!Demo2026` | مندي حضرموت |
-| `demo.burger` | `Jibli!Demo2026` | برجر بغداد |
-| `demo.pizza` | `Jibli!Demo2026` | بيتزا روما |
-| `demo.shawarma` | `Jibli!Demo2026` | شاورما الأصيل |
-| `demo.sweets` | `Jibli!Demo2026` | حلويات أبو عفيف |
-| `demo.grill` | `Jibli!Demo2026` | مشاوي الخيمة |
+| Username        | Password         | Restaurant      |
+| --------------- | ---------------- | --------------- |
+| `demo.mandi`    | `Jibli!Demo2026` | مندي حضرموت     |
+| `demo.burger`   | `Jibli!Demo2026` | برجر بغداد      |
+| `demo.pizza`    | `Jibli!Demo2026` | بيتزا روما      |
+| `demo.shawarma` | `Jibli!Demo2026` | شاورما الأصيل   |
+| `demo.sweets`   | `Jibli!Demo2026` | حلويات أبو عفيف |
+| `demo.grill`    | `Jibli!Demo2026` | مشاوي الخيمة    |
 
 Demo credentials, printed in the seed output and stated here on purpose. They
 belong to fake restaurants and must not exist in production — the seeder
@@ -263,7 +263,7 @@ refuses to run when `APP_ENV=production`.
 The seed also opens **بغداد** for signup, onboarding and ordering. Before it
 ran, the only ordering-enabled area was حديثة in الأنبار and it had no
 restaurants, so the app showed an empty list — indistinguishable from a broken
-one. `GET /restaurants` requires the city *and* its governorate to be enabled
+one. `GET /restaurants` requires the city _and_ its governorate to be enabled
 for ordering, the restaurant `APPROVED` and `ACTIVE`, and the branch active and
 accepting orders. Any one of those being off yields `[]`.
 
@@ -317,13 +317,13 @@ do with signing in.
 
 Three integrations get asked about, so they are written down plainly.
 
-| | State |
-|---|---|
-| **OTP / SMS** | The gateway is **implemented** — `HttpSmsGatewayProvider`, with one retry on a 5xx or a timeout, never on a rejection, and the body never logged. It is **not connected**: set `OTP_PROVIDER=sms_gateway`, `SMS_GATEWAY_URL` and `SMS_GATEWAY_API_KEY` and sign-in works. Field names differ by aggregator and are configuration (`SMS_GATEWAY_TO_FIELD` and friends); `SMS_GATEWAY_AUTH_SCHEME` chooses bearer, header or body. On staging, set `OTP_PHONE_ALLOWLIST` so a live gateway cannot text a real customer. |
+|                            | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OTP / SMS**              | The gateway is **implemented** — `HttpSmsGatewayProvider`, with one retry on a 5xx or a timeout, never on a rejection, and the body never logged. It is **not connected**: set `OTP_PROVIDER=sms_gateway`, `SMS_GATEWAY_URL` and `SMS_GATEWAY_API_KEY` and sign-in works. Field names differ by aggregator and are configuration (`SMS_GATEWAY_TO_FIELD` and friends); `SMS_GATEWAY_AUTH_SCHEME` chooses bearer, header or body. On staging, set `OTP_PHONE_ALLOWLIST` so a live gateway cannot text a real customer.                                                                                                                                                                                                                                                                                   |
 | **Signing in without SMS** | `OTP_PROVIDER=mock` makes the code a fixed one — `OTP_MOCK_CODE`, default `0000` — so **any number signs in**. It replaces the generated code rather than bypassing verification, so the challenge is still stored, hashed, expired, attempt-counted and rate-limited exactly as in production; only the randomness is gone. Right on a laptop, too wide for a URL anyone can reach — so `OTP_TEST_PHONES` is the same mechanism narrowed to a comma-separated list: those numbers get the fixed code and get it back in the response, every other number keeps a random one it cannot read. Listed numbers also skip the gateway, so connecting a real one later cannot start billing for them. The schema refuses both `mock` and a non-empty `OTP_TEST_PHONES` in production, so neither can escape. |
-| **Google sign-in** | **Server: done.** `POST /auth/google` verifies the ID token against Google's published keys, checking issuer, audience and expiry, and matches on Google's subject id rather than the email — an email can change hands, a subject cannot. A Google account is signed in but **cannot order**: `assertPhoneVerified` refuses the quote and the order until a phone is linked through `POST /auth/phone/link`, which runs the same OTP with the same limits. **App: ready but off.** Fill in `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` and set `GOOGLE_CLIENT_IDS` on the server; without them the button is hidden, because a Google button that fails is worse than none. **Shipping it on iOS obliges Sign in with Apple beside it** (guideline 4.8) — that work is not done. |
-| **Maps** | There is **no in-app map**, deliberately. What exists: the customer can attach their current coordinates to a saved address (`expo-location`, foreground only, asked once), and any point can be opened in whatever maps app the phone already has — `geo:` on Android, Apple Maps on iOS, a Google Maps URL as the fallback. None of that needs an API key or a billing account. A rendered map would need a map SDK, a key, and a geocoder, and in a city where addresses are landmarks it would still be «قرب صيدلية النور» that gets the driver there. ADR-0005 stands: no live driver tracking. |
-| **Driver sign-up** | **Now exists.** `POST /api/v1/driver/apply` creates a driver in `PENDING_ACTIVATION`; `GET /api/v1/driver/application` reports its state. In the app it is a row on the account screen — visible to guests too, because somebody who wants to deliver arrives as a browsing customer. Applying is not joining: an operator activates the account, and `assertDriver` refuses everything until they do. |
+| **Google sign-in**         | **Server: done.** `POST /auth/google` verifies the ID token against Google's published keys, checking issuer, audience and expiry, and matches on Google's subject id rather than the email — an email can change hands, a subject cannot. A Google account is signed in but **cannot order**: `assertPhoneVerified` refuses the quote and the order until a phone is linked through `POST /auth/phone/link`, which runs the same OTP with the same limits. **App: ready but off.** Fill in `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` and set `GOOGLE_CLIENT_IDS` on the server; without them the button is hidden, because a Google button that fails is worse than none. **Shipping it on iOS obliges Sign in with Apple beside it** (guideline 4.8) — that work is not done.                                  |
+| **Maps**                   | There is **no in-app map**, deliberately. What exists: the customer can attach their current coordinates to a saved address (`expo-location`, foreground only, asked once), and any point can be opened in whatever maps app the phone already has — `geo:` on Android, Apple Maps on iOS, a Google Maps URL as the fallback. None of that needs an API key or a billing account. A rendered map would need a map SDK, a key, and a geocoder, and in a city where addresses are landmarks it would still be «قرب صيدلية النور» that gets the driver there. ADR-0005 stands: no live driver tracking.                                                                                                                                                                                                    |
+| **Driver sign-up**         | **Now exists.** `POST /api/v1/driver/apply` creates a driver in `PENDING_ACTIVATION`; `GET /api/v1/driver/application` reports its state. In the app it is a row on the account screen — visible to guests too, because somebody who wants to deliver arrives as a browsing customer. Applying is not joining: an operator activates the account, and `assertDriver` refuses everything until they do.                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -349,7 +349,7 @@ instead of failing — it prints `waking it, this takes up to a minute…` and
 retries until the service answers.
 
 Run the API yourself when you need anything the deployed one will not do: sign
-in as a *second* number, raise the OTP limits, read server logs, or work
+in as a _second_ number, raise the OTP limits, read server logs, or work
 against your own database.
 
 ### No Docker needed
@@ -417,19 +417,19 @@ ip>:4000` instead — never `localhost`, which on a phone is the phone.
 Sign in with **any** Iraqi number and the code **1234**. One account is set up
 and ready to order from — profile completed, default address saved:
 
-| | |
-|---|---|
-| Phone | `+964 771 234 5678` |
-| Code | `1234` |
-| Name | حساب تجريبي |
-| Area | بغداد / بغداد |
-| Address | الكرادة، شارع ٦٢، قرب صيدلية النور (default) |
+|              |                                                               |
+| ------------ | ------------------------------------------------------------- |
+| Phone        | `+964 771 234 5678`                                           |
+| Code         | `1234`                                                        |
+| Name         | حساب تجريبي                                                   |
+| Area         | بغداد / بغداد                                                 |
+| Address      | الكرادة، شارع ٦٢، قرب صيدلية النور (default)                  |
 | Order placed | `JB9505061` — بطاطا مقلية ×2, 5,000 + 500 service = **5,500** |
 
 **One tap gets you in.** The sign-in screen carries a «دخول سريع — وضع
 التطوير» button that requests the code for that number and submits it in the
 same gesture, landing straight on the home screen. It is drawn only when
-`__DEV__` is true *and* the server actually answers with a code — which it does
+`__DEV__` is true _and_ the server actually answers with a code — which it does
 solely for `APP_ENV=local`, the mock provider, or a number in `OTP_TEST_PHONES`
 — so there is no build in which a customer can see it and no flag to remember
 to turn off. It works against the deployed API too, because the number it uses
@@ -448,15 +448,15 @@ which is the guard doing its job, not a bug.
 
 ## 12. What is deployed, and where
 
-| Piece | Where | Verified |
-|---|---|---|
-| API | Render `jibli-api`, Frankfurt | `/health/ready` → `{"status":"ok","checks":{"database":true,"redis":true}}` |
-| Admin portal | Vercel | — |
-| Restaurant portal | Vercel | — |
-| Database | Neon PostgreSQL | reported healthy by the API |
-| Redis / Key Value | Render | reported healthy by the API |
-| Customer app | not published | bundles for both platforms; reviewed screen by screen in a browser; never run on a device |
-| Demo marketplace | Neon, بغداد | 6 restaurants, 45 items, 8 option groups — §8 |
+| Piece             | Where                         | Verified                                                                                  |
+| ----------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
+| API               | Render `jibli-api`, Frankfurt | `/health/ready` → `{"status":"ok","checks":{"database":true,"redis":true}}`               |
+| Admin portal      | Vercel                        | —                                                                                         |
+| Restaurant portal | Vercel                        | —                                                                                         |
+| Database          | Neon PostgreSQL               | reported healthy by the API                                                               |
+| Redis / Key Value | Render                        | reported healthy by the API                                                               |
+| Customer app      | not published                 | bundles for both platforms; reviewed screen by screen in a browser; never run on a device |
+| Demo marketplace  | Neon, بغداد                   | 6 restaurants, 45 items, 8 option groups — §8                                             |
 
 The worker (`jibli-worker`) is the one paid service in `render.yaml`. Without it
 the portals still work — the order board falls back to polling — but the

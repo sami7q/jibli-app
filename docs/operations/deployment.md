@@ -7,12 +7,12 @@ step could not be executed from the development machine, it says so.
 
 ## 0. What you are deploying
 
-| Service | What it is | Needs |
-|---|---|---|
-| `@jibli/api` | Fastify HTTP + WebSocket | PostgreSQL, Redis |
-| `@jibli/worker` | Outbox publisher, settlement and reconciliation jobs | PostgreSQL, Redis |
-| `admin-web` | Next.js Admin Portal | the API |
-| `restaurant-web` | Next.js Restaurant Portal | the API |
+| Service          | What it is                                           | Needs             |
+| ---------------- | ---------------------------------------------------- | ----------------- |
+| `@jibli/api`     | Fastify HTTP + WebSocket                             | PostgreSQL, Redis |
+| `@jibli/worker`  | Outbox publisher, settlement and reconciliation jobs | PostgreSQL, Redis |
+| `admin-web`      | Next.js Admin Portal                                 | the API           |
+| `restaurant-web` | Next.js Restaurant Portal                            | the API           |
 
 Both portals are browser-only clients. They hold no secrets and talk to the API
 across an origin you list in `CORS_ALLOWED_ORIGINS`.
@@ -182,8 +182,8 @@ a column it did not have — the customer app's home screen, the restaurant
 portal's shell and the Admin directory at once, with no log line naming the
 cause. Choose one:
 
-  - a pre-deploy or release step: `node build/api/migrate.mjs`
-  - `RUN_MIGRATIONS_ON_BOOT=true`, which applies them before the first request
+- a pre-deploy or release step: `node build/api/migrate.mjs`
+- `RUN_MIGRATIONS_ON_BOOT=true`, which applies them before the first request
 
 The boot option is what `render.yaml` uses, because Render's pre-deploy command
 is a paid feature. It is safe with several instances: the runner takes an
@@ -287,13 +287,13 @@ activates one, the marketplace is correctly empty and no order can be placed.
 
 ### What runs where, and why
 
-| Piece | Host | Why not Vercel |
-|---|---|---|
-| `admin-web`, `restaurant-web` | **Vercel** | — it is the right tool for these |
-| `@jibli/api` | Render / Railway / Fly | Long-running Fastify server with a WebSocket gateway and a persistent Redis subscriber. A serverless function cannot hold either connection between invocations. |
-| `@jibli/worker` | Render / Railway / Fly | A `while (running)` loop polling the outbox every second, plus scheduled jobs. There is no request to attach it to. |
-| PostgreSQL | **Neon** | — |
-| Redis | Upstash, or the one in `render.yaml` | — |
+| Piece                         | Host                                 | Why not Vercel                                                                                                                                                   |
+| ----------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `admin-web`, `restaurant-web` | **Vercel**                           | — it is the right tool for these                                                                                                                                 |
+| `@jibli/api`                  | Render / Railway / Fly               | Long-running Fastify server with a WebSocket gateway and a persistent Redis subscriber. A serverless function cannot hold either connection between invocations. |
+| `@jibli/worker`               | Render / Railway / Fly               | A `while (running)` loop polling the outbox every second, plus scheduled jobs. There is no request to attach it to.                                              |
+| PostgreSQL                    | **Neon**                             | —                                                                                                                                                                |
+| Redis                         | Upstash, or the one in `render.yaml` | —                                                                                                                                                                |
 
 Putting the API behind Vercel Functions would silently break the live order
 board and stop the outbox from ever publishing.
@@ -313,7 +313,7 @@ browser → admin.vercel.app/api/v1/...   (same origin, cookie is first-party)
           jibli-api.onrender.com/api/v1/...
 ```
 
-The WebSocket is *not* proxied — Vercel does not forward upgrade requests — and
+The WebSocket is _not_ proxied — Vercel does not forward upgrade requests — and
 does not need to be. It authenticates with the access token in the query
 string, so it connects to the API host directly.
 
@@ -361,18 +361,18 @@ DATABASE_URL='<direct>' pnpm --filter @jibli/db bootstrap-admin --   --phone 077
 
 Create **two** projects pointing at the same repository.
 
-| Setting | Admin | Restaurant |
-|---|---|---|
+| Setting        | Admin            | Restaurant            |
+| -------------- | ---------------- | --------------------- |
 | Root Directory | `apps/admin-web` | `apps/restaurant-web` |
-| Framework | Next.js (auto) | Next.js (auto) |
+| Framework      | Next.js (auto)   | Next.js (auto)        |
 
 **Root Directory is not optional.** Leaving it empty makes Vercel build the
 repository root, find no framework there, and serve `404: NOT_FOUND` — the
 deployment succeeds and the site is empty. That is the single most common way
 this goes wrong.
 
-Vercel also needs *Settings → Build → Include source files outside of the Root
-Directory* switched **on**, because `installCommand` runs `cd ../..` to install
+Vercel also needs _Settings → Build → Include source files outside of the Root
+Directory_ switched **on**, because `installCommand` runs `cd ../..` to install
 from the pnpm workspace root.
 
 Environment variables — **all three, on both projects**:
@@ -416,14 +416,14 @@ launch, and it is the reason `APP_ENV` stays at `staging`.
 
 These are stated so nobody discovers them during a pilot:
 
-| Gap | Consequence |
-|---|---|
-| `OTP_PROVIDER=console` — no real SMS gateway | Customers and drivers cannot sign in |
-| `PUSH_PROVIDER=console` — no FCM/APNs | No order notifications on phones |
-| No upload endpoint | `assets` table and FKs exist; no restaurant logos or dish photos anywhere |
-| Mobile app has no customer ordering flow | Discovery, cart, checkout and tracking screens are not built |
-| E2E suite never executed | 13 tests written; needs Docker, which was unavailable |
-| No automated test touches a database | The five 500s fixed in `2e64bed` reached production because nothing in CI runs a query. `raw-sql.test.ts` refuses the two shapes that failed; it cannot prove a query runs |
+| Gap                                          | Consequence                                                                                                                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OTP_PROVIDER=console` — no real SMS gateway | Customers and drivers cannot sign in                                                                                                                                       |
+| `PUSH_PROVIDER=console` — no FCM/APNs        | No order notifications on phones                                                                                                                                           |
+| No upload endpoint                           | `assets` table and FKs exist; no restaurant logos or dish photos anywhere                                                                                                  |
+| Mobile app has no customer ordering flow     | Discovery, cart, checkout and tracking screens are not built                                                                                                               |
+| E2E suite never executed                     | 13 tests written; needs Docker, which was unavailable                                                                                                                      |
+| No automated test touches a database         | The five 500s fixed in `2e64bed` reached production because nothing in CI runs a query. `raw-sql.test.ts` refuses the two shapes that failed; it cannot prove a query runs |
 
 The two portals are complete and build for production. The API is complete for
 everything they use.
@@ -432,21 +432,21 @@ everything they use.
 
 All five migrations are applied to Neon and the stack is serving:
 
-| Component | Where | State |
-|---|---|---|
-| API | Render `jibli-api`, Frankfurt | Live. `/health/ready` reports database and Redis both up |
-| Worker | Render `jibli-worker` | Deployed |
-| Cache | Render `jibli-cache` (Valkey 8, free) | Available |
-| Database | Neon, eu-central-1 | 19 governorates, 115 cities, 0 enabled |
-| Admin portal | Vercel `jibli-app` | Live, signs in against the API through the `/api` rewrite |
-| Restaurant portal | Vercel `jibli-partner` | Live |
+| Component         | Where                                 | State                                                     |
+| ----------------- | ------------------------------------- | --------------------------------------------------------- |
+| API               | Render `jibli-api`, Frankfurt         | Live. `/health/ready` reports database and Redis both up  |
+| Worker            | Render `jibli-worker`                 | Deployed                                                  |
+| Cache             | Render `jibli-cache` (Valkey 8, free) | Available                                                 |
+| Database          | Neon, eu-central-1                    | 19 governorates, 115 cities, 0 enabled                    |
+| Admin portal      | Vercel `jibli-app`                    | Live, signs in against the API through the `/api` rewrite |
+| Restaurant portal | Vercel `jibli-partner`                | Live                                                      |
 
 Sign-in is verified end to end: `sami` authenticates as SUPER_ADMIN and the
 response carries `must_change_password` and `mfa_enrolment_required`.
 
 Two notes for whoever runs this next:
 
-  - The Render free instance sleeps after 15 minutes. The first request then
-    takes 15-50 seconds. Move to a paid instance before real customers.
-  - No city has ordering enabled, which is why the public geography endpoints
-    return an empty list. That is the gated rollout working, not a fault.
+- The Render free instance sleeps after 15 minutes. The first request then
+  takes 15-50 seconds. Move to a paid instance before real customers.
+- No city has ordering enabled, which is why the public geography endpoints
+  return an empty list. That is the gated rollout working, not a fault.

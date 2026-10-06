@@ -179,9 +179,7 @@ function codepointsIn(font: Buffer): Set<number> {
  */
 const FULL_GLYPHS: Record<string, number> = JSON.parse(
   readFileSync(
-    require.resolve(
-      '@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json',
-    ),
+    require.resolve('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json'),
     'utf8',
   ),
 ) as Record<string, number>;

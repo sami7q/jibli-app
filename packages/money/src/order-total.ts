@@ -155,21 +155,14 @@ export function calculateOrderTotals(input: OrderTotalsInput): OrderTotals {
   const commissionAmountIqd = minIqd(input.commissionFlatIqd, commissionBaseIqd);
 
   const customerTotalIqd = clampNonNegative(
-    iqd(
-      itemsSubtotalIqd -
-        discountTotalIqd +
-        input.deliveryFeeIqd +
-        input.platformServiceFeeIqd,
-    ),
+    iqd(itemsSubtotalIqd - discountTotalIqd + input.deliveryFeeIqd + input.platformServiceFeeIqd),
   );
 
   const beneficiary: DeliveryFeeBeneficiary = input.deliveryFeeBeneficiary ?? 'RESTAURANT';
   const restaurantDeliveryShare = beneficiary === 'RESTAURANT' ? input.deliveryFeeIqd : ZERO_IQD;
   const platformDeliveryShare = beneficiary === 'PLATFORM' ? input.deliveryFeeIqd : ZERO_IQD;
 
-  const restaurantNetIqd = iqd(
-    commissionBaseIqd - commissionAmountIqd + restaurantDeliveryShare,
-  );
+  const restaurantNetIqd = iqd(commissionBaseIqd - commissionAmountIqd + restaurantDeliveryShare);
   const platformRevenueIqd = iqd(
     commissionAmountIqd +
       input.platformServiceFeeIqd +

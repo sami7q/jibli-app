@@ -506,7 +506,14 @@ function DriverApplications({ token, canReview }: { token: string; canReview: bo
 
   return (
     <Card>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          marginBottom: 'var(--space-3)',
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>طلبات الانضمام كمندوب</h2>
         {rows.length > 0 ? <Badge tone="warning">{rows.length}</Badge> : null}
       </div>
@@ -535,7 +542,11 @@ function DriverApplications({ token, canReview }: { token: string; canReview: bo
             keyOf={(row) => row.id}
             emptyMessage="لا توجد طلبات"
             columns={[
-              { key: 'name', header: 'الاسم', render: (row) => <strong>{row.full_name ?? '—'}</strong> },
+              {
+                key: 'name',
+                header: 'الاسم',
+                render: (row) => <strong>{row.full_name ?? '—'}</strong>,
+              },
               {
                 key: 'phone',
                 header: 'الهاتف',
@@ -573,7 +584,9 @@ function DriverApplications({ token, canReview }: { token: string; canReview: bo
                         disabled={approve.isPending}
                         onClick={() => approve.mutate(row.id)}
                       >
-                        {approve.isPending && approve.variables === row.id ? 'جاري القبول…' : 'قبول'}
+                        {approve.isPending && approve.variables === row.id
+                          ? 'جاري القبول…'
+                          : 'قبول'}
                       </button>
                       <button
                         type="button"

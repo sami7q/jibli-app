@@ -45,7 +45,7 @@ origin: (origin, callback) => {
   // Same-origin and native mobile requests send no Origin header.
   if (!origin) return callback(null, true);
   callback(null, allowedOrigins.includes(origin));
-}
+};
 ```
 
 So `CORS_ALLOWED_ORIGINS` never needs a mobile entry, and adding one would mean
@@ -61,16 +61,16 @@ requires.**
 
 ### Public — a guest reaches all of these
 
-| Call | Route file | What it is for |
-|---|---|---|
-| `GET /api/v1/storefront` | `storefront.ts` | banners, categories, rotation seconds |
-| `GET /api/v1/restaurants?city_id=` | `catalog.ts` | the home list |
-| `GET /api/v1/restaurants/:id` | `catalog.ts` | detail + full menu |
-| `GET /api/v1/catalog/items/:id/modifiers` | `catalog.ts` | options, fetched when a dish is opened |
-| `GET /api/v1/geography/governorates?capability=` | `geography.ts` | the area picker |
-| `GET /api/v1/geography/governorates/:id/cities?capability=` | `geography.ts` | the area picker |
-| `GET /api/v1/assets/:id` | `assets.ts` | every image |
-| `POST /api/v1/auth/otp/request` · `…/verify` | `auth.ts` | sign-in |
+| Call                                                        | Route file      | What it is for                         |
+| ----------------------------------------------------------- | --------------- | -------------------------------------- |
+| `GET /api/v1/storefront`                                    | `storefront.ts` | banners, categories, rotation seconds  |
+| `GET /api/v1/restaurants?city_id=`                          | `catalog.ts`    | the home list                          |
+| `GET /api/v1/restaurants/:id`                               | `catalog.ts`    | detail + full menu                     |
+| `GET /api/v1/catalog/items/:id/modifiers`                   | `catalog.ts`    | options, fetched when a dish is opened |
+| `GET /api/v1/geography/governorates?capability=`            | `geography.ts`  | the area picker                        |
+| `GET /api/v1/geography/governorates/:id/cities?capability=` | `geography.ts`  | the area picker                        |
+| `GET /api/v1/assets/:id`                                    | `assets.ts`     | every image                            |
+| `POST /api/v1/auth/otp/request` · `…/verify`                | `auth.ts`       | sign-in                                |
 
 `GET /assets/:id` answers with `Cache-Control: public, max-age=31536000,
 immutable`, which is correct rather than optimistic: the id is a UUIDv7 minted
@@ -79,19 +79,19 @@ therefore fetched once per device, ever.
 
 ### Authenticated
 
-| Call | Route file | Notes |
-|---|---|---|
-| `GET /api/v1/auth/me` | `auth.ts` | identity **and the delivery area** — see §5 |
-| `POST /api/v1/profile/complete` · `PATCH /api/v1/profile` | `profile.ts` | name, default area |
-| `DELETE /api/v1/profile` | `profile.ts` | account deletion — App Store 5.1.1(v) |
-| `GET`/`POST /api/v1/addresses` | `profile.ts` | delivery addresses |
-| `POST /api/v1/checkout/quote` | `orders.ts` | the authoritative total |
-| `POST /api/v1/orders` | `orders.ts` | placement, with an idempotency key |
-| `GET /api/v1/orders` · `/:id` · `/:id/cancel` | `orders.ts` | history, detail, cancellation |
-| `GET /api/v1/orders/:id/review-eligibility` | `reviews.ts` | the 15-minute window |
-| `GET /api/v1/reviews/pending` · `POST /api/v1/orders/:id/review` | `reviews.ts` | rating |
-| `GET`/`PUT`/`DELETE /api/v1/favorites` | `favorites.ts` | the favourites tab |
-| `POST /api/v1/devices` | `profile.ts` | push token |
+| Call                                                             | Route file     | Notes                                       |
+| ---------------------------------------------------------------- | -------------- | ------------------------------------------- |
+| `GET /api/v1/auth/me`                                            | `auth.ts`      | identity **and the delivery area** — see §5 |
+| `POST /api/v1/profile/complete` · `PATCH /api/v1/profile`        | `profile.ts`   | name, default area                          |
+| `DELETE /api/v1/profile`                                         | `profile.ts`   | account deletion — App Store 5.1.1(v)       |
+| `GET`/`POST /api/v1/addresses`                                   | `profile.ts`   | delivery addresses                          |
+| `POST /api/v1/checkout/quote`                                    | `orders.ts`    | the authoritative total                     |
+| `POST /api/v1/orders`                                            | `orders.ts`    | placement, with an idempotency key          |
+| `GET /api/v1/orders` · `/:id` · `/:id/cancel`                    | `orders.ts`    | history, detail, cancellation               |
+| `GET /api/v1/orders/:id/review-eligibility`                      | `reviews.ts`   | the 15-minute window                        |
+| `GET /api/v1/reviews/pending` · `POST /api/v1/orders/:id/review` | `reviews.ts`   | rating                                      |
+| `GET`/`PUT`/`DELETE /api/v1/favorites`                           | `favorites.ts` | the favourites tab                          |
+| `POST /api/v1/devices`                                           | `profile.ts`   | push token                                  |
 
 ---
 
@@ -100,21 +100,21 @@ therefore fetched once per device, ever.
 This is the answer to "is it connected": not "the app can reach the API", but
 "this switch changes that pixel".
 
-| Change this | …in | The app shows it at | How |
-|---|---|---|---|
-| Banner image, title, order | Admin → شكل التطبيق | home carousel | `GET /storefront` |
-| Banner rotation seconds | Admin → شكل التطبيق | how fast the carousel advances | same field, read by `BannerCarousel` |
-| Category names, emoji, images, order, visibility | Admin → التصنيفات | the category strip | `GET /storefront` |
-| Enable/disable a governorate or city for ordering | Admin → المناطق | which areas the picker offers, and whether anything is orderable at all | `capability=ordering` |
-| Approve / suspend a restaurant | Admin → المطاعم | whether it appears anywhere | `onboarding_status`, `operational_status` |
-| Delivery fee, minimum order | Admin → restaurant detail | the card, the cart, the quote | `GET /restaurants` |
-| Commission (500 IQD) | Admin → الإعدادات | **nothing** — the customer never sees it | applied server-side at placement |
-| Working hours, busy mode | Restaurant portal | «مفتوح الآن» / «مغلق الآن», the ETA | computed server-side by `evaluateOpenState` |
-| Menu items, prices, availability, options | Restaurant portal → المنيو | the whole restaurant screen | `GET /restaurants/:id` |
-| Accepting orders toggle | Restaurant portal | whether the menu can be added to | `orderable` |
-| Order status | Restaurant portal → order board | the timeline on the order screen | `GET /orders/:id` |
-| Driver assignment | dispatch | the driver card appears | `GET /orders/:id` |
-| Rating window | Admin → الإعدادات | when «قيّم الطلب» becomes tappable | `review-eligibility` |
+| Change this                                       | …in                             | The app shows it at                                                     | How                                         |
+| ------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
+| Banner image, title, order                        | Admin → شكل التطبيق             | home carousel                                                           | `GET /storefront`                           |
+| Banner rotation seconds                           | Admin → شكل التطبيق             | how fast the carousel advances                                          | same field, read by `BannerCarousel`        |
+| Category names, emoji, images, order, visibility  | Admin → التصنيفات               | the category strip                                                      | `GET /storefront`                           |
+| Enable/disable a governorate or city for ordering | Admin → المناطق                 | which areas the picker offers, and whether anything is orderable at all | `capability=ordering`                       |
+| Approve / suspend a restaurant                    | Admin → المطاعم                 | whether it appears anywhere                                             | `onboarding_status`, `operational_status`   |
+| Delivery fee, minimum order                       | Admin → restaurant detail       | the card, the cart, the quote                                           | `GET /restaurants`                          |
+| Commission (500 IQD)                              | Admin → الإعدادات               | **nothing** — the customer never sees it                                | applied server-side at placement            |
+| Working hours, busy mode                          | Restaurant portal               | «مفتوح الآن» / «مغلق الآن», the ETA                                     | computed server-side by `evaluateOpenState` |
+| Menu items, prices, availability, options         | Restaurant portal → المنيو      | the whole restaurant screen                                             | `GET /restaurants/:id`                      |
+| Accepting orders toggle                           | Restaurant portal               | whether the menu can be added to                                        | `orderable`                                 |
+| Order status                                      | Restaurant portal → order board | the timeline on the order screen                                        | `GET /orders/:id`                           |
+| Driver assignment                                 | dispatch                        | the driver card appears                                                 | `GET /orders/:id`                           |
+| Rating window                                     | Admin → الإعدادات               | when «قيّم الطلب» becomes tappable                                      | `review-eligibility`                        |
 
 **Nothing on the home screen is a constant in the app.** That is the whole
 design: a Ramadan banner or a promoted category must not need a release,
@@ -139,7 +139,7 @@ because the server is the only party that knows whether this was a cooldown, a
 rate limit or a delivery failure. The app shows `messageAr` rather than
 inventing a generic string, and `request_id` is what support quotes.
 
-**The server owns the total.** `POST /checkout/quote` runs the *same* pricing
+**The server owns the total.** `POST /checkout/quote` runs the _same_ pricing
 path as placement. Placement also takes `expected_total_iqd` — what the customer
 was shown — and refuses with `PRICE_CHANGED` if it no longer matches. A customer
 cannot be charged a number they did not agree to.
@@ -189,20 +189,20 @@ restaurant looks like.
 **A guest has no profile to take a city from.** `GET /restaurants` needs one, so
 the comp's location row became a real control: a guest picks an area and browses;
 a signed-in customer's pick syncs back to their profile so it follows them to
-another phone. The profile *seeds* the local area and does not police it —
+another phone. The profile _seeds_ the local area and does not police it —
 policing it made the picker useless, because every choice snapped back.
 
 ---
 
 ## 6. Where the app deliberately does less
 
-| | Why |
-|---|---|
-| No WebSocket | The realtime gateway serves the restaurant board, where seconds matter. The order screen polls every 20s **only while the order is moving**, and stops at a terminal status; a delivered order never changes again, and polling one keeps a radio awake for nothing. |
-| No live driver GPS | ADR-0005. The order screen shows status and a driver card, not a map. |
-| No in-app payment | Food is a physical good, so App Store 3.1.1 does not apply and IAP must **not** be used. Cash on delivery is the only method. |
-| No social sign-in | The login comp draws Google and Apple. Neither was built: there is no identity provider behind them, and adding one pulls in guideline 4.8, which would then oblige Sign in with Apple. |
-| No camera or location permission | Removed from `app.config.ts`. `expo-location` is not even a dependency; the entries only added privacy-label lines for capabilities the app never uses. |
+|                                  | Why                                                                                                                                                                                                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No WebSocket                     | The realtime gateway serves the restaurant board, where seconds matter. The order screen polls every 20s **only while the order is moving**, and stops at a terminal status; a delivered order never changes again, and polling one keeps a radio awake for nothing. |
+| No live driver GPS               | ADR-0005. The order screen shows status and a driver card, not a map.                                                                                                                                                                                                |
+| No in-app payment                | Food is a physical good, so App Store 3.1.1 does not apply and IAP must **not** be used. Cash on delivery is the only method.                                                                                                                                        |
+| No social sign-in                | The login comp draws Google and Apple. Neither was built: there is no identity provider behind them, and adding one pulls in guideline 4.8, which would then oblige Sign in with Apple.                                                                              |
+| No camera or location permission | Removed from `app.config.ts`. `expo-location` is not even a dependency; the entries only added privacy-label lines for capabilities the app never uses.                                                                                                              |
 
 ---
 
@@ -225,22 +225,22 @@ Worth knowing before you rely on it.
 
 Not asserted — run.
 
-| Check | Result |
-|---|---|
-| Every client call matched to a route by script | 24 calls, 0 missing, 0 auth mismatches |
-| API reachable | `/health/live` 200 in 12.5s (cold start) |
-| API healthy | `/health/ready` → database `true`, redis `true` |
-| Storefront returns Admin's data | 22 categories with Arabic names and emoji; 0 banners; rotation 5s |
-| Geography reflects Admin's switches | بغداد opened for ordering; the list changed from 1 governorate to 2 on the next request |
-| Restaurant list | 6 restaurants, correct open/closed state for the hour, fees and minimums as seeded |
-| Menu and options | full menu for each; `الحجم` required, `إضافات` max 3, prices applied |
-| Cart arithmetic against the live prices | 18,000 + 500 modifier = 18,500; + 2,000 delivery = 20,500 |
-| Minimum-order rule | 4,000 against a 5,000 minimum → «أضف 1,000 د.ع» |
-| Seed idempotency | second run: `0 inserted, 6 updated` |
-| Every screen rendered and photographed | welcome, home, restaurant, item sheet, cart, account, favourites, closed restaurant |
-| App bundles | iOS 1220 modules, Android 1171 |
-| Resolved app config | `apiUrl`, brand `#FF5400`, no camera/location strings |
-| Monorepo | typecheck, lint, 386 tests, build — all clean |
+| Check                                          | Result                                                                                  |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Every client call matched to a route by script | 24 calls, 0 missing, 0 auth mismatches                                                  |
+| API reachable                                  | `/health/live` 200 in 12.5s (cold start)                                                |
+| API healthy                                    | `/health/ready` → database `true`, redis `true`                                         |
+| Storefront returns Admin's data                | 22 categories with Arabic names and emoji; 0 banners; rotation 5s                       |
+| Geography reflects Admin's switches            | بغداد opened for ordering; the list changed from 1 governorate to 2 on the next request |
+| Restaurant list                                | 6 restaurants, correct open/closed state for the hour, fees and minimums as seeded      |
+| Menu and options                               | full menu for each; `الحجم` required, `إضافات` max 3, prices applied                    |
+| Cart arithmetic against the live prices        | 18,000 + 500 modifier = 18,500; + 2,000 delivery = 20,500                               |
+| Minimum-order rule                             | 4,000 against a 5,000 minimum → «أضف 1,000 د.ع»                                         |
+| Seed idempotency                               | second run: `0 inserted, 6 updated`                                                     |
+| Every screen rendered and photographed         | welcome, home, restaurant, item sheet, cart, account, favourites, closed restaurant     |
+| App bundles                                    | iOS 1220 modules, Android 1171                                                          |
+| Resolved app config                            | `apiUrl`, brand `#FF5400`, no camera/location strings                                   |
+| Monorepo                                       | typecheck, lint, 386 tests, build — all clean                                           |
 
 ### What the visual pass found
 

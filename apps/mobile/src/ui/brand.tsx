@@ -51,7 +51,10 @@ const PARTS: readonly { key: PartKey; draw: (tint: string, pinTint: string) => R
         />
       ),
     },
-    { key: 'i1', draw: (tint) => <Rect x={109} y={80} width={18} height={65} rx={9} fill={tint} /> },
+    {
+      key: 'i1',
+      draw: (tint) => <Rect x={109} y={80} width={18} height={65} rx={9} fill={tint} />,
+    },
     { key: 'i1dot', draw: (tint) => <Circle cx={118} cy={62} r={9} fill={tint} /> },
     {
       key: 'b',
@@ -66,8 +69,14 @@ const PARTS: readonly { key: PartKey; draw: (tint: string, pinTint: string) => R
         </G>
       ),
     },
-    { key: 'l', draw: (tint) => <Rect x={245} y={30} width={18} height={115} rx={9} fill={tint} /> },
-    { key: 'i2', draw: (tint) => <Rect x={279} y={80} width={18} height={65} rx={9} fill={tint} /> },
+    {
+      key: 'l',
+      draw: (tint) => <Rect x={245} y={30} width={18} height={115} rx={9} fill={tint} />,
+    },
+    {
+      key: 'i2',
+      draw: (tint) => <Rect x={279} y={80} width={18} height={65} rx={9} fill={tint} />,
+    },
     { key: 'i2dot', draw: (tint) => <Circle cx={288} cy={62} r={9} fill={tint} /> },
     {
       // The pin — the J's dot, and the whole idea of the mark. «جيبلي» is
@@ -442,7 +451,6 @@ export function JibliWordmark({
  * first time this changes.
  */
 export const WORDMARK_ENTRANCE_MS = MARK_SETTLED_MS;
-
 
 /**
  * The flag of Iraq.

@@ -83,7 +83,10 @@ describe('sending', () => {
   });
 
   it('succeeds even when the gateway answers with something other than JSON', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('OK', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('OK', { status: 200 })),
+    );
     await expect(provider().send(MESSAGE)).resolves.toMatchObject({ ok: true });
   });
 });
@@ -135,7 +138,10 @@ describe('failure', () => {
 
 describe('what reaches the log', () => {
   it('never logs the message body, and masks the number', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 200 })),
+    );
 
     await provider().send(MESSAGE);
 
@@ -149,14 +155,16 @@ describe('what reaches the log', () => {
   });
 
   it('does not log the API key when the gateway refuses', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 401 })),
+    );
 
     await provider().send(MESSAGE);
 
     expect(JSON.stringify(logs)).not.toContain('secret-key');
   });
 });
-
 
 /*
  * The settings that decide whether a real Iraqi aggregator works.
@@ -272,7 +280,10 @@ describe('a refusal dressed as a 200', () => {
   });
 
   it('accepts the send when the body says it succeeded, whatever the case', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"status":"ok"}', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{"status":"ok"}', { status: 200 })),
+    );
 
     await expect(
       provider({ successField: 'status', successValue: 'OK' }).send(MESSAGE),
@@ -323,14 +334,20 @@ describe('the id the gateway assigns', () => {
   });
 
   it('keeps a numeric id, which is still an id', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"messageId":8842}', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{"messageId":8842}', { status: 200 })),
+    );
 
     const result = await provider().send(MESSAGE);
     expect(result.providerMessageId).toBe('8842');
   });
 
   it('sends successfully when the gateway returns none at all', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 200 })),
+    );
 
     const result = await provider().send(MESSAGE);
     expect(result.ok).toBe(true);
@@ -383,7 +400,10 @@ describe('why a refusal happened', () => {
   });
 
   it('truncates a gateway that answers with a wall of HTML', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('x'.repeat(5000), { status: 500 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('x'.repeat(5000), { status: 500 })),
+    );
 
     const result = await provider().send(MESSAGE);
     // A 500 is retried, and neither attempt floods the log.
@@ -404,7 +424,6 @@ describe('why a refusal happened', () => {
     expect(serialised).not.toContain('4821');
   });
 });
-
 
 /*
  * Code mode — what makes WhatsApp reachable through an SMS gateway.
@@ -457,7 +476,10 @@ describe('code mode', () => {
   });
 
   it('does not log the code it extracted', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 200 })),
+    );
 
     await provider({ bodyMode: 'code', bodyField: 'verificationCode' }).send(MESSAGE);
 
@@ -465,10 +487,13 @@ describe('code mode', () => {
   });
 
   it('takes the code out of a six-digit message too', async () => {
-    const { body } = await captureBody({ bodyMode: 'code' }, {
-      toE164: '+9647701234567',
-      body: 'رمز التحقق الخاص بك في جيبلي هو 482193. لا تشاركه مع أي شخص',
-    });
+    const { body } = await captureBody(
+      { bodyMode: 'code' },
+      {
+        toE164: '+9647701234567',
+        body: 'رمز التحقق الخاص بك في جيبلي هو 482193. لا تشاركه مع أي شخص',
+      },
+    );
 
     expect(body.message).toBe('482193');
   });

@@ -141,16 +141,18 @@ export default function ReviewsPage() {
               {
                 key: 'order',
                 header: 'الطلب',
-                render: (row) => (
-                  <span className="ltr-inline">#{row.public_order_number}</span>
-                ),
+                render: (row) => <span className="ltr-inline">#{row.public_order_number}</span>,
               },
               { key: 'date', header: 'التاريخ', render: (row) => dateAr(row.created_at) },
               {
                 key: 'state',
                 header: 'الحالة',
                 render: (row) =>
-                  row.is_hidden ? <Badge tone="neutral">مخفي</Badge> : <Badge tone="success">ظاهر</Badge>,
+                  row.is_hidden ? (
+                    <Badge tone="neutral">مخفي</Badge>
+                  ) : (
+                    <Badge tone="success">ظاهر</Badge>
+                  ),
               },
               {
                 key: 'actions',

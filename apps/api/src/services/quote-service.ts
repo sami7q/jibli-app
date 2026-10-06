@@ -109,7 +109,15 @@ export async function loadCatalogForPricing(
       } as Group);
 
     if (row.modifierId) {
-      (existing.modifiers as { id: string; groupId: string; nameAr: string; priceIqd: number; isAvailable: boolean }[]).push({
+      (
+        existing.modifiers as {
+          id: string;
+          groupId: string;
+          nameAr: string;
+          priceIqd: number;
+          isAvailable: boolean;
+        }[]
+      ).push({
         id: row.modifierId,
         groupId: row.groupId,
         nameAr: row.modifierNameAr ?? '',

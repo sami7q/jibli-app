@@ -97,9 +97,7 @@ export function registerRestaurantDashboardRoutes(app: FastifyInstance, ctx: App
       const [pending] = await ctx.db
         .select({ count: sql<number>`COUNT(*)` })
         .from(orders)
-        .where(
-          and(eq(orders.restaurantId, restaurantId), eq(orders.status, 'PENDING_RESTAURANT')),
-        );
+        .where(and(eq(orders.restaurantId, restaurantId), eq(orders.status, 'PENDING_RESTAURANT')));
 
       const [pendingYesterday] = await ctx.db
         .select({ count: sql<number>`COUNT(*)` })
@@ -131,7 +129,10 @@ export function registerRestaurantDashboardRoutes(app: FastifyInstance, ctx: App
         .orderBy(sql`1`);
 
       const salesByDay = new Map(
-        dailyRows.map((row) => [row.day, { sales: Number(row.salesIqd), count: Number(row.orderCount) }]),
+        dailyRows.map((row) => [
+          row.day,
+          { sales: Number(row.salesIqd), count: Number(row.orderCount) },
+        ]),
       );
 
       // Emit all seven days, including the quiet ones — a gap in a bar chart

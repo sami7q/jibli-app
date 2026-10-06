@@ -385,9 +385,7 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
         }
 
         const membershipPatch = {
-          ...(body.can_collect_cash !== undefined
-            ? { canCollectCash: body.can_collect_cash }
-            : {}),
+          ...(body.can_collect_cash !== undefined ? { canCollectCash: body.can_collect_cash } : {}),
           ...(body.is_active !== undefined
             ? {
                 isActive: body.is_active,

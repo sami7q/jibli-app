@@ -79,7 +79,9 @@ export function useRealtime(options: UseRealtimeOptions): RealtimeStatus {
       const base = apiBase().replace(/^http/, 'ws');
       // The browser WebSocket API cannot set an Authorization header, so the
       // short-lived access token travels as a query parameter over TLS.
-      const socket = new WebSocket(`${base}/api/v1/realtime?token=${encodeURIComponent(accessToken)}`);
+      const socket = new WebSocket(
+        `${base}/api/v1/realtime?token=${encodeURIComponent(accessToken)}`,
+      );
       socketRef.current = socket;
 
       socket.onopen = () => {

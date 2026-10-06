@@ -82,8 +82,8 @@ function NoMembership({ account }: { account?: string }) {
 
       {account ? (
         <p>
-          أنت مسجّل الدخول باسم <strong>{account}</strong>، وهذا الحساب ليس عضواً في أي مطعم
-          حتى الآن — لذلك لا توجد لوحة يعرضها هذا الحساب.
+          أنت مسجّل الدخول باسم <strong>{account}</strong>، وهذا الحساب ليس عضواً في أي مطعم حتى
+          الآن — لذلك لا توجد لوحة يعرضها هذا الحساب.
         </p>
       ) : (
         <p>هذا الحساب ليس عضواً في أي مطعم حتى الآن، لذلك لا توجد لوحة يعرضها.</p>
@@ -100,12 +100,12 @@ function NoMembership({ account }: { account?: string }) {
       >
         <p style={{ fontWeight: 700 }}>هناك طريقان للوصول:</p>
         <p>
-          <strong>لديك مطعم مسجّل؟</strong> اطلب من المالك إضافتك من «الموظفون» في لوحته. تُضاف
-          برقم هاتفك، ويحدّد لك دوراً — كاشير أو مدير أو غيره — وتظهر اللوحة فور إضافتك.
+          <strong>لديك مطعم مسجّل؟</strong> اطلب من المالك إضافتك من «الموظفون» في لوحته. تُضاف برقم
+          هاتفك، ويحدّد لك دوراً — كاشير أو مدير أو غيره — وتظهر اللوحة فور إضافتك.
         </p>
         <p>
-          <strong>مطعمك غير مسجّل بعد؟</strong> قدّم طلب انضمام، وبعد الموافقة تُنشأ لك بيانات
-          دخول المالك.
+          <strong>مطعمك غير مسجّل بعد؟</strong> قدّم طلب انضمام، وبعد الموافقة تُنشأ لك بيانات دخول
+          المالك.
         </p>
       </div>
 
@@ -113,7 +113,12 @@ function NoMembership({ account }: { account?: string }) {
         <a className="btn btn--primary" href="/apply">
           تقديم طلب انضمام مطعم
         </a>
-        <button type="button" className="btn btn--ghost" disabled={signingOut} onClick={() => void signOut()}>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          disabled={signingOut}
+          onClick={() => void signOut()}
+        >
           {signingOut ? 'جارٍ الخروج…' : 'تسجيل الخروج والدخول بحساب آخر'}
         </button>
       </div>

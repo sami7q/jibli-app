@@ -235,10 +235,7 @@ export async function reserveInventoryForOrder(
  *
  * Used by rejection, cancellation, and the stale-reservation sweeper.
  */
-export async function releaseInventoryForOrder(
-  tx: Transaction,
-  orderId: string,
-): Promise<number> {
+export async function releaseInventoryForOrder(tx: Transaction, orderId: string): Promise<number> {
   const reservations = await tx
     .select()
     .from(inventoryReservations)
@@ -300,10 +297,7 @@ export async function releaseInventoryForOrder(
  * When this happens is the restaurant's policy — on accept, on ready, or on
  * delivery. The COD completion path calls this for anything still outstanding.
  */
-export async function consumeInventoryForOrder(
-  tx: Transaction,
-  orderId: string,
-): Promise<number> {
+export async function consumeInventoryForOrder(tx: Transaction, orderId: string): Promise<number> {
   const reservations = await tx
     .select()
     .from(inventoryReservations)

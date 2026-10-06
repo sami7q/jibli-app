@@ -18,7 +18,18 @@ export const IRAQ_DIAL_PREFIX = '+964';
  * Zain (078/079), Asiacell (077/078), Korek (075/076), and the Kurdistan-region
  * operators. 072 is included for Itisaluna/other licensed operators.
  */
-const IRAQI_MOBILE_PREFIXES = ['070', '071', '072', '073', '074', '075', '076', '077', '078', '079'];
+const IRAQI_MOBILE_PREFIXES = [
+  '070',
+  '071',
+  '072',
+  '073',
+  '074',
+  '075',
+  '076',
+  '077',
+  '078',
+  '079',
+];
 
 export class PhoneValidationError extends Error {
   constructor(
@@ -101,7 +112,9 @@ export function toE164Iraq(input: string): string {
 }
 
 /** Non-throwing variant for form validation and bulk imports. */
-export function tryToE164Iraq(input: string): { ok: true; value: string } | { ok: false; code: string } {
+export function tryToE164Iraq(
+  input: string,
+): { ok: true; value: string } | { ok: false; code: string } {
   try {
     return { ok: true, value: toE164Iraq(input) };
   } catch (error) {

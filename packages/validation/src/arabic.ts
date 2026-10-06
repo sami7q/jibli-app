@@ -84,7 +84,9 @@ export function sanitizeDisplayText(input: string): string {
 
 /** True when the string contains at least one Arabic-script character. */
 export function containsArabic(input: string): boolean {
-  return new RegExp('[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]').test(input);
+  return new RegExp('[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]').test(
+    input,
+  );
 }
 
 /**

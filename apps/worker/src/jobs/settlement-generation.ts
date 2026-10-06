@@ -148,10 +148,7 @@ async function generateForRestaurant(
           lt(orders.completedAt, period.end),
           // The unique index on settlement_lines.order_id is the hard guarantee;
           // this subquery keeps the happy path from even attempting a duplicate.
-          notInArray(
-            orders.id,
-            tx.select({ id: settlementLines.orderId }).from(settlementLines),
-          ),
+          notInArray(orders.id, tx.select({ id: settlementLines.orderId }).from(settlementLines)),
         ),
       );
 
@@ -277,10 +274,7 @@ export async function runOverdueEvaluation(ctx: WorkerContext): Promise<number> 
     .update(settlements)
     .set({ status: 'OVERDUE', updatedAt: now })
     .where(
-      and(
-        sql`${settlements.status} IN ('ISSUED', 'PARTIALLY_PAID')`,
-        lt(settlements.dueDate, now),
-      ),
+      and(sql`${settlements.status} IN ('ISSUED', 'PARTIALLY_PAID')`, lt(settlements.dueDate, now)),
     )
     .returning({
       id: settlements.id,

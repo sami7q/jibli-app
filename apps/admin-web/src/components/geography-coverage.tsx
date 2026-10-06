@@ -119,8 +119,12 @@ export function GeographyCoverage({ token }: { token: string }) {
               <Icon name="geography" className="nav__icon" aria-hidden />
               المحافظات
             </h2>
-            <p className="card__subtitle" style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-              تفعيل قدرة على مستوى المحافظة يسري على كل مدنها. تعطيلها يوقف القدرة في كل المدن التابعة.
+            <p
+              className="card__subtitle"
+              style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}
+            >
+              تفعيل قدرة على مستوى المحافظة يسري على كل مدنها. تعطيلها يوقف القدرة في كل المدن
+              التابعة.
             </p>
           </div>
         </div>
@@ -130,9 +134,7 @@ export function GeographyCoverage({ token }: { token: string }) {
         ) : (
           <div className="table-wrap">
             <table className="table">
-              <caption className="sr-only">
-                المحافظات وقدرات التغطية المفعّلة لكل منها
-              </caption>
+              <caption className="sr-only">المحافظات وقدرات التغطية المفعّلة لكل منها</caption>
               <thead>
                 <tr>
                   <th scope="col">المحافظة</th>
@@ -299,9 +301,7 @@ function CityTable({
               <td>
                 <CapabilityToggle
                   enabled={city.is_enabled}
-                  blockedReason={
-                    parent?.is_enabled ? undefined : 'المحافظة غير مفعّلة'
-                  }
+                  blockedReason={parent?.is_enabled ? undefined : 'المحافظة غير مفعّلة'}
                   label="تفعيل المدينة"
                   entityName={city.name_ar}
                   onToggle={() =>

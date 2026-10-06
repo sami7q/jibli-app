@@ -76,7 +76,9 @@ export function verifyDeliveryPin(input: PinVerificationInput): PinVerificationR
 
   return {
     valid,
-    attemptsRemaining: valid ? maxAttempts - input.currentAttempts : maxAttempts - input.currentAttempts - 1,
+    attemptsRemaining: valid
+      ? maxAttempts - input.currentAttempts
+      : maxAttempts - input.currentAttempts - 1,
   };
 }
 

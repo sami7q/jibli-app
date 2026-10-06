@@ -3,10 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { GEOGRAPHY_CAPABILITIES, success } from '@jibli/contracts';
 import { uuidSchema } from '@jibli/validation';
 import type { AppContext } from '../lib/context.js';
-import {
-  listSelectableCities,
-  listSelectableGovernorates,
-} from '../services/geography-service.js';
+import { listSelectableCities, listSelectableGovernorates } from '../services/geography-service.js';
 
 /**
  * Public geography discovery (plan §67).

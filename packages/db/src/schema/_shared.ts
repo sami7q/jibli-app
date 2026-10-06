@@ -10,7 +10,10 @@ import { bigint, customType, numeric, timestamp, uuid } from 'drizzle-orm/pg-cor
  */
 
 /** Primary key. Application code supplies a UUIDv7 (plan §25); the default is a safety net. */
-export const primaryId = () => uuid('id').primaryKey().default(sql`gen_random_uuid()`);
+export const primaryId = () =>
+  uuid('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`);
 
 export const fk = (name: string) => uuid(name);
 
@@ -37,10 +40,7 @@ export const updatedAt = () => utcTimestamp('updated_at').notNull().defaultNow()
 export const deletedAt = () => utcTimestamp('deleted_at');
 
 /** Optimistic concurrency token for aggregates that accept concurrent commands. */
-export const version = () =>
-  bigint('version', { mode: 'number' })
-    .notNull()
-    .default(0);
+export const version = () => bigint('version', { mode: 'number' }).notNull().default(0);
 
 /**
  * Raw bytes.

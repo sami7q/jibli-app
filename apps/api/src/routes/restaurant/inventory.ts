@@ -1,12 +1,7 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import {
-  AppError,
-  ERROR_CODES,
-  INVENTORY_UNITS,
-  success,
-} from '@jibli/contracts';
+import { AppError, ERROR_CODES, INVENTORY_UNITS, success } from '@jibli/contracts';
 import { assertRestaurantPermission } from '@jibli/auth';
 import { arabicTextSchema, iqdAmountSchema, reasonSchema, uuidSchema } from '@jibli/validation';
 import {
@@ -60,9 +55,7 @@ export function registerRestaurantInventoryRoutes(app: FastifyInstance, ctx: App
       const rows = await ctx.db
         .select()
         .from(inventoryItems)
-        .where(
-          and(eq(inventoryItems.restaurantId, restaurantId), isNull(inventoryItems.deletedAt)),
-        )
+        .where(and(eq(inventoryItems.restaurantId, restaurantId), isNull(inventoryItems.deletedAt)))
         .orderBy(inventoryItems.nameAr);
 
       return reply.send(
@@ -429,9 +422,7 @@ export function registerRestaurantInventoryRoutes(app: FastifyInstance, ctx: App
         const [item] = await tx
           .select({ id: menuItems.id })
           .from(menuItems)
-          .where(
-            and(eq(menuItems.id, body.menu_item_id), eq(menuItems.restaurantId, restaurantId)),
-          )
+          .where(and(eq(menuItems.id, body.menu_item_id), eq(menuItems.restaurantId, restaurantId)))
           .limit(1);
 
         const [ingredient] = await tx

@@ -18,13 +18,7 @@ import { restaurants } from './restaurants.js';
  */
 
 /** What the thread is about, so it can be routed and counted. */
-export type SupportTopic =
-  | 'ORDERS'
-  | 'MENU'
-  | 'FINANCE'
-  | 'ACCOUNT'
-  | 'TECHNICAL'
-  | 'OTHER';
+export type SupportTopic = 'ORDERS' | 'MENU' | 'FINANCE' | 'ACCOUNT' | 'TECHNICAL' | 'OTHER';
 
 /**
  * OPEN — waiting on Jibli.

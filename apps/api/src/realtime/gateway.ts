@@ -5,7 +5,6 @@ import { verifyAccessToken } from '@jibli/auth';
 import { channels } from '@jibli/contracts';
 import type { AppContext } from '../lib/context.js';
 
-
 /**
  * The subscriber's own connection.
  *
@@ -152,7 +151,10 @@ export async function registerRealtimeGateway(
     return allowed;
   };
 
-  const subscribeConnection = async (connection: Connection, requested: string[]): Promise<string[]> => {
+  const subscribeConnection = async (
+    connection: Connection,
+    requested: string[],
+  ): Promise<string[]> => {
     const granted: string[] = [];
 
     for (const channel of requested.slice(0, MAX_CHANNELS_PER_SOCKET)) {

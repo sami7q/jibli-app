@@ -83,7 +83,11 @@ export async function claimIdempotencyKey<T>(
     // FAILED or expired: let this caller try again under the same key.
     await db
       .update(idempotencyKeys)
-      .set({ status: 'IN_PROGRESS', expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS), updatedAt: new Date() })
+      .set({
+        status: 'IN_PROGRESS',
+        expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS),
+        updatedAt: new Date(),
+      })
       .where(eq(idempotencyKeys.id, record.id));
     return { kind: 'PROCEED' };
   }

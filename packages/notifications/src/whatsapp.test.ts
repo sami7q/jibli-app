@@ -143,7 +143,11 @@ describe('when it goes wrong', () => {
       async () =>
         new Response(
           JSON.stringify({
-            error: { message: 'Template name does not exist', code: 132001, error_subcode: 2494010 },
+            error: {
+              message: 'Template name does not exist',
+              code: 132001,
+              error_subcode: 2494010,
+            },
           }),
           { status: 400 },
         ),

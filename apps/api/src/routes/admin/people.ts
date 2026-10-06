@@ -138,7 +138,10 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       .limit(query.limit)
       .offset(query.offset);
 
-    const [total] = await ctx.db.select({ value: count() }).from(users).where(and(...conditions));
+    const [total] = await ctx.db
+      .select({ value: count() })
+      .from(users)
+      .where(and(...conditions));
 
     /*
      * Memberships for this page of results only. A join on the main query
@@ -257,9 +260,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       const principal = requirePrincipal(request);
       assertAdminPermission(principal, 'customer.block');
       const { userId } = z.object({ userId: uuidSchema }).parse(request.params);
-      const body = z
-        .object({ blocked: z.boolean(), reason: reasonSchema })
-        .parse(request.body);
+      const body = z.object({ blocked: z.boolean(), reason: reasonSchema }).parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
         const [user] = await tx
@@ -295,9 +296,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         await revokeSessionChain(ctx, userId, 'ACCOUNT_BLOCKED');
       }
 
-      return reply.send(
-        success({ blocked: body.blocked }, { request_id: request.requestId }),
-      );
+      return reply.send(success({ blocked: body.blocked }, { request_id: request.requestId }));
     },
   );
 
@@ -318,7 +317,8 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
 
     const conditions = [];
     if (query.status) conditions.push(eq(drivers.status, query.status));
-    if (query.restaurant_id) conditions.push(eq(restaurantDrivers.restaurantId, query.restaurant_id));
+    if (query.restaurant_id)
+      conditions.push(eq(restaurantDrivers.restaurantId, query.restaurant_id));
     if (query.q) conditions.push(ilike(users.fullName, `%${query.q}%`));
 
     const rows = await ctx.db
@@ -566,9 +566,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       const principal = requirePrincipal(request);
       assertAdminPermission(principal, 'driver.suspend');
       const { driverId } = z.object({ driverId: uuidSchema }).parse(request.params);
-      const body = z
-        .object({ suspended: z.boolean(), reason: reasonSchema })
-        .parse(request.body);
+      const body = z.object({ suspended: z.boolean(), reason: reasonSchema }).parse(request.body);
 
       const driverUserId = await ctx.db.transaction(async (tx) => {
         const [driver] = await tx
@@ -598,8 +596,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
               details: {
                 reason: 'DRIVER_HAS_ACTIVE_DELIVERY',
                 activeAssignments: active?.value ?? 0,
-                messageHint:
-                  'أعد تعيين طلبات التوصيل النشطة إلى سائق آخر قبل إيقاف هذا السائق',
+                messageHint: 'أعد تعيين طلبات التوصيل النشطة إلى سائق آخر قبل إيقاف هذا السائق',
               },
             });
           }
@@ -654,9 +651,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         await revokeSessionChain(ctx, driverUserId, 'DRIVER_SUSPENDED');
       }
 
-      return reply.send(
-        success({ suspended: body.suspended }, { request_id: request.requestId }),
-      );
+      return reply.send(success({ suspended: body.suspended }, { request_id: request.requestId }));
     },
   );
 
@@ -868,7 +863,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       user_id: string;
       full_name: string | null;
       /** Null for a portal account created by staff before a phone was known. */
-  phone: string | null;
+      phone: string | null;
       status: string;
       mfa_enabled: boolean;
       roles: string[];
@@ -892,9 +887,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
     // this is the plan §88 launch blocker, made visible.
     const staff = [...byUser.values()].map((member) => ({
       ...member,
-      mfa_required: member.roles.some((role) =>
-        ['SUPER_ADMIN', 'FINANCE_ADMIN'].includes(role),
-      ),
+      mfa_required: member.roles.some((role) => ['SUPER_ADMIN', 'FINANCE_ADMIN'].includes(role)),
     }));
 
     return reply.send(
@@ -906,81 +899,85 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
   });
 
   /** Grant or revoke a platform role. Requires fresh MFA (plan §88). */
-  app.post('/api/v1/admin/staff/roles', { preHandler: app.authenticate }, async (request, reply) => {
-    const principal = requirePrincipal(request);
-    assertAdminPermission(principal, 'roles.manage');
-    const body = z
-      .object({
-        user_id: uuidSchema,
-        role: z.enum(PLATFORM_ROLES),
-        granted: z.boolean(),
-        reason: reasonSchema,
-      })
-      .parse(request.body);
+  app.post(
+    '/api/v1/admin/staff/roles',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'roles.manage');
+      const body = z
+        .object({
+          user_id: uuidSchema,
+          role: z.enum(PLATFORM_ROLES),
+          granted: z.boolean(),
+          reason: reasonSchema,
+        })
+        .parse(request.body);
 
-    // Refuse to remove the last Super Admin: an empty set locks everyone out of
-    // role management permanently.
-    if (!body.granted && body.role === 'SUPER_ADMIN') {
-      const [remaining] = await ctx.db
-        .select({ value: count() })
-        .from(userPlatformRoles)
-        .where(
-          and(eq(userPlatformRoles.role, 'SUPER_ADMIN'), isNull(userPlatformRoles.revokedAt)),
-        );
-
-      if ((remaining?.value ?? 0) <= 1) {
-        throw new AppError(ERROR_CODES.CONFLICT, {
-          details: {
-            reason: 'LAST_SUPER_ADMIN',
-            messageHint: 'لا يمكن إزالة آخر مدير نظام — عيّن مديراً آخر أولاً',
-          },
-        });
-      }
-    }
-
-    await ctx.db.transaction(async (tx) => {
-      if (body.granted) {
-        await tx
-          .insert(userPlatformRoles)
-          .values({
-            id: uuidv7(),
-            userId: body.user_id,
-            role: body.role,
-            grantedBy: principal.userId,
-          })
-          .onConflictDoUpdate({
-            target: [userPlatformRoles.userId, userPlatformRoles.role],
-            set: { revokedAt: null, grantedBy: principal.userId },
-          });
-      } else {
-        await tx
-          .update(userPlatformRoles)
-          .set({ revokedAt: new Date() })
+      // Refuse to remove the last Super Admin: an empty set locks everyone out of
+      // role management permanently.
+      if (!body.granted && body.role === 'SUPER_ADMIN') {
+        const [remaining] = await ctx.db
+          .select({ value: count() })
+          .from(userPlatformRoles)
           .where(
-            and(
-              eq(userPlatformRoles.userId, body.user_id),
-              eq(userPlatformRoles.role, body.role),
-            ),
+            and(eq(userPlatformRoles.role, 'SUPER_ADMIN'), isNull(userPlatformRoles.revokedAt)),
           );
+
+        if ((remaining?.value ?? 0) <= 1) {
+          throw new AppError(ERROR_CODES.CONFLICT, {
+            details: {
+              reason: 'LAST_SUPER_ADMIN',
+              messageHint: 'لا يمكن إزالة آخر مدير نظام — عيّن مديراً آخر أولاً',
+            },
+          });
+        }
       }
 
-      await writeAudit(tx, {
-        actorUserId: principal.userId,
-        action: body.granted ? AUDIT_ACTIONS.ROLE_GRANT : AUDIT_ACTIONS.ROLE_REVOKE,
-        entityType: 'user',
-        entityId: body.user_id,
-        after: { role: body.role, granted: body.granted },
-        reason: body.reason,
-        ip: clientIp(request),
-        userAgent: userAgent(request),
-        requestId: request.requestId,
+      await ctx.db.transaction(async (tx) => {
+        if (body.granted) {
+          await tx
+            .insert(userPlatformRoles)
+            .values({
+              id: uuidv7(),
+              userId: body.user_id,
+              role: body.role,
+              grantedBy: principal.userId,
+            })
+            .onConflictDoUpdate({
+              target: [userPlatformRoles.userId, userPlatformRoles.role],
+              set: { revokedAt: null, grantedBy: principal.userId },
+            });
+        } else {
+          await tx
+            .update(userPlatformRoles)
+            .set({ revokedAt: new Date() })
+            .where(
+              and(
+                eq(userPlatformRoles.userId, body.user_id),
+                eq(userPlatformRoles.role, body.role),
+              ),
+            );
+        }
+
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: body.granted ? AUDIT_ACTIONS.ROLE_GRANT : AUDIT_ACTIONS.ROLE_REVOKE,
+          entityType: 'user',
+          entityId: body.user_id,
+          after: { role: body.role, granted: body.granted },
+          reason: body.reason,
+          ip: clientIp(request),
+          userAgent: userAgent(request),
+          requestId: request.requestId,
+        });
       });
-    });
 
-    // "A role change takes effect server-side immediately and can trigger
-    // session refresh/revocation for sensitive changes" (plan §86).
-    await revokeSessionChain(ctx, body.user_id, 'ROLE_CHANGED');
+      // "A role change takes effect server-side immediately and can trigger
+      // session refresh/revocation for sensitive changes" (plan §86).
+      await revokeSessionChain(ctx, body.user_id, 'ROLE_CHANGED');
 
-    return reply.send(success({ updated: true }, { request_id: request.requestId }));
-  });
+      return reply.send(success({ updated: true }, { request_id: request.requestId }));
+    },
+  );
 }

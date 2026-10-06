@@ -361,7 +361,11 @@ function ApplyForm({
           placeholder="مثال: المنصور، شارع ١٤ رمضان، قرب جامع الرحمن"
           maxLength={300}
           multiline
-          style={{ minHeight: TAP_TARGET * 1.6, paddingVertical: space[2], textAlignVertical: 'top' }}
+          style={{
+            minHeight: TAP_TARGET * 1.6,
+            paddingVertical: space[2],
+            textAlignVertical: 'top',
+          }}
           accessibilityLabel="عنوان المتجر"
         />
       </Field>
@@ -403,7 +407,11 @@ function ApplyForm({
           placeholder="أوقات العمل، عدد الفروع، أو أي شيء تريدنا أن نعرفه"
           maxLength={500}
           multiline
-          style={{ minHeight: TAP_TARGET * 1.4, paddingVertical: space[2], textAlignVertical: 'top' }}
+          style={{
+            minHeight: TAP_TARGET * 1.4,
+            paddingVertical: space[2],
+            textAlignVertical: 'top',
+          }}
           accessibilityLabel="ملاحظة"
         />
       </Field>
@@ -433,8 +441,7 @@ function ApplyForm({
       />
 
       <Text variant="caption" tone="muted" align="center">
-        يراجع فريق جيبلي الطلب ويتصل بك على رقم حسابك. بإرسال الطلب توافق على شروط الشراكة مع
-        جيبلي.
+        يراجع فريق جيبلي الطلب ويتصل بك على رقم حسابك. بإرسال الطلب توافق على شروط الشراكة مع جيبلي.
       </Text>
     </View>
   );
@@ -634,12 +641,7 @@ function ApplicationStatus({
 
       {/* Approved onto another account (a portal login the team issued). */}
       {approved && !application.owned ? (
-        <Button
-          label="الدخول بحساب المتجر"
-          block
-          variant="secondary"
-          onPress={onSignInAsShop}
-        />
+        <Button label="الدخول بحساب المتجر" block variant="secondary" onPress={onSignInAsShop} />
       ) : null}
 
       {rejected ? <Button label="تقديم طلب جديد" block onPress={onReapply} /> : null}

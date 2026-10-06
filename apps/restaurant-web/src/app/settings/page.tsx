@@ -183,10 +183,7 @@ function BusyModeCard({
   const current = data.busy_mode as BusyMode;
 
   return (
-    <Card
-      title="حالة الازدحام"
-      subtitle="تعديل مؤقت لوقت التحضير المعلن للعميل"
-    >
+    <Card title="حالة الازدحام" subtitle="تعديل مؤقت لوقت التحضير المعلن للعميل">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
         {BUSY_MODES.map((mode) => (
           <button
@@ -305,7 +302,9 @@ function ProfileCard({
       <LogoUpload
         value={logoPreview}
         disabled={!canWrite}
-        upload={(dataUrl) => portal.uploadImage(auth, { data: dataUrl, purpose: 'RESTAURANT_LOGO' })}
+        upload={(dataUrl) =>
+          portal.uploadImage(auth, { data: dataUrl, purpose: 'RESTAURANT_LOGO' })
+        }
         onChange={(assetId, previewUrl) => {
           setLogoAssetId(assetId);
           setLogoPreview(previewUrl);
@@ -362,9 +361,7 @@ function ProfileCard({
             aria-invalid={radiusInvalid}
           />
           <span className="field__hint">صفر يعني بلا حد. غير ذلك بين ٥٠٠ و ٥٠٬٠٠٠ متر.</span>
-          {radiusInvalid ? (
-            <span className="field__error">القيمة خارج المدى المسموح</span>
-          ) : null}
+          {radiusInvalid ? <span className="field__error">القيمة خارج المدى المسموح</span> : null}
         </div>
 
         <div className="field">
@@ -427,8 +424,8 @@ function ProfileCard({
         <span>
           استقبال الطلبات
           <span className="field__hint" style={{ display: 'block' }}>
-            إيقافها يمنع الطلبات الجديدة حتى داخل ساعات العمل. للإيقاف القصير استخدم «إيقاف مؤقت»
-            في حالة الازدحام بدلاً من هذا.
+            إيقافها يمنع الطلبات الجديدة حتى داخل ساعات العمل. للإيقاف القصير استخدم «إيقاف مؤقت» في
+            حالة الازدحام بدلاً من هذا.
           </span>
         </span>
       </label>
@@ -509,9 +506,7 @@ function HoursCard({
 
   // A zero-length window is a data error, not "open all day" — the same rule
   // the server applies, checked here so the button explains itself.
-  const invalidDay = days.find(
-    (day) => !day.isClosed && day.opensAtMinute === day.closesAtMinute,
-  );
+  const invalidDay = days.find((day) => !day.isClosed && day.opensAtMinute === day.closesAtMinute);
 
   return (
     <Card title="ساعات العمل" subtitle="بتوقيت بغداد. يمكن أن تمتد الفترة بعد منتصف الليل">
@@ -655,8 +650,8 @@ function LocationCard({ data }: { data: PortalSettings }) {
       </div>
 
       <p style={{ color: 'var(--text-secondary)' }}>
-        العمولة بند تعاقدي تديره إدارة جيبلي، ولا تُعدَّل من لوحة المطعم. وهي قيمة ثابتة عن كل
-        طلب لا تتغيّر بحجمه. تجد القيمة المطبّقة على كل طلب في صفحة العمولات.
+        العمولة بند تعاقدي تديره إدارة جيبلي، ولا تُعدَّل من لوحة المطعم. وهي قيمة ثابتة عن كل طلب
+        لا تتغيّر بحجمه. تجد القيمة المطبّقة على كل طلب في صفحة العمولات.
       </p>
 
       <p style={{ color: 'var(--text-secondary)', marginBlockEnd: 0 }}>

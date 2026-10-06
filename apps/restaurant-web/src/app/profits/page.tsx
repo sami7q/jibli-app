@@ -36,13 +36,7 @@ export default function ProfitsPage() {
   );
 }
 
-function ProfitScreen({
-  auth,
-  canWriteExpenses,
-}: {
-  auth: PortalAuth;
-  canWriteExpenses: boolean;
-}) {
+function ProfitScreen({ auth, canWriteExpenses }: { auth: PortalAuth; canWriteExpenses: boolean }) {
   const [days, setDays] = useState<number>(30);
   const [addingExpense, setAddingExpense] = useState(false);
   const [category, setCategory] = useState<ExpenseCategory | ''>('');
@@ -85,7 +79,9 @@ function ProfitScreen({
         {profit.isError ? (
           <ErrorState
             message={
-              profit.error instanceof ApiError ? profit.error.messageAr : 'تعذّر تحميل تقرير الأرباح'
+              profit.error instanceof ApiError
+                ? profit.error.messageAr
+                : 'تعذّر تحميل تقرير الأرباح'
             }
             code={profit.error instanceof ApiError ? profit.error.code : undefined}
             onRetry={() => void profit.refetch()}
@@ -142,9 +138,7 @@ function ProfitScreen({
         {expenses.isError ? (
           <ErrorState
             message={
-              expenses.error instanceof ApiError
-                ? expenses.error.messageAr
-                : 'تعذّر تحميل المصاريف'
+              expenses.error instanceof ApiError ? expenses.error.messageAr : 'تعذّر تحميل المصاريف'
             }
             onRetry={() => void expenses.refetch()}
           />
@@ -204,9 +198,7 @@ function ProfitBody({ summary, days }: { summary: ProfitSummary; days: number })
 
       <div className="table-wrap" style={{ marginBlockStart: 'var(--space-4)' }}>
         <table className="table">
-          <caption className="sr-only">
-            تفصيل احتساب الربح التشغيلي خلال {days} يوماً
-          </caption>
+          <caption className="sr-only">تفصيل احتساب الربح التشغيلي خلال {days} يوماً</caption>
           <thead>
             <tr>
               <th scope="col">البند</th>
@@ -285,7 +277,20 @@ function ProfitBody({ summary, days }: { summary: ProfitSummary; days: number })
   );
 }
 
-function ExpensesTable({ rows, totalIqd }: { rows: { id: string; category: string; amount_iqd: number; description_ar: string | null; expense_date: string; created_by: string | null }[]; totalIqd: number }) {
+function ExpensesTable({
+  rows,
+  totalIqd,
+}: {
+  rows: {
+    id: string;
+    category: string;
+    amount_iqd: number;
+    description_ar: string | null;
+    expense_date: string;
+    created_by: string | null;
+  }[];
+  totalIqd: number;
+}) {
   if (rows.length === 0) {
     return (
       <div className="empty">

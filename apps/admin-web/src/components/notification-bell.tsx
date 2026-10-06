@@ -95,9 +95,7 @@ export function NotificationBell({ token }: { token: string }) {
         className="bell"
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={
-          count === 0 ? 'لا توجد إشعارات جديدة' : `${count} إشعار جديد`
-        }
+        aria-label={count === 0 ? 'لا توجد إشعارات جديدة' : `${count} إشعار جديد`}
         onClick={() => setOpen((value) => !value)}
       >
         <Icon name="bell" className="nav__icon" aria-hidden />

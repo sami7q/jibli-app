@@ -29,9 +29,7 @@ export function baghdad(
   minute = 0,
   second = 0,
 ): Date {
-  return new Date(
-    Date.UTC(year, month - 1, day, hour - BAGHDAD_UTC_OFFSET_HOURS, minute, second),
-  );
+  return new Date(Date.UTC(year, month - 1, day, hour - BAGHDAD_UTC_OFFSET_HOURS, minute, second));
 }
 
 /** Minutes since Baghdad midnight — the unit working-hours rules are stored in. */

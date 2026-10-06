@@ -105,7 +105,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return envelope.data;
 }
 
-async function requestEnvelope<T>(path: string, options: RequestOptions = {}): Promise<Envelope<T>> {
+async function requestEnvelope<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<Envelope<T>> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
   };
@@ -190,7 +193,6 @@ export interface LiveOrder {
   items: LiveOrderItem[];
 }
 
-
 export interface EligibleDriver {
   id: string;
   name: string;
@@ -202,7 +204,6 @@ export interface EligibleDriver {
   assignable: boolean;
 }
 
-
 export const restaurantApi = {
   liveOrders: (auth: { accessToken: string; restaurantId: string }, signal?: AbortSignal) =>
     apiRequest<LiveOrder[]>('/api/v1/restaurant-portal/orders/live', {
@@ -210,8 +211,6 @@ export const restaurantApi = {
       restaurantId: auth.restaurantId,
       ...(signal ? { signal } : {}),
     }),
-
-
 
   eligibleDrivers: (auth: { accessToken: string; restaurantId: string }) =>
     apiRequest<EligibleDriver[]>('/api/v1/restaurant-portal/drivers/eligible', {

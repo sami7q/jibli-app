@@ -87,10 +87,13 @@ export function useOwner(): OwnerSession {
     return saved ?? usable[0] ?? null;
   }, [usable, remembered.data]);
 
-  const select = useCallback(async (shopId: string) => {
-    await rememberSelectedShop(shopId);
-    await remembered.refetch();
-  }, [remembered]);
+  const select = useCallback(
+    async (shopId: string) => {
+      await rememberSelectedShop(shopId);
+      await remembered.refetch();
+    },
+    [remembered],
+  );
 
   /*
    * Permissions shape the screen; they never guard it.

@@ -68,9 +68,9 @@ const defaultScope = (): QuickLoginScope => globalThis as unknown as QuickLoginS
 export function quickLoginSupported(scope: QuickLoginScope = defaultScope()): boolean {
   return Boolean(
     scope &&
-      scope.isSecureContext &&
-      typeof scope.PasswordCredential === 'function' &&
-      scope.navigator?.credentials,
+    scope.isSecureContext &&
+    typeof scope.PasswordCredential === 'function' &&
+    scope.navigator?.credentials,
   );
 }
 

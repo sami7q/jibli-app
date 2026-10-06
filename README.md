@@ -12,17 +12,17 @@ implementation still matches the decision behind it.
 
 ## Release 1 at a glance
 
-| Decision | Choice |
-| --- | --- |
-| UI language | Arabic only, RTL as the native direction |
-| Market | Iraq — all 19 governorates seeded, coverage activated per city |
-| Payment | Cash on delivery |
-| Delivery | Restaurant-owned drivers, created by restaurants |
-| Navigation | Google Maps default, Waze alternative, no in-app turn-by-turn |
-| Driver tracking | None. Presence heartbeat only — no live GPS |
-| Money | Integer IQD everywhere. No floating point, ever |
-| Commission | Basis points, snapshotted per order |
-| Settlement | Half-month or calendar month, `Asia/Baghdad` |
+| Decision        | Choice                                                         |
+| --------------- | -------------------------------------------------------------- |
+| UI language     | Arabic only, RTL as the native direction                       |
+| Market          | Iraq — all 19 governorates seeded, coverage activated per city |
+| Payment         | Cash on delivery                                               |
+| Delivery        | Restaurant-owned drivers, created by restaurants               |
+| Navigation      | Google Maps default, Waze alternative, no in-app turn-by-turn  |
+| Driver tracking | None. Presence heartbeat only — no live GPS                    |
+| Money           | Integer IQD everywhere. No floating point, ever                |
+| Commission      | Basis points, snapshotted per order                            |
+| Settlement      | Half-month or calendar month, `Asia/Baghdad`                   |
 
 ---
 
@@ -107,22 +107,22 @@ The plan defines production-readiness as a set of things that must be
 impossible. Each one is enforced in a specific place — usually a database
 constraint, because application checks lose races.
 
-| Invariant | Where it is enforced |
-| --- | --- |
-| A stale client cannot order in a disabled city | `assertCityCapability` re-checked inside the PlaceOrder transaction |
-| A city can never belong to the wrong governorate | Composite FK `(city_id, governorate_id)` → `cities(id, governorate_id)` |
-| A network retry cannot create a second order | Unique index on `idempotency_keys (scope, key)` |
-| Commission cannot be recalculated at a later rate | Rate snapshotted onto the order; settlement reads the snapshot |
-| An order cannot be settled twice | Unique index on `settlement_lines (order_id)` — across all settlements |
-| A settlement cannot be issued twice for a period | Unique index on `settlements (restaurant_id, period_start, period_end)` |
-| Commission cannot double-accrue | Unique index on `ledger_entries (idempotency_key)` |
-| COD cash cannot be double-credited | Partial unique index: one `ORDER_CASH_COLLECTED` per order |
-| Two drivers cannot hold one delivery | Partial unique index on active `delivery_assignments (driver_id)` |
-| A reassigned driver cannot complete the delivery | `assertOwnsAssignment` against the live assignment row |
-| Concurrent orders cannot oversell stock | Row lock plus `SELECT … FOR UPDATE` on the inventory row |
-| An order total cannot disagree with its parts | `CHECK` constraint on `orders` |
-| A completed order must be delivered and paid | `CHECK` constraint on `orders` |
-| Disabling a city destroys nothing | Capability flags only; no cascade, no delete |
+| Invariant                                         | Where it is enforced                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| A stale client cannot order in a disabled city    | `assertCityCapability` re-checked inside the PlaceOrder transaction     |
+| A city can never belong to the wrong governorate  | Composite FK `(city_id, governorate_id)` → `cities(id, governorate_id)` |
+| A network retry cannot create a second order      | Unique index on `idempotency_keys (scope, key)`                         |
+| Commission cannot be recalculated at a later rate | Rate snapshotted onto the order; settlement reads the snapshot          |
+| An order cannot be settled twice                  | Unique index on `settlement_lines (order_id)` — across all settlements  |
+| A settlement cannot be issued twice for a period  | Unique index on `settlements (restaurant_id, period_start, period_end)` |
+| Commission cannot double-accrue                   | Unique index on `ledger_entries (idempotency_key)`                      |
+| COD cash cannot be double-credited                | Partial unique index: one `ORDER_CASH_COLLECTED` per order              |
+| Two drivers cannot hold one delivery              | Partial unique index on active `delivery_assignments (driver_id)`       |
+| A reassigned driver cannot complete the delivery  | `assertOwnsAssignment` against the live assignment row                  |
+| Concurrent orders cannot oversell stock           | Row lock plus `SELECT … FOR UPDATE` on the inventory row                |
+| An order total cannot disagree with its parts     | `CHECK` constraint on `orders`                                          |
+| A completed order must be delivered and paid      | `CHECK` constraint on `orders`                                          |
+| Disabling a city destroys nothing                 | Capability flags only; no cascade, no delete                            |
 
 ---
 
@@ -130,7 +130,7 @@ constraint, because application checks lose races.
 
 **Server-side authority.** Prices, availability, geography, eligibility,
 commissions and totals are decided by the backend. Clients are untrusted
-presentation layers. The quote endpoint and PlaceOrder run the *same* pricing
+presentation layers. The quote endpoint and PlaceOrder run the _same_ pricing
 code so the displayed total and the charged total cannot drift apart.
 
 **Transactional outbox.** A state change and its event row commit together, so

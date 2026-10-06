@@ -80,10 +80,7 @@ export const driverApi = {
     apiRequest<DriverDelivery[]>(`/api/v1/driver/deliveries?status=${status}`, auth(token)),
 
   delivery: (token: string, assignmentId: string) =>
-    apiRequest<DriverDeliveryDetail>(
-      `/api/v1/driver/deliveries/${assignmentId}`,
-      auth(token),
-    ),
+    apiRequest<DriverDeliveryDetail>(`/api/v1/driver/deliveries/${assignmentId}`, auth(token)),
 
   /** accept · reject · pickup · arrived-customer, which share one path. */
   transition: (

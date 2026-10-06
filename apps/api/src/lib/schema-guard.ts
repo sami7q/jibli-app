@@ -97,10 +97,15 @@ export async function ensureSchema(env: ApiEnv, logger: Logger): Promise<SchemaS
         { event: 'schema.migrated', applied },
         `Applied ${applied.length} migration(s): ${applied.join(', ')}`,
       );
-      return status.changed.length > 0 ? { ...HEALTHY, ok: false, changed: status.changed } : HEALTHY;
+      return status.changed.length > 0
+        ? { ...HEALTHY, ok: false, changed: status.changed }
+        : HEALTHY;
     } catch (error) {
       logger.error(
-        { event: 'schema.migrate_failed', err: error instanceof Error ? error.message : String(error) },
+        {
+          event: 'schema.migrate_failed',
+          err: error instanceof Error ? error.message : String(error),
+        },
         'Migrations failed; the API is serving a database older than its code',
       );
     }

@@ -30,8 +30,7 @@ const COMMAND_LABELS: Record<Command, string> = {
 
 const COMMAND_HINTS: Record<Command, string> = {
   receive: 'بضاعة وصلت من المورّد. تزيد الرصيد وتحدّث سعر التكلفة إن أدخلته.',
-  adjust:
-    'فرق ظهر عند الجرد. اكتب كمية موجبة إذا كان الموجود أكثر من المسجّل، وسالبة إذا كان أقل.',
+  adjust: 'فرق ظهر عند الجرد. اكتب كمية موجبة إذا كان الموجود أكثر من المسجّل، وسالبة إذا كان أقل.',
   waste: 'تالف أو منتهي الصلاحية. تُنقص الرصيد ولا تعود.',
   return: 'بضاعة رُدّت إلى المورّد. تُنقص الرصيد.',
 };
@@ -158,7 +157,10 @@ function InventoryScreen({
         </div>
 
         {lowItems.length > 0 ? (
-          <p className="alert-bar alert-bar--warning" style={{ marginBlockStart: 'var(--space-4)' }}>
+          <p
+            className="alert-bar alert-bar--warning"
+            style={{ marginBlockStart: 'var(--space-4)' }}
+          >
             <span style={{ flex: 1 }}>
               {lowItems.length === 1
                 ? 'مادة واحدة قاربت على النفاد'
@@ -367,9 +369,7 @@ function CommandDialog({
         </div>
 
         <div className="field">
-          <label htmlFor="cmd-qty">
-            الكمية ({unitLabel(item.unit)})
-          </label>
+          <label htmlFor="cmd-qty">الكمية ({unitLabel(item.unit)})</label>
           <input
             id="cmd-qty"
             inputMode="decimal"
@@ -379,8 +379,8 @@ function CommandDialog({
             aria-invalid={quantity !== '' && !quantityValid}
           />
           <span className="field__hint">
-            حتى ثلاث منازل عشرية. تُخزَّن الكميات كأعداد صحيحة بوحدات الألف حتى لا يتراكم خطأ
-            الكسور العشرية.
+            حتى ثلاث منازل عشرية. تُخزَّن الكميات كأعداد صحيحة بوحدات الألف حتى لا يتراكم خطأ الكسور
+            العشرية.
           </span>
           {quantity !== '' && !quantityValid ? (
             <span className="field__error">
@@ -416,7 +416,11 @@ function CommandDialog({
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder={
-              command === 'waste' ? 'انتهت الصلاحية' : command === 'adjust' ? 'فرق جرد نهاية اليوم' : ''
+              command === 'waste'
+                ? 'انتهت الصلاحية'
+                : command === 'adjust'
+                  ? 'فرق جرد نهاية اليوم'
+                  : ''
             }
             aria-invalid={requiresReason && reason.length > 0 && !reasonValid}
           />
@@ -605,7 +609,11 @@ function NewItemDialog({
 
         <div className="field">
           <label htmlFor="inv-unit">وحدة القياس</label>
-          <select id="inv-unit" value={unit} onChange={(event) => setUnit(event.target.value as InventoryUnit)}>
+          <select
+            id="inv-unit"
+            value={unit}
+            onChange={(event) => setUnit(event.target.value as InventoryUnit)}
+          >
             {INVENTORY_UNITS.map((value) => (
               <option key={value} value={value}>
                 {UNIT_LABELS[value]}

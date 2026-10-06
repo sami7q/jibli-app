@@ -48,7 +48,10 @@ describe('effective capability — a child is never stronger than its parent (pl
   });
 
   it('denies when the governorate has the capability off, even if the city says true', () => {
-    const resolved = { city: city({ orderingEnabled: true }), governorate: governorate({ orderingEnabled: false }) };
+    const resolved = {
+      city: city({ orderingEnabled: true }),
+      governorate: governorate({ orderingEnabled: false }),
+    };
     expect(cityHasCapability(resolved, 'ordering')).toBe(false);
   });
 
@@ -162,7 +165,12 @@ describe('assertCityBelongsToGovernorate() — forged city IDs (plan §215)', ()
 
 describe('selectable lists never offer what the server would reject', () => {
   const baghdad = governorate();
-  const basra = governorate({ id: 'gov-basra', code: 'IQ-BA', nameAr: 'البصرة', orderingEnabled: false });
+  const basra = governorate({
+    id: 'gov-basra',
+    code: 'IQ-BA',
+    nameAr: 'البصرة',
+    orderingEnabled: false,
+  });
 
   it('filters governorates by effective capability', () => {
     expect(selectableGovernorates([baghdad, basra], 'ordering').map((g) => g.id)).toEqual([

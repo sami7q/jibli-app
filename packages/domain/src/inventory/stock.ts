@@ -113,7 +113,10 @@ export interface ConsumptionResult {
  * On-hand falls and the reservation is released together: doing only one would
  * either double-count the stock or leave a permanent phantom hold.
  */
-export function consumeReservation(level: StockLevel, quantity: string | number): ConsumptionResult {
+export function consumeReservation(
+  level: StockLevel,
+  quantity: string | number,
+): ConsumptionResult {
   const consumeMilli = toMilliUnits(quantity);
   const onHandMilli = toMilliUnits(level.onHand);
   const reservedMilli = toMilliUnits(level.reserved);

@@ -86,8 +86,7 @@ export default function AppearancePage() {
   });
 
   const rotation = useMutation({
-    mutationFn: (seconds: number) =>
-      admin.updateConfig(token, 'banner_rotation_seconds', seconds),
+    mutationFn: (seconds: number) => admin.updateConfig(token, 'banner_rotation_seconds', seconds),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin-config'] });
     },
@@ -135,15 +134,13 @@ export default function AppearancePage() {
     >
       <div className="appearance">
         <div className="appearance__main">
-          <Card
-            title="البنرات"
-            icon="coupons"
-            subtitle="تظهر أعلى الشاشة الرئيسية بالترتيب أدناه"
-          >
+          <Card title="البنرات" icon="coupons" subtitle="تظهر أعلى الشاشة الرئيسية بالترتيب أدناه">
             {banners.isError ? (
               <ErrorState
                 message={
-                  banners.error instanceof ApiError ? banners.error.messageAr : 'تعذّر تحميل البنرات'
+                  banners.error instanceof ApiError
+                    ? banners.error.messageAr
+                    : 'تعذّر تحميل البنرات'
                 }
                 onRetry={() => void banners.refetch()}
               />
@@ -280,8 +277,8 @@ export default function AppearancePage() {
                 <strong style={{ minInlineSize: '4.5rem' }}>{seconds} ثانية</strong>
               </div>
               <span className="field__hint">
-                ينتقل التطبيق تلقائياً للبنر التالي بعد هذه المدة. المعاينة على اليسار تتحرك
-                بالسرعة نفسها.
+                ينتقل التطبيق تلقائياً للبنر التالي بعد هذه المدة. المعاينة على اليسار تتحرك بالسرعة
+                نفسها.
               </span>
             </div>
           </Card>
@@ -368,8 +365,8 @@ export default function AppearancePage() {
           error={remove.error instanceof ApiError ? remove.error.messageAr : null}
           body={
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              يختفي البنر من التطبيق فوراً ولا يمكن استرجاعه. إن كنت تريد إخفاءه مؤقتاً فقط،
-              استخدم «إيقاف» بدلاً من الحذف.
+              يختفي البنر من التطبيق فوراً ولا يمكن استرجاعه. إن كنت تريد إخفاءه مؤقتاً فقط، استخدم
+              «إيقاف» بدلاً من الحذف.
             </p>
           }
           onConfirm={() => remove.mutate(deleting.id)}
@@ -673,9 +670,7 @@ function BannerDialog({
             placeholder="حتى نهاية الأسبوع"
             maxLength={140}
           />
-          <span className="field__hint">
-            يظهر للعميل فقط إذا كان البنر بلا صورة.
-          </span>
+          <span className="field__hint">يظهر للعميل فقط إذا كان البنر بلا صورة.</span>
         </div>
 
         <Dropdown
@@ -740,8 +735,8 @@ function BannerDialog({
         </div>
 
         <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-          اتركهما فارغين ليظهر البنر دائماً. البنر المجدول يختفي من التطبيق تلقائياً خارج فترته
-          دون أن تحتاج لإيقافه يدوياً.
+          اتركهما فارغين ليظهر البنر دائماً. البنر المجدول يختفي من التطبيق تلقائياً خارج فترته دون
+          أن تحتاج لإيقافه يدوياً.
         </p>
 
         {save.error ? (

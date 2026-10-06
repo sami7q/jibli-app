@@ -31,12 +31,9 @@ function principal(overrides: Partial<Principal> = {}): Principal {
 }
 
 describe('needsMfaEnrolment()', () => {
-  it.each(['SUPER_ADMIN', 'FINANCE_ADMIN'] as const)(
-    'is true for an unenrolled %s',
-    (role) => {
-      expect(needsMfaEnrolment(principal({ platformRoles: [role] }))).toBe(true);
-    },
-  );
+  it.each(['SUPER_ADMIN', 'FINANCE_ADMIN'] as const)('is true for an unenrolled %s', (role) => {
+    expect(needsMfaEnrolment(principal({ platformRoles: [role] }))).toBe(true);
+  });
 
   it('is false once an authenticator is enrolled', () => {
     expect(

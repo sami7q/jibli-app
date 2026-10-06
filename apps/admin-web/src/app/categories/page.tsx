@@ -135,10 +135,7 @@ export default function CategoriesPage() {
         ) : (
           <ul className="cats">
             {rows.map((category, index) => (
-              <li
-                key={category.id}
-                className={`cat${category.is_active ? '' : ' cat--off'}`}
-              >
+              <li key={category.id} className={`cat${category.is_active ? '' : ' cat--off'}`}>
                 <div className="cat__order">
                   <button
                     type="button"
@@ -147,7 +144,11 @@ export default function CategoriesPage() {
                     onClick={() => move(index, -1)}
                     aria-label={`تحريك ${category.name_ar} للأعلى`}
                   >
-                    <Icon name="chevron" className="cat__move-icon cat__move-icon--up" aria-hidden />
+                    <Icon
+                      name="chevron"
+                      className="cat__move-icon cat__move-icon--up"
+                      aria-hidden
+                    />
                   </button>
                   <span className="cat__position">{index + 1}</span>
                   <button
@@ -267,8 +268,8 @@ export default function CategoriesPage() {
           error={remove.error instanceof ApiError ? remove.error.messageAr : null}
           body={
             <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-              يُحذف التصنيف نهائياً ويختفي من التطبيق ومن قائمة اختيار التصنيف عند إنشاء مطعم.
-              لا مطاعم مرتبطة به، فلن يتأثر أي مطعم.
+              يُحذف التصنيف نهائياً ويختفي من التطبيق ومن قائمة اختيار التصنيف عند إنشاء مطعم. لا
+              مطاعم مرتبطة به، فلن يتأثر أي مطعم.
             </p>
           }
           onConfirm={() => remove.mutate(deleting.id)}

@@ -1,20 +1,7 @@
 import { relations } from 'drizzle-orm';
 import { boolean, index, integer, jsonb, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
-import type {
-  ActorType,
-  OrderStatus,
-  PaymentMethod,
-  PaymentStatus,
-} from '@jibli/contracts';
-import {
-  createdAt,
-  fk,
-  money,
-  primaryId,
-  updatedAt,
-  utcTimestamp,
-  version,
-} from './_shared.js';
+import type { ActorType, OrderStatus, PaymentMethod, PaymentStatus } from '@jibli/contracts';
+import { createdAt, fk, money, primaryId, updatedAt, utcTimestamp, version } from './_shared.js';
 import { menuItems, modifiers } from './catalog.js';
 import { users, userAddresses } from './identity.js';
 import { restaurantBranches, restaurants } from './restaurants.js';

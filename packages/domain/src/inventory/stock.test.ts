@@ -102,10 +102,7 @@ describe('reserveStock() — the last-unit race (plan §36, §183)', () => {
   });
 
   it('permits overselling only where the restaurant opted in', () => {
-    const result = reserveStock(
-      level({ onHand: '0.000', allowNegativeStock: true }),
-      '5.000',
-    );
+    const result = reserveStock(level({ onHand: '0.000', allowNegativeStock: true }), '5.000');
     expect(result.newReserved).toBe('5.000');
     expect(result.availableAfter).toBe('-5.000');
   });

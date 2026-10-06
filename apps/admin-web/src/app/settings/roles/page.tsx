@@ -158,11 +158,7 @@ export default function RolesPage() {
         )}
       </Card>
 
-      <Card
-        title="مصفوفة صلاحيات المنصة"
-        icon="roles"
-        subtitle={matrix.data?.note_ar}
-      >
+      <Card title="مصفوفة صلاحيات المنصة" icon="roles" subtitle={matrix.data?.note_ar}>
         {matrix.isLoading ? (
           <Skeleton height={280} />
         ) : (

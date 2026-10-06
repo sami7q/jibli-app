@@ -21,7 +21,7 @@ there in minutes rather than in a build queue. Every dependency this app uses
 is in the standard Expo SDK 57 set, so nothing here needs a custom binary.
 
 **It does need an Expo account, though — since SDK 57.** Expo changed the rule:
-a project served in development mode now requires you to be signed in on *both*
+a project served in development mode now requires you to be signed in on _both_
 the CLI and the Expo Go app, to the same account. Scanning without that gives
 «You need to be signed in to Expo Go and Expo CLI to open your project», on the
 phone, for a cause that is on the computer. It currently applies to Expo Go on
@@ -33,6 +33,7 @@ then:
 ```powershell
 pnpm mobile:check
 ```
+
 ```powershell
 pnpm dev:mobile
 ```
@@ -57,8 +58,8 @@ Sign up at **https://expo.dev/signup** (free), confirm the email, then use
 those credentials below.
 
 **One command per line.** This project is developed on Windows PowerShell 5.1,
-which has no `&&` — a chained command line fails to parse and *nothing in it
-runs*, including the first command. The symptom is confusing, because the next
+which has no `&&` — a chained command line fails to parse and _nothing in it
+runs_, including the first command. The symptom is confusing, because the next
 thing you try then fails with "'eas' is not recognized": not a broken install, an
 install that never happened.
 
@@ -91,19 +92,19 @@ configured for it to work over mobile data.
 
 ## What "works online" depends on
 
-  - **The API sleeps.** It runs on a free Render instance that spins down after
-    fifteen minutes idle, and the first request then waits about a minute. The
-    app shows its own loading state rather than failing, but a tester who opens
-    the app cold should be told to expect it once.
-  - **Sign-in sends a real SMS.** OTPIQ is connected on the deployed API, so a
-    tester enters their own Iraqi number and receives a code. Each attempt
-    costs a message, which is worth saying to a tester who taps «إعادة إرسال»
-    out of habit — the per-number cooldown and hourly cap are what stop that
-    becoming expensive.
-  - **Map tiles.** `EXPO_PUBLIC_MAP_TILE_URL` is unset, so the address picker
-    falls back to OpenStreetMap's donated tile server. Fine for your own
-    testing; its usage policy does not allow it for an app handed to other
-    people. MapTiler's free tier covers far more than this needs.
+- **The API sleeps.** It runs on a free Render instance that spins down after
+  fifteen minutes idle, and the first request then waits about a minute. The
+  app shows its own loading state rather than failing, but a tester who opens
+  the app cold should be told to expect it once.
+- **Sign-in sends a real SMS.** OTPIQ is connected on the deployed API, so a
+  tester enters their own Iraqi number and receives a code. Each attempt
+  costs a message, which is worth saying to a tester who taps «إعادة إرسال»
+  out of habit — the per-number cooldown and hourly cap are what stop that
+  becoming expensive.
+- **Map tiles.** `EXPO_PUBLIC_MAP_TILE_URL` is unset, so the address picker
+  falls back to OpenStreetMap's donated tile server. Fine for your own
+  testing; its usage policy does not allow it for an app handed to other
+  people. MapTiler's free tier covers far more than this needs.
 
 ## iOS
 

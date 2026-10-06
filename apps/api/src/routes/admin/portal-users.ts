@@ -3,19 +3,9 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { assertAdminPermission, generatePortalPassword, hashPassword } from '@jibli/auth';
-import {
-  reasonSchema,
-  suggestUsername,
-  usernameSchema,
-  uuidSchema,
-} from '@jibli/validation';
+import { reasonSchema, suggestUsername, usernameSchema, uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
-import {
-  restaurantMembers,
-  restaurants,
-  users,
-  uuidv7,
-} from '@jibli/db';
+import { restaurantMembers, restaurants, users, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import { revokeSessionChain } from '../../services/session-service.js';
@@ -58,9 +48,7 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
         })
         .from(restaurantMembers)
         .innerJoin(users, eq(restaurantMembers.userId, users.id))
-        .where(
-          and(eq(restaurantMembers.restaurantId, restaurantId), isNull(users.deletedAt)),
-        )
+        .where(and(eq(restaurantMembers.restaurantId, restaurantId), isNull(users.deletedAt)))
         .orderBy(desc(restaurantMembers.createdAt));
 
       return reply.send(
@@ -124,9 +112,7 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
         candidate = `${base}-${attempt + 2}`.slice(0, 32);
       }
 
-      return reply.send(
-        success({ username: candidate }, { request_id: request.requestId }),
-      );
+      return reply.send(success({ username: candidate }, { request_id: request.requestId }));
     },
   );
 
@@ -318,8 +304,7 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
         success(
           {
             password,
-            note_ar:
-              'أُنهيت كل الجلسات المفتوحة. انسخ كلمة المرور الآن — لن تظهر مرة أخرى.',
+            note_ar: 'أُنهيت كل الجلسات المفتوحة. انسخ كلمة المرور الآن — لن تظهر مرة أخرى.',
           },
           { request_id: request.requestId },
         ),
@@ -335,9 +320,7 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
       const principal = requirePrincipal(request);
       assertAdminPermission(principal, 'restaurant.suspend');
       const { userId } = z.object({ userId: uuidSchema }).parse(request.params);
-      const body = z
-        .object({ is_active: z.boolean(), reason: reasonSchema })
-        .parse(request.body);
+      const body = z.object({ is_active: z.boolean(), reason: reasonSchema }).parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
         const [target] = await tx

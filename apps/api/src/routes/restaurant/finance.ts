@@ -17,8 +17,28 @@ import {
   uuidSchema,
 } from '@jibli/validation';
 import { commissionFeeDisplay } from '@jibli/money';
-import { assertHandoverAllowed, claimIdempotencyKey, completeIdempotencyKey, computeCustody, failIdempotencyKey, IDEMPOTENCY_SCOPES, startOfBusinessDay } from '@jibli/domain';
-import { driverCashEvents, driverCashHandovers, drivers, orderItems, orders, restaurantExpenses, settlementLines, settlementPayments, settlements, users, uuidv7 } from '@jibli/db';
+import {
+  assertHandoverAllowed,
+  claimIdempotencyKey,
+  completeIdempotencyKey,
+  computeCustody,
+  failIdempotencyKey,
+  IDEMPOTENCY_SCOPES,
+  startOfBusinessDay,
+} from '@jibli/domain';
+import {
+  driverCashEvents,
+  driverCashHandovers,
+  drivers,
+  orderItems,
+  orders,
+  restaurantExpenses,
+  settlementLines,
+  settlementPayments,
+  settlements,
+  users,
+  uuidv7,
+} from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
 
@@ -393,9 +413,7 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
         const [settlement] = await tx
           .select({ status: settlements.status })
           .from(settlements)
-          .where(
-            and(eq(settlements.id, settlementId), eq(settlements.restaurantId, restaurantId)),
-          )
+          .where(and(eq(settlements.id, settlementId), eq(settlements.restaurantId, restaurantId)))
           .for('update')
           .limit(1);
 
@@ -423,8 +441,7 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
         success(
           {
             disputed: true,
-            note_ar:
-              'تم تسجيل اعتراضك. يتوقف احتساب التأخير حتى تراجعه الإدارة المالية وترد عليك.',
+            note_ar: 'تم تسجيل اعتراضك. يتوقف احتساب التأخير حتى تراجعه الإدارة المالية وترد عليك.',
           },
           { request_id: request.requestId },
         ),
@@ -507,9 +524,7 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
         })
         .parse(request.body);
 
-      const idempotencyKey = idempotencyKeySchema.parse(
-        request.headers['x-idempotency-key'] ?? '',
-      );
+      const idempotencyKey = idempotencyKeySchema.parse(request.headers['x-idempotency-key'] ?? '');
 
       const claim = await claimIdempotencyKey<HandoverResponse>(ctx.db, {
         key: idempotencyKey,
@@ -519,9 +534,11 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
       });
 
       if (claim.kind === 'REPLAYED') {
-        return reply.status(200).send(
-          success(claim.response, { request_id: request.requestId, idempotent_replay: true }),
-        );
+        return reply
+          .status(200)
+          .send(
+            success(claim.response, { request_id: request.requestId, idempotent_replay: true }),
+          );
       }
 
       if (claim.kind === 'IN_PROGRESS') {
@@ -529,7 +546,6 @@ export function registerRestaurantFinanceRoutes(app: FastifyInstance, ctx: AppCo
           details: { reason: 'REQUEST_IN_PROGRESS', retryAfterSeconds: 2 },
         });
       }
-
 
       let handoverId: string;
       try {

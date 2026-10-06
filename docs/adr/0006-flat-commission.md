@@ -55,7 +55,7 @@ restaurant's own page.
 
 - Migration `0010_flat_commission.sql` backfills both snapshot columns from
   `commission_amount_iqd`, which is exact for any existing row: the fee that
-  applied to a placed order *is* the commission it was charged. It was applied
+  applied to a placed order _is_ the commission it was charged. It was applied
   when the tables held no orders, but it would have been correct if they had.
 - Per-restaurant configs cannot be converted arithmetically — a percentage
   carries no amount — so every existing row moved to the platform default. A
@@ -63,7 +63,7 @@ restaurant's own page.
 - `bpsPercent()` stays. Coupons are still percentages, and so is the restaurant
   share of a `SHARED`-funded discount.
 - `commissionBaseIqd` keeps its meaning and its column. It is no longer what the
-  commission is computed *from*, but it is still what the commission is capped
+  commission is computed _from_, but it is still what the commission is capped
   at and what the restaurant earns on.
 - Statement and commission tables lost their rate column: with a flat fee it
   repeated the commission column on every line except a capped one.

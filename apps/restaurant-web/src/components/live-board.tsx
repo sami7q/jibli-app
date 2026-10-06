@@ -76,9 +76,7 @@ export function LiveBoard({ auth }: { auth: Auth }) {
   const ordersQuery = useQuery({
     queryKey: ['live-orders', auth.restaurantId],
     queryFn: ({ signal }) => restaurantApi.liveOrders(auth, signal),
-    refetchInterval: isRealtimeHealthy
-      ? POLL_INTERVAL_CONNECTED_MS
-      : POLL_INTERVAL_DEGRADED_MS,
+    refetchInterval: isRealtimeHealthy ? POLL_INTERVAL_CONNECTED_MS : POLL_INTERVAL_DEGRADED_MS,
     // Keep polling in a background tab: a busy kitchen leaves the board behind
     // another window and still needs the alert to fire (plan §30).
     refetchIntervalInBackground: true,
@@ -169,7 +167,11 @@ export function LiveBoard({ auth }: { auth: Auth }) {
             <Icon name="alert" className="nav__icon" aria-hidden /> {EMPTY_STATES_AR.loadFailed} —
             جاري إعادة المحاولة تلقائياً
           </span>
-          <button type="button" className="btn btn--danger" onClick={() => void ordersQuery.refetch()}>
+          <button
+            type="button"
+            className="btn btn--danger"
+            onClick={() => void ordersQuery.refetch()}
+          >
             {ACTIONS_AR.retry}
           </button>
         </div>
@@ -186,9 +188,7 @@ export function LiveBoard({ auth }: { auth: Auth }) {
 
       {!alertState.enabled ? (
         <div className="alert-bar alert-bar--warning" style={{ marginBottom: 16 }}>
-          <span>
-            تنبيه الطلبات الصوتي غير مفعّل. المتصفح يتطلب ضغطة واحدة لتفعيل الصوت.
-          </span>
+          <span>تنبيه الطلبات الصوتي غير مفعّل. المتصفح يتطلب ضغطة واحدة لتفعيل الصوت.</span>
           <button type="button" className="btn btn--primary" onClick={() => void enableAlerts()}>
             {ACTIONS_AR.enableSound}
           </button>
@@ -234,11 +234,16 @@ export function LiveBoard({ auth }: { auth: Auth }) {
 
 function AlertToggle({ state, onEnable }: { state: AlertState; onEnable: () => void }) {
   return (
-    <div className="alert-bar alert-bar--success" style={{ padding: 'var(--space-2) var(--space-3)' }}>
+    <div
+      className="alert-bar alert-bar--success"
+      style={{ padding: 'var(--space-2) var(--space-3)' }}
+    >
       <Icon name="volume" className="nav__icon" aria-hidden />
       <span>
         تنبيه صوتي للطلبات:{' '}
-        <strong style={{ color: state.enabled ? 'var(--jibli-success-700)' : 'var(--jibli-danger-700)' }}>
+        <strong
+          style={{ color: state.enabled ? 'var(--jibli-success-700)' : 'var(--jibli-danger-700)' }}
+        >
           {state.enabled ? 'مفعل' : 'غير مفعل'}
         </strong>
       </span>
@@ -303,7 +308,9 @@ function OrderCard({
         : 'ok';
 
   return (
-    <article className={`order-card${order.status === 'PENDING_RESTAURANT' ? ' order-card--new' : ''}`}>
+    <article
+      className={`order-card${order.status === 'PENDING_RESTAURANT' ? ' order-card--new' : ''}`}
+    >
       <div className="order-card__head">
         <span className="order-card__number ltr-inline">#{order.public_order_number}</span>
         {/*

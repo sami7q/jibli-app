@@ -30,18 +30,14 @@ export default function InvoicesPage() {
   }
 
   return (
-    <AdminShell
-      title="الفواتير"
-      userName={session.userName || 'مدير'}
-      userRoleAr={session.roleAr}
-    >
+    <AdminShell title="الفواتير" userName={session.userName || 'مدير'} userRoleAr={session.roleAr}>
       <Card title="غير مفعّل في الإصدار الأول" icon="invoices">
         <div className="alert-bar alert-bar--warning">
           <Icon name="alert" className="nav__icon" aria-hidden />
           <span>
             إصدار فواتير ضريبية رسمية يتطلب مراجعة قانونية ومحاسبية عراقية للتسمية والمحتوى
-            والمتطلبات النظامية. لم تُجرَ هذه المراجعة بعد، ولذلك لا تُصدر المنصة أي مستند يدّعي
-            أنه فاتورة ضريبية.
+            والمتطلبات النظامية. لم تُجرَ هذه المراجعة بعد، ولذلك لا تُصدر المنصة أي مستند يدّعي أنه
+            فاتورة ضريبية.
           </span>
         </div>
 

@@ -17,13 +17,7 @@ import {
   verifyTotpCode,
 } from '@jibli/auth';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
-import {
-  mfaAttempts,
-  mfaRecoveryCodes,
-  sessions,
-  users,
-  uuidv7,
-} from '@jibli/db';
+import { mfaAttempts, mfaRecoveryCodes, sessions, users, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 
@@ -238,9 +232,7 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
     const [remaining] = await ctx.db
       .select({ value: count() })
       .from(mfaRecoveryCodes)
-      .where(
-        and(eq(mfaRecoveryCodes.userId, principal.userId), isNull(mfaRecoveryCodes.usedAt)),
-      );
+      .where(and(eq(mfaRecoveryCodes.userId, principal.userId), isNull(mfaRecoveryCodes.usedAt)));
 
     const required = mfaRequiredFor(principal.platformRoles);
 
@@ -251,7 +243,8 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
           required,
           // The portal uses this to block sensitive screens until enrolment
           // is done, rather than letting the user hit a wall mid-action.
-          enrolment_pending: user?.pendingStartedAt !== null && user?.pendingStartedAt !== undefined,
+          enrolment_pending:
+            user?.pendingStartedAt !== null && user?.pendingStartedAt !== undefined,
           recovery_codes_remaining: remaining?.value ?? 0,
           enabled_at: user?.mfaEnabledAt?.toISOString() ?? null,
         },
@@ -534,7 +527,9 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
         throw new AppError(ERROR_CODES.CONFLICT, { details: { reason: 'MFA_NOT_ENROLLED' } });
       }
 
-      if (!verifyTotpCode(user.secret, body.code, { lastUsedCounter: user.lastUsedCounter }).valid) {
+      if (
+        !verifyTotpCode(user.secret, body.code, { lastUsedCounter: user.lastUsedCounter }).valid
+      ) {
         throw new AppError(ERROR_CODES.OTP_INVALID);
       }
 
@@ -605,9 +600,7 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
         return fresh;
       });
 
-      return reply.send(
-        success({ recovery_codes: codes }, { request_id: request.requestId }),
-      );
+      return reply.send(success({ recovery_codes: codes }, { request_id: request.requestId }));
     },
   );
 

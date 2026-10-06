@@ -20,7 +20,13 @@ import {
   MAX_FAILED_LOGINS,
   recordLoginAttempt,
 } from '../services/credential-service.js';
-import { issueSession, loadCapabilities, refreshSession, revokeSessionByRefreshToken, revokeSessionChain } from '../services/session-service.js';
+import {
+  issueSession,
+  loadCapabilities,
+  refreshSession,
+  revokeSessionByRefreshToken,
+  revokeSessionChain,
+} from '../services/session-service.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { getConfig } from '../services/config-service.js';
 import { verifyTotpForUser } from './mfa.js';
@@ -292,12 +298,14 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
            * Not an enumeration leak: reaching here already required the right
            * password for this account.
            */
-          return reply.status(200).send(
-            success(
-              { mfa_required: true, note_ar: 'أدخل رمز التحقق من تطبيق المصادقة.' },
-              { request_id: request.requestId },
-            ),
-          );
+          return reply
+            .status(200)
+            .send(
+              success(
+                { mfa_required: true, note_ar: 'أدخل رمز التحقق من تطبيق المصادقة.' },
+                { request_id: request.requestId },
+              ),
+            );
         }
 
         try {
@@ -411,7 +419,6 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
         details: { reason: 'NO_SESSION_COOKIE' },
       });
     }
-
 
     let session;
     try {
@@ -613,10 +620,7 @@ export function registerPortalAuthRoutes(app: FastifyInstance, ctx: AppContext):
       .select({ count: sql<number>`COUNT(*)` })
       .from(userPlatformRoles)
       .where(
-        and(
-          eq(userPlatformRoles.userId, principal.userId),
-          isNull(userPlatformRoles.revokedAt),
-        ),
+        and(eq(userPlatformRoles.userId, principal.userId), isNull(userPlatformRoles.revokedAt)),
       );
 
     return reply.send(

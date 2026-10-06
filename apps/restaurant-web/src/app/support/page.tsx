@@ -61,7 +61,11 @@ function SupportScreen({ auth }: { auth: PortalAuth }) {
         icon="support"
         subtitle="تواصل مباشر مع فريق جيبلي"
         actions={
-          <button type="button" className="btn btn--primary btn--sm" onClick={() => setComposing(true)}>
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={() => setComposing(true)}
+          >
             رسالة جديدة
           </button>
         }
@@ -164,7 +168,12 @@ function ComposeDialog({
   const canSend = subject.trim().length >= 3 && message.trim().length >= 5 && !send.isPending;
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="support-title">
+    <div
+      className="dialog-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="support-title"
+    >
       <div className="dialog">
         <h2 id="support-title">رسالة إلى فريق جيبلي</h2>
 

@@ -45,10 +45,7 @@ describe('createPushProvider()', () => {
   });
 
   it('returns the Expo provider when asked for it', () => {
-    const provider = createPushProvider(
-      { provider: 'expo', nodeEnv: 'production' },
-      logger,
-    );
+    const provider = createPushProvider({ provider: 'expo', nodeEnv: 'production' }, logger);
     expect(provider).toBeInstanceOf(ExpoPushProvider);
     expect(provider.name).toBe('expo');
   });
@@ -59,9 +56,9 @@ describe('createPushProvider()', () => {
      * the console provider would reproduce the original bug exactly — a
      * plausible-looking setting that silently sends nothing.
      */
-    expect(() =>
-      createPushProvider({ provider: 'fcm', nodeEnv: 'production' }, logger),
-    ).toThrow(/no implementation/);
+    expect(() => createPushProvider({ provider: 'fcm', nodeEnv: 'production' }, logger)).toThrow(
+      /no implementation/,
+    );
   });
 });
 
@@ -78,9 +75,7 @@ describe('ExpoPushProvider', () => {
       { token: 'not-a-token', titleAr: 'عنوان', bodyAr: 'نص' },
     ]);
 
-    expect(results).toEqual([
-      { ok: false, tokenInvalid: true, error: 'INVALID_TOKEN_FORMAT' },
-    ]);
+    expect(results).toEqual([{ ok: false, tokenInvalid: true, error: 'INVALID_TOKEN_FORMAT' }]);
   });
 
   it('returns one result per message, at the caller’s index', async () => {

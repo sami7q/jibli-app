@@ -98,8 +98,16 @@ describe('where a push opens', () => {
       eventType: 'restaurant.approved',
       audience: 'restaurant',
     });
-    const newOrder = readOrderPush({ orderId: 'o1', eventType: 'order.placed', audience: 'restaurant' });
-    const customer = readOrderPush({ orderId: 'o1', eventType: 'order.ready', audience: 'customer' });
+    const newOrder = readOrderPush({
+      orderId: 'o1',
+      eventType: 'order.placed',
+      audience: 'restaurant',
+    });
+    const customer = readOrderPush({
+      orderId: 'o1',
+      eventType: 'order.ready',
+      audience: 'customer',
+    });
     expect(isLiveWork(approval!)).toBe(false);
     expect(isLiveWork(newOrder!)).toBe(true);
     expect(isLiveWork(customer!)).toBe(false);

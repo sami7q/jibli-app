@@ -46,10 +46,7 @@ export interface LedgerEntryInput {
  * Append a ledger entry. Takes a transaction: an accrual must commit with the
  * order completion that caused it (plan §53).
  */
-export async function appendLedgerEntry(
-  tx: DbExecutor,
-  input: LedgerEntryInput,
-): Promise<string> {
+export async function appendLedgerEntry(tx: DbExecutor, input: LedgerEntryInput): Promise<string> {
   const amount = iqd(input.amountIqd);
   if (amount < 0) {
     // Sign lives in `direction`; a negative amount would double-encode it and

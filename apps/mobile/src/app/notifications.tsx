@@ -72,7 +72,9 @@ export default function NotificationsScreen() {
       ) : feed.isError ? (
         <View style={{ padding: space[4] }}>
           <ErrorState
-            message={feed.error instanceof ApiError ? feed.error.messageAr : 'تعذّر تحميل الإشعارات'}
+            message={
+              feed.error instanceof ApiError ? feed.error.messageAr : 'تعذّر تحميل الإشعارات'
+            }
             onRetry={() => void feed.refetch()}
           />
         </View>
@@ -90,15 +92,15 @@ export default function NotificationsScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/*
-            * One card per day with hairlines between the rows, not one
-            * bordered box per notification.
-            *
-            * Nine cards stacked with nine borders and nine shadows is a wall
-            * of boxes — the eye has to parse the furniture before it reaches a
-            * sentence. Every notification list on a phone is grouped rows
-            * under a date, and the reason is that it disappears and leaves
-            * only the words.
-            */}
+           * One card per day with hairlines between the rows, not one
+           * bordered box per notification.
+           *
+           * Nine cards stacked with nine borders and nine shadows is a wall
+           * of boxes — the eye has to parse the furniture before it reaches a
+           * sentence. Every notification list on a phone is grouped rows
+           * under a date, and the reason is that it disappears and leaves
+           * only the words.
+           */}
           {grouped.map((group) => (
             <View key={group.label} style={{ gap: space[2] }}>
               <Text variant="caption" tone="muted" style={{ paddingHorizontal: space[1] }}>
@@ -200,13 +202,13 @@ function NotificationRow({
       </View>
 
       {/*
-        * A dot for unread, not a coloured card.
-        *
-        * The order number left with it: it is nine characters of Latin in the
-        * middle of an Arabic line, and a customer scanning their notifications
-        * is not matching reference numbers — it is on the order itself, one tap
-        * away, where somebody reading it out on the phone will actually need it.
-        */}
+       * A dot for unread, not a coloured card.
+       *
+       * The order number left with it: it is nine characters of Latin in the
+       * middle of an Arabic line, and a customer scanning their notifications
+       * is not matching reference numbers — it is on the order itself, one tap
+       * away, where somebody reading it out on the phone will actually need it.
+       */}
       {unseen ? (
         <View
           style={{

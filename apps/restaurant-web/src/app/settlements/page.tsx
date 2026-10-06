@@ -187,7 +187,9 @@ function SettlementsScreen({ auth }: { auth: PortalAuth }) {
                       <strong
                         style={{
                           color:
-                            row.remaining_iqd > 0 ? 'var(--jibli-danger-700)' : 'var(--jibli-success-700)',
+                            row.remaining_iqd > 0
+                              ? 'var(--jibli-danger-700)'
+                              : 'var(--jibli-success-700)',
                         }}
                       >
                         {money(row.remaining_iqd)}
@@ -198,7 +200,12 @@ function SettlementsScreen({ auth }: { auth: PortalAuth }) {
                         <>
                           <span className="ltr-inline">{formatDate(row.due_date)}</span>
                           {row.days_overdue > 0 && row.remaining_iqd > 0 ? (
-                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--jibli-danger-700)' }}>
+                            <div
+                              style={{
+                                fontSize: 'var(--text-xs)',
+                                color: 'var(--jibli-danger-700)',
+                              }}
+                            >
                               متأخر {row.days_overdue} يوماً
                             </div>
                           ) : null}

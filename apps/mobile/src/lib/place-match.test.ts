@@ -95,11 +95,7 @@ describe('matching a geocoded place to a city', () => {
   });
 
   it('looks in every field the platforms use for a town', () => {
-    for (const place of [
-      { subregion: 'Haditha' },
-      { district: 'حديثة' },
-      { name: 'Haditha' },
-    ]) {
+    for (const place of [{ subregion: 'Haditha' }, { district: 'حديثة' }, { name: 'Haditha' }]) {
       const found = lookupArea(place, TREE);
       expect(found.status === 'matched' && found.area.cityId).toBe('city-haditha');
     }
@@ -163,7 +159,9 @@ describe('matching a geocoded place to a city', () => {
 
 describe('how far the pin has moved', () => {
   it('is zero for the same point', () => {
-    expect(metresBetween({ latitude: 33.31, longitude: 44.36 }, { latitude: 33.31, longitude: 44.36 })).toBe(0);
+    expect(
+      metresBetween({ latitude: 33.31, longitude: 44.36 }, { latitude: 33.31, longitude: 44.36 }),
+    ).toBe(0);
   });
 
   it('measures a nudge down the street in metres', () => {

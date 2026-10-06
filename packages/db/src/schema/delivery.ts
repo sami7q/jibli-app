@@ -7,15 +7,7 @@ import type {
   DriverCashEventType,
   VehicleType,
 } from '@jibli/contracts';
-import {
-  createdAt,
-  fk,
-  money,
-  primaryId,
-  updatedAt,
-  utcTimestamp,
-  version,
-} from './_shared.js';
+import { createdAt, fk, money, primaryId, updatedAt, utcTimestamp, version } from './_shared.js';
 import { users } from './identity.js';
 import { orders } from './orders.js';
 import { restaurantBranches, restaurants } from './restaurants.js';
@@ -37,7 +29,10 @@ export const drivers = pgTable(
     /** Account state — separate from availability (plan §46). */
     status: text('status').$type<DriverAccountStatus>().notNull().default('PENDING_ACTIVATION'),
     availability: text('availability').$type<DriverAvailability>().notNull().default('OFFLINE'),
-    defaultVehicleType: text('default_vehicle_type').$type<VehicleType>().notNull().default('MOTORCYCLE'),
+    defaultVehicleType: text('default_vehicle_type')
+      .$type<VehicleType>()
+      .notNull()
+      .default('MOTORCYCLE'),
     plateNumber: text('plate_number'),
     photoAssetId: fk('photo_asset_id'),
     /**

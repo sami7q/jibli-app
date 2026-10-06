@@ -104,7 +104,8 @@ export default function AlertTestPage() {
       platform: navigator.platform,
       audioContext:
         typeof window !== 'undefined' && 'AudioContext' in window ? 'مدعوم' : 'غير مدعوم',
-      notifications: typeof window !== 'undefined' && 'Notification' in window ? 'مدعوم' : 'غير مدعوم',
+      notifications:
+        typeof window !== 'undefined' && 'Notification' in window ? 'مدعوم' : 'غير مدعوم',
       screen: `${window.screen.width}×${window.screen.height}`,
     });
   }, []);
@@ -145,7 +146,9 @@ export default function AlertTestPage() {
     `المنصة: ${environment.platform ?? ''}`,
     `الشاشة: ${environment.screen ?? ''}`,
     '',
-    ...checks.map((c) => `${c.status === 'pass' ? '✓' : c.status === 'fail' ? '✗' : '—'} ${c.labelAr}`),
+    ...checks.map(
+      (c) => `${c.status === 'pass' ? '✓' : c.status === 'fail' ? '✗' : '—'} ${c.labelAr}`,
+    ),
     '',
     `النتيجة: ${passedCount} نجح، ${failedCount} فشل من ${checks.length}`,
   ].join('\n');
@@ -170,7 +173,9 @@ export default function AlertTestPage() {
           </h2>
         </div>
 
-        <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', margin: 0 }}>
+        <dl
+          style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', margin: 0 }}
+        >
           <dt style={{ color: 'var(--text-muted)' }}>الصوت</dt>
           <dd style={{ margin: 0, fontWeight: 700 }}>
             {alertState.enabled ? 'مفعّل' : 'غير مفعّل'}

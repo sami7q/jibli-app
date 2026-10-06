@@ -46,9 +46,10 @@ export function createDatabase(options: DatabaseOptions): { db: Database; sql: p
      * option as `k in o ? o[k] : query[k]`, so any explicitly-passed `ssl`
      * shadows the connection string entirely (src/index.js parseOptions).
      */
-    ssl: (options.ssl ?? shouldUseSsl(options.connectionString, process.env.DATABASE_SSL))
-      ? 'require'
-      : false,
+    ssl:
+      (options.ssl ?? shouldUseSsl(options.connectionString, process.env.DATABASE_SSL))
+        ? 'require'
+        : false,
     connection: { application_name: options.applicationName ?? 'jibli' },
     max_lifetime: options.maxLifetimeSeconds ?? 60 * 30,
     // Money columns are bigint; postgres.js would hand back strings by default.

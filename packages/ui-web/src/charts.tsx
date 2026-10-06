@@ -24,7 +24,6 @@ export interface SeriesPoint {
   readonly value: number;
 }
 
-
 /** The hidden table every chart pairs with, so the data is never colour-only. */
 function DataTableFallback({
   caption,
@@ -191,7 +190,10 @@ export function AreaChart({
 
   // Roughly five labels, whatever the series length.
   const labelStride = Math.max(1, Math.ceil(points.length / 5));
-  const peak = points.reduce((best, point) => (point.value > best.value ? point : best), points[0]!);
+  const peak = points.reduce(
+    (best, point) => (point.value > best.value ? point : best),
+    points[0]!,
+  );
 
   return (
     <div dir="ltr" style={{ width: '100%' }}>
@@ -221,60 +223,60 @@ export function AreaChart({
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-      <svg
-        viewBox={`0 0 100 ${height}`}
-        preserveAspectRatio="none"
-        style={{ width: '100%', height, display: 'block' }}
-        role="img"
-        aria-label={`${caption}. أعلى قيمة ${format(peak.value)} في ${peak.label}.`}
-      >
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--jibli-orange-500)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="var(--jibli-orange-500)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
+          <svg
+            viewBox={`0 0 100 ${height}`}
+            preserveAspectRatio="none"
+            style={{ width: '100%', height, display: 'block' }}
+            role="img"
+            aria-label={`${caption}. أعلى قيمة ${format(peak.value)} في ${peak.label}.`}
+          >
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--jibli-orange-500)" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="var(--jibli-orange-500)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
 
-        {ticks.map(({ fraction }) => (
-          <line
-            key={fraction}
-            x1="0"
-            x2="100"
-            y1={plotHeight - fraction * plotHeight}
-            y2={plotHeight - fraction * plotHeight}
-            stroke="var(--border-subtle)"
-            strokeWidth="0.5"
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
+            {ticks.map(({ fraction }) => (
+              <line
+                key={fraction}
+                x1="0"
+                x2="100"
+                y1={plotHeight - fraction * plotHeight}
+                y2={plotHeight - fraction * plotHeight}
+                stroke="var(--border-subtle)"
+                strokeWidth="0.5"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
 
-        <path d={area} fill={`url(#${gradientId})`} />
-        <path
-          d={line}
-          fill="none"
-          stroke="var(--jibli-orange-500)"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          // Keeps the stroke 2px however the viewBox is stretched.
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
+            <path d={area} fill={`url(#${gradientId})`} />
+            <path
+              d={line}
+              fill="none"
+              stroke="var(--jibli-orange-500)"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              // Keeps the stroke 2px however the viewBox is stretched.
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
 
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: 'var(--text-xs)',
-          color: 'var(--text-muted)',
-        }}
-      >
-        {points
-          .filter((_, index) => index % labelStride === 0)
-          .map((point) => (
-            <span key={point.label}>{point.label}</span>
-          ))}
-      </div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            {points
+              .filter((_, index) => index % labelStride === 0)
+              .map((point) => (
+                <span key={point.label}>{point.label}</span>
+              ))}
+          </div>
         </div>
       </div>
 
@@ -399,10 +401,7 @@ export function DonutChart({
               }}
             />
             <span style={{ flex: 1, fontSize: 'var(--text-sm)' }}>{slice.label}</span>
-            <span
-              className="numeric"
-              style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}
-            >
+            <span className="numeric" style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>
               {Math.round((slice.value / sum) * 100)}%
             </span>
           </li>
@@ -452,9 +451,7 @@ export function RankedBar({
             marginBlockEnd: 4,
           }}
         >
-          <span
-            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {label}
           </span>
           <span className="numeric" style={{ fontWeight: 700 }}>

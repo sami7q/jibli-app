@@ -178,9 +178,7 @@ export function CommissionOverviewCards({ token }: { token: string }) {
           />
           <Select
             value={settlement}
-            onChange={(value) =>
-              setSettlement((value || 'ALL') as 'ALL' | 'SETTLED' | 'UNSETTLED')
-            }
+            onChange={(value) => setSettlement((value || 'ALL') as 'ALL' | 'SETTLED' | 'UNSETTLED')}
             label="حالة التحصيل"
             options={[
               { value: 'ALL', label: 'الكل' },
@@ -194,11 +192,7 @@ export function CommissionOverviewCards({ token }: { token: string }) {
           <Skeleton height={120} />
         ) : (
           <div className="kpi-row">
-            <Kpi
-              label="إجمالي العمولة"
-              value={money(data.totals.commission_iqd)}
-              tone="primary"
-            />
+            <Kpi label="إجمالي العمولة" value={money(data.totals.commission_iqd)} tone="primary" />
             <Kpi
               label="معلّقة لدى المطاعم"
               value={money(data.totals.outstanding_iqd)}
@@ -277,11 +271,7 @@ export function CommissionOverviewCards({ token }: { token: string }) {
         )}
       </Card>
 
-      <Card
-        title="حسب المطعم"
-        icon="restaurants"
-        subtitle="الأكثر تعليقاً للعمولة أولاً"
-      >
+      <Card title="حسب المطعم" icon="restaurants" subtitle="الأكثر تعليقاً للعمولة أولاً">
         <FilterBar>
           <SearchInput
             value={search}
@@ -328,7 +318,12 @@ export function CommissionOverviewCards({ token }: { token: string }) {
                   header: 'المنطقة',
                   render: (row) => `${row.governorate_name_ar} - ${row.city_name_ar}`,
                 },
-                { key: 'orders', header: 'الطلبات', numeric: true, render: (row) => row.order_count },
+                {
+                  key: 'orders',
+                  header: 'الطلبات',
+                  numeric: true,
+                  render: (row) => row.order_count,
+                },
                 {
                   key: 'sales',
                   header: 'المبيعات',

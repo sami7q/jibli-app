@@ -23,23 +23,14 @@ import { outboxEvents, uuidv7, type DbExecutor } from '@jibli/db';
 export interface OutboxEventInput {
   readonly eventType: EventType;
   readonly aggregateType:
-    | 'order'
-    | 'delivery'
-    | 'restaurant'
-    | 'settlement'
-    | 'inventory'
-    | 'geography'
-    | 'driver';
+    'order' | 'delivery' | 'restaurant' | 'settlement' | 'inventory' | 'geography' | 'driver';
   readonly aggregateId: string;
   readonly aggregateVersion?: number;
   readonly payload: Record<string, unknown>;
   readonly requestId?: string | null;
 }
 
-export async function enqueueOutboxEvent(
-  tx: DbExecutor,
-  event: OutboxEventInput,
-): Promise<string> {
+export async function enqueueOutboxEvent(tx: DbExecutor, event: OutboxEventInput): Promise<string> {
   const id = uuidv7();
   await tx.insert(outboxEvents).values({
     id,

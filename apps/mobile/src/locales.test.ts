@@ -26,7 +26,10 @@ describe('locale files', () => {
   });
 
   it.each(files)('%s nests every key under ios or android', (file) => {
-    const locale = JSON.parse(readFileSync(path.join(dir, file), 'utf8')) as Record<string, unknown>;
+    const locale = JSON.parse(readFileSync(path.join(dir, file), 'utf8')) as Record<
+      string,
+      unknown
+    >;
     expect(Object.keys(locale).filter((key) => key !== 'ios' && key !== 'android')).toEqual([]);
   });
 

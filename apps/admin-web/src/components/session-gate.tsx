@@ -37,5 +37,11 @@ export function SessionGate({ session }: { session: AdminSessionState }) {
    * their own `status !== 'authenticated'` check — but the type does not know
    * that, and asserting it would be a lie the compiler cannot verify.
    */
-  return <SignedOut {...(session.status === 'unauthenticated' && session.reason ? { reason: session.reason } : {})} />;
+  return (
+    <SignedOut
+      {...(session.status === 'unauthenticated' && session.reason
+        ? { reason: session.reason }
+        : {})}
+    />
+  );
 }

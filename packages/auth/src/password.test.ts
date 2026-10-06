@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ADMIN_PASSWORD_MIN_LENGTH,
-  checkPasswordPolicy,
-  PASSWORD_MIN_LENGTH,
-} from './password.js';
+import { ADMIN_PASSWORD_MIN_LENGTH, checkPasswordPolicy, PASSWORD_MIN_LENGTH } from './password.js';
 
 /**
  * The policy is NIST SP 800-63B shaped, so these tests pin down what it

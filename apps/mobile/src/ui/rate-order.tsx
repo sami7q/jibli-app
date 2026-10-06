@@ -43,10 +43,7 @@ export function RateOrderSheet({
       onSubmitted();
     },
     onError: (error) =>
-      notify(
-        'تعذّر إرسال التقييم',
-        error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.',
-      ),
+      notify('تعذّر إرسال التقييم', error instanceof ApiError ? error.messageAr : 'حاول مرة أخرى.'),
   });
 
   return (

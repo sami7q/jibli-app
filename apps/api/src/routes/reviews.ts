@@ -6,11 +6,7 @@ import { uuidSchema } from '@jibli/validation';
 import { orderReviews, orders, restaurants, users } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
-import {
-  pendingReviews,
-  reviewEligibility,
-  submitReview,
-} from '../services/review-service.js';
+import { pendingReviews, reviewEligibility, submitReview } from '../services/review-service.js';
 import { notifyAdmins } from '../services/admin-notification-service.js';
 
 /**
@@ -38,10 +34,9 @@ export function registerReviewRoutes(app: FastifyInstance, ctx: AppContext): voi
       const { orderId } = z.object({ orderId: uuidSchema }).parse(request.params);
 
       return reply.send(
-        success(
-          await reviewEligibility(ctx, { orderId, userId: principal.userId }),
-          { request_id: request.requestId },
-        ),
+        success(await reviewEligibility(ctx, { orderId, userId: principal.userId }), {
+          request_id: request.requestId,
+        }),
       );
     },
   );
@@ -147,9 +142,7 @@ export function registerReviewRoutes(app: FastifyInstance, ctx: AppContext): voi
       })
       .from(orderReviews)
       .leftJoin(users, eq(users.id, orderReviews.userId))
-      .where(
-        and(eq(orderReviews.restaurantId, restaurantId), eq(orderReviews.isHidden, false)),
-      )
+      .where(and(eq(orderReviews.restaurantId, restaurantId), eq(orderReviews.isHidden, false)))
       .orderBy(desc(orderReviews.createdAt))
       .limit(query.limit);
 

@@ -70,7 +70,11 @@ function ThreadScreen({ auth }: { auth: PortalAuth }) {
         <div className="thread__meta">
           <span
             className={`badge badge--${
-              data.status === 'RESOLVED' ? 'neutral' : data.status === 'ANSWERED' ? 'success' : 'warning'
+              data.status === 'RESOLVED'
+                ? 'neutral'
+                : data.status === 'ANSWERED'
+                  ? 'success'
+                  : 'warning'
             }`}
           >
             {THREAD_STATUS_LABELS[data.status] ?? data.status}
@@ -87,7 +91,9 @@ function ThreadScreen({ auth }: { auth: PortalAuth }) {
               }`}
             >
               <div className="thread__head">
-                <strong>{entry.side === 'JIBLI' ? `${entry.author_name} — جيبلي` : entry.author_name}</strong>
+                <strong>
+                  {entry.side === 'JIBLI' ? `${entry.author_name} — جيبلي` : entry.author_name}
+                </strong>
                 <span>{dateTimeAr(entry.created_at)}</span>
               </div>
               {/* Plain text, deliberately: a support message is not markup. */}

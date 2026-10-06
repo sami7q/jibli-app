@@ -23,9 +23,7 @@ describe('generatePortalPassword()', () => {
   it('satisfies the stricter admin minimum when asked', () => {
     for (let i = 0; i < 100; i += 1) {
       const password = generatePortalPassword({ minLength: ADMIN_PASSWORD_MIN_LENGTH });
-      expect(
-        checkPasswordPolicy(password, { minLength: ADMIN_PASSWORD_MIN_LENGTH }).ok,
-      ).toBe(true);
+      expect(checkPasswordPolicy(password, { minLength: ADMIN_PASSWORD_MIN_LENGTH }).ok).toBe(true);
     }
   });
 

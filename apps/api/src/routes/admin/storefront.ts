@@ -42,9 +42,10 @@ const merchantFilterSchema = z.object({
 });
 
 /** Restrict a query to one storefront, or to neither if none was named. */
-const ofType = (column: typeof appCategories.merchantType | typeof appBanners.merchantType,
-  merchantType: (typeof MERCHANT_TYPES)[number] | undefined) =>
-  merchantType ? eq(column, merchantType) : undefined;
+const ofType = (
+  column: typeof appCategories.merchantType | typeof appBanners.merchantType,
+  merchantType: (typeof MERCHANT_TYPES)[number] | undefined,
+) => (merchantType ? eq(column, merchantType) : undefined);
 
 const keySchema = z
   .string()

@@ -29,10 +29,36 @@ const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
  * route.
  */
 const RESERVED = new Set([
-  'admin', 'administrator', 'root', 'superuser', 'sysadmin', 'system',
-  'jibli', 'support', 'help', 'security', 'billing', 'finance', 'noreply',
-  'api', 'app', 'www', 'mail', 'ftp', 'login', 'logout', 'signup', 'register',
-  'settings', 'account', 'accounts', 'user', 'users', 'me', 'null', 'undefined',
+  'admin',
+  'administrator',
+  'root',
+  'superuser',
+  'sysadmin',
+  'system',
+  'jibli',
+  'support',
+  'help',
+  'security',
+  'billing',
+  'finance',
+  'noreply',
+  'api',
+  'app',
+  'www',
+  'mail',
+  'ftp',
+  'login',
+  'logout',
+  'signup',
+  'register',
+  'settings',
+  'account',
+  'accounts',
+  'user',
+  'users',
+  'me',
+  'null',
+  'undefined',
 ]);
 
 export function isReservedUsername(value: string): boolean {
@@ -72,12 +98,7 @@ export const usernameSchema = z
  * or the difference becomes a way to test which names exist. It only lowercases
  * and bounds the length so an oversized body cannot reach the database.
  */
-export const loginIdentifierSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .transform(normalizeUsername);
+export const loginIdentifierSchema = z.string().trim().min(1).max(64).transform(normalizeUsername);
 
 /**
  * Suggest a username from a restaurant's name.

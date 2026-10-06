@@ -59,9 +59,7 @@ export async function findSchemaDrift(connectionString: string): Promise<Drift[]
   });
 
   try {
-    const live = await sql<
-      { table_name: string; column_name: string; data_type: string }[]
-    >`
+    const live = await sql<{ table_name: string; column_name: string; data_type: string }[]>`
       SELECT table_name, column_name, data_type
         FROM information_schema.columns
        WHERE table_schema = 'public'

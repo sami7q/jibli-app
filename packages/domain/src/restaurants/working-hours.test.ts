@@ -228,8 +228,7 @@ describe('busy mode (plan §33)', () => {
 
   it('adds 30 minutes when very busy', () => {
     expect(
-      evaluateOpenState({ ...base, rules, now, busyMode: 'VERY_BUSY' })
-        .estimatedPreparationMinutes,
+      evaluateOpenState({ ...base, rules, now, busyMode: 'VERY_BUSY' }).estimatedPreparationMinutes,
     ).toBe(60);
   });
 

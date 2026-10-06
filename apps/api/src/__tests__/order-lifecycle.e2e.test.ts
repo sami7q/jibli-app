@@ -111,7 +111,9 @@ async function buildFixture(): Promise<Fixture> {
   });
 
   const providerId = uuidv7();
-  await db.insert(providers).values({ id: providerId, providerType: 'RESTAURANT', status: 'ACTIVE' });
+  await db
+    .insert(providers)
+    .values({ id: providerId, providerType: 'RESTAURANT', status: 'ACTIVE' });
 
   const restaurantId = uuidv7();
   await db.insert(restaurants).values({
@@ -455,9 +457,7 @@ describeWithDb('order lifecycle (end to end)', () => {
 
     // A retried COD completion must collide with the unique index rather than
     // accruing a second time (plan §53).
-    await expect(
-      fx.db.insert(ledgerEntries).values({ id: uuidv7(), ...entry }),
-    ).rejects.toThrow();
+    await expect(fx.db.insert(ledgerEntries).values({ id: uuidv7(), ...entry })).rejects.toThrow();
   });
 
   it('cannot collect COD cash twice for one order', async () => {
@@ -751,10 +751,7 @@ describeWithDb('order lifecycle (end to end)', () => {
   it('blocks checkout in a city whose ordering was just disabled', async () => {
     // The stale-client race of plan §22: the customer was shown this city, an
     // Admin closed it, and the final server call must refuse.
-    await fx.db
-      .update(cities)
-      .set({ orderingEnabled: false })
-      .where(eq(cities.id, fx.cityId));
+    await fx.db.update(cities).set({ orderingEnabled: false }).where(eq(cities.id, fx.cityId));
 
     const [row] = await fx.db
       .select({

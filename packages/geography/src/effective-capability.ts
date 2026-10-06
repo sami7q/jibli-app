@@ -78,11 +78,15 @@ export function cityHasCapability(
       },
     });
   }
-  return hasCapability(resolved.governorate, capability) && hasCapability(resolved.city, capability);
+  return (
+    hasCapability(resolved.governorate, capability) && hasCapability(resolved.city, capability)
+  );
 }
 
 /** All three effective capabilities at once, for admin coverage views. */
-export function effectiveCityCapabilities(resolved: ResolvedCity): Record<GeographyCapability, boolean> {
+export function effectiveCityCapabilities(
+  resolved: ResolvedCity,
+): Record<GeographyCapability, boolean> {
   return {
     customer_signup: cityHasCapability(resolved, 'customer_signup'),
     restaurant_onboarding: cityHasCapability(resolved, 'restaurant_onboarding'),
@@ -101,12 +105,14 @@ export function effectiveGovernorateCapabilities(
 }
 
 /** Error code raised when a capability check fails, per capability. */
-const CAPABILITY_ERROR: Record<GeographyCapability, (typeof ERROR_CODES)[keyof typeof ERROR_CODES]> =
-  {
-    customer_signup: ERROR_CODES.CITY_NOT_AVAILABLE,
-    restaurant_onboarding: ERROR_CODES.RESTAURANT_ONBOARDING_NOT_AVAILABLE_IN_CITY,
-    ordering: ERROR_CODES.ORDERING_NOT_AVAILABLE_IN_CITY,
-  };
+const CAPABILITY_ERROR: Record<
+  GeographyCapability,
+  (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
+> = {
+  customer_signup: ERROR_CODES.CITY_NOT_AVAILABLE,
+  restaurant_onboarding: ERROR_CODES.RESTAURANT_ONBOARDING_NOT_AVAILABLE_IN_CITY,
+  ordering: ERROR_CODES.ORDERING_NOT_AVAILABLE_IN_CITY,
+};
 
 /**
  * Assert a city currently supports a capability.

@@ -30,7 +30,7 @@ Admin UI while the server refused every order.
 - The rule has exactly two implementations — `@jibli/geography` for in-memory
   rows and `effectiveCapabilitySql` for queries — and they are tested against
   the same cases.
-- The Admin coverage matrix shows *effective* state, and a city enabled under a
+- The Admin coverage matrix shows _effective_ state, and a city enabled under a
   disabled parent renders as "معطّل بالمحافظة" rather than as enabled.
 - Disabling never deletes. Existing orders finish, saved addresses remain
   stored but unorderable, and the Restaurant Portal stays accessible.

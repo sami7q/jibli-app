@@ -10,18 +10,18 @@ customer moves through the app, rather than in the order the files happened to
 be drawn. What each one became is in
 [`../mobile-design-system.md`](../mobile-design-system.md).
 
-| File | Screen | Was | Route |
-|---|---|---|---|
-| `01-welcome.html` | شاشة البداية | `1.html` | `(auth)/welcome` |
-| `02-phone.html` | تسجيل الدخول | `2.html` | `(auth)/phone` |
-| `03-otp.html` | التحقق | `3.html` | `(auth)/otp` |
-| `04-profile.html` | إكمال البيانات | `code.html` | `(auth)/profile` |
-| `05-home.html` | الرئيسية | `main.html` | `(tabs)/index` |
-| `06-restaurant.html` | تفاصيل المطعم | `6.html` | `restaurant/[id]` |
-| `07-cart.html` | سلة المشتريات | `5.html` | `cart` |
-| `08-order-detail.html` | تفاصيل الطلب | `7.html` | `order/[id]` |
-| `09-order-tracking.html` | تتبع الطلب | `8.html` | `order/[id]` — same screen |
-| `10-account.html` | الملف الشخصي | `9.html` | `(tabs)/account` |
+| File                     | Screen         | Was         | Route                      |
+| ------------------------ | -------------- | ----------- | -------------------------- |
+| `01-welcome.html`        | شاشة البداية   | `1.html`    | `(auth)/welcome`           |
+| `02-phone.html`          | تسجيل الدخول   | `2.html`    | `(auth)/phone`             |
+| `03-otp.html`            | التحقق         | `3.html`    | `(auth)/otp`               |
+| `04-profile.html`        | إكمال البيانات | `code.html` | `(auth)/profile`           |
+| `05-home.html`           | الرئيسية       | `main.html` | `(tabs)/index`             |
+| `06-restaurant.html`     | تفاصيل المطعم  | `6.html`    | `restaurant/[id]`          |
+| `07-cart.html`           | سلة المشتريات  | `5.html`    | `cart`                     |
+| `08-order-detail.html`   | تفاصيل الطلب   | `7.html`    | `order/[id]`               |
+| `09-order-tracking.html` | تتبع الطلب     | `8.html`    | `order/[id]` — same screen |
+| `10-account.html`        | الملف الشخصي   | `9.html`    | `(tabs)/account`           |
 
 There was no `4.html`; nothing referenced it and the journey is complete without
 it.

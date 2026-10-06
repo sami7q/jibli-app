@@ -39,7 +39,10 @@ export const restaurantCommissionConfigs = pgTable(
      * with this one restaurant.
      */
     commissionFlatIqd: money('commission_flat_iqd').notNull(),
-    settlementPolicy: text('settlement_policy').$type<SettlementPolicy>().notNull().default('HALF_MONTH'),
+    settlementPolicy: text('settlement_policy')
+      .$type<SettlementPolicy>()
+      .notNull()
+      .default('HALF_MONTH'),
     /** Days after a statement is issued before it becomes overdue. */
     paymentTermDays: integer('payment_term_days').notNull().default(7),
     effectiveFrom: utcTimestamp('effective_from').notNull(),

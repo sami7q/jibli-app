@@ -83,7 +83,9 @@ export function AreaChoice({
         </View>
       ) : active.isError ? (
         <ErrorState
-          message={active.error instanceof ApiError ? active.error.messageAr : 'تعذّر تحميل المناطق'}
+          message={
+            active.error instanceof ApiError ? active.error.messageAr : 'تعذّر تحميل المناطق'
+          }
           onRetry={() => void active.refetch()}
         />
       ) : (active.data ?? []).length === 0 ? (

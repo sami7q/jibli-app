@@ -3,8 +3,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'سياسة الخصوصية',
-  description:
-    'ما الذي يحفظه تطبيق جيبلي عنك بالضبط، ولماذا، ومتى يُحذف — مكتوبة كأسئلة وأجوبة.',
+  description: 'ما الذي يحفظه تطبيق جيبلي عنك بالضبط، ولماذا، ومتى يُحذف — مكتوبة كأسئلة وأجوبة.',
 };
 
 /** Changed only when the practice changes, not when the wording is tidied. */

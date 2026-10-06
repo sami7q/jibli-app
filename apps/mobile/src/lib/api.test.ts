@@ -203,11 +203,7 @@ describe('token refresh', () => {
       }),
     );
 
-    await Promise.all([
-      apiRequest('/api/v1/a'),
-      apiRequest('/api/v1/b'),
-      apiRequest('/api/v1/c'),
-    ]);
+    await Promise.all([apiRequest('/api/v1/a'), apiRequest('/api/v1/b'), apiRequest('/api/v1/c')]);
 
     /*
      * The whole point. Rotation is single-use: three concurrent refreshes
@@ -280,9 +276,9 @@ describe('a sleeping server', () => {
       }),
     );
 
-    await expect(settle(apiRequest('/api/v1/storefront', { authenticated: false }))).resolves.toEqual(
-      { ok: true },
-    );
+    await expect(
+      settle(apiRequest('/api/v1/storefront', { authenticated: false })),
+    ).resolves.toEqual({ ok: true });
     expect(calls).toBe(2);
   });
 
@@ -306,7 +302,9 @@ describe('a sleeping server', () => {
       vi.fn(async () => gatewayHtml(502)),
     );
 
-    const error = await rejection(settle(apiRequest('/api/v1/thing', { method: 'POST', body: {} })));
+    const error = await rejection(
+      settle(apiRequest('/api/v1/thing', { method: 'POST', body: {} })),
+    );
 
     expect(error.code).toBe('SERVICE_UNAVAILABLE');
     expect(error.messageAr).toBe('الخدمة غير متاحة حالياً، الرجاء المحاولة بعد قليل');
@@ -316,7 +314,9 @@ describe('a sleeping server', () => {
     const fetchMock = vi.fn(async () => gatewayHtml(504));
     vi.stubGlobal('fetch', fetchMock);
 
-    const error = await rejection(settle(apiRequest('/api/v1/storefront', { authenticated: false })));
+    const error = await rejection(
+      settle(apiRequest('/api/v1/storefront', { authenticated: false })),
+    );
 
     // The original plus two retries, then the error — never an open loop.
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -422,7 +422,10 @@ describe('request timeouts', () => {
   });
 
   it('does not leave its timer running after a request settles', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: { ok: true }, meta: {} })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ data: { ok: true }, meta: {} })),
+    );
 
     await apiRequest('/api/v1/storefront', { authenticated: false });
 

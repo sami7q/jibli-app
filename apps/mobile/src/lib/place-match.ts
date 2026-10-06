@@ -49,7 +49,11 @@ export interface GeographyBranch {
   readonly id: string;
   readonly code: string;
   readonly name_ar: string;
-  readonly cities: readonly { readonly id: string; readonly code: string; readonly name_ar: string }[];
+  readonly cities: readonly {
+    readonly id: string;
+    readonly code: string;
+    readonly name_ar: string;
+  }[];
 }
 
 /**
@@ -135,17 +139,17 @@ const ADMINISTRATIVE_WORDS: readonly string[] = [
 
 /** Every spelling the seed data knows for a place, normalised. */
 function spellings(nameAr: string, nameEnInternal: string | null | undefined): string[] {
-  return [normalisePlaceName(nameAr), nameEnInternal ? normalisePlaceName(nameEnInternal) : '']
-    .filter((value) => value.length > 0);
+  return [
+    normalisePlaceName(nameAr),
+    nameEnInternal ? normalisePlaceName(nameEnInternal) : '',
+  ].filter((value) => value.length > 0);
 }
 
 /** The seed row for a place named like this, in either language. */
 function citySeedFor(name: string): { code: string; nameAr: string } | null {
   const wanted = normalisePlaceName(name);
   if (!wanted) return null;
-  const found = CITIES.find((city) =>
-    spellings(city.nameAr, city.nameEnInternal).includes(wanted),
-  );
+  const found = CITIES.find((city) => spellings(city.nameAr, city.nameEnInternal).includes(wanted));
   return found ? { code: found.code, nameAr: found.nameAr } : null;
 }
 
@@ -175,7 +179,11 @@ export type AreaLookup =
    * open and a `region` alone does not say which. The caller decides: if the
    * city already selected sits in this governorate, the pin agrees with it.
    */
-  | { readonly status: 'governorate'; readonly governorateId: string; readonly governorateNameAr: string }
+  | {
+      readonly status: 'governorate';
+      readonly governorateId: string;
+      readonly governorateNameAr: string;
+    }
   /** A place Iraq has and Jibli does not serve. Worth saying out loud. */
   | { readonly status: 'outside'; readonly placeNameAr: string }
   /** Nothing recognisable. Says nothing about where delivery goes. */

@@ -50,10 +50,7 @@ describe('expectAppError()', () => {
 
 describe('expectRejectsAppError()', () => {
   it('accepts a promise', async () => {
-    const error = await expectRejectsAppError(
-      Promise.reject(new AppError('CONFLICT')),
-      'CONFLICT',
-    );
+    const error = await expectRejectsAppError(Promise.reject(new AppError('CONFLICT')), 'CONFLICT');
     expect(error.code).toBe('CONFLICT');
   });
 

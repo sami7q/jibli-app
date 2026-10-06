@@ -67,9 +67,7 @@ export default function DriverLoginPage() {
 
       router.replace('/driver');
     } catch (caught) {
-      setError(
-        caught instanceof ApiError ? caught.messageAr : 'تعذّر تسجيل الدخول، حاول مرة أخرى',
-      );
+      setError(caught instanceof ApiError ? caught.messageAr : 'تعذّر تسجيل الدخول، حاول مرة أخرى');
       setSubmitting(false);
     }
   };
@@ -86,7 +84,10 @@ export default function DriverLoginPage() {
           اسم المستخدم وكلمة المرور من المطعم الذي تعمل معه.
         </p>
 
-        <form onSubmit={(event) => void submit(event)} style={{ display: 'grid', gap: 'var(--space-4)' }}>
+        <form
+          onSubmit={(event) => void submit(event)}
+          style={{ display: 'grid', gap: 'var(--space-4)' }}
+        >
           <div className="field">
             <label htmlFor="driver-username">اسم المستخدم</label>
             <input

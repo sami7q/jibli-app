@@ -31,7 +31,12 @@ export const ORDER_TRANSITIONS: readonly TransitionRule<OrderStatus>[] = [
   // Placement is immediately visible to the restaurant queue.
   { from: 'PLACED', to: 'PENDING_RESTAURANT', actors: ['SYSTEM'], command: 'QueueForRestaurant' },
 
-  { from: 'PENDING_RESTAURANT', to: 'ACCEPTED', actors: ['RESTAURANT', 'ADMIN'], command: 'AcceptOrder' },
+  {
+    from: 'PENDING_RESTAURANT',
+    to: 'ACCEPTED',
+    actors: ['RESTAURANT', 'ADMIN'],
+    command: 'AcceptOrder',
+  },
   {
     from: 'PENDING_RESTAURANT',
     to: 'REJECTED',
@@ -48,7 +53,12 @@ export const ORDER_TRANSITIONS: readonly TransitionRule<OrderStatus>[] = [
   // The order stays READY while a driver is merely assigned; pickup moves it on (plan §49).
   { from: 'READY', to: 'OUT_FOR_DELIVERY', actors: ['DRIVER', 'ADMIN'], command: 'PickupOrder' },
 
-  { from: 'OUT_FOR_DELIVERY', to: 'DELIVERED', actors: ['DRIVER', 'ADMIN'], command: 'ConfirmDelivery' },
+  {
+    from: 'OUT_FOR_DELIVERY',
+    to: 'DELIVERED',
+    actors: ['DRIVER', 'ADMIN'],
+    command: 'ConfirmDelivery',
+  },
   // COD completion closes the order in the same transaction as delivery (plan §53).
   { from: 'DELIVERED', to: 'COMPLETED', actors: ['SYSTEM', 'ADMIN'], command: 'CompleteOrder' },
 
@@ -191,16 +201,51 @@ export const SETTLEMENT_TRANSITIONS: readonly TransitionRule<SettlementStatus>[]
   { from: 'ISSUED', to: 'PARTIALLY_PAID', actors: ['ADMIN', 'SYSTEM'], command: 'RecordPayment' },
   { from: 'ISSUED', to: 'PAID', actors: ['ADMIN', 'SYSTEM'], command: 'RecordPayment' },
   { from: 'ISSUED', to: 'OVERDUE', actors: ['SYSTEM'], command: 'MarkOverdue' },
-  { from: 'ISSUED', to: 'DISPUTED', actors: ['RESTAURANT', 'ADMIN'], command: 'DisputeSettlement', requiresReason: true },
-  { from: 'PARTIALLY_PAID', to: 'PARTIALLY_PAID', actors: ['ADMIN', 'SYSTEM'], command: 'RecordPayment' },
+  {
+    from: 'ISSUED',
+    to: 'DISPUTED',
+    actors: ['RESTAURANT', 'ADMIN'],
+    command: 'DisputeSettlement',
+    requiresReason: true,
+  },
+  {
+    from: 'PARTIALLY_PAID',
+    to: 'PARTIALLY_PAID',
+    actors: ['ADMIN', 'SYSTEM'],
+    command: 'RecordPayment',
+  },
   { from: 'PARTIALLY_PAID', to: 'PAID', actors: ['ADMIN', 'SYSTEM'], command: 'RecordPayment' },
   { from: 'PARTIALLY_PAID', to: 'OVERDUE', actors: ['SYSTEM'], command: 'MarkOverdue' },
-  { from: 'PARTIALLY_PAID', to: 'DISPUTED', actors: ['RESTAURANT', 'ADMIN'], command: 'DisputeSettlement', requiresReason: true },
+  {
+    from: 'PARTIALLY_PAID',
+    to: 'DISPUTED',
+    actors: ['RESTAURANT', 'ADMIN'],
+    command: 'DisputeSettlement',
+    requiresReason: true,
+  },
   { from: 'OVERDUE', to: 'PARTIALLY_PAID', actors: ['ADMIN', 'SYSTEM'], command: 'RecordPayment' },
   { from: 'OVERDUE', to: 'PAID', actors: ['ADMIN', 'SYSTEM'], command: 'RecordPayment' },
-  { from: 'OVERDUE', to: 'DISPUTED', actors: ['RESTAURANT', 'ADMIN'], command: 'DisputeSettlement', requiresReason: true },
-  { from: 'DISPUTED', to: 'ISSUED', actors: ['ADMIN'], command: 'ResolveDispute', requiresReason: true },
-  { from: 'DISPUTED', to: 'VOID', actors: ['ADMIN'], command: 'VoidSettlement', requiresReason: true },
+  {
+    from: 'OVERDUE',
+    to: 'DISPUTED',
+    actors: ['RESTAURANT', 'ADMIN'],
+    command: 'DisputeSettlement',
+    requiresReason: true,
+  },
+  {
+    from: 'DISPUTED',
+    to: 'ISSUED',
+    actors: ['ADMIN'],
+    command: 'ResolveDispute',
+    requiresReason: true,
+  },
+  {
+    from: 'DISPUTED',
+    to: 'VOID',
+    actors: ['ADMIN'],
+    command: 'VoidSettlement',
+    requiresReason: true,
+  },
   // A paid statement can only be voided through an explicit, audited correction.
   { from: 'PAID', to: 'VOID', actors: ['ADMIN'], command: 'VoidSettlement', requiresReason: true },
 ];
@@ -241,9 +286,7 @@ export function assertTransition<S extends string>(
   table: readonly TransitionRule<S>[],
   check: TransitionCheck<S>,
   notAllowedCode: (typeof ERROR_CODES)[
-    | 'ORDER_CANNOT_TRANSITION'
-    | 'DELIVERY_CANNOT_TRANSITION'
-    | 'SETTLEMENT_INVALID_STATE'],
+    'ORDER_CANNOT_TRANSITION' | 'DELIVERY_CANNOT_TRANSITION' | 'SETTLEMENT_INVALID_STATE'],
 ): TransitionRule<S> {
   const rule = findTransition(table, check.from, check.to);
   if (!rule) {

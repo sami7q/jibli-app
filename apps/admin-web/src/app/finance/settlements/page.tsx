@@ -106,8 +106,9 @@ export default function SettlementsPage() {
         <div className="alert-bar alert-bar--danger" role="alert">
           <Icon name="alert" className="nav__icon" aria-hidden />
           <span>
-            فشلت {pluralAr(failedChecks.length, 'مطابقة مالية', 'مطابقتان ماليتان', 'مطابقات مالية')}.
-            لا تعتمد أرقام التقارير قبل حل الاختلاف — راجع دليل حوادث المالية.
+            فشلت{' '}
+            {pluralAr(failedChecks.length, 'مطابقة مالية', 'مطابقتان ماليتان', 'مطابقات مالية')}. لا
+            تعتمد أرقام التقارير قبل حل الاختلاف — راجع دليل حوادث المالية.
           </span>
         </div>
       ) : null}
@@ -186,7 +187,11 @@ export default function SettlementsPage() {
                     {row.restaurant_name}
                     <span
                       className="ltr-inline"
-                      style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', marginInlineStart: 6 }}
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: 'var(--text-xs)',
+                        marginInlineStart: 6,
+                      }}
                     >
                       #{row.partner_code}
                     </span>
@@ -244,7 +249,10 @@ export default function SettlementsPage() {
                       إصدار
                     </button>
                   ) : (
-                    <Link className="btn btn--outline btn--sm" href={`/finance/settlements/${row.id}`}>
+                    <Link
+                      className="btn btn--outline btn--sm"
+                      href={`/finance/settlements/${row.id}`}
+                    >
                       التفاصيل
                     </Link>
                   ),

@@ -91,10 +91,7 @@ export interface StoredAsset {
   readonly byteSize: number;
 }
 
-export async function storeAsset(
-  ctx: AppContext,
-  params: StoreAssetParams,
-): Promise<StoredAsset> {
+export async function storeAsset(ctx: AppContext, params: StoreAssetParams): Promise<StoredAsset> {
   /*
    * Decoded before anything else is trusted. `Buffer.from(..., 'base64')` never
    * throws — it silently skips characters it does not recognise — so the size

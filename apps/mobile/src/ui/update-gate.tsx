@@ -51,9 +51,18 @@ export function UpdateGate() {
     const [deepLink, webLink] =
       Platform.OS === 'ios'
         ? iosAppId
-          ? [`itms-apps://apps.apple.com/app/id${iosAppId}`, `https://apps.apple.com/app/id${iosAppId}`]
-          : ['itms-apps://search.itunes.apple.com/WebObjects/MZSearch.woa/wa/search?media=software&term=Jibli', 'https://apps.apple.com/search?term=Jibli']
-        : [`market://details?id=${androidPackage}`, `https://play.google.com/store/apps/details?id=${androidPackage}`];
+          ? [
+              `itms-apps://apps.apple.com/app/id${iosAppId}`,
+              `https://apps.apple.com/app/id${iosAppId}`,
+            ]
+          : [
+              'itms-apps://search.itunes.apple.com/WebObjects/MZSearch.woa/wa/search?media=software&term=Jibli',
+              'https://apps.apple.com/search?term=Jibli',
+            ]
+        : [
+            `market://details?id=${androidPackage}`,
+            `https://play.google.com/store/apps/details?id=${androidPackage}`,
+          ];
 
     void Linking.openURL(deepLink).catch(() => {
       void Linking.openURL(webLink).catch(() => undefined);

@@ -89,7 +89,10 @@ export default function AuditPage() {
             onChange={setAction}
             label="نوع الإجراء"
             allLabel="كل الإجراءات"
-            options={Object.entries(AUDIT_ACTION_LABELS).map(([value, label]) => ({ value, label }))}
+            options={Object.entries(AUDIT_ACTION_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            }))}
           />
         </FilterBar>
 

@@ -35,9 +35,7 @@ export function restaurantScope(request: FastifyRequest): RestaurantScope {
  * rather than to gate an action. Gating always uses the asserting form so a
  * missing permission fails loudly.
  */
-export function hasPermission(
-  check: () => void,
-): boolean {
+export function hasPermission(check: () => void): boolean {
   try {
     check();
     return true;

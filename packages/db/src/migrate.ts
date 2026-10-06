@@ -202,7 +202,11 @@ export async function migrationStatus(connectionString: string): Promise<Migrati
       }
     }
 
-    return { applied: [...recorded.keys()].sort((a, b) => a.localeCompare(b, 'en')), pending, changed };
+    return {
+      applied: [...recorded.keys()].sort((a, b) => a.localeCompare(b, 'en')),
+      pending,
+      changed,
+    };
   } finally {
     await sql.end({ timeout: 5 });
   }

@@ -114,7 +114,9 @@ function DriversScreen({
   if (drivers.isError) {
     return (
       <ErrorState
-        message={drivers.error instanceof ApiError ? drivers.error.messageAr : 'تعذّر تحميل المندوبين'}
+        message={
+          drivers.error instanceof ApiError ? drivers.error.messageAr : 'تعذّر تحميل المندوبين'
+        }
         code={drivers.error instanceof ApiError ? drivers.error.code : undefined}
         onRetry={() => void drivers.refetch()}
       />
@@ -126,10 +128,7 @@ function DriversScreen({
   const rows = drivers.data ?? [];
   const active = rows.filter((driver) => driver.is_active);
   const onDuty = active.filter((driver) => driver.availability !== 'OFFLINE');
-  const totalCustody = (cash.data ?? []).reduce(
-    (sum, row) => sum + row.current_custody_iqd,
-    0,
-  );
+  const totalCustody = (cash.data ?? []).reduce((sum, row) => sum + row.current_custody_iqd, 0);
 
   return (
     <>
@@ -323,11 +322,11 @@ function DriversScreen({
                             تعديل
                           </button>
                           {/*
-                            * The login, issued here because this is where the
-                            * restaurant hires. A driver added by phone had no
-                            * way into anything but an OTP to that number, and
-                            * a delivery handset is usually shared.
-                            */}
+                           * The login, issued here because this is where the
+                           * restaurant hires. A driver added by phone had no
+                           * way into anything but an OTP to that number, and
+                           * a delivery handset is usually shared.
+                           */}
                           <button
                             type="button"
                             className="btn btn--ghost btn--sm"
@@ -354,9 +353,7 @@ function DriversScreen({
                               type="button"
                               className="btn btn--ghost btn--sm"
                               disabled={setActive.isPending}
-                              onClick={() =>
-                                setActive.mutate({ id: driver.id, isActive: true })
-                              }
+                              onClick={() => setActive.mutate({ id: driver.id, isActive: true })}
                             >
                               إعادة تفعيل
                             </button>
@@ -405,11 +402,7 @@ function DriversScreen({
       ) : null}
 
       {issuing ? (
-        <CredentialsDialog
-          auth={auth}
-          driver={issuing}
-          onClose={() => setIssuing(null)}
-        />
+        <CredentialsDialog auth={auth} driver={issuing} onClose={() => setIssuing(null)} />
       ) : null}
 
       {editing ? (
@@ -483,10 +476,7 @@ function CashCard({
   const holding = cash.filter((row) => row.current_custody_iqd !== 0);
 
   return (
-    <Card
-      title="عهدة النقد"
-      subtitle="ما حصّله المندوبون من العملاء ولم يسلّموه بعد"
-    >
+    <Card title="عهدة النقد" subtitle="ما حصّله المندوبون من العملاء ولم يسلّموه بعد">
       {/*
         Stated once, prominently: this money belongs to the restaurant and is
         simply in transit. It is not a balance Jibli holds or owes (plan §54).
@@ -605,8 +595,7 @@ function HandoverDialog({
     onSuccess: onDone,
   });
 
-  const invalid =
-    !Number.isInteger(amount) || amount <= 0 || amount > row.current_custody_iqd;
+  const invalid = !Number.isInteger(amount) || amount <= 0 || amount > row.current_custody_iqd;
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="ho-title">
@@ -874,8 +863,8 @@ function CredentialsDialog({
         {issued ? (
           <>
             <p className="alert-bar alert-bar--warning" role="status">
-              تظهر كلمة المرور مرة واحدة فقط. سلّمها للمندوب الآن — لا يمكن عرضها لاحقاً، لكن
-              يمكنك إصدار غيرها في أي وقت.
+              تظهر كلمة المرور مرة واحدة فقط. سلّمها للمندوب الآن — لا يمكن عرضها لاحقاً، لكن يمكنك
+              إصدار غيرها في أي وقت.
             </p>
 
             <div className="field">
@@ -995,8 +984,8 @@ function EditDriverDialog({
             مسموح له بتحصيل النقد من العملاء
             {driver.cash_custody_iqd > 0 && !canCollectCash ? (
               <span className="field__hint" style={{ display: 'block' }}>
-                لديه عهدة {money(driver.cash_custody_iqd)} — المنع يسري على الطلبات الجديدة ولا
-                يلغي عهدته الحالية.
+                لديه عهدة {money(driver.cash_custody_iqd)} — المنع يسري على الطلبات الجديدة ولا يلغي
+                عهدته الحالية.
               </span>
             ) : null}
           </span>

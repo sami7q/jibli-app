@@ -89,9 +89,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
       const categories = await ctx.db
         .select()
         .from(menuCategories)
-        .where(
-          and(eq(menuCategories.restaurantId, restaurantId), isNull(menuCategories.deletedAt)),
-        )
+        .where(and(eq(menuCategories.restaurantId, restaurantId), isNull(menuCategories.deletedAt)))
         .orderBy(asc(menuCategories.sortOrder));
 
       const items = await ctx.db
@@ -180,7 +178,10 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
       const { principal, restaurantId } = restaurantScope(request);
       assertRestaurantPermission(principal, restaurantId, 'menu.write');
       const { categoryId } = z.object({ categoryId: uuidSchema }).parse(request.params);
-      const body = categorySchema.partial().extend({ is_active: z.boolean().optional() }).parse(request.body);
+      const body = categorySchema
+        .partial()
+        .extend({ is_active: z.boolean().optional() })
+        .parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
         // Tenant guard: the WHERE clause includes the restaurant, so another
@@ -531,9 +532,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
       const { principal, restaurantId } = restaurantScope(request);
       assertRestaurantPermission(principal, restaurantId, 'menu.write');
       const { itemId } = z.object({ itemId: uuidSchema }).parse(request.params);
-      const body = z
-        .object({ group_id: uuidSchema, attached: z.boolean() })
-        .parse(request.body);
+      const body = z.object({ group_id: uuidSchema, attached: z.boolean() }).parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
         // Both sides must belong to this restaurant.

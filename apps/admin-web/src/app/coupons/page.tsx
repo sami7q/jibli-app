@@ -105,13 +105,15 @@ export default function CouponsPage() {
           <Card>
             <p className="alert-bar alert-bar--warning" role="note">
               <span style={{ flex: 1 }}>
-                مصدر التمويل يحدّد أساس احتساب العمولة: الخصم الذي تموّله جيبلي لا يُنقص ما
-                يُحتسب على المطعم، بينما الخصم الذي يموّله المطعم يُنقصه. لا يمكن تعديل شروط
-                الكوبون بعد إنشائه — فقط إيقافه.
+                مصدر التمويل يحدّد أساس احتساب العمولة: الخصم الذي تموّله جيبلي لا يُنقص ما يُحتسب
+                على المطعم، بينما الخصم الذي يموّله المطعم يُنقصه. لا يمكن تعديل شروط الكوبون بعد
+                إنشائه — فقط إيقافه.
               </span>
             </p>
 
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBlockStart: 'var(--space-4)' }}>
+            <div
+              style={{ display: 'flex', gap: 'var(--space-2)', marginBlockStart: 'var(--space-4)' }}
+            >
               {[
                 { value: '', label: 'الكل' },
                 { value: 'active', label: 'فعّال' },
@@ -184,7 +186,9 @@ export default function CouponsPage() {
                               ? bpsPercent(coupon.value)
                               : money(coupon.value)}
                             {coupon.max_discount_iqd ? (
-                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                              <div
+                                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
+                              >
                                 بحد أقصى {money(coupon.max_discount_iqd)}
                               </div>
                             ) : null}
@@ -193,7 +197,9 @@ export default function CouponsPage() {
                             {COUPON_FUNDING_LABELS[coupon.funding_source as CouponFundingSource] ??
                               coupon.funding_source}
                             {coupon.restaurant_share_bps !== null ? (
-                              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                              <div
+                                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
+                              >
                                 حصة المطعم {bpsPercent(coupon.restaurant_share_bps)}
                               </div>
                             ) : null}
@@ -207,7 +213,9 @@ export default function CouponsPage() {
                           </td>
                           <td className="numeric">{money(coupon.discount_given_iqd)}</td>
                           <td>
-                            <span className={`badge badge--${STATE_TONES[coupon.state] ?? 'neutral'}`}>
+                            <span
+                              className={`badge badge--${STATE_TONES[coupon.state] ?? 'neutral'}`}
+                            >
                               {COUPON_STATE_LABELS[coupon.state] ?? coupon.state}
                             </span>
                           </td>

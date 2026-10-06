@@ -54,7 +54,7 @@ a ledger row destroys the evidence needed to understand what happened.
    a data-entry problem.
 
 4. **Driver cash mismatch.** The same shape, against `driver_cash_events`.
-   Remember: COD cash is *restaurant* cash in driver custody. It is never a
+   Remember: COD cash is _restaurant_ cash in driver custody. It is never a
    Jibli commission payment, and the two balances must not be reconciled
    against each other.
 
@@ -82,7 +82,7 @@ DISPUTED and stops accruing overdue status.
    orders snapshot the fee in force when they were placed, so one statement can
    legitimately contain lines at two different fees.
 
-   A line whose amount is *below* the fee is also expected, and is not an error:
+   A line whose amount is _below_ the fee is also expected, and is not an error:
    the fee is capped at the commission base, so an order too small to carry it
    is charged what the restaurant earned and no more (ADR 0006).
 

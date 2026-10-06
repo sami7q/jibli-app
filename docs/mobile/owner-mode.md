@@ -15,16 +15,16 @@ adding an enum value rather than writing the feature again.
 This is the part worth establishing before any code is written, because most of
 it is done and rebuilding it would be the expensive mistake.
 
-| Piece | Where | State |
-| --- | --- | --- |
-| Owner sign-in by password | `POST /api/v1/auth/login`, `client: 'mobile'` | **Works.** Returns `portal: 'RESTAURANT'` and a token pair |
-| The app's client for it | `api.passwordSignIn` in `src/lib/api.ts` | **Works.** Used today by courier sign-in |
-| Which shops this user owns | `GET /api/v1/restaurant-portal/me` | **Works.** Returns `merchant_type` and roles per shop |
-| Product read / create / edit / delete | `/api/v1/restaurant-portal/menu/*` | **Works.** Gated on `menu.write` |
-| Shop profile, including its picture | `PUT /api/v1/restaurant-portal/settings` (`logo_asset_id`) | **Works** |
-| Image upload | `POST /api/v1/uploads` — base64, ≤5 MB, returns an asset id | **Works** |
-| Permission model | `RESTAURANT_ROLE_PERMISSIONS` in `@jibli/contracts` | **Works.** `OWNER` holds everything; `MANAGER` holds `menu.write` and `settings.write` |
-| Tenant scoping | `X-Restaurant-Id` header, resolved by `restaurantScope` | **Works.** The header only *selects* among shops the session already proves membership of |
+| Piece                                 | Where                                                       | State                                                                                     |
+| ------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Owner sign-in by password             | `POST /api/v1/auth/login`, `client: 'mobile'`               | **Works.** Returns `portal: 'RESTAURANT'` and a token pair                                |
+| The app's client for it               | `api.passwordSignIn` in `src/lib/api.ts`                    | **Works.** Used today by courier sign-in                                                  |
+| Which shops this user owns            | `GET /api/v1/restaurant-portal/me`                          | **Works.** Returns `merchant_type` and roles per shop                                     |
+| Product read / create / edit / delete | `/api/v1/restaurant-portal/menu/*`                          | **Works.** Gated on `menu.write`                                                          |
+| Shop profile, including its picture   | `PUT /api/v1/restaurant-portal/settings` (`logo_asset_id`)  | **Works**                                                                                 |
+| Image upload                          | `POST /api/v1/uploads` — base64, ≤5 MB, returns an asset id | **Works**                                                                                 |
+| Permission model                      | `RESTAURANT_ROLE_PERMISSIONS` in `@jibli/contracts`         | **Works.** `OWNER` holds everything; `MANAGER` holds `menu.write` and `settings.write`    |
+| Tenant scoping                        | `X-Restaurant-Id` header, resolved by `restaurantScope`     | **Works.** The header only _selects_ among shops the session already proves membership of |
 
 `GET /restaurant-portal/me` already carries a comment saying it returns
 `merchant_type` "so the portal can say «المنتجات» to a grocer and «القائمة» to a
@@ -131,7 +131,7 @@ inside the customer binary: a separate route group, reached deliberately from
 ### The one screen that has to be excellent
 
 **Add a product.** It is the screen a grocer uses two hundred times and every
-other screen once. The target is *under a minute, standing in the aisle*:
+other screen once. The target is _under a minute, standing in the aisle_:
 
 - Camera opens first, not a form. The photograph is the slow part and the part
   that needs the shop's light.
@@ -174,7 +174,7 @@ customers browsing the market half.
 
 So the vertical gate — the one rule everything else hangs off — is pinned by
 `src/lib/owner-vertical.test.ts` instead, which is why that rule lives in a
-module with no React in it. What *was* tested against the live API, with a
+module with no React in it. What _was_ tested against the live API, with a
 real merchant credential:
 
 - sign-in with the shop's own portal username and password

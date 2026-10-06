@@ -5,10 +5,7 @@ import { createPushProvider } from '@jibli/notifications';
 import { purgeExpiredIdempotencyKeys } from '@jibli/domain';
 import { createWorkerRedis, type WorkerContext } from './context.js';
 import { runOutboxPublisher } from './jobs/outbox-publisher.js';
-import {
-  runOverdueEvaluation,
-  runSettlementGeneration,
-} from './jobs/settlement-generation.js';
+import { runOverdueEvaluation, runSettlementGeneration } from './jobs/settlement-generation.js';
 import { runDailyReconciliation, runGeographyIntegrityCheck } from './jobs/reconciliation.js';
 import { purgeExpiredLocks } from './jobs/job-lock.js';
 import { runStalledOrderSweep, STALLED_ORDERS_INTERVAL_MS } from './jobs/stalled-orders.js';

@@ -86,7 +86,9 @@ export default function SupportThreadPage() {
     >
       {thread.isError ? (
         <ErrorState
-          message={thread.error instanceof ApiError ? thread.error.messageAr : 'تعذّر تحميل المحادثة'}
+          message={
+            thread.error instanceof ApiError ? thread.error.messageAr : 'تعذّر تحميل المحادثة'
+          }
           onRetry={() => void thread.refetch()}
         />
       ) : thread.isLoading || !data ? (

@@ -11,13 +11,7 @@ import {
 import { assertAdminPermission } from '@jibli/auth';
 import { reasonSchema, uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
-import {
-  coupons,
-  couponRedemptions,
-  restaurants,
-  users,
-  uuidv7,
-} from '@jibli/db';
+import { coupons, couponRedemptions, restaurants, users, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 
@@ -265,9 +259,7 @@ export function registerAdminCouponRoutes(app: FastifyInstance, ctx: AppContext)
       const principal = requirePrincipal(request);
       assertAdminPermission(principal, 'coupon.manage');
       const { couponId } = z.object({ couponId: uuidSchema }).parse(request.params);
-      const body = z
-        .object({ is_active: z.boolean(), reason: reasonSchema })
-        .parse(request.body);
+      const body = z.object({ is_active: z.boolean(), reason: reasonSchema }).parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
         const [existing] = await tx
@@ -347,7 +339,13 @@ export function registerAdminCouponRoutes(app: FastifyInstance, ctx: AppContext)
 
 /** Lifecycle state, derived rather than stored (see the list handler). */
 function couponState(
-  row: { isActive: boolean; startsAt: Date; endsAt: Date | null; usageCount: number; totalUsageLimit: number | null },
+  row: {
+    isActive: boolean;
+    startsAt: Date;
+    endsAt: Date | null;
+    usageCount: number;
+    totalUsageLimit: number | null;
+  },
   now: Date,
 ): 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'DISABLED' | 'EXHAUSTED' {
   if (!row.isActive) return 'DISABLED';

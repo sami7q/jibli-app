@@ -42,13 +42,7 @@ export default function OrdersPage() {
   );
 }
 
-function OrdersScreen({
-  auth,
-  canSeeCommission,
-}: {
-  auth: PortalAuth;
-  canSeeCommission: boolean;
-}) {
+function OrdersScreen({ auth, canSeeCommission }: { auth: PortalAuth; canSeeCommission: boolean }) {
   const [status, setStatus] = useState<OrderStatus | ''>('');
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');

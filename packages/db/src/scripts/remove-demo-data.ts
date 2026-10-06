@@ -116,7 +116,11 @@ async function main(): Promise<void> {
       .where(scope);
 
     if (demo.length === 0) {
-      console.log(everyPartner ? 'No partners found. Nothing to do.' : 'No demo partners found. Nothing to do.');
+      console.log(
+        everyPartner
+          ? 'No partners found. Nothing to do.'
+          : 'No demo partners found. Nothing to do.',
+      );
       return;
     }
 
@@ -139,8 +143,11 @@ async function main(): Promise<void> {
 
     console.log(`${everyPartner ? 'Partners' : 'Demo partners'} found: ${verdicts.length}\n`);
     for (const v of verdicts) {
-      const note = v.action === 'DELETE' ? 'delete' : `archive — ${v.orderCount} order(s) behind it`;
-      console.log(`  ${v.partnerCode.padEnd(10)} ${v.merchantType.padEnd(10)} ${v.displayName}  → ${note}`);
+      const note =
+        v.action === 'DELETE' ? 'delete' : `archive — ${v.orderCount} order(s) behind it`;
+      console.log(
+        `  ${v.partnerCode.padEnd(10)} ${v.merchantType.padEnd(10)} ${v.displayName}  → ${note}`,
+      );
     }
 
     /*

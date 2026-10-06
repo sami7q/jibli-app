@@ -376,13 +376,13 @@ function NavigationButtons({ links }: { links?: NavigationLinks }) {
       ) : null}
 
       {/*
-        * Waze only when there is a pin.
-        *
-        * It navigates to coordinates and has nothing to do with a landmark
-        * address, so the server returns null for it without one — and a
-        * button that is there half the time is better than a button that
-        * opens an app with nowhere to go.
-        */}
+       * Waze only when there is a pin.
+       *
+       * It navigates to coordinates and has nothing to do with a landmark
+       * address, so the server returns null for it without one — and a
+       * button that is there half the time is better than a button that
+       * opens an app with nowhere to go.
+       */}
       {links.waze ? (
         <a className="btn btn--ghost" href={links.waze} target="_blank" rel="noreferrer">
           Waze

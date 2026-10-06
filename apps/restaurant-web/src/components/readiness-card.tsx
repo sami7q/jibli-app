@@ -61,8 +61,8 @@ export function ReadinessCard({ auth, canWrite }: { auth: Auth; canWrite: boolea
         <div className="readiness__sent" role="status">
           <strong>طلبك قيد المراجعة لدى إدارة جيبلي.</strong>
           <span>
-            أُرسل في {new Date(data.activation_requested_at ?? '').toLocaleDateString('ar-IQ')}. يمكنك
-            متابعة تجهيز المنيو والصور أثناء المراجعة.
+            أُرسل في {new Date(data.activation_requested_at ?? '').toLocaleDateString('ar-IQ')}.
+            يمكنك متابعة تجهيز المنيو والصور أثناء المراجعة.
           </span>
           {canWrite ? (
             <button
@@ -129,9 +129,7 @@ export function ReadinessCard({ auth, canWrite }: { auth: Auth; canWrite: boolea
             ) : null}
           </div>
         ) : (
-          <p className="readiness__pending">
-            أكمل المتطلبات المتبقية، وسيظهر زر إرسال الطلب هنا.
-          </p>
+          <p className="readiness__pending">أكمل المتطلبات المتبقية، وسيظهر زر إرسال الطلب هنا.</p>
         )
       ) : null}
     </section>

@@ -105,7 +105,8 @@ export async function listSelectableCities(
     .where(eq(governorates.id, governorateId))
     .limit(1);
 
-  if (!governorate) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'governorate' } });
+  if (!governorate)
+    throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'governorate' } });
 
   const rows = await ctx.db
     .select(CITY_COLUMNS)
@@ -168,10 +169,7 @@ export async function assertSelectableGeography(
 
 /** Full admin view, including rows a customer would never be offered. */
 export async function listAllGovernorates(ctx: AppContext) {
-  return ctx.db
-    .select(GOVERNORATE_COLUMNS)
-    .from(governorates)
-    .orderBy(asc(governorates.sortOrder));
+  return ctx.db.select(GOVERNORATE_COLUMNS).from(governorates).orderBy(asc(governorates.sortOrder));
 }
 
 export async function listCitiesForAdmin(ctx: AppContext, governorateId?: string) {
@@ -235,10 +233,7 @@ export interface CoverageImpact {
   readonly customerProfiles: number;
 }
 
-export async function cityCoverageImpact(
-  ctx: AppContext,
-  cityId: string,
-): Promise<CoverageImpact> {
+export async function cityCoverageImpact(ctx: AppContext, cityId: string): Promise<CoverageImpact> {
   const [restaurantCount] = await ctx.db
     .select({ value: count() })
     .from(restaurantBranches)
@@ -256,10 +251,7 @@ export async function cityCoverageImpact(
     .from(orders)
     .innerJoin(restaurantBranches, eq(orders.branchId, restaurantBranches.id))
     .where(
-      and(
-        eq(restaurantBranches.cityId, cityId),
-        inArray(orders.status, [...LIVE_ORDER_STATUSES]),
-      ),
+      and(eq(restaurantBranches.cityId, cityId), inArray(orders.status, [...LIVE_ORDER_STATUSES])),
     );
 
   return {
