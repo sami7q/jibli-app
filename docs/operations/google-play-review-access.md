@@ -175,14 +175,16 @@ Verification code: <GOOGLE_PLAY_REVIEW_OTP_CODE>
 4. Enter the verification code above. It is fixed for this account only;
    the app says it was sent over WhatsApp, but for this review account
    nothing is sent and the code above always works.
-5. You land on the home screen. Sections: "طعام" (food), "ماركت"
-   (market), "كوزمتك" (cosmetics). Open "ماركت المراجعة" (the review
-   market), add products to the basket ("أضف"), open the basket (bottom
-   bar), and continue to checkout ("إتمام الطلب"). A saved delivery
-   address ("المنزل") is already on the account; you may also pick a
-   location on the map or type an address. Location permission is
-   optional — denying it does not block anything. Cash on delivery is the
-   only payment method.
+5. A screen asks "شنو تريد اليوم؟" (what would you like today?) with three
+   sections: "طعام" (food), "ماركت" (market), "كوزمتك" (cosmetics). Tap
+   "ماركت". Open "ماركت المراجعة" (the review market), add products with
+   the "+" on each product, tap the basket bar at the bottom ("عرض
+   السلة"), then "متابعة إلى العنوان والدفع" (continue to address and
+   payment). A saved delivery address ("المنزل") is already on the
+   account; you may also pick a location on the map or type an address.
+   Location permission is optional — denying it does not block anything.
+   Payment is "نقداً عند الاستلام" (cash on delivery) only. You do not
+   need to place the order.
 6. Account: tab "حسابي" (bottom bar, far left). It shows the profile,
    saved addresses ("عناويني"), order history ("طلباتي"), favorites,
    notifications, privacy policy, terms, and "حذف حسابي" (delete

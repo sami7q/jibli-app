@@ -17,6 +17,7 @@ import {
   userAddresses,
   userPlatformRoles,
   users,
+  orders,
 } from '../schema/index.js';
 import {
   DEMO_MARKETS,
@@ -383,8 +384,21 @@ async function upsertCustomer(
      * already the review account. Updating it would rename a real customer
      * and point their profile at the review address — on a database the
      * script has no other way to tell apart from a fresh one.
+     *
+     * One exception: the empty account a sign-in leaves behind. Review mode
+     * is switched on on the API before this script runs, and anyone who tries
+     * the review number in between creates an identity with no name, no
+     * completed profile and no orders. That is not somebody's account; it is
+     * this one, unfinished, and refusing it would leave review access stuck.
      */
-    if (existing.fullName !== CUSTOMER_NAME) {
+    const [anyOrder] = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.userId, existing.id))
+      .limit(1);
+    const isEmptyStub =
+      existing.fullName === null && existing.profileCompletedAt === null && !anyOrder;
+    if (existing.fullName !== CUSTOMER_NAME && !isEmptyStub) {
       fail(
         'The review number already belongs to an account that is not the review customer. ' +
           'Pick a number nobody uses.',
