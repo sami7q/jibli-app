@@ -261,9 +261,21 @@ services:
       #   GOOGLE_PLAY_REVIEW_PHONE=+9647XXXXXXXXX     (the review account's number)
       #   GOOGLE_PLAY_REVIEW_OTP_CODE=NNNN            (OTP_LENGTH digits, not 0000)
       #
-      # Set all three in the dashboard for the review window and delete them
-      # after approval; the API refuses to boot with the switch on and either
-      # value missing. The reviewer's accounts themselves are created with
+      # Values stay in the Render dashboard, not in Git. Declaring the keys
+      # with sync:false makes that explicit in the Blueprint without committing
+      # the review phone or fixed code. On an existing Blueprint Render ignores
+      # sync:false values during sync, so the manually-set dashboard values are
+      # preserved. Remove/disable them in the dashboard after review.
+      - key: GOOGLE_PLAY_REVIEW_ENABLED
+        sync: false
+      - key: GOOGLE_PLAY_REVIEW_PHONE
+        sync: false
+      - key: GOOGLE_PLAY_REVIEW_OTP_CODE
+        sync: false
+      - key: GOOGLE_PLAY_REVIEW_MAX_FAILURES
+        sync: false
+
+      # The reviewer's accounts themselves are created with
       # `pnpm review:provision`. Everything is written up, with the text to
       # paste into the Play Console, in
       # docs/operations/google-play-review-access.md.
