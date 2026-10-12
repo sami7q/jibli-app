@@ -5,7 +5,6 @@
 **Customer app with Driver Mode · Restaurant portal · Admin portal · API · Background worker**
 One TypeScript monorepo, built for production rather than for a demo.
 
-[![CI](https://github.com/sami7q/jibli-app/actions/workflows/ci.yml/badge.svg)](https://github.com/sami7q/jibli-app/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![React Native](https://img.shields.io/badge/React_Native-Expo-000020?logo=expo)
 ![Next.js](https://img.shields.io/badge/Next.js-portals-000000?logo=nextdotjs)
