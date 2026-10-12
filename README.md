@@ -23,14 +23,14 @@ One TypeScript monorepo, built for production rather than for a demo.
 
 Jibli is a food-delivery platform for the Iraqi market: customers order from restaurants, restaurant-owned drivers deliver, payment is cash on delivery and the platform takes a commission settled twice a month. The interface is Arabic-first (RTL).
 
-| App | Stack | Who uses it |
-|---|---|---|
-| `apps/mobile` | Expo / React Native | Customers — and drivers, through **Driver Mode** in the same app |
-| `apps/restaurant-web` | Next.js | Restaurants: live orders, menu, stock, staff, drivers, earnings |
-| `apps/admin-web` | Next.js | Operations: cities, restaurants, commissions, settlements |
-| `apps/api` | Fastify + WebSocket | REST API and realtime gateway |
-| `apps/worker` | Node.js | Transactional outbox, settlements, reconciliation |
-| `apps/legal` | Next.js | Privacy policy and terms pages |
+| App                   | Stack               | Who uses it                                                      |
+| --------------------- | ------------------- | ---------------------------------------------------------------- |
+| `apps/mobile`         | Expo / React Native | Customers — and drivers, through **Driver Mode** in the same app |
+| `apps/restaurant-web` | Next.js             | Restaurants: live orders, menu, stock, staff, drivers, earnings  |
+| `apps/admin-web`      | Next.js             | Operations: cities, restaurants, commissions, settlements        |
+| `apps/api`            | Fastify + WebSocket | REST API and realtime gateway                                    |
+| `apps/worker`         | Node.js             | Transactional outbox, settlements, reconciliation                |
+| `apps/legal`          | Next.js             | Privacy policy and terms pages                                   |
 
 13 shared packages hold the actual business rules: `domain`, `money`, `contracts`, `db`, `auth`, `geography`, `validation`, `notifications`, `config`, `logger`, `design-tokens`, `ui-web`, `test-utils`.
 
@@ -38,8 +38,8 @@ Jibli is a food-delivery platform for the Iraqi market: customers order from res
 
 > UI design of the three client surfaces (Arabic, RTL).
 
-| Customer app | Restaurant portal | Admin portal |
-|---|---|---|
+| Customer app                                                                   | Restaurant portal                                                                          | Admin portal                                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | <img src="docs/design/02-mobile-app.png" width="230" alt="Jibli customer app"> | <img src="docs/design/03-restaurant-portal.png" width="380" alt="Jibli restaurant portal"> | <img src="docs/design/04-admin-portal.png" width="380" alt="Jibli admin portal"> |
 
 ## Architecture
@@ -103,16 +103,16 @@ Transitions — and which actor may perform each one — are declared once in `p
 
 The interesting part of this codebase is what it makes **impossible**. Most rules are enforced by the database, because application checks lose races.
 
-| Must be impossible | Enforced by |
-|---|---|
-| A network retry creates a second order | Unique index on `idempotency_keys (scope, key)` |
-| An order is settled twice | Unique index on `settlement_lines (order_id)` across all settlements |
-| Commission is recalculated at a later rate | Rate snapshotted onto the order; settlement reads the snapshot |
-| COD cash is credited twice | Partial unique index: one `ORDER_CASH_COLLECTED` per order |
-| Two drivers hold one delivery | Partial unique index on active `delivery_assignments (driver_id)` |
-| Concurrent orders oversell stock | Row lock + `SELECT … FOR UPDATE` on the inventory row |
-| An order total disagrees with its parts | `CHECK` constraint on `orders` |
-| A stale client orders in a disabled city | City capability re-checked inside the PlaceOrder transaction |
+| Must be impossible                         | Enforced by                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------- |
+| A network retry creates a second order     | Unique index on `idempotency_keys (scope, key)`                      |
+| An order is settled twice                  | Unique index on `settlement_lines (order_id)` across all settlements |
+| Commission is recalculated at a later rate | Rate snapshotted onto the order; settlement reads the snapshot       |
+| COD cash is credited twice                 | Partial unique index: one `ORDER_CASH_COLLECTED` per order           |
+| Two drivers hold one delivery              | Partial unique index on active `delivery_assignments (driver_id)`    |
+| Concurrent orders oversell stock           | Row lock + `SELECT … FOR UPDATE` on the inventory row                |
+| An order total disagrees with its parts    | `CHECK` constraint on `orders`                                       |
+| A stale client orders in a disabled city   | City capability re-checked inside the PlaceOrder transaction         |
 
 Other decisions, each written up as an ADR in [`docs/adr`](docs/adr):
 
