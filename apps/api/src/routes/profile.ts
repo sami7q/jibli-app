@@ -522,11 +522,14 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
         .set({ customerNameSnapshot: 'عميل محذوف', customerPhoneSnapshot: '' })
         .where(eq(orders.userId, principal.userId));
 
-      // Every device signed out, including ones not holding this request.
-      await tx
-        .update(sessions)
-        .set({ revokedAt: now, revokedReason: 'ACCOUNT_DELETED' })
-        .where(and(eq(sessions.userId, principal.userId), isNull(sessions.revokedAt)));
+      /*
+       * Every device signed out, including ones not holding this request — by
+       * deleting the sessions rather than revoking them. A revoked row keeps
+       * the IP address and user agent of every sign-in for as long as the
+       * table lives, tied to an account that no longer exists; a missing row
+       * is refused by `authenticate` and by refresh exactly as a revoked one.
+       */
+      await tx.delete(sessions).where(eq(sessions.userId, principal.userId));
 
       await tx.insert(auditLogs).values({
         id: uuidv7(),

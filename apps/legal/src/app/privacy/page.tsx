@@ -19,8 +19,10 @@ const UPDATED = '١٦ تشرين الأول ٢٠٢٦';
  * column is the real column name, which is what makes this checkable by
  * somebody who has the code, and what keeps it honest when the schema moves.
  *
- * `keeps` marks the two rows that survive deletion, and both are stated in the
- * app's own confirmation sheet before anyone taps «حذف نهائي».
+ * `keeps` marks the rows that survive deletion. The order and the deletion
+ * line are stated in the app's own confirmation sheet before anyone taps
+ * «حذف نهائي»; the account id survives only as the key of a row that no longer
+ * names anyone.
  */
 const INVENTORY: readonly {
   what: string;
@@ -88,6 +90,19 @@ const INVENTORY: readonly {
     field: 'user_devices.push_token',
     why: 'لإرسال تحديث حالة الطلب إلى هاتفك، مع نوع الجهاز وإصدار التطبيق لتشخيص الأعطال.',
     fate: 'يُحذف عند حذف الحساب أو تسجيل الخروج.',
+  },
+  {
+    what: 'سجل جلسات الدخول',
+    field: 'sessions',
+    why: 'عنوان IP ونوع التطبيق أو المتصفح لكل جلسة دخول، لحماية حسابك من الدخول غير المشروع.',
+    fate: 'يُحذف عند حذف الحساب.',
+  },
+  {
+    what: 'معرّف حسابك',
+    field: 'users.id',
+    why: 'رقم داخلي يربط طلباتك وتقييماتك بحسابك. لا يظهر لأحد.',
+    fate: 'يبقى في صفّ الحساب المجهول بعد الحذف، بلا اسم ولا رقم هاتف.',
+    keeps: true,
   },
   {
     what: 'سجل طلباتك',
@@ -223,7 +238,8 @@ export default function PrivacyPage(): ReactElement {
           <p>
             رمز التحقق لا يُحفظ كما هو — يُحفظ تجزئته (hash) فقط، مملّحة برقم الطلب نفسه، وتنتهي
             صلاحيته بعد دقائق ويُقفل بعد عدد محدود من المحاولات. نحفظ مع طلب الرمز عنوان IP ونوع
-            المتصفح أو التطبيق، لمنع إغراق الخدمة بطلبات آلية.
+            المتصفح أو التطبيق، لمنع إغراق الخدمة بطلبات آلية، وتُحذف هذه السجلات تلقائياً بعد ٧
+            أيام.
           </p>
         </section>
 

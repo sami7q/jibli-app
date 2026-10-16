@@ -25,26 +25,38 @@ The forms ask about the app, not the role, so the answers below are the union.
 
 ## What is collected
 
-| Data                         | Who        | Required?                     | Source                                              | Why                                             |
-| ---------------------------- | ---------- | ----------------------------- | --------------------------------------------------- | ----------------------------------------------- |
-| Name                         | all        | yes                           | `users.full_name`                                   | the shop and driver know whom the order is for  |
-| Phone number                 | all        | yes                           | `users.phone_e164`, order snapshot                  | sign-in, the driver calls on arrival            |
-| Delivery address (text)      | customer   | yes, to order                 | `user_addresses`, order snapshot                    | delivery                                        |
-| Precise location             | customer   | **optional** (map pin)        | `user_addresses.latitude/longitude`                 | delivery; the app works without it              |
-| Approximate location         | customer   | optional                      | `ACCESS_COARSE_LOCATION` is declared alongside fine | same pin, when the user grants only approximate |
-| Purchase history             | customer   | yes                           | `orders`, `order_items`                             | the order itself, receipts, support             |
-| Photos                       | shop owner | optional                      | product and shop images, uploaded to storage        | shown to customers on purpose                   |
-| Other user content (reviews) | customer   | optional                      | `order_reviews`, `review_reports`, `user_blocks`    | ratings, comments, reports and blocks           |
-| Device push token            | all        | optional                      | `user_devices`                                      | order notifications                             |
-| Email address                | customer   | only with Google sign-in      | `users.email`                                       | recognise the Google account next time          |
-| Crash logs                   | all        | only when a Sentry DSN is set | Sentry                                              | fix crashes                                     |
+| Data                          | Who        | Required?                      | Source                                              | Why                                             |
+| ----------------------------- | ---------- | ------------------------------ | --------------------------------------------------- | ----------------------------------------------- |
+| Name                          | all        | yes                            | `users.full_name`                                   | the shop and driver know whom the order is for  |
+| Phone number                  | all        | yes                            | `users.phone_e164`, order snapshot                  | sign-in, the driver calls on arrival            |
+| Delivery address (text)       | customer   | yes, to order                  | `user_addresses`, order snapshot                    | delivery                                        |
+| Precise location              | customer   | **optional** (map pin)         | `user_addresses.latitude/longitude`                 | delivery; the app works without it              |
+| Approximate location          | customer   | optional                       | `ACCESS_COARSE_LOCATION` is declared alongside fine | same pin, when the user grants only approximate |
+| Purchase history              | customer   | yes                            | `orders`, `order_items`                             | the order itself, receipts, support             |
+| Photos                        | shop owner | optional                       | product and shop images, uploaded to storage        | shown to customers on purpose                   |
+| Other user content (reviews)  | customer   | optional                       | `order_reviews`, `review_reports`, `user_blocks`    | ratings, comments, reports and blocks           |
+| Device push token             | all        | optional                       | `user_devices`                                      | order notifications                             |
+| Device model, OS, app version | all        | optional (with the push token) | `user_devices`                                      | diagnose a notification that does not arrive    |
+| User ID                       | all        | yes                            | `users.id`; `users.username` for owners and drivers | the account itself                              |
+| IP address and user agent     | all        | yes                            | `sessions`, `otp_challenges`, `login_attempts`      | security: stop automated sign-in abuse          |
+| Email address                 | customer   | only with Google sign-in       | `users.email`                                       | recognise the Google account next time          |
+| Crash logs                    | all        | only when a Sentry DSN is set  | Sentry                                              | fix crashes                                     |
 
-**Email and crash logs are conditional on the build.** Neither
-`EXPO_PUBLIC_GOOGLE_*` nor `EXPO_PUBLIC_SENTRY_DSN` is set in `eas.json`
-today, so the current production build collects neither, and the privacy
-manifest leaves both out (it adds them when those variables are set). If a
-build ships with either one, add the row to both forms **before** that
-build is submitted.
+**Email and crash logs are conditional on the build.** Release 1 signs in
+with phone and code only: `app.config.ts` refuses a store build that carries
+any `EXPO_PUBLIC_GOOGLE_*` client id, so a store build never collects an
+email. `EXPO_PUBLIC_SENTRY_DSN` is not set in `eas.json` or on EAS today, so
+crash logs are not collected either, and the privacy manifest leaves both
+out (it adds them when those variables are set). If a build ships with
+either one, add the row to both forms **before** that build is submitted.
+
+**Security logs.** Each sign-in session keeps the IP address and user agent
+it was opened from (`sessions`), as do code requests (`otp_challenges`,
+swept after `RETENTION_OTP_CHALLENGE_DAYS`, 7) and portal sign-in attempts
+(`login_attempts`, swept after `RETENTION_LOGIN_ATTEMPT_DAYS`, 90). Sessions
+live as long as the account and are deleted with it. Neither store's form
+has an IP-address field, and both treat security use as App functionality;
+the privacy policy states it.
 
 **Not collected:** payment card or bank data (cash on delivery only),
 contacts, SMS, call logs, calendar, health, audio, files, browsing history,
@@ -64,17 +76,19 @@ advertising ID, installed apps, background location.
 **Data types** — collected: yes, shared: **no** for every row, processed
 ephemerally: no.
 
-| Play category       | Data type                    | Required / optional | Purposes                               |
-| ------------------- | ---------------------------- | ------------------- | -------------------------------------- |
-| Personal info       | Name                         | required            | App functionality, Account management  |
-| Personal info       | Phone number                 | required            | App functionality, Account management  |
-| Personal info       | Address                      | required            | App functionality                      |
-| Location            | Precise location             | optional            | App functionality                      |
-| Location            | Approximate location         | optional            | App functionality                      |
-| Financial info      | Purchase history             | required            | App functionality                      |
-| Photos and videos   | Photos                       | optional            | App functionality                      |
-| App activity        | Other user-generated content | optional            | App functionality                      |
-| Device or other IDs | Device or other IDs          | optional            | App functionality (push notifications) |
+| Play category            | Data type                    | Required / optional | Purposes                               |
+| ------------------------ | ---------------------------- | ------------------- | -------------------------------------- |
+| Personal info            | Name                         | required            | App functionality, Account management  |
+| Personal info            | Phone number                 | required            | App functionality, Account management  |
+| Personal info            | Address                      | required            | App functionality                      |
+| Personal info            | User IDs                     | required            | App functionality, Account management  |
+| Location                 | Precise location             | optional            | App functionality                      |
+| Location                 | Approximate location         | optional            | App functionality                      |
+| Financial info           | Purchase history             | required            | App functionality                      |
+| Photos and videos        | Photos                       | optional            | App functionality                      |
+| App activity             | Other user-generated content | optional            | App functionality                      |
+| Device or other IDs      | Device or other IDs          | optional            | App functionality (push notifications) |
+| App info and performance | Diagnostics                  | optional            | App functionality                      |
 
 Add only when the build has them: Personal info → Email address (optional,
 App functionality, Account management); App info and performance → Crash
@@ -98,22 +112,28 @@ Address as shared for "App functionality", not to change the app.
 - Every type below is **linked to the user**, purpose **App Functionality**
   only.
 
-| Apple category | Data type          |
-| -------------- | ------------------ |
-| Contact Info   | Name               |
-| Contact Info   | Phone Number       |
-| Contact Info   | Physical Address   |
-| Location       | Precise Location   |
-| Location       | Coarse Location    |
-| Purchases      | Purchase History   |
-| User Content   | Photos or Videos   |
-| User Content   | Other User Content |
+| Apple category | Data type             |
+| -------------- | --------------------- |
+| Contact Info   | Name                  |
+| Contact Info   | Phone Number          |
+| Contact Info   | Physical Address      |
+| Location       | Precise Location      |
+| Location       | Coarse Location       |
+| Purchases      | Purchase History      |
+| User Content   | Photos or Videos      |
+| User Content   | Other User Content    |
+| Identifiers    | User ID               |
+| Diagnostics    | Other Diagnostic Data |
 
 Conditional, as for Play: Contact Info → Email Address (Google sign-in);
 Diagnostics → Crash Data, **not linked**, App Functionality (Sentry).
 
 Apple does not count a push token as "Device ID" (that category means
-advertising and vendor identifiers), so it is not declared.
+advertising and vendor identifiers), so it is not declared. The app sends no
+device identifier of its own (`sessions.device_id` stays empty).
+
+`ios.privacyManifests` in `app.config.ts` declares exactly the rows above,
+plus the conditional two when their variables are set — keep them in step.
 
 ## User-generated content (both stores)
 

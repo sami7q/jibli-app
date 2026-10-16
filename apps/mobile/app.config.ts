@@ -67,6 +67,68 @@ const termsUrl = requireForStore(
   'https://jibli.iq/terms',
 );
 
+/**
+ * The number «تواصل معنا» dials, which App Review tries (guideline 1.5).
+ *
+ * Past the placeholder it must still be a number a phone can call: an Iraqi
+ * number in international form, so a typo is a failed build rather than a
+ * dead support row in every installed copy.
+ */
+const supportPhone = requireForStore(
+  'EXPO_PUBLIC_SUPPORT_PHONE',
+  process.env.EXPO_PUBLIC_SUPPORT_PHONE,
+  '+9647700000000',
+);
+if (isStoreBuild && !/^\+964\d{9,10}$/.test(supportPhone)) {
+  throw new Error(
+    `EXPO_PUBLIC_SUPPORT_PHONE must be an Iraqi number in international form ` +
+      `(+964…), and it is baked into the binary.`,
+  );
+}
+
+/**
+ * Release 1 signs in with a phone number and a code, and nothing else.
+ *
+ * A Google button on iOS obliges Sign in with Apple beside it (App Store
+ * guideline 4.8), which is not built, and the store forms, the privacy
+ * manifest and the policy all describe a phone-only sign-in. The button
+ * appears whenever a client id is present — and a client id set as an EAS
+ * environment variable never shows in this repository — so a store build
+ * refuses one outright. Remove this when Sign in with Apple ships.
+ */
+if (isStoreBuild) {
+  const googleIds = [
+    'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID',
+    'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID',
+    'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+  ].filter((name) => process.env[name]);
+  if (googleIds.length > 0) {
+    throw new Error(
+      `${googleIds.join(', ')} set for a store build. Release 1 is phone and code ` +
+        `only: Google sign-in on iOS needs Sign in with Apple beside it.`,
+    );
+  }
+}
+
+/**
+ * An Android store build without Firebase cannot receive a single push: the
+ * order alerts a shop owner depends on would never arrive, while the app still
+ * asks for the notification permission. EAS sets EAS_BUILD_PLATFORM on its
+ * builders, so this stops the Android build and leaves iOS (APNs, held by EAS)
+ * alone.
+ */
+if (
+  isStoreBuild &&
+  process.env.EAS_BUILD_PLATFORM === 'android' &&
+  !process.env.GOOGLE_SERVICES_JSON
+) {
+  throw new Error(
+    'GOOGLE_SERVICES_JSON is not set for this Android store build, so FCM — and ' +
+      'every push notification — would be missing from it. Upload ' +
+      'google-services.json as the GOOGLE_SERVICES_JSON file variable on EAS.',
+  );
+}
+
 const config: ExpoConfig = {
   /*
    * The home-screen name, and the default for every language without an entry
@@ -194,11 +256,7 @@ const config: ExpoConfig = {
      */
     mapTileUrl: process.env.EXPO_PUBLIC_MAP_TILE_URL,
     mapTileAttribution: process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION,
-    supportPhone: requireForStore(
-      'EXPO_PUBLIC_SUPPORT_PHONE',
-      process.env.EXPO_PUBLIC_SUPPORT_PHONE,
-      '+9647700000000',
-    ),
+    supportPhone,
     /*
      * The App Store numeric id, for the «حدّث التطبيق» button.
      *
@@ -284,6 +342,43 @@ const config: ExpoConfig = {
         {
           /* The delivery pin, attached to an address the customer saved. */
           NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePreciseLocation',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          /*
+           * The same pin when the customer allows only approximate location —
+           * iOS lets them turn precise off in the permission prompt.
+           */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeCoarseLocation',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          /* The delivery address the customer types: district, street, landmark. */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePhysicalAddress',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          /*
+           * The account's own identifier, and a shop owner's or driver's
+           * username — the "User ID" Apple asks about.
+           */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeUserID',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          /*
+           * Device model, OS version and app version, stored with the push
+           * token to diagnose a notification that does not arrive.
+           */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeOtherDiagnosticData',
           NSPrivacyCollectedDataTypeLinked: true,
           NSPrivacyCollectedDataTypeTracking: false,
           NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],

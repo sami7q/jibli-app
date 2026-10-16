@@ -96,6 +96,38 @@ for (const [name, value, placeholder] of links) {
   }
 }
 
+/*
+ * «تواصل معنا» dials this, and App Review tries it (1.5). app.config.ts
+ * refuses a store build with the placeholder or a malformed number.
+ */
+const supportPhone = buildEnv('EXPO_PUBLIC_SUPPORT_PHONE');
+if (!supportPhone || supportPhone === '+9647700000000') {
+  bad(
+    'EXPO_PUBLIC_SUPPORT_PHONE is unset, so it would bake the placeholder +9647700000000',
+    "Set a real Iraqi number (+964…) in eas.json's production profile.",
+  );
+} else if (!/^\+964\d{9,10}$/.test(supportPhone)) {
+  bad(`EXPO_PUBLIC_SUPPORT_PHONE (${supportPhone}) is not an Iraqi number in international form`);
+} else {
+  ok(`EXPO_PUBLIC_SUPPORT_PHONE → ${supportPhone}`);
+}
+
+/*
+ * Release 1 is phone and code only. A Google client id puts a Google button
+ * on iOS, which needs Sign in with Apple beside it (4.8); app.config.ts
+ * refuses a store build that carries one.
+ */
+const googleIds = [
+  'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID',
+  'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID',
+  'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+].filter((name) => buildEnv(name));
+if (googleIds.length > 0) {
+  bad(`${googleIds.join(', ')} set — release 1 signs in with phone and code only`);
+} else {
+  ok('no Google client id — sign-in is phone and code only');
+}
+
 // ── 2. Android push ──────────────────────────────────────────────────────────
 
 console.log('\nAndroid notifications');

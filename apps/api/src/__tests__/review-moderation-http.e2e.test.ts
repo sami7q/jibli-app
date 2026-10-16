@@ -11,6 +11,7 @@ import {
   restaurantBranches,
   restaurantMembers,
   restaurants,
+  sessions,
   userPlatformRoles,
   users,
   uuidv7,
@@ -44,6 +45,7 @@ interface Flow {
   readonly restaurantId: string;
   readonly orderA: string;
   readonly orderB: string;
+  readonly customerId: string;
   readonly tokens: { customer: string; owner: string; ops: string; analyst: string };
   readonly teardown: () => Promise<void>;
 }
@@ -182,6 +184,7 @@ async function setUp(): Promise<Flow> {
     restaurantId,
     orderA,
     orderB,
+    customerId: customer,
     tokens: {
       customer: await token(customer),
       owner: await token(owner),
@@ -341,6 +344,12 @@ describeWithDb('review moderation over HTTP (app → API → portal → Admin)',
   it('deleting the account takes every review, report, block and quoted comment with it', async () => {
     const deleted = await call('DELETE', '/api/v1/profile', 'customer');
     expect(deleted.statusCode).toBe(200);
+
+    // Signed out everywhere, and no sign-in IP or user agent left behind.
+    expect(
+      await flow.db.select().from(sessions).where(eq(sessions.userId, flow.customerId)),
+    ).toEqual([]);
+    expect((await call('GET', '/api/v1/profile', 'customer')).statusCode).toBe(401);
 
     const shown = await publicReviews();
     expect(shown.reviews).toEqual([]);
