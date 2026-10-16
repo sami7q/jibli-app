@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Linking, Pressable, TextInput, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError } from '@/lib/api';
+import { configString } from '@/lib/app-config';
 import { notify } from '@/lib/dialog';
-import { color, palette, radius, space, TAP_TARGET, text } from '@/theme';
+import { ROW, color, palette, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, Row, Text } from './index';
 import { Sheet } from './catalog';
 
@@ -15,6 +16,11 @@ import { Sheet } from './catalog';
  * that rule — this sheet is only reachable when it has said so. The stars are
  * the required part; the comment is not, because a customer who wants to give
  * five stars and move on should not be made to write a sentence first.
+ *
+ * A comment is text the shop and other people read, so it carries the one
+ * thing both stores require of user content: the author agrees to the
+ * content rules first. The box appears only once something is typed — a
+ * rating alone is not text and stays one tap.
  */
 
 const WORDS = ['', 'سيئ', 'مقبول', 'جيد', 'جيد جداً', 'ممتاز'] as const;
@@ -34,12 +40,18 @@ export function RateOrderSheet({
 }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const hasComment = comment.trim().length > 0;
 
   const submit = useMutation({
-    mutationFn: () => api.submitReview(orderId, rating, comment.trim() || undefined),
-    onSuccess: () => {
+    mutationFn: () =>
+      api.submitReview(orderId, rating, comment.trim() || undefined, hasComment && accepted),
+    onSuccess: (result) => {
       setRating(0);
       setComment('');
+      setAccepted(false);
+      // A held comment is not an error, but the author should know why it is not visible yet.
+      if (result.held) notify('شكراً لتقييمك', result.note_ar);
       onSubmitted();
     },
     onError: (error) =>
@@ -55,7 +67,7 @@ export function RateOrderSheet({
         <Button
           label="إرسال التقييم"
           block
-          disabled={rating === 0 || submit.isPending}
+          disabled={rating === 0 || (hasComment && !accepted) || submit.isPending}
           loading={submit.isPending}
           onPress={() => submit.mutate()}
         />
@@ -120,6 +132,45 @@ export function RateOrderSheet({
           },
         ]}
       />
+
+      {hasComment ? (
+        <View style={{ gap: space[1] }}>
+          <Pressable
+            onPress={() => setAccepted((value) => !value)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: accepted }}
+            accessibilityLabel="أوافق على قواعد المحتوى"
+            style={{
+              flexDirection: ROW,
+              alignItems: 'flex-start',
+              gap: space[2],
+              minHeight: TAP_TARGET,
+            }}
+          >
+            <MaterialCommunityIcons
+              name={accepted ? 'checkbox-marked' : 'checkbox-blank-outline'}
+              size={22}
+              color={accepted ? color.brand : color.textMuted}
+            />
+            <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+              أوافق على قواعد المحتوى: لا شتائم ولا إساءة، ولا أرقام هواتف أو روابط. يراجع فريق
+              جيبلي التعليقات المخالفة ويحذفها.
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              const url = configString('termsUrl');
+              if (url) void Linking.openURL(url).catch(() => undefined);
+            }}
+            accessibilityRole="link"
+            style={{ alignSelf: 'flex-start', paddingVertical: space[1] }}
+          >
+            <Text variant="caption" tone="brand">
+              قراءة الشروط وقواعد المحتوى
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={{ height: space[1] }} />
     </Sheet>

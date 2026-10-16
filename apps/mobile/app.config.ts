@@ -302,6 +302,47 @@ const config: ExpoConfig = {
           NSPrivacyCollectedDataTypeTracking: false,
           NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
         },
+        {
+          /*
+           * A review's stars and comment, which the shop and other readers see,
+           * and a shop's own product names and descriptions. Deleted with the
+           * account (DELETE /api/v1/profile).
+           */
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeOtherUserContent',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        /*
+         * Declared only when the build actually collects it: an email arrives
+         * only through Google sign-in, and crash data only when a Sentry DSN is
+         * baked in. A manifest that claims data the binary never collects is
+         * as wrong as one that omits data it does.
+         */
+        ...(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+          ? [
+              {
+                NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeEmailAddress',
+                NSPrivacyCollectedDataTypeLinked: true,
+                NSPrivacyCollectedDataTypeTracking: false,
+                NSPrivacyCollectedDataTypePurposes: [
+                  'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+                ],
+              },
+            ]
+          : []),
+        ...(process.env.EXPO_PUBLIC_SENTRY_DSN
+          ? [
+              {
+                NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeCrashData',
+                NSPrivacyCollectedDataTypeLinked: false,
+                NSPrivacyCollectedDataTypeTracking: false,
+                NSPrivacyCollectedDataTypePurposes: [
+                  'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+                ],
+              },
+            ]
+          : []),
       ],
       /*
        * Required-reason APIs this binary reaches, through its dependencies

@@ -1,10 +1,11 @@
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { success } from '@jibli/contracts';
 import { orderReviews, orders, restaurants, users } from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
+import { blockedAuthorIds } from '../../services/review-moderation-service.js';
 
 /**
  * What customers said, for the restaurant that cooked it.
@@ -24,7 +25,7 @@ export function registerRestaurantReviewRoutes(app: FastifyInstance, ctx: AppCon
     '/api/v1/restaurant-portal/reviews',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { restaurantId } = restaurantScope(request);
+      const { principal, restaurantId } = restaurantScope(request);
       const query = z
         .object({
           limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -43,6 +44,9 @@ export function registerRestaurantReviewRoutes(app: FastifyInstance, ctx: AppCon
       if (query.max_rating !== undefined) {
         conditions.push(lte(orderReviews.rating, query.max_rating));
       }
+      // Authors this member blocked stay out of their list; the stars still count.
+      const blocked = await blockedAuthorIds(ctx, principal.userId);
+      if (blocked.length > 0) conditions.push(notInArray(orderReviews.userId, blocked));
 
       const rows = await ctx.db
         .select({

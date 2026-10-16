@@ -1,6 +1,7 @@
 import { and, avg, count, desc, eq, gt, isNull, lte } from 'drizzle-orm';
 import { orderReviews, orders, restaurants, uuidv7, type DbExecutor } from '@jibli/db';
 import { AppError, ERROR_CODES } from '@jibli/contracts';
+import { screenComment } from '@jibli/domain';
 import type { AppContext } from '../lib/context.js';
 import { getConfig } from './config-service.js';
 
@@ -181,8 +182,10 @@ export async function submitReview(
     userId: string;
     rating: number;
     comment?: string | null;
+    /** The author ticked «أوافق على قواعد المحتوى». Required when there is a comment. */
+    acceptedTerms?: boolean;
   },
-): Promise<{ average: number | null; count: number }> {
+): Promise<{ average: number | null; count: number; held: boolean; heldReasons: string[] }> {
   const eligibility = await reviewEligibility(ctx, {
     orderId: params.orderId,
     userId: params.userId,
@@ -194,6 +197,19 @@ export async function submitReview(
       messageAr: REVIEW_REFUSALS[eligibility.reason],
     });
   }
+
+  /*
+   * Text that others will read needs the author's agreement to the content
+   * rules first. Stars alone are not text, and a rating stays one tap.
+   */
+  const comment = params.comment?.trim() || null;
+  if (comment && !params.acceptedTerms) {
+    throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+      details: { field: 'accepted_terms', reason: 'TERMS_REQUIRED' },
+      messageAr: 'وافق على قواعد المحتوى قبل نشر التعليق.',
+    });
+  }
+  const screen = screenComment(comment);
 
   const [order] = await ctx.db
     .select({ restaurantId: orders.restaurantId })
@@ -219,7 +235,15 @@ export async function submitReview(
         userId: params.userId,
         restaurantId: order.restaurantId,
         rating: params.rating,
-        comment: params.comment?.trim() || null,
+        comment,
+        termsAcceptedAt: comment ? new Date() : null,
+        /*
+         * A comment the screen caught waits for a moderator, unseen and
+         * uncounted, rather than being refused: a false positive costs a
+         * short delay, not a lost review.
+         */
+        isHidden: screen.held,
+        heldReason: screen.held ? (screen.reasons[0] ?? null) : null,
       })
       .onConflictDoNothing()
       .returning({ id: orderReviews.id });
@@ -231,7 +255,8 @@ export async function submitReview(
       });
     }
 
-    return recomputeRating(tx, order.restaurantId);
+    const stats = await recomputeRating(tx, order.restaurantId);
+    return { ...stats, held: screen.held, heldReasons: [...screen.reasons] };
   });
 }
 
@@ -246,6 +271,9 @@ export async function setReviewHidden(
       .set({
         isHidden: params.hidden,
         moderatedBy: params.moderatorId,
+        // A moderator has decided; whatever held it is settled.
+        heldReason: null,
+        moderatedAt: new Date(),
       })
       .where(eq(orderReviews.id, params.reviewId))
       .returning({ restaurantId: orderReviews.restaurantId });

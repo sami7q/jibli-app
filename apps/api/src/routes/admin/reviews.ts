@@ -9,6 +9,7 @@ import { orderReviews, orders, restaurants, users } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import { setReviewHidden } from '../../services/review-service.js';
+import { moderationQueue, resolveReview } from '../../services/review-moderation-service.js';
 
 /**
  * Moderating ratings.
@@ -78,6 +79,66 @@ export function registerAdminReviewRoutes(app: FastifyInstance, ctx: AppContext)
       ),
     );
   });
+
+  /** Held comments and reported reviews, waiting on a decision. */
+  app.get(
+    '/api/v1/admin/review-queue',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      assertAdminPermission(requirePrincipal(request), 'restaurant.read');
+      const query = z
+        .object({ limit: z.coerce.number().int().min(1).max(100).default(50) })
+        .parse(request.query);
+      return reply.send(
+        success(await moderationQueue(ctx, query.limit), { request_id: request.requestId }),
+      );
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/review-queue/:reviewId/resolve',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'restaurant.read');
+      const { reviewId } = z.object({ reviewId: uuidSchema }).parse(request.params);
+      const body = z
+        .object({ action: z.enum(['PUBLISH', 'HIDE']), reason: reasonSchema })
+        .parse(request.body);
+
+      const result = await resolveReview(ctx, {
+        reviewId,
+        action: body.action,
+        moderatorId: principal.userId,
+      });
+
+      await writeAudit(ctx.db, {
+        actorUserId: principal.userId,
+        action: AUDIT_ACTIONS.REVIEW_REPORTS_RESOLVE,
+        entityType: 'order_review',
+        entityId: reviewId,
+        after: { action: body.action, restaurantRating: result.average },
+        reason: body.reason,
+        ip: clientIp(request),
+        userAgent: userAgent(request),
+        requestId: request.requestId,
+      });
+
+      return reply.send(
+        success(
+          {
+            action: body.action,
+            restaurant_rating: result.average,
+            note_ar:
+              body.action === 'HIDE'
+                ? 'أُخفي التقييم وأُغلقت البلاغات.'
+                : 'نُشر التقييم وأُغلقت البلاغات.',
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
 
   app.post(
     '/api/v1/admin/reviews/:reviewId/visibility',

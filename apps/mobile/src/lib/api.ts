@@ -1478,11 +1478,19 @@ export const api = {
    */
   notifications: () => apiRequest<OrderNotification[]>('/api/v1/notifications'),
 
-  submitReview: (orderId: string, rating: number, comment?: string) =>
-    apiRequest<{ submitted: boolean }>(`/api/v1/orders/${orderId}/review`, {
-      method: 'POST',
-      body: { rating, ...(comment ? { comment } : {}) },
-    }),
+  /**
+   * Rate an order. A comment is text others read, so it needs the author's
+   * agreement to the content rules (`accepted_terms`); the server refuses a
+   * comment without it. `held` means the comment waits for a moderator.
+   */
+  submitReview: (orderId: string, rating: number, comment?: string, acceptedTerms = false) =>
+    apiRequest<{ recorded: boolean; held?: boolean; note_ar: string }>(
+      `/api/v1/orders/${orderId}/review`,
+      {
+        method: 'POST',
+        body: { rating, ...(comment ? { comment, accepted_terms: acceptedTerms } : {}) },
+      },
+    ),
 
   // ── Owner Mode ────────────────────────────────────────────────────────────
   //

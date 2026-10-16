@@ -257,11 +257,63 @@ export const orderReviews = pgTable(
     comment: text('comment'),
     isHidden: boolean('is_hidden').notNull().default(false),
     moderatedBy: fk('moderated_by').references(() => users.id, { onDelete: 'set null' }),
+    /** When the author accepted the content rules (migration 0022). */
+    termsAcceptedAt: utcTimestamp('terms_accepted_at'),
+    /** Why it waits for a moderator: PROFANITY, CONTACT, LINK or REPORTED. */
+    heldReason: text('held_reason').$type<ReviewHeldReason>(),
+    moderatedAt: utcTimestamp('moderated_at'),
     createdAt: createdAt(),
   },
   (table) => [
     uniqueIndex('order_reviews_order_key').on(table.orderId),
     index('order_reviews_restaurant_idx').on(table.restaurantId, table.createdAt),
+  ],
+);
+
+export type ReviewHeldReason = 'PROFANITY' | 'CONTACT' | 'LINK' | 'REPORTED';
+export type ReviewReportReason = 'ABUSIVE' | 'SPAM' | 'PERSONAL_DATA' | 'FALSE' | 'OTHER';
+export type ReviewReportStatus = 'OPEN' | 'ACTIONED' | 'DISMISSED';
+
+/** A reader's complaint about a review (migration 0022). */
+export const reviewReports = pgTable(
+  'review_reports',
+  {
+    id: primaryId(),
+    reviewId: fk('review_id')
+      .notNull()
+      .references(() => orderReviews.id, { onDelete: 'cascade' }),
+    reporterUserId: fk('reporter_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    reason: text('reason').$type<ReviewReportReason>().notNull(),
+    note: text('note'),
+    status: text('status').$type<ReviewReportStatus>().notNull().default('OPEN'),
+    resolvedBy: fk('resolved_by').references(() => users.id, { onDelete: 'set null' }),
+    resolvedAt: utcTimestamp('resolved_at'),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('review_reports_once').on(table.reviewId, table.reporterUserId),
+    index('review_reports_open_idx').on(table.status, table.createdAt),
+  ],
+);
+
+/** One person no longer seeing another's content (migration 0022). */
+export const userBlocks = pgTable(
+  'user_blocks',
+  {
+    id: primaryId(),
+    blockerUserId: fk('blocker_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blockedUserId: fk('blocked_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('user_blocks_pair').on(table.blockerUserId, table.blockedUserId),
+    index('user_blocks_blocked_idx').on(table.blockedUserId),
   ],
 );
 

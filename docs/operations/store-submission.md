@@ -321,11 +321,11 @@ here is a common rejection.
 
 ### App Store Connect
 
-- **App Privacy.** Declare what is collected and why. Jibli collects a phone
-  number, a name, a delivery area and optionally a coordinate, plus order
-  history — all "linked to the user", none for tracking. There is no
-  advertising SDK and no third-party analytics, so **App Tracking Transparency
-  does not apply** and no `NSUserTrackingUsageDescription` should be added.
+- **App Privacy.** Answer from `docs/operations/data-safety.md` — every data
+  type, for customers, shop owners and drivers, with the source that stores
+  it. All "linked to the user", none for tracking. There is no advertising
+  SDK and no third-party analytics, so **App Tracking Transparency does not
+  apply** and no `NSUserTrackingUsageDescription` should be added.
 - **Age rating.** No objectionable content; food delivery is 4+.
 - **Demo account.** Review needs one that works from anywhere. Customers sign
   in with a code only, so the demo account is the review number with its
@@ -339,11 +339,12 @@ here is a common rejection.
 
 ### Google Play Console
 
-- **Data safety.** Must agree with the App Privacy answers above. A mismatch
-  between the two stores is not checked by either, but a mismatch between this
-  form and observed behaviour is.
+- **Data safety.** Answer from `docs/operations/data-safety.md`, the same list
+  as App Privacy. A mismatch between the two stores is not checked by either,
+  but a mismatch between this form and observed behaviour is.
 - **Account deletion URL.** Play requires a **web** page for deletion requests
-  in addition to the in-app flow. The in-app flow exists; the page does not.
+  in addition to the in-app flow. Both exist: حسابي ← حذف الحساب in the app,
+  and `https://legal-weld-seven.vercel.app/delete-account` on the web.
 - **Target API.** Confirm the upload reports 36. It is refused at upload, not
   at review.
 - **Data deletion and privacy policy URLs** must resolve publicly before

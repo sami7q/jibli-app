@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, notInArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { success } from '@jibli/contracts';
@@ -8,6 +8,13 @@ import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { pendingReviews, reviewEligibility, submitReview } from '../services/review-service.js';
 import { notifyAdmins } from '../services/admin-notification-service.js';
+import {
+  blockedAuthorIds,
+  blockReviewAuthor,
+  listBlocks,
+  reportReview,
+  unblock,
+} from '../services/review-moderation-service.js';
 
 /**
  * Rating an order, from the customer's side.
@@ -64,6 +71,8 @@ export function registerReviewRoutes(app: FastifyInstance, ctx: AppContext): voi
         .object({
           rating: z.number().int().min(1).max(5),
           comment: z.string().trim().max(1000).optional(),
+          /** Agreement to the content rules; required when there is a comment. */
+          accepted_terms: z.boolean().optional(),
         })
         .parse(request.body);
 
@@ -72,7 +81,20 @@ export function registerReviewRoutes(app: FastifyInstance, ctx: AppContext): voi
         userId: principal.userId,
         rating: body.rating,
         comment: body.comment ?? null,
+        acceptedTerms: body.accepted_terms === true,
       });
+
+      if (stats.held) {
+        await notifyAdmins(ctx, {
+          kind: 'REVIEW_POSTED',
+          severity: 'ATTENTION',
+          titleAr: 'تعليق بانتظار المراجعة',
+          bodyAr: `أوقفه الفلتر: ${stats.heldReasons.join('، ')}`,
+          linkPath: '/reviews?queue=1',
+          entityType: 'order_review',
+          entityId: orderId,
+        });
+      }
 
       /*
        * A low rating is the one an operator wants to see the day it lands, not
@@ -111,7 +133,10 @@ export function registerReviewRoutes(app: FastifyInstance, ctx: AppContext): voi
             recorded: true,
             restaurant_rating: stats.average,
             restaurant_rating_count: stats.count,
-            note_ar: 'شكراً لتقييمك.',
+            held: stats.held,
+            note_ar: stats.held
+              ? 'شكراً لتقييمك. سيظهر تعليقك بعد أن يراجعه فريق جيبلي.'
+              : 'شكراً لتقييمك.',
           },
           { request_id: request.requestId },
         ),
@@ -126,54 +151,142 @@ export function registerReviewRoutes(app: FastifyInstance, ctx: AppContext): voi
    * requiring a session to read a rating would make the listing screen useless
    * to someone who has not signed up yet.
    */
-  app.get('/api/v1/restaurants/:restaurantId/reviews', async (request, reply) => {
-    const { restaurantId } = z.object({ restaurantId: uuidSchema }).parse(request.params);
-    const query = z
-      .object({ limit: z.coerce.number().int().min(1).max(50).default(20) })
-      .parse(request.query);
+  app.get(
+    '/api/v1/restaurants/:restaurantId/reviews',
+    // Signed in or not; a signed-in reader does not see authors they blocked.
+    { preHandler: app.tryAuthenticate },
+    async (request, reply) => {
+      const { restaurantId } = z.object({ restaurantId: uuidSchema }).parse(request.params);
+      const query = z
+        .object({ limit: z.coerce.number().int().min(1).max(50).default(20) })
+        .parse(request.query);
 
-    const rows = await ctx.db
-      .select({
-        id: orderReviews.id,
-        rating: orderReviews.rating,
-        comment: orderReviews.comment,
-        createdAt: orderReviews.createdAt,
-        authorName: users.fullName,
-      })
-      .from(orderReviews)
-      .leftJoin(users, eq(users.id, orderReviews.userId))
-      .where(and(eq(orderReviews.restaurantId, restaurantId), eq(orderReviews.isHidden, false)))
-      .orderBy(desc(orderReviews.createdAt))
-      .limit(query.limit);
+      const blocked = await blockedAuthorIds(ctx, request.principal?.userId ?? null);
 
-    const [restaurant] = await ctx.db
-      .select({
-        ratingAverage: restaurants.ratingAverage,
-        ratingCount: restaurants.ratingCount,
-      })
-      .from(restaurants)
-      .where(eq(restaurants.id, restaurantId))
-      .limit(1);
+      const rows = await ctx.db
+        .select({
+          id: orderReviews.id,
+          rating: orderReviews.rating,
+          comment: orderReviews.comment,
+          createdAt: orderReviews.createdAt,
+          authorName: users.fullName,
+        })
+        .from(orderReviews)
+        .leftJoin(users, eq(users.id, orderReviews.userId))
+        .where(
+          and(
+            eq(orderReviews.restaurantId, restaurantId),
+            eq(orderReviews.isHidden, false),
+            ...(blocked.length > 0 ? [notInArray(orderReviews.userId, blocked)] : []),
+          ),
+        )
+        .orderBy(desc(orderReviews.createdAt))
+        .limit(query.limit);
 
+      const [restaurant] = await ctx.db
+        .select({
+          ratingAverage: restaurants.ratingAverage,
+          ratingCount: restaurants.ratingCount,
+        })
+        .from(restaurants)
+        .where(eq(restaurants.id, restaurantId))
+        .limit(1);
+
+      return reply.send(
+        success(
+          {
+            rating: restaurant?.ratingAverage ?? null,
+            rating_count: restaurant?.ratingCount ?? 0,
+            reviews: rows.map((row) => ({
+              id: row.id,
+              rating: row.rating,
+              comment: row.comment,
+              // First name only: a review is public, and the full name of
+              // someone who ordered food is not ours to publish.
+              author_name: firstName(row.authorName),
+              created_at: row.createdAt.toISOString(),
+            })),
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
+  // ── Reports and blocks (UGC, both stores' requirement) ─────────────────
+
+  /** Report a review to Jibli's moderators. Three reporters hide it pending review. */
+  app.post(
+    '/api/v1/reviews/:reviewId/report',
+    { preHandler: app.authenticate, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      const { reviewId } = z.object({ reviewId: uuidSchema }).parse(request.params);
+      const body = z
+        .object({
+          reason: z.enum(['ABUSIVE', 'SPAM', 'PERSONAL_DATA', 'FALSE', 'OTHER']),
+          note: z.string().trim().max(500).optional(),
+        })
+        .parse(request.body);
+
+      const result = await reportReview(ctx, {
+        reviewId,
+        reporterUserId: principal.userId,
+        reason: body.reason,
+        note: body.note ?? null,
+      });
+
+      return reply.send(
+        success(
+          {
+            ...result,
+            note_ar: result.reported
+              ? 'وصل بلاغك إلى فريق جيبلي وسيُراجع.'
+              : 'أبلغت عن هذا التقييم من قبل، وهو قيد المراجعة.',
+          },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
+  /** Stop seeing this review's author, anywhere reviews are listed for you. */
+  app.post(
+    '/api/v1/reviews/:reviewId/block-author',
+    { preHandler: app.authenticate, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      const { reviewId } = z.object({ reviewId: uuidSchema }).parse(request.params);
+      const result = await blockReviewAuthor(ctx, { reviewId, blockerUserId: principal.userId });
+      return reply.send(
+        success(
+          { ...result, note_ar: 'لن تظهر لك تقييمات هذا الشخص بعد الآن.' },
+          { request_id: request.requestId },
+        ),
+      );
+    },
+  );
+
+  app.get('/api/v1/blocks', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
     return reply.send(
-      success(
-        {
-          rating: restaurant?.ratingAverage ?? null,
-          rating_count: restaurant?.ratingCount ?? 0,
-          reviews: rows.map((row) => ({
-            id: row.id,
-            rating: row.rating,
-            comment: row.comment,
-            // First name only: a review is public, and the full name of
-            // someone who ordered food is not ours to publish.
-            author_name: firstName(row.authorName),
-            created_at: row.createdAt.toISOString(),
-          })),
-        },
-        { request_id: request.requestId },
-      ),
+      success(await listBlocks(ctx, principal.userId), { request_id: request.requestId }),
     );
   });
+
+  app.delete(
+    '/api/v1/blocks/:blockId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      const { blockId } = z.object({ blockId: uuidSchema }).parse(request.params);
+      return reply.send(
+        success(await unblock(ctx, { blockId, userId: principal.userId }), {
+          request_id: request.requestId,
+        }),
+      );
+    },
+  );
 }
 
 function firstName(fullName: string | null): string {

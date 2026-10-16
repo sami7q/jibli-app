@@ -612,6 +612,7 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
 
       <Bullet icon="check" text="يُحذف اسمك ورقم هاتفك وعناوينك المحفوظة." />
       <Bullet icon="check" text="تُحذف مطاعمك المفضّلة وإشعاراتك." />
+      <Bullet icon="check" text="تُحذف تقييماتك وتعليقاتك وبلاغاتك." />
       <Bullet icon="check" text="يتم تسجيل خروجك من كل الأجهزة." />
       <Bullet
         icon="information"

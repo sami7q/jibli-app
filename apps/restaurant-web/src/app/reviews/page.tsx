@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dateAr } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
-import { Card, ErrorState, Skeleton } from '@/components/ui';
+import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
 import { portal } from '@/lib/portal-endpoints';
@@ -27,6 +27,32 @@ export default function ReviewsPage() {
 
 function ReviewsScreen({ auth }: { auth: PortalAuth }) {
   const [maxRating, setMaxRating] = useState<number | undefined>(undefined);
+  const queryClient = useQueryClient();
+  const [reporting, setReporting] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState<
+    'ABUSIVE' | 'SPAM' | 'PERSONAL_DATA' | 'FALSE' | 'OTHER'
+  >('ABUSIVE');
+  const [blocking, setBlocking] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const report = useMutation({
+    mutationFn: ({ reviewId, note }: { reviewId: string; note: string }) =>
+      portal.reportReview(auth, reviewId, { reason: reportReason, note: note || undefined }),
+    onSuccess: (result) => {
+      setReporting(null);
+      setNotice(result.note_ar);
+      void queryClient.invalidateQueries({ queryKey: ['portal-reviews'] });
+    },
+  });
+
+  const block = useMutation({
+    mutationFn: (reviewId: string) => portal.blockReviewAuthor(auth, reviewId),
+    onSuccess: (result) => {
+      setBlocking(null);
+      setNotice(result.note_ar);
+      void queryClient.invalidateQueries({ queryKey: ['portal-reviews'] });
+    },
+  });
 
   const reviews = useQuery({
     queryKey: ['portal-reviews', auth.restaurantId, maxRating],
@@ -124,16 +150,90 @@ function ReviewsScreen({ auth }: { auth: PortalAuth }) {
                 ) : (
                   <p className="review__body review__body--empty">تقييم بدون تعليق</p>
                 )}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 'var(--space-2)',
+                    marginBlockStart: 'var(--space-2)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => setReporting(review.id)}
+                  >
+                    إبلاغ
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => setBlocking(review.id)}
+                  >
+                    حظر الكاتب
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
 
+        {notice ? (
+          <p className="alert-bar alert-bar--success" role="status">
+            {notice}
+          </p>
+        ) : null}
+
         <p style={{ marginBlockEnd: 0, fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
           التقييمات تصل من العملاء بعد استلام الطلب ولا يمكن تعديلها أو حذفها من هنا. إن كان تقييم
-          مخالفاً أو غير صحيح، افتح محادثة في <strong>الدعم</strong> وسيراجعه فريق جيبلي.
+          مخالفاً أو غير صحيح فاضغط <strong>إبلاغ</strong> وسيراجعه فريق جيبلي؛ يُخفى تلقائياً بعد
+          ثلاثة بلاغات. <strong>حظر الكاتب</strong> يخفي تقييماته من قائمتك أنت فقط.
         </p>
       </Card>
+
+      {reporting ? (
+        <ConfirmDialog
+          title="الإبلاغ عن تقييم"
+          confirmLabel="إرسال البلاغ"
+          tone="primary"
+          isSubmitting={report.isPending}
+          error={report.error instanceof ApiError ? report.error.messageAr : null}
+          body={
+            <div className="field">
+              <label htmlFor="report-reason">السبب</label>
+              <select
+                id="report-reason"
+                value={reportReason}
+                onChange={(event) => setReportReason(event.target.value as typeof reportReason)}
+              >
+                <option value="ABUSIVE">إساءة أو شتائم</option>
+                <option value="PERSONAL_DATA">بيانات شخصية (رقم، عنوان)</option>
+                <option value="SPAM">إعلان أو محتوى مزعج</option>
+                <option value="FALSE">ادعاء غير صحيح</option>
+                <option value="OTHER">سبب آخر</option>
+              </select>
+            </div>
+          }
+          onConfirm={(note) => report.mutate({ reviewId: reporting, note })}
+          onCancel={() => setReporting(null)}
+        />
+      ) : null}
+
+      {blocking ? (
+        <ConfirmDialog
+          title="حظر كاتب التقييم"
+          confirmLabel="حظر"
+          isSubmitting={block.isPending}
+          error={block.error instanceof ApiError ? block.error.messageAr : null}
+          body={
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              لن تظهر لك تقييمات هذا العميل بعد الآن. نجومه تبقى ضمن متوسط تقييمك، ولا يُبلَّغ
+              بالحظر.
+            </p>
+          }
+          onConfirm={() => block.mutate(blocking)}
+          onCancel={() => setBlocking(null)}
+        />
+      ) : null}
     </>
   );
 }

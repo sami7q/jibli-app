@@ -20,6 +20,7 @@ import {
 } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
+import { deleteUserContent } from '../services/review-moderation-service.js';
 import { assertSelectableGeography, resolveCity } from '../services/geography-service.js';
 
 /**
@@ -500,6 +501,14 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
       await tx.delete(userAddresses).where(eq(userAddresses.userId, principal.userId));
       await tx.delete(userDevices).where(eq(userDevices.userId, principal.userId));
       await tx.delete(customerFavorites).where(eq(customerFavorites.userId, principal.userId));
+
+      /*
+       * What this person wrote for others to read goes with them: their
+       * reviews (and any reports on those reviews, by cascade), the reports
+       * they filed and the blocks in either direction. The shops' averages
+       * are recomputed without their stars.
+       */
+      await deleteUserContent(tx, principal.userId);
 
       /*
        * Past orders stay, as the public deletion page says — a delivered order

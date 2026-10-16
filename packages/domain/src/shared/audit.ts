@@ -147,6 +147,7 @@ export const AUDIT_ACTIONS = {
   COMMISSION_COLLECT: 'finance.commission.collect',
   REVIEW_HIDE: 'review.hide',
   REVIEW_RESTORE: 'review.restore',
+  REVIEW_REPORTS_RESOLVE: 'review.reports.resolve',
   EXPORT_CREATE: 'export.create',
 } as const;
 

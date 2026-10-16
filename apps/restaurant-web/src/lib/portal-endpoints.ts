@@ -426,6 +426,25 @@ export const portal = {
   reviews: (auth: Auth, filters: Record<string, string | number | undefined> = {}) =>
     apiRequest<PortalReviews>(`/api/v1/restaurant-portal/reviews${qs(filters)}`, scoped(auth)),
 
+  /** Report a review to Jibli's moderators. */
+  reportReview: (
+    auth: Auth,
+    reviewId: string,
+    body: { reason: 'ABUSIVE' | 'SPAM' | 'PERSONAL_DATA' | 'FALSE' | 'OTHER'; note?: string },
+  ) =>
+    apiRequest<{ reported: boolean; hidden: boolean; note_ar: string }>(
+      `/api/v1/reviews/${reviewId}/report`,
+      { ...scoped(auth), method: 'POST', body },
+    ),
+
+  /** Stop seeing this review's author in this account's list. */
+  blockReviewAuthor: (auth: Auth, reviewId: string) =>
+    apiRequest<{ blocked: boolean; note_ar: string }>(`/api/v1/reviews/${reviewId}/block-author`, {
+      ...scoped(auth),
+      method: 'POST',
+      body: {},
+    }),
+
   // ── Dashboard ───────────────────────────────────────────────────────────
   /** Everything the home screen shows, in one round trip (plan §131). */
   dashboard: (auth: Auth) =>

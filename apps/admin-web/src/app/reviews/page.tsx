@@ -20,6 +20,7 @@ import { ApiError } from '@/lib/api';
 import { admin, type AdminReview } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
+import { ReviewQueue } from '@/components/review-queue';
 
 /**
  * Ratings, and hiding the ones that are not ratings.
@@ -73,6 +74,8 @@ export default function ReviewsPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >
+      <ReviewQueue token={token} />
+
       <Card>
         <FilterBar>
           <Select

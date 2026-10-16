@@ -187,6 +187,23 @@ export interface AdminReview {
   created_at: string;
 }
 
+/** A review waiting on a moderator — `GET /admin/review-queue`. */
+export interface ReviewQueueItem {
+  review_id: string;
+  rating: number;
+  comment: string | null;
+  is_hidden: boolean;
+  held_reason: string | null;
+  restaurant_id: string;
+  restaurant_name: string;
+  public_order_number: string;
+  author_name: string | null;
+  created_at: string;
+  open_reports: number;
+  report_reasons: string[];
+  report_notes: string[];
+}
+
 export interface CommissionOverview {
   totals: {
     order_count: number;
@@ -973,6 +990,15 @@ export const admin = {
       accessToken: token,
       body: { hidden, reason },
     }),
+
+  reviewQueue: (token: string) =>
+    apiRequest<ReviewQueueItem[]>('/api/v1/admin/review-queue', { accessToken: token }),
+
+  resolveReview: (token: string, reviewId: string, action: 'PUBLISH' | 'HIDE', reason: string) =>
+    apiRequest<{ action: string; restaurant_rating: number | null; note_ar: string }>(
+      `/api/v1/admin/review-queue/${reviewId}/resolve`,
+      { method: 'POST', accessToken: token, body: { action, reason } },
+    ),
 
   restaurantsByArea: (token: string) =>
     apiRequest<AreaCoverage[]>('/api/v1/admin/restaurants/by-area', { accessToken: token }),
