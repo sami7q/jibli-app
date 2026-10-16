@@ -1,4 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
+import { withAndroidManifest, type ConfigPlugin } from 'expo/config-plugins';
 
 /**
  * Expo configuration.
@@ -662,6 +663,13 @@ const config: ExpoConfig = {
         color: '#FF5400',
         defaultChannel: 'orders',
         sounds: ['./assets/sounds/new_order.wav'],
+        /*
+         * The APNs environment in the entitlements. App Store signing usually
+         * rewrites `development` to `production`, but a store build should not
+         * depend on that: a binary whose entitlement points at the sandbox
+         * gets no notification from the production gateway.
+         */
+        mode: isStoreBuild ? 'production' : 'development',
       },
     ],
     /*
@@ -801,6 +809,13 @@ const config: ExpoConfig = {
       'expo-build-properties',
       {
         android: {
+          /*
+           * API 36 is what Play requires of a new app. React Native's version
+           * catalog says 36 today, but Expo falls back to 35 whenever it
+           * cannot read that catalog — stated here, it cannot drift.
+           */
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
           enableProguardInReleaseBuilds: true,
           enableShrinkResourcesInReleaseBuilds: true,
         },
@@ -821,4 +836,27 @@ const config: ExpoConfig = {
   },
 };
 
-export default config;
+/**
+ * expo-location's own manifest declares `LocationTaskService`, a foreground
+ * service of type `location`, for background updates. Release 1 reads the
+ * position once, in the foreground, to drop a delivery pin; it never starts
+ * that service and never asks for FOREGROUND_SERVICE_LOCATION
+ * (`isAndroidForegroundServiceEnabled: false` above). A declared location
+ * service is still a question in Play review, so the merged manifest drops it.
+ */
+const withoutLocationTaskService: ConfigPlugin = (input) =>
+  withAndroidManifest(input, (mod) => {
+    const manifest = mod.modResults.manifest;
+    manifest.$['xmlns:tools'] ??= 'http://schemas.android.com/tools';
+    const application = manifest.application?.[0];
+    if (application) {
+      const name = 'expo.modules.location.services.LocationTaskService';
+      application.service = [
+        ...(application.service ?? []).filter((service) => service.$['android:name'] !== name),
+        { $: { 'android:name': name, 'tools:node': 'remove' } as never },
+      ];
+    }
+    return mod;
+  });
+
+export default withoutLocationTaskService(config);
