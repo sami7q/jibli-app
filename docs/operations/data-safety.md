@@ -128,7 +128,10 @@ policy and App Store Guideline 1.2 into play. What answers them:
   comment with insults, a phone number, an email or a link before anyone
   reads it; it waits in the moderation queue.
 - **Reporting.** `POST /api/v1/reviews/:id/report` — the shop portal's
-  «إبلاغ». Three distinct reporters hide the review at once.
+  «إبلاغ». Every report reaches the queue. Three independent reporters —
+  people who have received an order and are not, and never were, on the
+  reviewed shop's staff — hide the review at once; the shop's own reports
+  never hide anything by themselves.
 - **Blocking.** `POST /api/v1/reviews/:id/block-author` — the shop portal's
   «حظر الكاتب». Personal: only the blocker stops seeing that author.
 - **Someone who acts on reports.** Admin → التقييمات → «طابور المراجعة»,
@@ -136,8 +139,8 @@ policy and App Store Guideline 1.2 into play. What answers them:
   The terms promise a decision within about 24 hours — someone must actually
   watch the queue.
 - **Deletion.** Deleting an account deletes its reviews, the reports it
-  filed and its blocks, and recomputes each shop's rating
-  (`deleteUserContent`).
+  filed, its blocks and the admin bell entries that quoted its comments, and
+  recomputes each shop's rating (`deleteUserContent`).
 
 For App Review notes: "Reviews are moderated: comments are screened
 automatically, readers can report a review and block its author, and reports

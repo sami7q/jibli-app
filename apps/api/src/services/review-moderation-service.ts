@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { AppError, ERROR_CODES } from '@jibli/contracts';
 import {
+  adminNotifications,
   orderReviews,
   orders,
   restaurantMembers,
@@ -26,10 +27,14 @@ import { recomputeRating } from './review-service.js';
  * is a signal worth acting on at 3 a.m. A block is personal: the blocker stops
  * seeing that author's reviews, and nobody else's view changes.
  *
- * Only independent reporters count toward hiding: not the shop's own staff (an
- * owner, a manager and a cashier would otherwise bury any bad review of their
- * shop), and only people who have received at least one order, so three
- * throwaway sign-ups cannot do it either. Their reports still reach the queue.
+ * Only independent reporters count toward hiding: never anyone who is or was
+ * on the shop's staff (an owner, a manager and a cashier would otherwise bury
+ * any bad review of their shop; membership is deactivated, never deleted, so
+ * a former member still matches), and only people who have received at least
+ * one order (DELIVERED or COMPLETED — not a cancelled or rejected one), so
+ * three throwaway sign-ups cannot do it either. One report per person per
+ * review is a unique index, so nobody counts twice. Reports that do not count
+ * still reach the queue.
  */
 
 /**
@@ -37,6 +42,10 @@ import { recomputeRating } from './review-service.js';
  * their reviews (and, by cascade, reports filed against them), the reports
  * they filed and blocks in either direction. Each shop they rated has its
  * average recomputed without their stars. Run inside the deletion transaction.
+ *
+ * The admin bell copies the first words of a low rating or a reported comment
+ * into its body, keyed by the review's id or its order's id. Those entries go
+ * too, or the comment the policy says is deleted would survive in the bell.
  */
 export async function deleteUserContent(
   executor: DbExecutor,
@@ -45,7 +54,22 @@ export async function deleteUserContent(
   const reviewed = await executor
     .delete(orderReviews)
     .where(eq(orderReviews.userId, userId))
-    .returning({ restaurantId: orderReviews.restaurantId });
+    .returning({
+      id: orderReviews.id,
+      orderId: orderReviews.orderId,
+      restaurantId: orderReviews.restaurantId,
+    });
+  if (reviewed.length > 0) {
+    await executor.delete(adminNotifications).where(
+      and(
+        eq(adminNotifications.entityType, 'order_review'),
+        inArray(
+          adminNotifications.entityId,
+          reviewed.flatMap((row) => [row.id, row.orderId]),
+        ),
+      ),
+    );
+  }
   await executor.delete(reviewReports).where(eq(reviewReports.reporterUserId, userId));
   await executor
     .delete(userBlocks)
@@ -118,7 +142,7 @@ export async function reportReview(
           sql`EXISTS (
             SELECT 1 FROM ${orders}
             WHERE ${orders.userId} = ${reviewReports.reporterUserId}
-              AND ${orders.status} = 'COMPLETED'
+              AND ${orders.status} IN ('DELIVERED', 'COMPLETED')
           )`,
         ),
       );

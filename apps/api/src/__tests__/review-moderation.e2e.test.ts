@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, like } from 'drizzle-orm';
 import {
+  adminNotifications,
   cities,
   createDatabase,
   orderReviews,
@@ -123,19 +124,24 @@ async function buildFixture(): Promise<Fixture> {
     addressText: 'بغداد',
   });
 
-  const delivered = async (userId: string): Promise<string> => {
+  const delivered = async (
+    userId: string,
+    status: 'COMPLETED' | 'DELIVERED' | 'CANCELLED' = 'COMPLETED',
+  ): Promise<string> => {
     const id = uuidv7();
+    const reached = status !== 'CANCELLED';
     await db.insert(orders).values({
       id,
       publicOrderNumber: `JR${Math.random().toString().slice(2, 9)}`,
       userId,
       restaurantId,
       branchId,
-      status: 'COMPLETED',
-      paymentStatus: 'PAID_CASH',
+      status,
+      paymentStatus: reached ? 'PAID_CASH' : 'CASH_EXPECTED',
       placedAt: new Date(Date.now() - 3_600_000),
-      deliveredAt: new Date(),
-      completedAt: new Date(),
+      deliveredAt: reached ? new Date() : null,
+      completedAt: status === 'COMPLETED' ? new Date() : null,
+      cancelledAt: reached ? null : new Date(),
       itemsSubtotalIqd: 10_000,
       deliveryFeeIqd: 0,
       platformServiceFeeIqd: 0,
@@ -174,24 +180,37 @@ async function buildFixture(): Promise<Fixture> {
     .set({ ratingAverage: 1.5, ratingCount: 2 })
     .where(eq(restaurants.id, restaurantId));
 
-  // Readers are real customers: each has received an order.
-  for (const reader of readers) await delivered(reader);
+  // Readers are real customers: each has received an order. Delivered counts
+  // as received even before the cash is reconciled into COMPLETED.
+  await delivered(readers[0]!, 'DELIVERED');
+  await delivered(readers[1]!);
+  await delivered(readers[2]!);
 
   // The shop's own people — customers too, so only membership disqualifies them.
   const staff: string[] = [];
   for (const role of ['OWNER', 'MANAGER', 'CASHIER'] as const) {
     const id = await person(db, city.id, city.governorateId, `موظف ${role}`);
-    await db.insert(restaurantMembers).values({ id: uuidv7(), restaurantId, userId: id, role });
+    // The cashier has since left: a former member is still an interested party.
+    const former = role === 'CASHIER';
+    await db.insert(restaurantMembers).values({
+      id: uuidv7(),
+      restaurantId,
+      userId: id,
+      role,
+      isActive: !former,
+      deactivatedAt: former ? new Date() : null,
+    });
     await delivered(id);
     staff.push(id);
   }
 
-  // Fresh sign-ups that have never received anything.
+  // Sign-ups that have never received anything — one had an order cancelled.
   const strangers = [
     await person(db, city.id, city.governorateId, 'حساب جديد ١'),
     await person(db, city.id, city.governorateId, 'حساب جديد ٢'),
     await person(db, city.id, city.governorateId, 'حساب جديد ٣'),
   ];
+  await delivered(strangers[0]!, 'CANCELLED');
 
   const ctx = { db, logger: silent } as unknown as AppContext;
 
@@ -346,6 +365,32 @@ describeWithDb('review moderation (end to end)', () => {
   });
 
   it("deleting the author's account deletes their reviews, reports, blocks and stars", async () => {
+    // The low-rating bell entry is keyed by the order, the report's by the review.
+    const [rated] = await fx.db
+      .select({ orderId: orderReviews.orderId })
+      .from(orderReviews)
+      .where(eq(orderReviews.id, fx.reviewId));
+    await fx.db.insert(adminNotifications).values({
+      id: uuidv7(),
+      kind: 'REVIEW_POSTED',
+      titleAr: 'تقييم منخفض',
+      bodyAr: 'تعليق سيُبلَّغ عنه',
+      entityType: 'order_review',
+      entityId: rated!.orderId,
+      restaurantId: fx.restaurantId,
+    });
+    const quoting = () =>
+      fx.db
+        .select({ id: adminNotifications.id })
+        .from(adminNotifications)
+        .where(
+          and(
+            eq(adminNotifications.entityType, 'order_review'),
+            like(adminNotifications.bodyAr, '%تعليق%'),
+          ),
+        );
+    expect((await quoting()).length).toBeGreaterThan(1);
+
     const removed = await fx.db.transaction((tx) => deleteUserContent(tx, fx.author));
     expect(removed.reviews).toBe(2);
     expect(removed.restaurants).toEqual([fx.restaurantId]);
@@ -371,5 +416,8 @@ describeWithDb('review moderation (end to end)', () => {
       .where(eq(restaurants.id, fx.restaurantId));
     expect(shop?.ratingCount).toBe(0);
     expect(shop?.ratingAverage).toBeNull();
+
+    // No bell entry still quotes what they wrote.
+    expect(await quoting()).toEqual([]);
   });
 });

@@ -15,6 +15,9 @@ import { admin, type ReviewQueueItem } from '@/lib/admin-endpoints';
  * Publish when the screen or the reporters were wrong, hide when they were
  * right. Either decision closes the review's open reports and takes it out of
  * the queue; a reason is recorded in the audit log.
+ *
+ * Roles without `review.moderate` see the queue but not the decisions; the API
+ * refuses them either way.
  */
 
 const HELD_LABEL: Record<string, string> = {
@@ -32,7 +35,7 @@ const REPORT_LABEL: Record<string, string> = {
   OTHER: 'آخر',
 };
 
-export function ReviewQueue({ token }: { token: string }) {
+export function ReviewQueue({ token, canModerate }: { token: string; canModerate: boolean }) {
   const queryClient = useQueryClient();
   const [deciding, setDeciding] = useState<{
     item: ReviewQueueItem;
@@ -69,7 +72,11 @@ export function ReviewQueue({ token }: { token: string }) {
     <Card
       title={`طابور المراجعة${items.length > 0 ? ` (${items.length})` : ''}`}
       icon="alert"
-      subtitle="تعليقات أوقفها الفلتر، وتقييمات أبلغ عنها القرّاء"
+      subtitle={
+        canModerate
+          ? 'تعليقات أوقفها الفلتر، وتقييمات أبلغ عنها القرّاء'
+          : 'للاطلاع فقط — النشر والإخفاء لأدوار العمليات والدعم'
+      }
     >
       {queue.isError ? (
         <ErrorState
@@ -126,28 +133,30 @@ export function ReviewQueue({ token }: { token: string }) {
                   ملاحظات المبلّغين: {item.report_notes.join(' · ')}
                 </p>
               ) : null}
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <button
-                  type="button"
-                  className="btn btn--primary btn--sm"
-                  onClick={() => setDeciding({ item, action: 'PUBLISH' })}
-                >
-                  نشر
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--danger btn--sm"
-                  onClick={() => setDeciding({ item, action: 'HIDE' })}
-                >
-                  إخفاء
-                </button>
-              </div>
+              {canModerate ? (
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => setDeciding({ item, action: 'PUBLISH' })}
+                  >
+                    نشر
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--danger btn--sm"
+                    onClick={() => setDeciding({ item, action: 'HIDE' })}
+                  >
+                    إخفاء
+                  </button>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
 
-      {deciding ? (
+      {canModerate && deciding ? (
         <ConfirmDialog
           title={deciding.action === 'HIDE' ? 'إخفاء التقييم' : 'نشر التقييم'}
           confirmLabel={deciding.action === 'HIDE' ? 'إخفاء' : 'نشر'}

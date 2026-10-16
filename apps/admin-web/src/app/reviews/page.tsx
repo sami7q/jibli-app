@@ -32,6 +32,10 @@ import { ReviewQueue } from '@/components/review-queue';
  * Hide, never delete. A deleted review is an accusation nobody can re-read, and
  * the one case where moderation is contested is exactly the case where the
  * original text matters. Hiding removes it from the average immediately.
+ *
+ * Every admin role can read this page; only `review.moderate` may change what
+ * a shop is rated, so the actions are offered to those roles alone. The API
+ * refuses the rest regardless — this only decides what the page offers.
  */
 export default function ReviewsPage() {
   const session = useAdminSession();
@@ -67,6 +71,8 @@ export default function ReviewsPage() {
     return <SessionGate session={session} />;
   }
 
+  const canModerate = session.can('review.moderate');
+
   return (
     <AdminShell
       title="التقييمات"
@@ -74,7 +80,7 @@ export default function ReviewsPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >
-      <ReviewQueue token={token} />
+      <ReviewQueue token={token} canModerate={canModerate} />
 
       <Card>
         <FilterBar>
@@ -157,25 +163,29 @@ export default function ReviewsPage() {
                     <Badge tone="success">ظاهر</Badge>
                   ),
               },
-              {
-                key: 'actions',
-                header: 'إجراءات',
-                render: (row) => (
-                  <button
-                    type="button"
-                    className={`btn btn--${row.is_hidden ? 'ghost' : 'danger'} btn--sm`}
-                    onClick={() => setModerating(row)}
-                  >
-                    {row.is_hidden ? 'إظهار' : 'إخفاء'}
-                  </button>
-                ),
-              },
+              ...(canModerate
+                ? [
+                    {
+                      key: 'actions',
+                      header: 'إجراءات',
+                      render: (row: AdminReview) => (
+                        <button
+                          type="button"
+                          className={`btn btn--${row.is_hidden ? 'ghost' : 'danger'} btn--sm`}
+                          onClick={() => setModerating(row)}
+                        >
+                          {row.is_hidden ? 'إظهار' : 'إخفاء'}
+                        </button>
+                      ),
+                    },
+                  ]
+                : []),
             ]}
           />
         )}
       </Card>
 
-      {moderating ? (
+      {canModerate && moderating ? (
         <ConfirmDialog
           title={moderating.is_hidden ? 'إظهار التقييم' : 'إخفاء التقييم'}
           confirmLabel={moderating.is_hidden ? 'إظهار' : 'إخفاء'}
