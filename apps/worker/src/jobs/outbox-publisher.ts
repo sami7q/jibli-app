@@ -2,8 +2,10 @@ import { and, eq, inArray, lte, sql } from 'drizzle-orm';
 import {
   channels,
   EVENT_AUDIENCE,
+  ORDER_REJECTION_REASON_LABELS_AR,
   type EventType,
   type OrderEventPayload,
+  type OrderRejectionReason,
   type DeliveryEventPayload,
 } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
@@ -321,7 +323,12 @@ async function buildNotifications(
   const out: PendingNotification[] = [];
   const orderNumber = String(payload.publicOrderNumber ?? '');
 
-  const customerTemplate = customerTemplateFor(event.eventType as EventType, orderNumber);
+  const rejectionReason = typeof payload.reason === 'string' ? payload.reason : null;
+  const customerTemplate = customerTemplateFor(
+    event.eventType as EventType,
+    orderNumber,
+    rejectionReason,
+  );
   if (customerTemplate && audience.includes('customer') && typeof payload.customerId === 'string') {
     out.push({ userId: payload.customerId, audience: 'customer', ...customerTemplate });
   }
@@ -445,6 +452,7 @@ async function orderDesk(ctx: WorkerContext, restaurantId: string): Promise<stri
 function customerTemplateFor(
   eventType: EventType,
   orderNumber: string,
+  rejectionReason?: string | null,
 ): { titleAr: string; bodyAr: string } | null {
   switch (eventType) {
     case 'order.accepted':
@@ -460,8 +468,16 @@ function customerTemplateFor(
     case 'order.delivered':
     case 'order.completed':
       return NOTIFICATION_TEMPLATES.orderDelivered(orderNumber);
-    case 'order.rejected':
-      return NOTIFICATION_TEMPLATES.orderRejected(orderNumber);
+    case 'order.rejected': {
+      // The reason the shop chose, so the banner can say why rather than a bare
+      // «مرفوض» (MERCH-20). A known enum maps to its Arabic label; a free-text
+      // note is shown as written.
+      const reasonAr = rejectionReason
+        ? (ORDER_REJECTION_REASON_LABELS_AR[rejectionReason as OrderRejectionReason] ??
+          rejectionReason)
+        : null;
+      return NOTIFICATION_TEMPLATES.orderRejected(orderNumber, reasonAr);
+    }
     case 'order.cancelled':
       return NOTIFICATION_TEMPLATES.orderCancelled(orderNumber);
     default:

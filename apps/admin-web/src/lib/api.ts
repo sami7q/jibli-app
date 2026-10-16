@@ -98,6 +98,59 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return envelope.data;
 }
 
+/**
+ * Like `apiRequest` but keeps the envelope's `meta` as well as its `data`.
+ *
+ * List screens need `meta.total` to page without loading everything (ADMIN-17);
+ * the plain helper drops it. Returns a stable `{ data, meta }` so a caller that
+ * only wants the rows reads `.data` exactly as before.
+ */
+export async function apiRequestWithMeta<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ data: T; meta: Record<string, unknown> }> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (options.accessToken) headers.Authorization = `Bearer ${options.accessToken}`;
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: options.method ?? 'GET',
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    credentials: 'include',
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+
+  if (!response.ok) {
+    type ErrorPayload = {
+      error?: {
+        code: ErrorCode;
+        message: string;
+        details: Record<string, unknown>;
+        request_id: string;
+      };
+    };
+
+    let payload: ErrorPayload | null = null;
+    try {
+      payload = (await response.json()) as ErrorPayload;
+    } catch {
+      /* a gateway page or truncated body still needs a usable message */
+    }
+    const code = (payload?.error?.code ?? 'INTERNAL_ERROR') as ErrorCode;
+    throw new ApiError(
+      code,
+      payload?.error?.message ?? ERROR_MESSAGES_AR[code] ?? ERROR_MESSAGES_AR.INTERNAL_ERROR,
+      payload?.error?.details ?? {},
+      response.status,
+      payload?.error?.request_id ?? '',
+    );
+  }
+
+  const envelope = (await response.json()) as Envelope<T>;
+  return { data: envelope.data, meta: envelope.meta ?? {} };
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface AdminGovernorate {
@@ -138,6 +191,12 @@ export interface RestaurantApplication {
   id: string;
   display_name: string;
   contact_phone: string;
+  /** Who applied, on a self-service application; null on a row Admin created. */
+  applicant_name: string | null;
+  /** What the applicant wrote when applying; null when nothing was said. */
+  applicant_note: string | null;
+  /** Keys from CUISINES the applicant chose. */
+  cuisine_tags: string[];
   governorate_name_ar: string;
   city_name_ar: string;
   address_text: string;
@@ -260,6 +319,13 @@ export const adminApi = {
     apiRequest<{ rejected: boolean }>(
       `/api/v1/admin/restaurants/applications/${applicationId}/reject`,
       { method: 'POST', accessToken: token, body: { reason } },
+    ),
+
+  /** Ask the applicant for more information — moves it to INFO_REQUESTED (ADMIN-13). */
+  requestApplicationInfo: (token: string, applicationId: string, message: string) =>
+    apiRequest<{ status: string }>(
+      `/api/v1/admin/restaurants/applications/${applicationId}/request-info`,
+      { method: 'POST', accessToken: token, body: { message } },
     ),
 
   readiness: (token: string, restaurantId: string) =>

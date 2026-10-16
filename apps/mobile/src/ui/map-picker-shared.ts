@@ -14,6 +14,8 @@ export interface MapPickerProps {
   readonly longitude?: number | null;
   readonly onPick: (coordinates: { latitude: number; longitude: number }) => void;
   readonly height?: number;
+  /** Whose door the pin marks — the hint says «منزلك» or «باب متجرك» (MERCH-18). */
+  readonly placeNoun?: 'home' | 'shop';
 }
 
 /** About a metre: closer than this, a new position is the map's own echo. */

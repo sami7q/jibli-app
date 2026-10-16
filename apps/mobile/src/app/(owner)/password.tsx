@@ -11,7 +11,7 @@ import { useMe, useSession } from '@/lib/session';
 import { color, radius, space, TAP_TARGET, text } from '@/theme';
 import { Button, EmptyState, Field, Ltr, Row, Screen, Text } from '@/ui';
 import { PasswordField } from '@/ui/password-field';
-import { OwnerHeader } from './index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * A new password for the shop's account, proved by the owner's phone.

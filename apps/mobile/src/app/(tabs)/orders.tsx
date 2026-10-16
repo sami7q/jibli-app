@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@/ui/icon';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api, ApiError } from '@/lib/api';
-import { useIsGuest } from '@/lib/session';
+import { useIsGuest, useMe } from '@/lib/session';
 import { color, palette, radius, shadow, space, TAP_TARGET } from '@/theme';
 import { Badge, EmptyState, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
 import { Enter } from '@/ui/enter';
@@ -24,10 +24,13 @@ import { isLiveOrderStatus } from '@/lib/order-watch';
 export default function OrdersScreen() {
   const router = useRouter();
   const isGuest = useIsGuest();
+  // Shares the watcher's per-user key, so the two observers serve one fetch
+  // and the next user on the device starts from an empty cache (CUST-5).
+  const userId = useMe()?.user_id ?? null;
   const [rating, setRating] = useState<{ orderId: string; restaurantName: string } | null>(null);
 
   const orders = useQuery({
-    queryKey: ['my-orders'],
+    queryKey: ['my-orders', userId],
     queryFn: () => api.myOrders(),
     enabled: !isGuest,
     /*
@@ -54,7 +57,7 @@ export default function OrdersScreen() {
    * opens; this only shows what it returns.
    */
   const pending = useQuery({
-    queryKey: ['pending-reviews'],
+    queryKey: ['pending-reviews', userId],
     queryFn: () => api.pendingReviews(),
     enabled: !isGuest,
     staleTime: 60_000,
@@ -108,7 +111,7 @@ export default function OrdersScreen() {
               <EmptyState
                 title="لا توجد طلبات بعد"
                 body="عندما تطلب، ستتابع حالة الطلب من هنا خطوة بخطوة."
-                action={{ label: 'تصفّح المطاعم', onPress: () => router.push('/(tabs)') }}
+                action={{ label: 'تصفّح المتاجر', onPress: () => router.push('/(tabs)') }}
               />
             ) : (
               (orders.data ?? []).map((order, index) => {

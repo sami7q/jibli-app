@@ -27,7 +27,7 @@ import {
   Skeleton,
   Text,
 } from '@/ui';
-import { OwnerHeader } from './index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * The shop's own page, as its owner edits it.
@@ -620,6 +620,7 @@ export default function OwnerSettingsScreen() {
                       setPinProblem(null);
                     }}
                     height={220}
+                    placeNoun="shop"
                   />
                   {pinProblem ? (
                     <Text variant="caption" tone="danger">

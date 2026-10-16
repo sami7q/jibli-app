@@ -7,7 +7,10 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { api, ApiError, idempotencyKey, NetworkError, type Address } from '@/lib/api';
 import { registerForPush } from '@/lib/push';
 import { customerDeliveryFee } from '@/lib/delivery-fee';
+import { countAr, MINUTES } from '@/lib/arabic-count';
+import { MODIFIERS_ENABLED } from '@/lib/menu-options';
 import { useCart, useOrderLines } from '@/lib/cart';
+import { useMe } from '@/lib/session';
 import { notify } from '@/lib/dialog';
 import { color, palette, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
@@ -34,7 +37,7 @@ export default function CheckoutScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { notes } = useLocalSearchParams<{ notes?: string }>();
-  const { cart, subtotalIqd, clear } = useCart();
+  const { cart, clear } = useCart();
   const lines = useOrderLines();
 
   const [addressId, setAddressId] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export default function CheckoutScreen() {
   const orderKey = useRef(idempotencyKey('order'));
 
   const addresses = useQuery({
-    queryKey: ['addresses'],
+    queryKey: ['addresses', useMe()?.user_id ?? null],
     queryFn: () => api.addresses(),
   });
 
@@ -124,9 +127,13 @@ export default function CheckoutScreen() {
        */
       void registerForPush();
 
+      // Back from the order must not land on the now-empty cart (CUST-14): the
+      // stack built to get here (restaurant → cart → checkout) is dismissed, so
+      // the order sits on top of the tabs and «رجوع» returns to them.
+      if (router.canGoBack()) router.dismissAll();
       // `placed=1` is what turns the order screen's header into a confirmation
       // rather than a status it silently already had.
-      router.replace(`/order/${order.order_id}?placed=1`);
+      router.push(`/order/${order.order_id}?placed=1`);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
@@ -158,7 +165,7 @@ export default function CheckoutScreen() {
         <EmptyState
           title="لا يوجد طلب"
           body="سلتك فارغة."
-          action={{ label: 'تصفّح المطاعم', onPress: () => router.replace('/(tabs)') }}
+          action={{ label: 'تصفّح المتاجر', onPress: () => router.replace('/(tabs)') }}
         />
       </Screen>
     );
@@ -340,7 +347,7 @@ export default function CheckoutScreen() {
               >
                 <MaterialCommunityIcons name="clock-outline" size={16} color={color.brand} />
                 <Text variant="caption" tone="secondary">
-                  يصل خلال {quote.data.estimated_preparation_minutes} دقيقة تقريباً
+                  مدة التحضير {countAr(quote.data.estimated_preparation_minutes, MINUTES)}
                 </Text>
               </View>
             </View>
@@ -406,21 +413,29 @@ export default function CheckoutScreen() {
             </View>
           ) : (
             <>
-              <Text variant="bodyBold" tone="inverse">
+              <Text
+                variant="bodyBold"
+                tone="inverse"
+                style={totalIqd === null ? { flex: 1 } : null}
+              >
                 تأكيد الطلب
               </Text>
-              <View
-                style={{
-                  paddingVertical: space[1],
-                  paddingHorizontal: space[3],
-                  borderRadius: radius.full,
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                }}
-              >
-                <Text variant="bodyBold" tone="inverse">
-                  {formatIqdArabic(iqd(totalIqd ?? subtotalIqd))}
-                </Text>
-              </View>
+              {/* No price until the server has quoted one: a stale client
+                  subtotal under a disabled button misleads (CUST-24). */}
+              {totalIqd !== null ? (
+                <View
+                  style={{
+                    paddingVertical: space[1],
+                    paddingHorizontal: space[3],
+                    borderRadius: radius.full,
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                  }}
+                >
+                  <Text variant="bodyBold" tone="inverse">
+                    {formatIqdArabic(iqd(totalIqd))}
+                  </Text>
+                </View>
+              ) : null}
             </>
           )}
         </Pressable>
@@ -597,9 +612,44 @@ function AddressRow({
  */
 function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const router = useRouter();
-  const { cart, remove } = useCart();
+  const { cart, remove, subtotalIqd } = useCart();
 
   const api = error instanceof ApiError ? error : null;
+
+  const toCart = () => (router.canGoBack() ? router.back() : router.replace('/cart'));
+
+  /*
+   * Below the minimum: «إعادة المحاولة» can never succeed, so it is replaced by
+   * the one thing that can — adding to the basket — with the exact shortfall
+   * (CUST-24). The server also carries the minimum in the error details; the
+   * cart's own figures are used so a number always shows.
+   */
+  if (api?.code === 'MINIMUM_ORDER_NOT_MET') {
+    const shortfall = cart ? Math.max(0, cart.minimumOrderIqd - subtotalIqd) : 0;
+    return (
+      <View
+        style={{
+          padding: space[4],
+          borderRadius: radius.lg,
+          backgroundColor: color.warningSoft,
+          gap: space[3],
+        }}
+      >
+        <Text variant="smallBold" tone="secondary">
+          {shortfall > 0
+            ? `أضف ${formatIqdArabic(iqd(shortfall))} لإتمام الطلب`
+            : (api.messageAr ?? 'قيمة الطلب أقل من الحد الأدنى المطلوب')}
+        </Text>
+        <Button
+          label="العودة إلى السلة"
+          variant="secondary"
+          style={{ alignSelf: 'center' }}
+          onPress={toCart}
+        />
+      </View>
+    );
+  }
+
   const details = (api?.details ?? {}) as { menuItemId?: unknown; groupNameAr?: unknown };
   const menuItemId = typeof details.menuItemId === 'string' ? details.menuItemId : null;
   const groupNameAr = typeof details.groupNameAr === 'string' ? details.groupNameAr : null;
@@ -634,11 +684,18 @@ function QuoteError({ error, onRetry }: { error: unknown; onRetry: () => void })
       </Text>
 
       <Row gap={space[2]}>
-        <Button
-          label="اختيار الخيارات"
-          style={{ alignSelf: 'center' }}
-          onPress={() => router.push(`/restaurant/${cart.restaurantId}?item=${line.menuItemId}`)}
-        />
+        {/*
+         * «اختيار الخيارات» only helps when options can be collected. While they
+         * are off it opens a sheet with nothing to pick — a dead end — so the
+         * only way out of a bad line is to remove it (CUST-2).
+         */}
+        {MODIFIERS_ENABLED ? (
+          <Button
+            label="اختيار الخيارات"
+            style={{ alignSelf: 'center' }}
+            onPress={() => router.push(`/restaurant/${cart.restaurantId}?item=${line.menuItemId}`)}
+          />
+        ) : null}
         <Button
           label="حذف الصنف"
           variant="secondary"

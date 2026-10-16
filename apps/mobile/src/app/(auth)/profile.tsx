@@ -205,7 +205,7 @@ export default function ProfileScreen() {
           <Text style={styles.step}>الخطوة ٢ من ٢</Text>
           <Text style={styles.title}>عرّفنا بنفسك</Text>
           <Text style={styles.subtitle}>
-            الاسم لنخاطبك به، والمنطقة لنعرض المطاعم التي توصّل إليك
+            الاسم لنخاطبك به، والمنطقة لنعرض المتاجر التي توصّل إليك
           </Text>
         </View>
 

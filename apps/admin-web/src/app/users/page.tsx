@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RESTAURANT_ROLE_LABELS, dateAr, relativeAr } from '@jibli/ui-web';
 import { USER_STATUSES, type RestaurantRole, type UserStatus } from '@jibli/contracts';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import {
   Badge,
   Card,
@@ -15,6 +16,7 @@ import {
   FilterBar,
   MfaChallenge,
   Money,
+  Pager,
   SearchInput,
   Select,
   Skeleton,
@@ -47,17 +49,35 @@ const STATUS_LABELS: Record<UserStatus, string> = {
 
 type Audience = 'OWNERS' | 'CUSTOMERS' | '';
 
+// «ملاك المتاجر», not «ملاك المطاعم»: markets and cosmetics shops have owners
+// too and they appear here, so the audience label matches the sidebar (ADMIN-14).
 const AUDIENCE_LABELS: Record<Exclude<Audience, ''>, string> = {
-  OWNERS: 'ملاك المطاعم',
+  OWNERS: 'ملاك المتاجر',
   CUSTOMERS: 'العملاء',
 };
 
+const PAGE_SIZE = 25;
+
 export default function UsersPage() {
+  // The content reads `?q=` (the header search routes phone lookups here,
+  // ADMIN-18); Next needs a Suspense boundary around useSearchParams.
+  return (
+    <Suspense fallback={null}>
+      <UsersPageContent />
+    </Suspense>
+  );
+}
+
+function UsersPageContent() {
   const session = useAdminSession();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [status, setStatus] = useState<UserStatus | ''>('');
-  const [audience, setAudience] = useState<Audience>('OWNERS');
+  // A header search (usually a phone) should look across everyone, not just
+  // owners, so a direct «?q=» opens on «الجميع» (ADMIN-18).
+  const [audience, setAudience] = useState<Audience>(() => (searchParams.get('q') ? '' : 'OWNERS'));
+  const [offset, setOffset] = useState(0);
   const [blocking, setBlocking] = useState<AdminCustomer | null>(null);
   const [unmasking, setUnmasking] = useState<AdminCustomer | null>(null);
   const [revealed, setRevealed] = useState<Record<string, string>>({});
@@ -67,12 +87,14 @@ export default function UsersPage() {
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const customers = useQuery({
-    queryKey: ['admin-customers', debouncedSearch, status, audience],
+    queryKey: ['admin-customers', debouncedSearch, status, audience, offset],
     queryFn: () =>
-      admin.customers(token, {
+      admin.customersPaged(token, {
         q: debouncedSearch || undefined,
         status: status || undefined,
         role: audience || undefined,
+        limit: PAGE_SIZE,
+        offset,
       }),
     enabled: session.status === 'authenticated',
   });
@@ -101,11 +123,26 @@ export default function UsersPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('customer.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة الأشخاص" />;
+  }
+
+  const canUnmask = session.can('customer.phone.unmask');
+  const canBlock = session.can('customer.block');
+  const rows = customers.data?.data ?? [];
+  const total = Number(customers.data?.meta.total ?? rows.length);
+
+  const resetAnd =
+    <T,>(setter: (value: T) => void) =>
+    (value: T) => {
+      setOffset(0);
+      setter(value);
+    };
 
   return (
     <AdminShell
-      title={audience === 'CUSTOMERS' ? 'العملاء' : audience === '' ? 'الأشخاص' : 'ملاك المطاعم'}
-      subtitle={audience === 'OWNERS' ? 'من يدير المطاعم على المنصة، وما يديره كل منهم' : undefined}
+      title={audience === 'CUSTOMERS' ? 'العملاء' : audience === '' ? 'الأشخاص' : 'ملاك المتاجر'}
+      subtitle={audience === 'OWNERS' ? 'من يدير المتاجر على المنصة، وما يديره كل منهم' : undefined}
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
     >
@@ -113,13 +150,13 @@ export default function UsersPage() {
         <FilterBar>
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={resetAnd(setSearch)}
             label="بحث"
-            placeholder="الاسم، الهاتف، اسم المستخدم، أو اسم المطعم…"
+            placeholder="الاسم، الهاتف، اسم المستخدم، أو اسم المتجر…"
           />
           <Select
             value={audience}
-            onChange={setAudience}
+            onChange={resetAnd(setAudience)}
             label="الفئة"
             allLabel="الجميع"
             options={(['OWNERS', 'CUSTOMERS'] as const).map((value) => ({
@@ -129,7 +166,7 @@ export default function UsersPage() {
           />
           <Select
             value={status}
-            onChange={setStatus}
+            onChange={resetAnd(setStatus)}
             label="حالة الحساب"
             allLabel="كل الحالات"
             options={USER_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
@@ -150,7 +187,7 @@ export default function UsersPage() {
         ) : (
           <DataTable<AdminCustomer>
             caption={audience === 'CUSTOMERS' ? 'قائمة العملاء' : 'قائمة الأشخاص'}
-            rows={customers.data ?? []}
+            rows={rows}
             keyOf={(row) => row.id}
             emptyMessage={
               audience === 'OWNERS' ? 'لا يوجد ملاك مطاعم مطابقون' : 'لا يوجد أشخاص مطابقون'
@@ -164,7 +201,7 @@ export default function UsersPage() {
               },
               {
                 key: 'restaurant',
-                header: 'المطعم',
+                header: 'المتجر',
                 render: (row) =>
                   row.restaurants.length === 0 ? (
                     <span style={{ color: 'var(--text-muted)' }}>عميل</span>
@@ -199,7 +236,9 @@ export default function UsersPage() {
                 render: (row) => (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span className="ltr-inline">{revealed[row.id] ?? row.phone}</span>
-                    {row.phone_masked && !revealed[row.id] ? (
+                    {/* «إظهار» only for a role that may unmask; others never
+                        saw a button that could only end in FORBIDDEN (ADMIN-14). */}
+                    {canUnmask && row.phone_masked && !revealed[row.id] ? (
                       <button
                         type="button"
                         className="btn btn--outline btn--sm"
@@ -251,19 +290,24 @@ export default function UsersPage() {
               {
                 key: 'actions',
                 header: '',
-                render: (row) => (
-                  <button
-                    type="button"
-                    className={`btn btn--sm ${row.status === 'ACTIVE' ? 'btn--danger' : 'btn--outline'}`}
-                    onClick={() => setBlocking(row)}
-                  >
-                    {row.status === 'ACTIVE' ? 'حظر' : 'رفع الحظر'}
-                  </button>
-                ),
+                render: (row) =>
+                  canBlock ? (
+                    <button
+                      type="button"
+                      className={`btn btn--sm ${row.status === 'ACTIVE' ? 'btn--danger' : 'btn--outline'}`}
+                      onClick={() => setBlocking(row)}
+                    >
+                      {row.status === 'ACTIVE' ? 'حظر' : 'رفع الحظر'}
+                    </button>
+                  ) : null,
               },
             ]}
           />
         )}
+
+        {!customers.isLoading && !customers.isError ? (
+          <Pager offset={offset} pageSize={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
+        ) : null}
       </Card>
 
       {blocking ? (

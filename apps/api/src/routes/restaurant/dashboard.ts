@@ -302,6 +302,7 @@ async function buildFinanceSummary(
     .select({
       orderCount: sql<number>`COUNT(*)`,
       commissionIqd: sql<number>`COALESCE(SUM(${orders.commissionAmountIqd}), 0)`,
+      serviceFeeIqd: sql<number>`COALESCE(SUM(${orders.platformServiceFeeIqd}), 0)`,
       netIqd: sql<number>`COALESCE(SUM(${orders.restaurantNetSnapshotIqd}), 0)`,
     })
     .from(orders)
@@ -321,8 +322,16 @@ async function buildFinanceSummary(
     Math.ceil((period.end.getTime() - now.getTime()) / 86_400_000),
   );
 
+  const commissionIqd = Number(open?.commissionIqd ?? 0);
+  const serviceFeeIqd = Number(open?.serviceFeeIqd ?? 0);
+
   return {
-    open_commission_iqd: Number(open?.commissionIqd ?? 0),
+    open_commission_iqd: commissionIqd,
+    // What the shop actually owes Jibli: commission plus the platform service
+    // fee its courier collected. The commissions screen sums both, so the
+    // dashboard must too or the two numbers disagree (MERCH-21).
+    amount_owed_iqd: commissionIqd + serviceFeeIqd,
+    open_service_fee_iqd: serviceFeeIqd,
     open_order_count: Number(open?.orderCount ?? 0),
     // Net is margin-adjacent, so it follows the profit permission.
     estimated_net_iqd: canSeeProfit ? Number(open?.netIqd ?? 0) : null,

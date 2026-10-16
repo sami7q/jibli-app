@@ -222,13 +222,18 @@ export const restaurantApi = {
     auth: { accessToken: string; restaurantId: string },
     orderId: string,
     expectedVersion: number,
+    /** How long the shop needs; the customer is shown it and the courier timed against it. */
+    preparationMinutes?: number,
   ) =>
     apiRequest<{ status: string }>(`/api/v1/restaurant-portal/orders/${orderId}/accept`, {
       method: 'POST',
       accessToken: auth.accessToken,
       restaurantId: auth.restaurantId,
       // Optimistic concurrency: a stale board cannot overwrite a newer state.
-      body: { expected_version: expectedVersion },
+      body: {
+        expected_version: expectedVersion,
+        ...(preparationMinutes ? { estimated_preparation_minutes: preparationMinutes } : {}),
+      },
     }),
 
   rejectOrder: (
@@ -283,6 +288,22 @@ export const restaurantApi = {
         accessToken: auth.accessToken,
         restaurantId: auth.restaurantId,
         body: { driver_id: driverId },
+      },
+    ),
+
+  /** Take a READY order back from a courier who has not collected it yet (MERCH-6). */
+  unassignDriver: (
+    auth: { accessToken: string; restaurantId: string },
+    orderId: string,
+    reason: string,
+  ) =>
+    apiRequest<{ unassigned: boolean }>(
+      `/api/v1/restaurant-portal/orders/${orderId}/unassign-driver`,
+      {
+        method: 'POST',
+        accessToken: auth.accessToken,
+        restaurantId: auth.restaurantId,
+        body: { reason },
       },
     ),
 };

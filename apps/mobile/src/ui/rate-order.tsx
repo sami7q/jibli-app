@@ -50,8 +50,11 @@ export function RateOrderSheet({
       setRating(0);
       setComment('');
       setAccepted(false);
-      // A held comment is not an error, but the author should know why it is not visible yet.
+      // A held comment is not an error, but the author should know why it is not
+      // visible yet; a published one gets a short thank-you rather than closing
+      // in silence (CUST-15).
       if (result.held) notify('شكراً لتقييمك', result.note_ar);
+      else notify('شكراً', 'تم تسجيل تقييمك.');
       onSubmitted();
     },
     onError: (error) =>
@@ -64,13 +67,31 @@ export function RateOrderSheet({
       onClose={onClose}
       title="كيف كان طلبك؟"
       footer={
-        <Button
-          label="إرسال التقييم"
-          block
-          disabled={rating === 0 || (hasComment && !accepted) || submit.isPending}
-          loading={submit.isPending}
-          onPress={() => submit.mutate()}
-        />
+        <View style={{ gap: space[1] }}>
+          <Button
+            label="إرسال التقييم"
+            block
+            disabled={rating === 0 || (hasComment && !accepted) || submit.isPending}
+            loading={submit.isPending}
+            onPress={() => submit.mutate()}
+          />
+          {/* A visible way out, so the sheet is not dismissible only by the
+              backdrop or the Android back button (CUST-15). */}
+          <Pressable
+            onPress={onClose}
+            disabled={submit.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="لاحقاً"
+            style={({ pressed }) => [
+              { minHeight: TAP_TARGET, alignItems: 'center', justifyContent: 'center' },
+              pressed ? { opacity: 0.6 } : null,
+            ]}
+          >
+            <Text variant="smallBold" tone="muted">
+              لاحقاً
+            </Text>
+          </Pressable>
+        </View>
       }
     >
       <Text tone="secondary" align="center">

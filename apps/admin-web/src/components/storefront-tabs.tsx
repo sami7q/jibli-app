@@ -69,6 +69,8 @@ export const STOREFRONT_COPY: Record<
   {
     /** «٣ مطاعم» / «٣ ماركتات» — what the count on a category row counts. */
     readonly countedAr: string;
+    /** The plural, for a sentence like «لا يمكن حذف تصنيف فيه مطاعم» (ADMIN-24). */
+    readonly countedPluralAr: string;
     readonly noneYetAr: string;
     readonly defaultEmoji: string;
     readonly nameAr: string;
@@ -76,18 +78,21 @@ export const STOREFRONT_COPY: Record<
 > = {
   RESTAURANT: {
     countedAr: 'مطعم',
+    countedPluralAr: 'مطاعم',
     noneYetAr: 'لا مطاعم بعد',
     defaultEmoji: '🍽️',
     nameAr: MERCHANT_TYPE_LABELS.RESTAURANT.nameAr,
   },
   MARKET: {
     countedAr: 'ماركت',
+    countedPluralAr: 'ماركتات',
     noneYetAr: 'لا ماركتات بعد',
     defaultEmoji: '🛒',
     nameAr: MERCHANT_TYPE_LABELS.MARKET.nameAr,
   },
   COSMETICS: {
     countedAr: 'متجر تجميل',
+    countedPluralAr: 'متاجر تجميل',
     noneYetAr: 'لا متاجر تجميل بعد',
     defaultEmoji: '💄',
     nameAr: MERCHANT_TYPE_LABELS.COSMETICS.nameAr,

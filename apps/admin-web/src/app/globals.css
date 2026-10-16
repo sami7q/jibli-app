@@ -569,9 +569,12 @@ html {
   inset: 0;
   background: rgba(22, 24, 29, 0.5);
   display: grid;
-  place-items: center;
+  /* Align to the top so a dialog taller than the viewport scrolls from its
+     head rather than being centred with both ends cut off (ADMIN-9). */
+  place-items: start center;
   z-index: var(--z-modal);
   padding: var(--space-4);
+  overflow-y: auto;
 }
 
 .dialog {
@@ -584,6 +587,11 @@ html {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  /* A long form (coupon, banner) must stay submittable on a laptop screen: cap
+     the height to the viewport and scroll inside, so the action row is always
+     reachable (ADMIN-9). */
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
 }
 
 .dialog h2 {
@@ -2867,4 +2875,57 @@ html {
 .merchant-cell__missing {
   color: var(--text-muted);
   opacity: 0.75;
+}
+
+/* ── Detail rows and order timeline (ADMIN-2) ───────────────────────────── */
+
+/* A two-column key/value grid for a detail card; collapses to one column on a
+   narrow viewport so nothing is clipped. */
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-6);
+}
+
+@media (max-width: 640px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle, #eceef1);
+}
+
+.detail-row__label {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* The value is often an English token (phone, number) inside an RTL row; keep
+   it from drifting to the far edge away from its label. */
+.detail-row__value {
+  text-align: end;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.timeline__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--border-subtle, #eceef1);
 }

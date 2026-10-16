@@ -32,3 +32,24 @@ export function signedInDestination(fallback = '/(tabs)'): string {
 export function clearAfterSignIn(): void {
   destination = null;
 }
+
+/**
+ * A shop the guest tried to favourite before signing in.
+ *
+ * The heart needs an account to hang a favourite on, so a guest is sent to sign
+ * in — and used to come back with the shop un-favourited and themselves on the
+ * home screen (CUST-10). The id is remembered here; the shop screen reads it on
+ * the way back and does the favourite the guest actually asked for.
+ */
+let pendingFavorite: string | null = null;
+
+export function rememberFavoriteIntent(restaurantId: string): void {
+  pendingFavorite = restaurantId;
+}
+
+/** Returns the pending favourite for this shop and clears it, or null. */
+export function takeFavoriteIntent(restaurantId: string): boolean {
+  if (pendingFavorite !== restaurantId) return false;
+  pendingFavorite = null;
+  return true;
+}

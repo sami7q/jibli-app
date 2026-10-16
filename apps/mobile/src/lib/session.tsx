@@ -10,7 +10,8 @@ import {
 } from 'react';
 import { AppState } from 'react-native';
 import { onlineManager } from '@tanstack/react-query';
-import { apiRequest, ApiError, NetworkError } from './api';
+import { api as apiClient, apiRequest, ApiError, NetworkError } from './api';
+import { clearPreferredAddressId } from './preferred-address';
 import {
   clearParkedSession,
   clearSession,
@@ -247,7 +248,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await resolve();
       },
       signOut: async () => {
-        await Promise.all([clearSession(), clearParkedSession(), forgetGuestChoice()]);
+        /*
+         * Tell the server first, so the refresh token is revoked and a copy of
+         * it taken before sign-out stops working (CUST-5). Best-effort: a device
+         * with no signal must still be able to sign out, and the tokens are
+         * cleared below regardless. The React-Query cache, the cart and the
+         * preferred address are per-user and are cleared by the caller (which
+         * holds the query client and the cart); the preferred id is a bare
+         * storage key, so it is cleared here with the tokens.
+         */
+        await apiClient.logout().catch(() => undefined);
+        await Promise.all([
+          clearSession(),
+          clearParkedSession(),
+          forgetGuestChoice(),
+          clearPreferredAddressId(),
+        ]);
         generation.current += 1;
         setParkedAccount(null);
         setState({ status: 'signed-out' });

@@ -20,7 +20,13 @@ import { color, radius, space } from '@/theme';
 
 export { isSamePoint, type MapPickerProps } from './map-picker-shared';
 
-export function MapPicker({ latitude, longitude, onPick, height = 280 }: MapPickerProps) {
+export function MapPicker({
+  latitude,
+  longitude,
+  onPick,
+  height = 280,
+  placeNoun = 'home',
+}: MapPickerProps) {
   const [ready, setReady] = useState(false);
   /**
    * Whether the map failed to draw at all — an unreachable CDN or tile server,
@@ -38,7 +44,7 @@ export function MapPicker({ latitude, longitude, onPick, height = 280 }: MapPick
    * the map reports. So every drag reloaded the entire map from the network
    * at the spot the finger let go. Later positions are sent in instead.
    */
-  const [html] = useState(() => MAP_PICKER_HTML(latitude ?? null, longitude ?? null));
+  const [html] = useState(() => MAP_PICKER_HTML(latitude ?? null, longitude ?? null, placeNoun));
 
   /** Where the map itself last said it was, so its own echo is not sent back. */
   const lastReported = useRef<{ latitude: number; longitude: number } | null>(

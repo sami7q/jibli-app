@@ -39,6 +39,18 @@ export interface AlertState {
 const DEFAULT_REPEAT_MS = 20_000;
 const DEFAULT_ESCALATE_MS = 60_000;
 
+/**
+ * The tab title with no badge (MERCH-14).
+ *
+ * It was captured from `document.title` at enable/restore time, which bit twice:
+ * on a client navigation the title could already be badged (so the badge
+ * compounded — «(3) طلبات جديدة — (2) طلبات جديدة —») or momentarily empty (so
+ * `restoreTitle` refused to run and the «جيبلي — بوابة الشركاء» title never came
+ * back). A constant base is the one title that cannot drift. It mirrors the
+ * `metadata.title` in `app/layout.tsx`.
+ */
+const BASE_TITLE = 'جيبلي — بوابة الشركاء';
+
 /** Per browser, per device. Not an account setting — it is about this machine. */
 const ENABLED_KEY = 'jibli.portal.orderAlerts';
 
@@ -70,7 +82,6 @@ export class OrderAlertManager {
   private readonly options: Required<Omit<AlertManagerOptions, 'onStateChange'>> & {
     onStateChange?: (state: AlertState) => void;
   };
-  private originalTitle = '';
 
   constructor(options: AlertManagerOptions = {}) {
     this.options = {
@@ -87,8 +98,6 @@ export class OrderAlertManager {
    */
   async enable(): Promise<AlertState> {
     if (typeof window === 'undefined') return this.state();
-
-    this.originalTitle = document.title;
 
     try {
       await this.openAudio();
@@ -124,7 +133,6 @@ export class OrderAlertManager {
   restore(): AlertState {
     if (typeof window === 'undefined' || !readStoredChoice()) return this.state();
 
-    this.originalTitle = document.title;
     this.enabled = true;
 
     void this.openAudio().catch(() => {
@@ -340,13 +348,12 @@ export class OrderAlertManager {
   private updateTitle(): void {
     if (typeof document === 'undefined') return;
     const count = this.pending.size;
-    document.title =
-      count > 0 ? `(${count}) طلبات جديدة — ${this.originalTitle}` : this.originalTitle;
+    document.title = count > 0 ? `(${count}) طلبات جديدة — ${BASE_TITLE}` : BASE_TITLE;
   }
 
   private restoreTitle(): void {
-    if (typeof document !== 'undefined' && this.originalTitle) {
-      document.title = this.originalTitle;
+    if (typeof document !== 'undefined') {
+      document.title = BASE_TITLE;
     }
   }
 

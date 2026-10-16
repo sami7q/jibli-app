@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dateTimeAr } from '@jibli/ui-web';
-import { AdminShell } from '@/components/shell';
-import { Badge, Card, ErrorState, Skeleton } from '@/components/ui';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
+import { Badge, Card, EmptyState, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { admin } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
@@ -60,7 +60,13 @@ export default function SupportThreadPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('restaurant.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة الدعم" />;
+  }
 
+  // Only a role holding support.reply may answer or close a thread as «فريق
+  // جيبلي» (ADMIN-12); a read-only role sees the conversation, not the box.
+  const canReply = session.can('support.reply');
   const data = thread.data;
 
   return (
@@ -72,7 +78,7 @@ export default function SupportThreadPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
-        data && data.status !== 'RESOLVED' ? (
+        data && data.status !== 'RESOLVED' && canReply ? (
           <button
             type="button"
             className="btn btn--outline"
@@ -131,48 +137,57 @@ export default function SupportThreadPage() {
             </ol>
           </Card>
 
-          <Card title="الرد" icon="support">
-            <div className="field">
-              <label htmlFor="reply">نص الرد</label>
-              <textarea
-                id="reply"
-                rows={5}
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="اكتب ردّك للمطعم…"
-              />
-            </div>
+          {canReply ? (
+            <Card title="الرد" icon="support">
+              <div className="field">
+                <label htmlFor="reply">نص الرد</label>
+                <textarea
+                  id="reply"
+                  rows={5}
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  placeholder="اكتب ردّك للمطعم…"
+                />
+              </div>
 
-            <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-              <input
-                type="checkbox"
-                checked={resolve}
-                onChange={(event) => setResolve(event.target.checked)}
-              />
-              إنهاء المحادثة بعد الإرسال
-            </label>
+              <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={resolve}
+                  onChange={(event) => setResolve(event.target.checked)}
+                />
+                إنهاء المحادثة بعد الإرسال
+              </label>
 
-            <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-              يستطيع المطعم الرد مرة أخرى في أي وقت، وسيُعاد فتح المحادثة تلقائياً إن فعل.
-            </p>
-
-            {reply.error ? (
-              <p className="alert-bar alert-bar--danger" role="alert">
-                {reply.error instanceof ApiError ? reply.error.messageAr : 'تعذّر إرسال الرد'}
+              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                يستطيع المطعم الرد مرة أخرى في أي وقت، وسيُعاد فتح المحادثة تلقائياً إن فعل.
               </p>
-            ) : null}
 
-            <div className="dialog__actions">
-              <button
-                type="button"
-                className="btn btn--primary"
-                disabled={message.trim().length === 0 || reply.isPending}
-                onClick={() => reply.mutate()}
-              >
-                {reply.isPending ? 'جاري الإرسال…' : 'إرسال الرد'}
-              </button>
-            </div>
-          </Card>
+              {reply.error ? (
+                <p className="alert-bar alert-bar--danger" role="alert">
+                  {reply.error instanceof ApiError ? reply.error.messageAr : 'تعذّر إرسال الرد'}
+                </p>
+              ) : null}
+
+              <div className="dialog__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={message.trim().length === 0 || reply.isPending}
+                  onClick={() => reply.mutate()}
+                >
+                  {reply.isPending ? 'جاري الإرسال…' : 'إرسال الرد'}
+                </button>
+              </div>
+            </Card>
+          ) : (
+            <Card title="الرد" icon="support">
+              <EmptyState
+                message="للاطلاع فقط"
+                hint="دورك لا يملك صلاحية الرد على رسائل المطاعم أو إنهائها."
+              />
+            </Card>
+          )}
         </>
       )}
     </AdminShell>

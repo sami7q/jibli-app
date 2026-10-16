@@ -80,7 +80,17 @@ export function Dropdown<T extends string>({
       if (!container.current?.contains(event.target as Node)) setOpen(false);
     };
     // Capture, because the page scrolls in a container rather than the window.
-    const onScroll = () => setOpen(false);
+    //
+    // But the list scrolls the selected option into view the moment it opens
+    // (the effect below), and that scroll — whose target is the list itself —
+    // used to fire this capture listener and close the panel in the same frame.
+    // Any option past the ~6th was therefore unreachable: choosing it left the
+    // dropdown impossible to reopen (ADMIN-3). Ignore scrolls originating inside
+    // our own container; only a scroll of the page behind it should close us.
+    const onScroll = (event: Event) => {
+      if (container.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
 
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('scroll', onScroll, true);

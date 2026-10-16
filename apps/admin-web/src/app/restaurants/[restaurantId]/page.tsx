@@ -11,13 +11,14 @@ import {
   type MerchantType,
   type RestaurantRole,
 } from '@jibli/contracts';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { PortalCredentials } from '@/components/portal-credentials';
 import {
   Badge,
   Card,
   ConfirmDialog,
   DataTable,
+  EmptyState,
   ErrorState,
   MfaChallenge,
   Money,
@@ -25,7 +26,7 @@ import {
 } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
-import { admin, type CommissionConfigView } from '@/lib/admin-endpoints';
+import { admin, type CatalogMenu, type CommissionConfigView } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 
@@ -83,6 +84,17 @@ export default function RestaurantDetailPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('restaurant.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المتاجر" />;
+  }
+
+  // Action gating (ADMIN-11): each control mirrors the permission its route
+  // enforces, so a read-only role no longer sees buttons that only end in
+  // «لا تملك صلاحية».
+  const canSuspend = session.can('restaurant.suspend');
+  const canCommission = session.can('restaurant.commission.update');
+  const canChangeKind = session.can('restaurant.create');
+  const canCredentials = session.can('restaurant.create');
 
   const data = restaurant.data;
   const isActive = data?.operational_status === 'ACTIVE';
@@ -103,7 +115,7 @@ export default function RestaurantDetailPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
-        data ? (
+        data && canSuspend ? (
           isActive ? (
             <button type="button" className="btn btn--danger" onClick={() => setSuspending(true)}>
               {isShop ? 'إيقاف المتجر' : 'إيقاف المطعم'}
@@ -136,7 +148,9 @@ export default function RestaurantDetailPage() {
           {data.suspended_reason ? (
             <div className="alert-bar alert-bar--danger" role="alert">
               <Icon name="alert" className="nav__icon" aria-hidden />
-              <span>المطعم موقوف. السبب: {data.suspended_reason}</span>
+              <span>
+                {isShop ? 'المتجر موقوف' : 'المطعم موقوف'}. السبب: {data.suspended_reason}
+              </span>
             </div>
           ) : null}
 
@@ -173,8 +187,8 @@ export default function RestaurantDetailPage() {
             <div className="alert-bar alert-bar--warning">
               <Icon name="geography" className="nav__icon" aria-hidden />
               <span>
-                المطعم مفعّل لكن الطلبات معطّلة في مدينته، لذلك لا يظهر للعملاء. هذا إعداد تغطية
-                وليس مشكلة في المطعم.
+                {isShop ? 'المتجر مفعّل' : 'المطعم مفعّل'} لكن الطلبات معطّلة في مدينته، لذلك لا
+                يظهر للعملاء. هذا إعداد تغطية وليس مشكلة في {isShop ? 'المتجر' : 'المطعم'}.
               </span>
             </div>
           ) : null}
@@ -190,13 +204,15 @@ export default function RestaurantDetailPage() {
             icon="restaurants"
             subtitle="القسم الذي يظهر فيه داخل التطبيق، ومن أين يُدار"
             actions={
-              <button
-                type="button"
-                className="btn btn--outline btn--sm"
-                onClick={() => setEditingKind(true)}
-              >
-                تغيير النوع
-              </button>
+              canChangeKind ? (
+                <button
+                  type="button"
+                  className="btn btn--outline btn--sm"
+                  onClick={() => setEditingKind(true)}
+                >
+                  تغيير النوع
+                </button>
+              ) : null
             }
           >
             {kindNote ? (
@@ -277,13 +293,15 @@ export default function RestaurantDetailPage() {
             icon="commissions"
             subtitle="قيمة ثابتة عن كل طلب، لا تتغيّر بحجم الطلب"
             actions={
-              <button
-                type="button"
-                className="btn btn--outline btn--sm"
-                onClick={() => setEditingCommission(true)}
-              >
-                تعديل العمولة
-              </button>
+              canCommission ? (
+                <button
+                  type="button"
+                  className="btn btn--outline btn--sm"
+                  onClick={() => setEditingCommission(true)}
+                >
+                  تعديل العمولة
+                </button>
+              ) : null
             }
           >
             <DataTable<CommissionConfigView>
@@ -408,7 +426,12 @@ export default function RestaurantDetailPage() {
             restaurantName={data.display_name}
             recoveryPhone={data.password_recovery_phone ?? null}
             isShop={isShop}
+            canManage={canCredentials}
           />
+
+          {/* Read-only menu, so an operator can answer a complaint or confirm
+              readiness without leaving the portal (ADMIN-15). */}
+          <MenuCard token={token} restaurantId={restaurantId} />
 
           <Card title="الموظفون" icon="staff">
             <DataTable
@@ -604,6 +627,92 @@ function CommissionDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Read-only menu card (ADMIN-15).
+ *
+ * Reuses the public catalog, which returns only active items and only for an
+ * approved shop — so for a pending or suspended one it 404s, and the card says
+ * so plainly rather than looking broken.
+ */
+function MenuCard({ token, restaurantId }: { token: string; restaurantId: string }) {
+  const menu = useQuery({
+    queryKey: ['admin-menu', restaurantId],
+    queryFn: () => admin.catalogMenu(token, restaurantId),
+    // The shop may not be public yet; a 404 is an expected answer, not a retry.
+    retry: false,
+  });
+
+  const itemCount = (menu.data?.categories ?? []).reduce(
+    (sum, category) => sum + category.items.length,
+    0,
+  );
+
+  return (
+    <Card title="القائمة" icon="orders" subtitle="الأصناف المعروضة للعملاء — للاطلاع فقط">
+      {menu.isLoading ? (
+        <Skeleton height={160} />
+      ) : menu.isError ? (
+        <EmptyState
+          message="القائمة غير متاحة"
+          hint="تظهر القائمة بعد اعتماد المتجر وتفعيله. تُدار الأصناف من تطبيق المتجر أو لوحته."
+        />
+      ) : (menu.data?.categories.length ?? 0) === 0 ? (
+        <EmptyState message="لا توجد أصناف في القائمة بعد" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+            {menu.data?.categories.length ?? 0} تصنيفاً · {itemCount} صنفاً
+          </p>
+          {(menu.data?.categories ?? []).map((category) => (
+            <div key={category.id}>
+              <h3 style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-base)' }}>
+                {category.name_ar}
+              </h3>
+              <DataTable<CatalogMenu['categories'][number]['items'][number]>
+                caption={`أصناف ${category.name_ar}`}
+                rows={category.items}
+                keyOf={(item) => item.id}
+                emptyMessage="لا أصناف"
+                columns={[
+                  {
+                    key: 'name',
+                    header: 'الصنف',
+                    render: (item) => (
+                      <span>
+                        {item.name_ar}
+                        {item.is_popular ? (
+                          <span style={{ marginInlineStart: 6 }}>
+                            <Badge tone="warning">شائع</Badge>
+                          </span>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'price',
+                    header: 'السعر',
+                    numeric: true,
+                    render: (item) => <Money amount={item.price_iqd} />,
+                  },
+                  {
+                    key: 'available',
+                    header: 'التوفر',
+                    render: (item) => (
+                      <Badge tone={item.is_available ? 'success' : 'neutral'}>
+                        {item.is_available ? 'متاح' : 'غير متاح'}
+                      </Badge>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

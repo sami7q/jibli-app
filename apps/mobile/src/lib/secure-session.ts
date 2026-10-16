@@ -227,6 +227,45 @@ export async function loadArea(): Promise<string | null> {
   }
 }
 
+// ── The chosen section ───────────────────────────────────────────────────────
+
+const VERTICAL_KEY = 'jibli.vertical';
+const VERTICALS = ['RESTAURANT', 'MARKET', 'COSMETICS'] as const;
+export type StoredVertical = (typeof VERTICALS)[number];
+
+/**
+ * Which half of Jibli the customer last chose.
+ *
+ * Kept so a reload, a cold start, or a deep link does not drop them back on the
+ * chooser with their cart and destination intact but their section forgotten
+ * (CUST-7). One enum value, not a secret; stored here beside the area for the
+ * same reason.
+ */
+export async function saveVertical(vertical: StoredVertical): Promise<void> {
+  try {
+    await putSecure(VERTICAL_KEY, vertical);
+  } catch {
+    /* The choice still holds for this launch. */
+  }
+}
+
+export async function loadVertical(): Promise<StoredVertical | null> {
+  try {
+    const stored = await readSecure(VERTICAL_KEY);
+    return VERTICALS.includes(stored as StoredVertical) ? (stored as StoredVertical) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearVertical(): Promise<void> {
+  try {
+    await dropSecure(VERTICAL_KEY);
+  } catch {
+    /* Nothing to do. */
+  }
+}
+
 /**
  * Update only the tokens after a refresh rotation, leaving the identity intact.
  */

@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icon';
 import { Dropdown } from './dropdown';
+import { apiRequest, ApiError } from '@/lib/api';
+import { useAdminSession, useApplyAccessToken } from '@/hooks/use-session';
 
 /**
  * Shared Admin Portal primitives.
@@ -84,13 +86,13 @@ export function ErrorState({
   code?: string;
   onRetry?: () => void;
 }) {
+  // The server's Arabic message is the banner; the raw code is kept only on the
+  // element's title for support, never appended as English text to the Arabic
+  // sentence (ADMIN-24).
   return (
-    <div className="alert-bar alert-bar--danger" role="alert">
+    <div className="alert-bar alert-bar--danger" role="alert" {...(code ? { title: code } : {})}>
       <Icon name="alert" className="nav__icon" aria-hidden />
-      <span style={{ flex: 1 }}>
-        {message}
-        {code ? <span style={{ opacity: 0.7, fontSize: 'var(--text-xs)' }}> ({code})</span> : null}
-      </span>
+      <span style={{ flex: 1 }}>{message}</span>
       {onRetry ? (
         <button type="button" className="btn btn--danger btn--sm" onClick={onRetry}>
           إعادة المحاولة
@@ -248,6 +250,70 @@ export function ConfirmDialog({
   );
 }
 
+/**
+ * Offset pager shared by every long list (ADMIN-17).
+ *
+ * The lists silently stopped at the first page and gave no sign there was more;
+ * older records were reachable only by an exact search. This reads `meta.total`
+ * the API already returns and offers «السابق / التالي», so nothing is stranded.
+ * It renders nothing when a single page holds everything.
+ */
+export function Pager({
+  offset,
+  pageSize,
+  total,
+  onOffsetChange,
+}: {
+  offset: number;
+  pageSize: number;
+  total: number;
+  onOffsetChange: (offset: number) => void;
+}) {
+  if (total <= pageSize && offset === 0) return null;
+
+  const from = total === 0 ? 0 : offset + 1;
+  const to = Math.min(offset + pageSize, total);
+  const canPrev = offset > 0;
+  const canNext = offset + pageSize < total;
+
+  return (
+    <nav
+      aria-label="تصفّح النتائج"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 'var(--space-3)',
+        marginTop: 'var(--space-4)',
+        flexWrap: 'wrap',
+      }}
+    >
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+        <span className="numeric">{from}</span>–<span className="numeric">{to}</span> من{' '}
+        <span className="numeric">{total}</span>
+      </span>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <button
+          type="button"
+          className="btn btn--outline btn--sm"
+          disabled={!canPrev}
+          onClick={() => onOffsetChange(Math.max(0, offset - pageSize))}
+        >
+          السابق
+        </button>
+        <button
+          type="button"
+          className="btn btn--outline btn--sm"
+          disabled={!canNext}
+          onClick={() => onOffsetChange(offset + pageSize)}
+        >
+          التالي
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 /** Search + filter bar shared by every list screen. */
 export function FilterBar({ children }: { children: ReactNode }) {
   return (
@@ -359,6 +425,10 @@ export function MfaChallenge({
   onVerified: () => void;
   onCancel: () => void;
 }) {
+  const session = useAdminSession();
+  const applyAccessToken = useApplyAccessToken();
+  const accessToken = session.status === 'authenticated' ? session.accessToken : null;
+
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [usesAuthenticator, setUsesAuthenticator] = useState<boolean | null>(null);
@@ -367,12 +437,17 @@ export function MfaChallenge({
 
   // Which factor to ask for. Until this answers, the dialog shows neither
   // field rather than guessing and making the operator retype.
+  //
+  // Both `/auth/mfa/status` and `/auth/mfa/verify` sit behind bearer auth, so
+  // the session's access token must be passed — without it they always 401 and
+  // the step-up could never complete (ADMIN-1).
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const { apiRequest } = await import('@/lib/api');
-        const status = await apiRequest<{ enabled: boolean }>('/api/v1/auth/mfa/status');
+        const status = await apiRequest<{ enabled: boolean }>('/api/v1/auth/mfa/status', {
+          accessToken,
+        });
         if (!cancelled) setUsesAuthenticator(status.enabled);
       } catch {
         // Ask for the code: it is the stricter of the two, so a failed check
@@ -383,7 +458,7 @@ export function MfaChallenge({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [accessToken]);
 
   const answer = usesAuthenticator ? code : password;
 
@@ -391,14 +466,21 @@ export function MfaChallenge({
     setSubmitting(true);
     setError(null);
     try {
-      const { apiRequest } = await import('@/lib/api');
-      await apiRequest('/api/v1/auth/mfa/verify', {
-        method: 'POST',
-        body: usesAuthenticator ? { code } : { password },
-      });
+      const result = await apiRequest<{ verified: boolean; access_token?: string }>(
+        '/api/v1/auth/mfa/verify',
+        {
+          method: 'POST',
+          accessToken,
+          body: usesAuthenticator ? { code } : { password },
+        },
+      );
+      // The verify response carries a fresh token stamped with `mfaAt`; swap it
+      // into the provider so the retried sensitive action is step-up-fresh.
+      if (result.access_token) applyAccessToken(result.access_token);
       onVerified();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'تعذّر التحقق');
+      // The server's Arabic message, never `CODE: message` (ADMIN-1 / §112).
+      setError(caught instanceof ApiError ? caught.messageAr : 'تعذّر التحقق');
       setCode('');
       setPassword('');
     } finally {

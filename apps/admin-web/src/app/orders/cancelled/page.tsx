@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { OrderListScreen } from '@/components/order-list-screen';
 
 /**
@@ -11,10 +12,12 @@ import { OrderListScreen } from '@/components/order-list-screen';
  */
 export default function CancelledOrdersPage() {
   return (
-    <OrderListScreen
-      scope="cancelled"
-      title="الطلبات الملغاة"
-      subtitle="راجع الأسباب لرصد مشاكل متكررة"
-    />
+    <Suspense fallback={null}>
+      <OrderListScreen
+        scope="cancelled"
+        title="الطلبات الملغاة"
+        subtitle="راجع الأسباب لرصد مشاكل متكررة"
+      />
+    </Suspense>
   );
 }

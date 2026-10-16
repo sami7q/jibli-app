@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AUDIT_ACTION_LABELS, dateTimeAr, relativeAr } from '@jibli/ui-web';
-import { AdminShell } from '@/components/shell';
+import { dateTimeAr, relativeAr } from '@jibli/ui-web';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { Card, DataTable, ErrorState, FilterBar, Select, Skeleton } from '@/components/ui';
 import { adminApi, ApiError, type AuditEntry } from '@/lib/api';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
+import { ADMIN_AUDIT_ACTION_LABELS, AUDIT_ENTITY_LABELS } from '@/lib/audit-labels';
 
 /**
  * Audit trail (plan §64).
@@ -36,14 +37,21 @@ const HIGH_RISK = new Set([
   'config.update',
 ]);
 
+// The full set of entity types the feed can show, including the ones the filter
+// used to omit — review, banner, category, application, support (ADMIN-23).
 const ENTITY_TYPES = [
   { value: 'governorate', label: 'محافظة' },
   { value: 'city', label: 'مدينة' },
-  { value: 'restaurant', label: 'مطعم' },
+  { value: 'restaurant', label: 'متجر' },
+  { value: 'restaurant_application', label: 'طلب انضمام' },
   { value: 'settlement', label: 'تسوية' },
   { value: 'order', label: 'طلب' },
   { value: 'driver', label: 'سائق' },
   { value: 'user', label: 'مستخدم' },
+  { value: 'review', label: 'تقييم' },
+  { value: 'banner', label: 'بنر' },
+  { value: 'category', label: 'تصنيف' },
+  { value: 'support_thread', label: 'محادثة دعم' },
   { value: 'platform_config', label: 'إعداد' },
 ] as const;
 
@@ -67,6 +75,9 @@ export default function AuditPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('audit.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة السجلات" />;
+  }
 
   return (
     <AdminShell
@@ -89,7 +100,7 @@ export default function AuditPage() {
             onChange={setAction}
             label="نوع الإجراء"
             allLabel="كل الإجراءات"
-            options={Object.entries(AUDIT_ACTION_LABELS).map(([value, label]) => ({
+            options={Object.entries(ADMIN_AUDIT_ACTION_LABELS).map(([value, label]) => ({
               value,
               label,
             }))}
@@ -117,7 +128,7 @@ export default function AuditPage() {
                 render: (row) => (
                   <span style={{ fontWeight: HIGH_RISK.has(row.action) ? 700 : 400 }}>
                     {HIGH_RISK.has(row.action) ? '🔒 ' : ''}
-                    {AUDIT_ACTION_LABELS[row.action] ?? row.action}
+                    {ADMIN_AUDIT_ACTION_LABELS[row.action] ?? row.action}
                   </span>
                 ),
               },
@@ -126,7 +137,7 @@ export default function AuditPage() {
                 header: 'العنصر',
                 render: (row) => (
                   <span>
-                    {row.entity_type}
+                    {AUDIT_ENTITY_LABELS[row.entity_type] ?? row.entity_type}
                     {row.entity_id ? (
                       <>
                         <br />

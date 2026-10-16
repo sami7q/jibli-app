@@ -1,6 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { AppError, ERROR_CODES, type PlatformRole, type RestaurantRole } from '@jibli/contracts';
-import { hashRefreshToken, signAccessToken } from '@jibli/auth';
+import { hashRefreshToken, MFA_FRESHNESS_SECONDS, signAccessToken } from '@jibli/auth';
 import {
   cities,
   drivers,
@@ -149,6 +149,11 @@ export async function issueSession(
     ip: string | null;
     deviceId?: string | null;
     mfaVerified?: boolean;
+    /**
+     * An existing step-up moment to carry forward (a refresh keeping freshness
+     * alive). Takes precedence over `mfaVerified`, which stamps "now".
+     */
+    mfaVerifiedAt?: Date | null;
   },
 ): Promise<IssuedSession> {
   const capabilities = await loadCapabilities(ctx, params.userId);
@@ -157,6 +162,7 @@ export async function issueSession(
   const refreshToken = generateToken(32);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + ctx.env.REFRESH_TOKEN_TTL_SECONDS * 1000);
+  const mfaStamp = params.mfaVerifiedAt ?? (params.mfaVerified ? now : null);
 
   await ctx.db.insert(sessions).values({
     id: sessionId,
@@ -166,7 +172,7 @@ export async function issueSession(
     userAgent: params.userAgent,
     ip: params.ip,
     deviceId: params.deviceId ?? null,
-    mfaVerifiedAt: params.mfaVerified ? now : null,
+    mfaVerifiedAt: mfaStamp,
     expiresAt,
     lastUsedAt: now,
   });
@@ -180,7 +186,7 @@ export async function issueSession(
       driverId: capabilities.driverId,
       modes: capabilities.modes,
       profileCompleted: capabilities.profileCompleted,
-      mfaAt: params.mfaVerified ? now.getTime() : null,
+      mfaAt: mfaStamp ? mfaStamp.getTime() : null,
     },
     {
       accessSecret: ctx.env.JWT_ACCESS_SECRET,
@@ -273,13 +279,25 @@ export async function refreshSession(
     throw new AppError(ERROR_CODES.SESSION_EXPIRED);
   }
 
+  /*
+   * Carry a still-fresh step-up forward across the rotation (ADMIN-1). The
+   * admin portal re-derives its token through refresh, so dropping the stamp
+   * here made every step-up action unreachable seconds after the challenge.
+   * Only an MFA moment still inside the freshness window survives; an older one
+   * is let go, which is the same as re-challenging.
+   */
+  const mfaVerifiedAt =
+    session.mfaVerifiedAt &&
+    Date.now() - session.mfaVerifiedAt.getTime() <= MFA_FRESHNESS_SECONDS * 1000
+      ? session.mfaVerifiedAt
+      : null;
+
   const issued = await issueSession(ctx, {
     userId: session.userId,
     userAgent: params.userAgent,
     ip: params.ip,
     deviceId: session.deviceId,
-    // MFA freshness does not survive rotation; a sensitive action re-challenges.
-    mfaVerified: false,
+    mfaVerifiedAt,
   });
 
   /*

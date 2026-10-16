@@ -122,9 +122,13 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
             busy_mode: openState.effectiveBusyMode,
             busy_mode_expires_at: row.branch.busyModeExpiresAt?.toISOString() ?? null,
             is_open: openState.isOpen,
-            accepts_orders_now: openState.acceptsOrders,
+            // The branch toggle is a hard gate the hours computation does not
+            // know about: unticking «استقبال الطلبات» hides the shop from
+            // customers, so the status line must say so rather than «يستقبل
+            // الطلبات الآن» (MERCH-8).
+            accepts_orders_now: row.branch.acceptsOrders && openState.acceptsOrders,
             estimated_preparation_minutes: openState.estimatedPreparationMinutes,
-            closed_reason: openState.reason,
+            closed_reason: row.branch.acceptsOrders ? openState.reason : 'NOT_ACCEPTING_ORDERS',
             city_ordering_enabled: row.cityOrderingEnabled,
             working_hours: hours.map((hour) => ({
               id: hour.id,

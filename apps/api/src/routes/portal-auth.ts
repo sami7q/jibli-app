@@ -48,8 +48,17 @@ import { verifyTotpForUser } from './mfa.js';
 const loginSchema = z.object({
   username: loginIdentifierSchema,
   password: z.string().min(1).max(256),
-  /** Present on the second leg, once MFA has been challenged. */
-  mfa_code: z.string().min(6).max(10).optional(),
+  /**
+   * Present on the second leg, once MFA has been challenged. Up to 16 and with
+   * «-»/spaces stripped, so a recovery code read back as `46D4E-458DE` works —
+   * 10 truncated it and «رمز غير صحيح» was the only feedback (ADMIN-8).
+   */
+  mfa_code: z
+    .string()
+    .min(6)
+    .max(16)
+    .transform((value) => value.replace(/[\s-]/g, ''))
+    .optional(),
   /**
    * «تذكرني». Defaults to true, which is what the portal did before it was
    * ever asked — so an older client that does not send the field is unchanged.

@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BUSY_MODES, BUSY_MODE_EXTRA_MINUTES, type BusyMode } from '@jibli/contracts';
+import { iraqiPhoneSchema } from '@jibli/validation';
 import { LogoUpload, money, NumberField } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError } from '@/lib/api';
+import { closedReasonAr } from '@/lib/operational-labels';
 import { portal, type PortalSettings, type WorkingHour } from '@/lib/portal-endpoints';
 
 /**
@@ -101,6 +103,7 @@ function SettingsScreen({
       {canSetBusy ? <BusyModeCard auth={auth} data={data} onChanged={invalidate} /> : null}
       <ProfileCard auth={auth} data={data} canWrite={canWrite} onChanged={invalidate} />
       <HoursCard auth={auth} data={data} canWrite={canWrite} onChanged={invalidate} />
+      <ExceptionsCard auth={auth} data={data} canWrite={canWrite} onChanged={invalidate} />
       <LocationCard data={data} />
     </>
   );
@@ -119,7 +122,7 @@ function StatusCard({ data }: { data: PortalSettings }) {
         <span style={{ flex: 1 }}>
           {open
             ? `المطعم يستقبل الطلبات الآن — وقت التحضير المعلن ${data.estimated_preparation_minutes} دقيقة.`
-            : `المطعم لا يستقبل الطلبات حالياً: ${data.closed_reason}`}
+            : `المطعم لا يستقبل الطلبات حالياً: ${closedReasonAr(data.closed_reason)}`}
         </span>
       </p>
 
@@ -274,6 +277,14 @@ function ProfileCard({
   const [districtText, setDistrictText] = useState(data.branch.district_text ?? '');
   const [acceptsOrders, setAcceptsOrders] = useState(data.branch.accepts_orders);
 
+  // The shop phone is what the courier and Jibli support dial, so «abc» can't
+  // be saved (MERCH-17). Empty is allowed (optional); anything typed must be a
+  // real Iraqi number, and is normalised to E.164 before it is sent.
+  const trimmedPhone = phone.trim();
+  const phoneParsed = trimmedPhone === '' ? null : iraqiPhoneSchema.safeParse(trimmedPhone);
+  const phoneInvalid = phoneParsed !== null && !phoneParsed.success;
+  const normalizedPhone = phoneParsed && phoneParsed.success ? phoneParsed.data : '';
+
   const save = useMutation({
     mutationFn: () =>
       portal.updateSettings(auth, {
@@ -285,7 +296,7 @@ function ProfileCard({
         base_preparation_minutes: prepMinutes,
         // Zero means "no radius limit"; the server expects null for that.
         service_radius_meters: radius > 0 ? radius : null,
-        phone: phone.trim(),
+        phone: normalizedPhone,
         address_text: addressText.trim(),
         district_text: districtText.trim(),
         accepts_orders: acceptsOrders,
@@ -373,7 +384,15 @@ function ProfileCard({
             value={phone}
             disabled={!canWrite}
             onChange={(event) => setPhone(event.target.value)}
+            aria-invalid={phoneInvalid}
           />
+          {phoneInvalid ? (
+            <span className="field__error">رقم هاتف عراقي غير صالح</span>
+          ) : (
+            <span className="field__hint">
+              رقم عراقي يتّصل به المندوب والدعم. اتركه فارغاً إن لم يوجد.
+            </span>
+          )}
         </div>
 
         <div className="field">
@@ -447,7 +466,9 @@ function ProfileCard({
           <button
             type="button"
             className="btn btn--primary"
-            disabled={prepInvalid || radiusInvalid || addressInvalid || save.isPending}
+            disabled={
+              prepInvalid || radiusInvalid || addressInvalid || phoneInvalid || save.isPending
+            }
             onClick={() => save.mutate()}
           >
             {save.isPending ? 'جاري الحفظ…' : 'حفظ التعديلات'}
@@ -517,13 +538,17 @@ function HoursCard({
               <th scope="col">اليوم</th>
               <th scope="col">يفتح</th>
               <th scope="col">يغلق</th>
+              <th scope="col">24 ساعة</th>
               <th scope="col">مغلق</th>
               <th scope="col">ملاحظة</th>
             </tr>
           </thead>
           <tbody>
             {days.map((day) => {
-              const overnight = !day.isClosed && day.closesAtMinute <= day.opensAtMinute;
+              // A 24-hour day is stored 0→1440; the time inputs showed it as
+              // «12:00 AM – 12:00 AM», which reads as a zero-length day (MERCH-29).
+              const is24h = !day.isClosed && day.opensAtMinute === 0 && day.closesAtMinute === 1440;
+              const overnight = !day.isClosed && !is24h && day.closesAtMinute <= day.opensAtMinute;
               return (
                 <tr key={day.dayOfWeek}>
                   <td>
@@ -534,7 +559,7 @@ function HoursCard({
                       type="time"
                       aria-label={`وقت الفتح يوم ${DAY_NAMES[day.dayOfWeek]}`}
                       value={toTimeValue(day.opensAtMinute)}
-                      disabled={!canWrite || day.isClosed}
+                      disabled={!canWrite || day.isClosed || is24h}
                       onChange={(event) =>
                         update(day.dayOfWeek, { opensAtMinute: toMinutes(event.target.value) })
                       }
@@ -545,9 +570,25 @@ function HoursCard({
                       type="time"
                       aria-label={`وقت الإغلاق يوم ${DAY_NAMES[day.dayOfWeek]}`}
                       value={toTimeValue(day.closesAtMinute)}
-                      disabled={!canWrite || day.isClosed}
+                      disabled={!canWrite || day.isClosed || is24h}
                       onChange={(event) =>
                         update(day.dayOfWeek, { closesAtMinute: toMinutes(event.target.value) })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`يعمل 24 ساعة يوم ${DAY_NAMES[day.dayOfWeek]}`}
+                      checked={is24h}
+                      disabled={!canWrite || day.isClosed}
+                      onChange={(event) =>
+                        update(
+                          day.dayOfWeek,
+                          event.target.checked
+                            ? { opensAtMinute: 0, closesAtMinute: 1440 }
+                            : { opensAtMinute: 10 * 60, closesAtMinute: 23 * 60 },
+                        )
                       }
                     />
                   </td>
@@ -565,11 +606,13 @@ function HoursCard({
                   <td style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                     {day.isClosed
                       ? 'اليوم مغلق'
-                      : day.opensAtMinute === day.closesAtMinute
-                        ? 'وقتا الفتح والإغلاق متطابقان — حدّد فترة فعلية'
-                        : overnight
-                          ? 'تمتد بعد منتصف الليل إلى اليوم التالي'
-                          : ''}
+                      : is24h
+                        ? 'يعمل 24 ساعة'
+                        : day.opensAtMinute === day.closesAtMinute
+                          ? 'وقتا الفتح والإغلاق متطابقان — حدّد فترة فعلية'
+                          : overnight
+                            ? 'تمتد بعد منتصف الليل إلى اليوم التالي'
+                            : ''}
                   </td>
                 </tr>
               );
@@ -631,6 +674,218 @@ function HoursCard({
   );
 }
 
+/**
+ * Holidays and one-off exceptions (MERCH-18).
+ *
+ * Weekday hours repeat every week, so an Eid closure or a one-day late opening
+ * had nowhere to go — the app sent owners here and the card did not exist. The
+ * API's `hour-exceptions` endpoints do; this is their screen.
+ *
+ * The location pin stays a support-approved change (see «الموقع والعمولة»
+ * below): moving a shop between markets by editing a field is exactly what that
+ * workflow prevents, so a pin editor here is deliberately deferred.
+ */
+function ExceptionsCard({
+  auth,
+  data,
+  canWrite,
+  onChanged,
+}: {
+  auth: PortalAuth;
+  data: PortalSettings;
+  canWrite: boolean;
+  onChanged: () => void;
+}) {
+  const [date, setDate] = useState('');
+  const [isClosed, setIsClosed] = useState(true);
+  const [opensAt, setOpensAt] = useState('10:00');
+  const [closesAt, setClosesAt] = useState('23:00');
+  const [note, setNote] = useState('');
+
+  const add = useMutation({
+    mutationFn: () =>
+      portal.addHourException(auth, {
+        local_date: date,
+        is_closed: isClosed,
+        ...(isClosed
+          ? {}
+          : { opens_at_minute: toMinutes(opensAt), closes_at_minute: toMinutes(closesAt) }),
+        ...(note.trim() ? { note_ar: note.trim() } : {}),
+      }),
+    onSuccess: () => {
+      setDate('');
+      setNote('');
+      onChanged();
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => portal.deleteHourException(auth, id),
+    onSuccess: onChanged,
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const openInvalid = !isClosed && toMinutes(opensAt) === toMinutes(closesAt);
+  const exceptions = [...data.hour_exceptions].sort((a, b) =>
+    a.local_date.localeCompare(b.local_date),
+  );
+
+  return (
+    <Card
+      title="العطل والأيام الاستثنائية"
+      subtitle="إغلاق أو توقيت خاص ليوم واحد لا يتكرّر أسبوعياً"
+    >
+      {exceptions.length === 0 ? (
+        <p className="empty" style={{ paddingBlock: 'var(--space-6)' }}>
+          لا توجد أيام استثنائية مسجّلة
+        </p>
+      ) : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">التاريخ</th>
+                <th scope="col">الحالة</th>
+                <th scope="col">ملاحظة</th>
+                {canWrite ? <th scope="col" /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {exceptions.map((exception) => (
+                <tr key={exception.id}>
+                  <td>
+                    <span className="ltr-inline">{exception.local_date}</span>
+                  </td>
+                  <td>
+                    {exception.is_closed ? (
+                      <span className="badge badge--neutral">مغلق</span>
+                    ) : (
+                      <span className="ltr-inline">
+                        {exception.opens_at} — {exception.closes_at}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                    {exception.note_ar ?? '—'}
+                  </td>
+                  {canWrite ? (
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn--danger btn--sm"
+                        disabled={remove.isPending}
+                        onClick={() => remove.mutate(exception.id)}
+                      >
+                        حذف
+                      </button>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {remove.error ? (
+        <ErrorState
+          message={remove.error instanceof ApiError ? remove.error.messageAr : 'تعذّر الحذف'}
+        />
+      ) : null}
+
+      {canWrite ? (
+        <div className="split" style={{ marginBlockStart: 'var(--space-4)', alignItems: 'end' }}>
+          <div className="field">
+            <label htmlFor="exc-date">التاريخ</label>
+            <input
+              id="exc-date"
+              type="date"
+              min={today}
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </div>
+
+          <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={isClosed}
+              onChange={(event) => setIsClosed(event.target.checked)}
+            />
+            مغلق طوال اليوم
+          </label>
+
+          {!isClosed ? (
+            <>
+              <div className="field">
+                <label htmlFor="exc-open">يفتح</label>
+                <input
+                  id="exc-open"
+                  type="time"
+                  value={opensAt}
+                  onChange={(event) => setOpensAt(event.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="exc-close">يغلق</label>
+                <input
+                  id="exc-close"
+                  type="time"
+                  value={closesAt}
+                  onChange={(event) => setClosesAt(event.target.value)}
+                  aria-invalid={openInvalid}
+                />
+                {openInvalid ? <span className="field__error">حدّد فترة فعلية</span> : null}
+              </div>
+            </>
+          ) : null}
+
+          <div className="field">
+            <label htmlFor="exc-note">ملاحظة (اختياري)</label>
+            <input
+              id="exc-note"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="عيد الفطر"
+            />
+          </div>
+
+          <div>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={date === '' || openInvalid || add.isPending}
+              onClick={() => add.mutate()}
+            >
+              {add.isPending ? 'جاري الإضافة…' : 'إضافة يوم استثنائي'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {add.error ? (
+        <p
+          className="alert-bar alert-bar--danger"
+          role="alert"
+          style={{ marginBlockStart: 'var(--space-3)' }}
+        >
+          {add.error instanceof ApiError ? add.error.messageAr : 'تعذّرت الإضافة'}
+        </p>
+      ) : null}
+
+      {add.isSuccess && !add.isPending ? (
+        <p
+          className="alert-bar alert-bar--success"
+          role="status"
+          style={{ marginBlockStart: 'var(--space-3)' }}
+        >
+          <span style={{ flex: 1 }}>حُفظ اليوم الاستثنائي.</span>
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
 function LocationCard({ data }: { data: PortalSettings }) {
   return (
     <Card title="الموقع والعمولة" subtitle="بنود تديرها إدارة جيبلي وليست قابلة للتعديل هنا">
@@ -658,6 +913,14 @@ function LocationCard({ data }: { data: PortalSettings }) {
         الانتقال إلى مدينة أخرى يتطلّب طلب موافقة من الإدارة — لا يتغيّر الموقع بمجرّد تعديل حقل.
         يبقى الفرع الحالي يعمل حتى تُعتمد الموافقة، وتحتفظ الطلبات السابقة بموقعها الأصلي. تواصل مع
         الدعم لبدء الطلب.
+      </p>
+
+      {/*
+        The map pin (dropping/correcting the delivery point) is not editable
+        here yet — it is corrected through the same support request (MERCH-18).
+      */}
+      <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', marginBlockEnd: 0 }}>
+        لتصحيح دبوس الموقع على الخريطة تواصل مع الدعم؛ تعديله من اللوحة قيد التطوير.
       </p>
     </Card>
   );

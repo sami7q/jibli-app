@@ -80,7 +80,11 @@ export function centerMapScript(latitude: number, longitude: number): string {
   return `window.jibliCenter && window.jibliCenter(${lat}, ${lon}); true;`;
 }
 
-export function MAP_PICKER_HTML(latitude: number | null, longitude: number | null): string {
+export function MAP_PICKER_HTML(
+  latitude: number | null,
+  longitude: number | null,
+  placeNoun: 'home' | 'shop' = 'home',
+): string {
   /*
    * Whether there is a point to open on, and therefore whether the map may
    * report its opening position as a chosen one.
@@ -98,6 +102,14 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
   const hasPin = typeof latitude === 'number' && typeof longitude === 'number';
   const lat = hasPin ? latitude : FALLBACK.latitude;
   const lon = hasPin ? longitude : FALLBACK.longitude;
+
+  /*
+   * The hint names the door, which is the shop's for an owner (MERCH-18) and
+   * the home's for a customer.
+   */
+  const hint = hasPin
+    ? `اسحب الخريطة لضبط الدبوس على ${placeNoun === 'shop' ? 'باب متجرك' : 'باب منزلك'}`
+    : `حرّك الخريطة حتى يصبح الدبوس على ${placeNoun === 'shop' ? 'باب متجرك' : 'منزلك'}`;
 
   /*
    * Serialised rather than quoted by hand: an apostrophe in an attribution
@@ -151,6 +163,16 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
     background: rgba(0,0,0,.35); pointer-events: none;
     transition: transform .16s ease-out, opacity .16s ease-out;
   }
+  /*
+    No pin until there is a point. Showing one centred over Baghdad before the
+    customer has chosen anything reads as «your home is here», and an address
+    saved without dragging it then had a landmark but no coordinate — the pin
+    was a promise the save did not keep (CUST-16). Hidden until the map has
+    actually moved (a drag, or a GPS fix landing), which is also when a point
+    is reported.
+  */
+  #pin, #shadow { display: none; }
+  body.pinned #pin, body.pinned #shadow { display: block; }
   body.moving #pin { transform: translateY(-12px); }
   body.moving #shadow { transform: scale(1.6); opacity: .5; }
   #hint {
@@ -163,7 +185,7 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
   body.touched #hint { opacity: 0; }
 </style>
 </head>
-<body>
+<body class="${hasPin ? 'pinned' : ''}">
 <div id="map"></div>
 <div id="shadow"></div>
 <div id="pin">
@@ -172,7 +194,7 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
     <circle cx="12" cy="10" r="3.2" fill="#fff"/>
   </svg>
 </div>
-<div id="hint">${hasPin ? 'اسحب الخريطة لضبط الدبوس على باب منزلك' : 'حرّك الخريطة حتى يصبح الدبوس على منزلك'}</div>
+<div id="hint">${hint}</div>
 
 <script src="${MAPLIBRE.script}" integrity="${MAPLIBRE.scriptIntegrity}" crossorigin="anonymous"></script>
 <script>
@@ -260,6 +282,8 @@ export function MAP_PICKER_HTML(latitude: number | null, longitude: number | nul
      */
     map.on('moveend', function () {
       document.body.classList.remove('moving');
+      // The map has moved, so there is now a point to show and to report.
+      document.body.classList.add('pinned');
       var c = map.getCenter();
       send({ type: 'pick', latitude: c.lat, longitude: c.lng });
     });

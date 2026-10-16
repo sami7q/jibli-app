@@ -1,5 +1,11 @@
 import type { MerchantType } from '@jibli/contracts';
-import { apiRequest } from './api';
+import { apiRequest, apiRequestWithMeta } from './api';
+
+/** A page of rows plus the envelope meta the pager needs (`total`, …). */
+export interface Paged<T> {
+  data: T[];
+  meta: Record<string, unknown>;
+}
 
 /**
  * Admin endpoint bindings beyond geography and applications.
@@ -309,6 +315,27 @@ export interface AdminRestaurantDetail {
   }[];
 }
 
+/** The public catalog for a shop — the read-only menu card (ADMIN-15). */
+export interface CatalogMenu {
+  id: string;
+  display_name: string;
+  is_open: boolean;
+  orderable: boolean;
+  categories: {
+    id: string;
+    name_ar: string;
+    description_ar: string | null;
+    items: {
+      id: string;
+      name_ar: string;
+      description_ar: string | null;
+      price_iqd: number;
+      is_available: boolean;
+      is_popular: boolean;
+    }[];
+  }[];
+}
+
 export interface AdminOrder {
   id: string;
   public_order_number: string;
@@ -410,8 +437,15 @@ export interface AdminDriver {
   status: string;
   availability: string;
   vehicle_type: string;
-  restaurant_id: string | null;
-  restaurant_name: string | null;
+  /**
+   * Every shop this courier works for, in one row (ADMIN-4).
+   *
+   * Drivers used to appear once per membership, each copy repeating the same
+   * custody total, which both tripled a shared courier on the roster and
+   * overstated the platform's cash-in-the-field. The server now aggregates
+   * memberships into this array and the row is unique per driver.
+   */
+  restaurants: { id: string; name: string | null }[];
   active_assignments: number;
   completed_deliveries: number;
   cash_custody_iqd: number;
@@ -785,9 +819,25 @@ export const admin = {
       blocking_failures: string[];
     }>(`/api/v1/admin/restaurants/${id}/readiness`, { accessToken: token }),
 
+  /**
+   * Read-only menu, reusing the public catalog endpoint (ADMIN-15).
+   *
+   * The portal had no menu view anywhere. This is the customer-facing catalog,
+   * so it returns only active items and only for an APPROVED shop — enough to
+   * answer a complaint or confirm readiness, which is all the card promises.
+   */
+  catalogMenu: (token: string, id: string) =>
+    apiRequest<CatalogMenu>(`/api/v1/restaurants/${id}`, { accessToken: token }),
+
   // ── Orders ──────────────────────────────────────────────────────────────
   orders: (token: string, filters: Record<string, string | number | undefined> = {}) =>
     apiRequest<AdminOrder[]>(`/api/v1/admin/orders${qs(filters)}`, { accessToken: token }),
+
+  /** Orders with the envelope meta (`total`) kept, for the pager (ADMIN-17). */
+  ordersPaged: (token: string, filters: Record<string, string | number | undefined> = {}) =>
+    apiRequestWithMeta<AdminOrder[]>(`/api/v1/admin/orders${qs(filters)}`, {
+      accessToken: token,
+    }) as Promise<Paged<AdminOrder>>,
 
   order: (token: string, id: string) =>
     apiRequest<AdminOrderDetail>(`/api/v1/admin/orders/${id}`, { accessToken: token }),
@@ -805,6 +855,12 @@ export const admin = {
   // ── People ──────────────────────────────────────────────────────────────
   customers: (token: string, filters: Record<string, string | undefined> = {}) =>
     apiRequest<AdminCustomer[]>(`/api/v1/admin/users${qs(filters)}`, { accessToken: token }),
+
+  /** Customers with the envelope meta (`total`) kept, for the pager (ADMIN-17). */
+  customersPaged: (token: string, filters: Record<string, string | number | undefined> = {}) =>
+    apiRequestWithMeta<AdminCustomer[]>(`/api/v1/admin/users${qs(filters)}`, {
+      accessToken: token,
+    }) as Promise<Paged<AdminCustomer>>,
 
   commissionOverview: (token: string, filters: Record<string, string | undefined> = {}) =>
     apiRequest<CommissionOverview>(`/api/v1/admin/finance/commission-overview${qs(filters)}`, {
@@ -1021,6 +1077,18 @@ export const admin = {
     apiRequest<AdminDriver[]>(`/api/v1/admin/drivers${qs(filters)}`, { accessToken: token }),
 
   /**
+   * Drivers with the envelope meta kept (ADMIN-4, ADMIN-17).
+   *
+   * `meta.total_custody_iqd` is the sum over unique drivers the server now
+   * computes, so the banner no longer re-sums duplicated rows; `meta.total`
+   * drives the pager.
+   */
+  driversPaged: (token: string, filters: Record<string, string | number | undefined> = {}) =>
+    apiRequestWithMeta<AdminDriver[]>(`/api/v1/admin/drivers${qs(filters)}`, {
+      accessToken: token,
+    }) as Promise<Paged<AdminDriver>>,
+
+  /**
    * Put a courier on the platform's roster.
    *
    * The account is created PENDING_ACTIVATION and stays that way until the
@@ -1127,6 +1195,22 @@ export const admin = {
 
   staff: (token: string) =>
     apiRequest<StaffMember[]>('/api/v1/admin/staff', { accessToken: token }),
+
+  /**
+   * Create a platform staff login (ADMIN-7).
+   *
+   * Returns a one-time password shown exactly once; the holder must change it
+   * on first sign-in. Requires a fresh MFA step-up (the server gates it on
+   * `roles.manage`), so a 401 REAUTHENTICATION_REQUIRED here opens the dialog.
+   */
+  createStaff: (token: string, body: { username: string; full_name: string; role: string }) =>
+    apiRequest<{
+      user_id: string;
+      username: string;
+      password: string;
+      must_change_password: boolean;
+      note_ar: string;
+    }>('/api/v1/admin/staff', { method: 'POST', accessToken: token, body }),
 
   roleMatrix: (token: string) =>
     apiRequest<RoleMatrix>('/api/v1/admin/roles', { accessToken: token }),

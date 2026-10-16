@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError, type Address, type GeographyOption } from '@/lib/api';
 import { useArea, type DeliveryArea } from '@/lib/area';
+import { useMe } from '@/lib/session';
 import {
   captureCurrentLocation,
   describePlace,
@@ -13,7 +14,16 @@ import {
 } from '@/lib/location';
 import { lookupArea, metresBetween } from '@/lib/place-match';
 import { loadPreferredAddressId, savePreferredAddressId } from '@/lib/preferred-address';
-import { color, radius, space, TAP_TARGET, INPUT_TEXT_START, text } from '@/theme';
+import {
+  ALIGN_START,
+  color,
+  radius,
+  ROW,
+  space,
+  TAP_TARGET,
+  INPUT_TEXT_START,
+  text,
+} from '@/theme';
 import { Button, ErrorState, Row, Text } from '@/ui';
 import { MapPicker } from '@/ui/map-picker';
 import { AreaChoice, areaStepTitle } from '@/ui/area-choice';
@@ -179,7 +189,7 @@ export function AddressSheet({
   }, [area]);
 
   const addresses = useQuery({
-    queryKey: ['addresses'],
+    queryKey: ['addresses', useMe()?.user_id ?? null],
     queryFn: () => api.addresses(),
     enabled: visible,
     staleTime: 5 * 60_000,
@@ -404,6 +414,7 @@ export function AddressSheet({
     mutationFn: (entry: Address) => api.deleteAddress(entry.id),
     onSuccess: async () => {
       setConfirmingDelete(null);
+      setProblem(null);
       await queryClient.invalidateQueries({ queryKey: ['addresses'] });
     },
     onError: (error) =>
@@ -452,6 +463,9 @@ export function AddressSheet({
       return created;
     },
     onSuccess: async (created) => {
+      // The save worked; a banner from an earlier failed attempt must not ride
+      // back to the list with it (CUST-16).
+      setProblem(null);
       await queryClient.invalidateQueries({ queryKey: ['addresses'] });
       await preferred.refetch();
       onSaved?.(created.id);
@@ -861,16 +875,40 @@ function AddressList({
                     <Text variant="smallBold" tone={chosen ? 'brand' : 'primary'}>
                       {entry.governorate.name_ar} — {entry.city.name_ar}
                     </Text>
+                    {/*
+                     * The description the customer wrote is shown even without a
+                     * pin — two addresses both reading «بغداد — بغداد» told them
+                     * apart by nothing (CUST-16). The missing pin is a small chip
+                     * beside it, not a replacement for what they typed.
+                     */}
                     <Text variant="caption" tone="muted" numberOfLines={2}>
-                      {/*
-                       * A missing pin is called out rather than left blank: it
-                       * is the difference between a courier arriving and a
-                       * courier phoning, and it is fixable in two taps.
-                       */}
-                      {pinned
-                        ? (entry.landmark ?? entry.district_text ?? 'مثبّت على الخريطة')
-                        : 'بلا دبوس — افتحه وثبّته على الخريطة'}
+                      {entry.landmark ??
+                        entry.district_text ??
+                        (pinned ? 'مثبّت على الخريطة' : 'أضف وصفاً أو ثبّت الدبوس')}
                     </Text>
+                    {!pinned ? (
+                      <View
+                        style={{
+                          alignSelf: ALIGN_START,
+                          flexDirection: ROW,
+                          alignItems: 'center',
+                          gap: space[1],
+                          borderRadius: radius.full,
+                          backgroundColor: color.warningSoft,
+                          paddingHorizontal: space[2],
+                          paddingVertical: 2,
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name="map-marker-alert-outline"
+                          size={12}
+                          color={color.warningStrong}
+                        />
+                        <Text variant="caption" style={{ color: color.warningStrong }}>
+                          بلا دبوس
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                   {chosen ? (
                     <MaterialCommunityIcons name="check-circle" size={20} color={color.brand} />

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { relativeAr } from '@jibli/ui-web';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import {
   Badge,
   Card,
@@ -53,6 +53,9 @@ export default function SupportPage() {
 
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
+  }
+  if (!session.can('restaurant.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة الدعم" />;
   }
 
   return (

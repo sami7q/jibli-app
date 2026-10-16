@@ -321,6 +321,9 @@ export interface DashboardOverview {
   /** Null when the role may not see money at all (plan §86). */
   finance: {
     open_commission_iqd: number;
+    /** Commission + platform service fee — what the shop owes Jibli (MERCH-21). */
+    amount_owed_iqd?: number;
+    open_service_fee_iqd?: number;
     open_order_count: number;
     estimated_net_iqd: number | null;
     commission_flat_iqd: number | null;
@@ -747,4 +750,10 @@ export const portal = {
       method: 'POST',
       body,
     }),
+
+  deleteHourException: (auth: Auth, exceptionId: string) =>
+    apiRequest<{ deleted: boolean }>(
+      `/api/v1/restaurant-portal/settings/hour-exceptions/${exceptionId}`,
+      { ...scoped(auth), method: 'DELETE' },
+    ),
 };

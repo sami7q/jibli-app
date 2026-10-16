@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type { DriverAvailability, VehicleType } from '@jibli/contracts';
+import { ORDER_REJECTION_REASONS, ORDER_REJECTION_REASON_LABELS_AR } from '@jibli/contracts';
 import {
   ACTIONS_AR,
   DRIVER_AVAILABILITY_LABELS,
@@ -10,23 +11,21 @@ import {
   ORDER_LANES,
   VEHICLE_TYPE_LABELS,
   money,
-  ordersCountAr,
   relativeAr,
+  ordersCountAr,
 } from '@jibli/ui-web';
 import { ApiError, restaurantApi, type EligibleDriver, type LiveOrder } from '@/lib/api';
-import { OrderAlertManager, type AlertState } from '@/lib/order-alerts';
-import { useRealtime } from '@/hooks/use-realtime';
+import type { AlertState } from '@/lib/order-alerts';
+import { useLiveOrders } from '@/hooks/use-live-orders';
 import { Icon } from './icon';
 
 /**
  * Live order board (plan §29, §30, §110).
  *
- * Behaviour the plan requires:
- *   - lanes by status, with an SLA timer per card
- *   - an audible alert that survives browser autoplay rules
- *   - polling as the fallback when realtime is unavailable
- *   - a visible offline/reconnecting banner
- *   - acceptance is never shown as done until the server confirms it
+ * The query, the realtime socket and the alert manager no longer live here —
+ * they were hoisted into `LiveOrdersProvider` so the chime and the bell run on
+ * every portal page, not only the dashboard (MERCH-4). This component now reads
+ * that shared state and renders the lanes.
  */
 
 /** An order older than this without acceptance is visibly late (plan §29). */
@@ -34,15 +33,30 @@ const SLA_WARNING_MINUTES = 5;
 const SLA_LATE_MINUTES = 10;
 
 /**
- * Poll interval.
+ * How long the shop needs, chosen as it accepts (MERCH-6).
  *
- * Realtime is the primary channel. This is the fallback that guarantees an
- * order can never sit unseen because a frame was dropped or the gateway was
- * down (plan §31, §110) — so it stays slow while the socket is healthy and
- * tightens when it is not.
+ * The customer is shown it and the courier is timed against it, so it is asked
+ * for on the tap that commits to it rather than left at a default nobody set.
+ * Mirrors the app's owner mode.
  */
-const POLL_INTERVAL_CONNECTED_MS = 60_000;
-const POLL_INTERVAL_DEGRADED_MS = 8_000;
+const PREP_OPTIONS = [10, 15, 20, 30, 45] as const;
+
+/** Why a shop takes an order back from its courier (MERCH-6). */
+const RECALL_REASONS = ['المندوب لا يرد', 'تأخّر المندوب كثيراً', 'سبب آخر'] as const;
+
+/**
+ * The courier's side of an order, in the shop's words (MERCH-13).
+ *
+ * The card printed the raw code — «المندوب: … — ASSIGNED». Mirrors the app's
+ * `ASSIGNMENT_LABELS`.
+ */
+const ASSIGNMENT_LABELS: Record<string, string> = {
+  ASSIGNED: 'بانتظار قبول المندوب',
+  ACCEPTED: 'المندوب في الطريق إليك',
+  PICKED_UP: 'استلم الطلب وفي الطريق للعميل',
+  ARRIVED_CUSTOMER: 'وصل إلى العميل',
+  DELIVERED: 'سُلّم الطلب',
+};
 
 interface Auth {
   readonly accessToken: string;
@@ -50,79 +64,10 @@ interface Auth {
 }
 
 export function LiveBoard({ auth }: { auth: Auth }) {
-  const queryClient = useQueryClient();
-  const [alertState, setAlertState] = useState<AlertState>({
-    enabled: false,
-    notificationPermission: 'unknown',
-    pendingOrderIds: [],
-  });
+  const live = useLiveOrders();
+  const { orders, alertState, isOffline, isDegraded } = live;
 
-  const alertManager = useRef<OrderAlertManager | null>(null);
-  if (!alertManager.current) {
-    alertManager.current = new OrderAlertManager({ onStateChange: setAlertState });
-  }
-
-  // Every realtime event invalidates the query rather than patching state
-  // directly, so an out-of-order or duplicated frame cannot corrupt the board.
-  const realtimeStatus = useRealtime({
-    accessToken: auth.accessToken,
-    onEvent: () => {
-      void queryClient.invalidateQueries({ queryKey: ['live-orders', auth.restaurantId] });
-    },
-  });
-
-  const isRealtimeHealthy = realtimeStatus === 'connected';
-
-  const ordersQuery = useQuery({
-    queryKey: ['live-orders', auth.restaurantId],
-    queryFn: ({ signal }) => restaurantApi.liveOrders(auth, signal),
-    refetchInterval: isRealtimeHealthy ? POLL_INTERVAL_CONNECTED_MS : POLL_INTERVAL_DEGRADED_MS,
-    // Keep polling in a background tab: a busy kitchen leaves the board behind
-    // another window and still needs the alert to fire (plan §30).
-    refetchIntervalInBackground: true,
-  });
-
-  const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
-
-  // Feed the alert manager the full pending set, never a delta — that is what
-  // makes duplicate realtime events harmless (plan §30).
-  useEffect(() => {
-    const pendingIds = orders
-      .filter((order) => order.status === 'PENDING_RESTAURANT')
-      .map((order) => order.id);
-    alertManager.current?.syncPending(pendingIds);
-  }, [orders]);
-
-  /*
-   * Pick the choice back up on mount, and put it down on unmount without
-   * forgetting it. `disable()` defaults to not remembering precisely so this
-   * cleanup cannot be mistaken for the operator switching alerts off.
-   */
-  useEffect(() => {
-    const manager = alertManager.current;
-    manager?.restore();
-    return () => manager?.disable();
-  }, []);
-
-  const enableAlerts = useCallback(async () => {
-    await alertManager.current?.enable();
-  }, []);
-
-  const invalidate = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['live-orders', auth.restaurantId] });
-  }, [queryClient, auth.restaurantId]);
-
-  const lanes = useMemo(() => {
-    const grouped = new Map<string, LiveOrder[]>();
-    for (const lane of ORDER_LANES) grouped.set(lane.key, []);
-    for (const order of orders) {
-      grouped.get(order.status)?.push(order);
-    }
-    return grouped;
-  }, [orders]);
-
-  const isOffline = ordersQuery.isError;
-  const isDegraded = !isRealtimeHealthy && !isOffline;
+  const lanes = groupByLane(orders);
 
   return (
     <section className="card" id="live-orders" aria-label="الطلبات المباشرة">
@@ -154,7 +99,7 @@ export function LiveBoard({ auth }: { auth: Auth }) {
           </p>
         </div>
 
-        <AlertToggle state={alertState} onEnable={enableAlerts} />
+        <AlertToggle state={alertState} onEnable={live.enableAlerts} />
       </div>
 
       {/*
@@ -167,11 +112,7 @@ export function LiveBoard({ auth }: { auth: Auth }) {
             <Icon name="alert" className="nav__icon" aria-hidden /> {EMPTY_STATES_AR.loadFailed} —
             جاري إعادة المحاولة تلقائياً
           </span>
-          <button
-            type="button"
-            className="btn btn--danger"
-            onClick={() => void ordersQuery.refetch()}
-          >
+          <button type="button" className="btn btn--danger" onClick={() => live.refetch()}>
             {ACTIONS_AR.retry}
           </button>
         </div>
@@ -189,7 +130,7 @@ export function LiveBoard({ auth }: { auth: Auth }) {
       {!alertState.enabled ? (
         <div className="alert-bar alert-bar--warning" style={{ marginBottom: 16 }}>
           <span>تنبيه الطلبات الصوتي غير مفعّل. المتصفح يتطلب ضغطة واحدة لتفعيل الصوت.</span>
-          <button type="button" className="btn btn--primary" onClick={() => void enableAlerts()}>
+          <button type="button" className="btn btn--primary" onClick={() => live.enableAlerts()}>
             {ACTIONS_AR.enableSound}
           </button>
         </div>
@@ -218,8 +159,8 @@ export function LiveBoard({ auth }: { auth: Auth }) {
                     order={order}
                     auth={auth}
                     onChanged={() => {
-                      alertManager.current?.acknowledge(order.id);
-                      invalidate();
+                      live.acknowledge(order.id);
+                      live.invalidate();
                     }}
                   />
                 ))
@@ -230,6 +171,13 @@ export function LiveBoard({ auth }: { auth: Auth }) {
       </div>
     </section>
   );
+}
+
+function groupByLane(orders: LiveOrder[]): Map<string, LiveOrder[]> {
+  const grouped = new Map<string, LiveOrder[]>();
+  for (const lane of ORDER_LANES) grouped.set(lane.key, []);
+  for (const order of orders) grouped.get(order.status)?.push(order);
+  return grouped;
 }
 
 function AlertToggle({ state, onEnable }: { state: AlertState; onEnable: () => void }) {
@@ -267,28 +215,53 @@ function OrderCard({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pickingDriver, setPickingDriver] = useState(false);
+  /** The card expands in place to ask, rather than committing on one tap (MERCH-2, §6). */
+  const [accepting, setAccepting] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
+  const [recalling, setRecalling] = useState(false);
+  /**
+   * A second click of a double-click fires before `isPending` re-renders, so a
+   * ref is the guard that actually holds (MERCH-24).
+   */
+  const submitting = useRef(false);
 
   const runCommand = useMutation({
-    mutationFn: async (action: 'accept' | 'reject' | 'prepare' | 'ready') => {
-      switch (action) {
+    mutationFn: async (
+      action:
+        | { name: 'accept'; minutes?: number }
+        | { name: 'reject'; reason: string; note?: string }
+        | { name: 'prepare' }
+        | { name: 'ready' }
+        | { name: 'unassign'; reason: string },
+    ) => {
+      switch (action.name) {
         case 'accept':
-          return restaurantApi.acceptOrder(auth, order.id, order.version);
+          return restaurantApi.acceptOrder(auth, order.id, order.version, action.minutes);
         case 'reject':
           return restaurantApi.rejectOrder(auth, order.id, {
-            reason: 'TOO_BUSY',
+            reason: action.reason,
+            note: action.note,
             expectedVersion: order.version,
           });
         case 'prepare':
           return restaurantApi.startPreparing(auth, order.id, order.version);
         case 'ready':
           return restaurantApi.markReady(auth, order.id, order.version);
+        case 'unassign':
+          return restaurantApi.unassignDriver(auth, order.id, action.reason);
       }
     },
     onSuccess: () => {
+      submitting.current = false;
       setError(null);
+      setAccepting(false);
+      setRejecting(false);
+      setRecalling(false);
       onChanged();
     },
     onError: (mutationError: unknown) => {
+      submitting.current = false;
       if (mutationError instanceof ApiError) {
         // A stale board is recoverable: refresh rather than showing a dead end
         // (plan §113 ORDER_ALREADY_UPDATED).
@@ -300,12 +273,24 @@ function OrderCard({
     },
   });
 
+  const run = (action: Parameters<typeof runCommand.mutate>[0]): void => {
+    if (submitting.current) return;
+    submitting.current = true;
+    runCommand.mutate(action);
+  };
+
   const slaTone =
     order.status === 'PENDING_RESTAURANT' && order.age_minutes >= SLA_LATE_MINUTES
       ? 'late'
       : order.age_minutes >= SLA_WARNING_MINUTES
         ? 'warning'
         : 'ok';
+
+  const serviceFeeIqd = Math.max(
+    0,
+    order.customer_total_iqd - order.items_subtotal_iqd - order.delivery_fee_iqd,
+  );
+  const addressLines = describeAddress(order.delivery_address);
 
   return (
     <article
@@ -326,32 +311,90 @@ function OrderCard({
 
       <div className="order-card__customer">
         <Icon name="drivers" className="nav__icon" aria-hidden />
-        {order.customer_name}
+        <span style={{ flex: 1 }}>{order.customer_name}</span>
+        {/*
+          A tappable number, not a line of text to read out (MERCH-1). The
+          counter calls the customer back without copying digits.
+        */}
+        {order.customer_phone ? (
+          <a
+            className="order-card__call ltr-inline"
+            href={`tel:${order.customer_phone}`}
+            aria-label={`اتصال بالعميل ${order.customer_name}`}
+          >
+            <span aria-hidden>☏</span>
+            {order.customer_phone}
+          </a>
+        ) : null}
       </div>
+
+      {/* Where it goes — the district, the building/floor, the note the courier reads (MERCH-1). */}
+      {addressLines.length > 0 ? (
+        <p className="order-card__address">
+          {addressLines.map((line, index) => (
+            <span key={index} style={{ display: 'block' }}>
+              {line}
+            </span>
+          ))}
+        </p>
+      ) : null}
 
       <div className="order-card__items">
         {order.items.map((item) => (
-          <div className="order-card__item" key={item.id}>
-            <span className="order-card__item-name">
-              <span className="numeric">{item.quantity}</span> × {item.name_ar}
-            </span>
-            <span className="numeric">{money(item.line_total_iqd)}</span>
+          <div className="order-card__item-block" key={item.id}>
+            <div className="order-card__item">
+              <span className="order-card__item-name">
+                <span className="numeric">{item.quantity}</span> × {item.name_ar}
+              </span>
+              <span className="numeric">{money(item.line_total_iqd)}</span>
+            </div>
+            {/*
+              The options the kitchen cooks to — «ويل دن، جبن إضافي» — and the
+              per-line note. Without these the card said «برجر كلاسيك» and the
+              kitchen cooked the wrong burger (MERCH-1).
+            */}
+            {item.modifiers.length > 0 ? (
+              <div className="order-card__item-modifiers">
+                {item.modifiers.map((modifier) => modifier.name_ar).join('، ')}
+              </div>
+            ) : null}
+            {item.notes ? <div className="order-card__item-note">ملاحظة: {item.notes}</div> : null}
           </div>
         ))}
       </div>
 
       {order.customer_notes ? (
-        <p className="order-card__note">ملاحظة: {order.customer_notes}</p>
+        <p className="order-card__note">ملاحظة الطلب: {order.customer_notes}</p>
       ) : null}
 
-      <div className="order-card__total">
-        <span>المجموع</span>
-        <span className="numeric">{money(order.customer_total_iqd)}</span>
+      {/* A subtotal / fee / service breakdown, not a bare total (MERCH-26). */}
+      <div className="order-card__breakdown">
+        <div className="order-card__breakdown-row">
+          <span>المجموع الفرعي</span>
+          <span className="numeric">{money(order.items_subtotal_iqd)}</span>
+        </div>
+        <div className="order-card__breakdown-row">
+          <span>أجرة التوصيل (أجرتك)</span>
+          <span className="numeric">{money(order.delivery_fee_iqd)}</span>
+        </div>
+        {serviceFeeIqd > 0 ? (
+          <div className="order-card__breakdown-row">
+            <span>رسوم خدمة جيبلي</span>
+            <span className="numeric">{money(serviceFeeIqd)}</span>
+          </div>
+        ) : null}
+        <div className="order-card__total">
+          <span>المجموع (يدفعه الزبون)</span>
+          <span className="numeric">{money(order.customer_total_iqd)}</span>
+        </div>
       </div>
+
+      <p className="order-card__payment">{paymentMethodAr(order.payment_method)}</p>
 
       {order.driver ? (
         <p className="order-card__note">
-          المندوب: {order.driver.name} — {order.driver.assignment_status}
+          المندوب: {order.driver.name} —{' '}
+          {ASSIGNMENT_LABELS[order.driver.assignment_status] ?? order.driver.assignment_status}
         </p>
       ) : null}
 
@@ -361,27 +404,108 @@ function OrderCard({
         </p>
       ) : null}
 
-      <div className="order-card__actions">
-        {order.status === 'PENDING_RESTAURANT' ? (
-          <>
+      <div className="order-card__actions" style={{ flexDirection: 'column' }}>
+        {order.status === 'PENDING_RESTAURANT' && !accepting && !rejecting ? (
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button
               type="button"
               className="btn btn--primary"
-              style={{ flex: 1 }}
+              style={{ flex: 2 }}
               disabled={runCommand.isPending}
-              onClick={() => runCommand.mutate('accept')}
+              onClick={() => {
+                setError(null);
+                setAccepting(true);
+              }}
             >
               {ACTIONS_AR.accept}
             </button>
             <button
               type="button"
               className="btn btn--danger"
+              style={{ flex: 1 }}
               disabled={runCommand.isPending}
-              onClick={() => runCommand.mutate('reject')}
+              onClick={() => {
+                setError(null);
+                setRejectNote('');
+                setRejecting(true);
+              }}
             >
               {ACTIONS_AR.reject}
             </button>
-          </>
+          </div>
+        ) : null}
+
+        {/* How long the kitchen needs, on the tap that commits to it (MERCH-6). */}
+        {order.status === 'PENDING_RESTAURANT' && accepting ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <strong style={{ fontSize: 'var(--text-sm)' }}>كم تحتاج لتجهيز الطلب؟</strong>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              {PREP_OPTIONS.map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  style={{ flex: 1, minWidth: 56 }}
+                  disabled={runCommand.isPending}
+                  onClick={() => run({ name: 'accept', minutes })}
+                >
+                  {minutes}&nbsp;د
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              disabled={runCommand.isPending}
+              onClick={() => setAccepting(false)}
+            >
+              تراجع
+            </button>
+          </div>
+        ) : null}
+
+        {/*
+          The reason, asked in the card — the customer is told it, so a single
+          tap with a hard-coded «TOO_BUSY» was wrong (MERCH-2).
+        */}
+        {order.status === 'PENDING_RESTAURANT' && rejecting ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <strong style={{ fontSize: 'var(--text-sm)' }}>سبب رفض الطلب</strong>
+            <div className="field">
+              <label htmlFor={`reject-note-${order.id}`} className="field__hint">
+                ملاحظة للعميل (اختياري)
+              </label>
+              <input
+                id={`reject-note-${order.id}`}
+                value={rejectNote}
+                onChange={(event) => setRejectNote(event.target.value)}
+                placeholder="يُرسل مع السبب"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              {ORDER_REJECTION_REASONS.map((reason) => (
+                <button
+                  key={reason}
+                  type="button"
+                  className="btn btn--danger btn--sm"
+                  disabled={runCommand.isPending}
+                  onClick={() =>
+                    run({ name: 'reject', reason, note: rejectNote.trim() || undefined })
+                  }
+                >
+                  {ORDER_REJECTION_REASON_LABELS_AR[reason]}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              disabled={runCommand.isPending}
+              onClick={() => setRejecting(false)}
+            >
+              تراجع
+            </button>
+          </div>
         ) : null}
 
         {order.status === 'ACCEPTED' ? (
@@ -389,7 +513,7 @@ function OrderCard({
             type="button"
             className="btn btn--primary btn--block"
             disabled={runCommand.isPending}
-            onClick={() => runCommand.mutate('prepare')}
+            onClick={() => run({ name: 'prepare' })}
           >
             {ACTIONS_AR.startPreparing}
           </button>
@@ -398,17 +522,13 @@ function OrderCard({
         {order.status === 'PREPARING' ? (
           /*
            * Green, because it is the one action on this card that finishes
-           * something. It was a ghost button — the quietest style the portal
-           * has — for the step that says the food is cooked, sitting under a
-           * row of filled buttons for accepting and refusing. The lane it
-           * moves the order into is «جاهز», which the board already draws in
-           * green; the button that gets it there should agree.
+           * something — the step that says the food is cooked.
            */
           <button
             type="button"
             className="btn btn--success btn--block"
             disabled={runCommand.isPending}
-            onClick={() => runCommand.mutate('ready')}
+            onClick={() => run({ name: 'ready' })}
           >
             <Icon name="check" className="nav__icon" aria-hidden />
             {ACTIONS_AR.markReady}
@@ -423,6 +543,53 @@ function OrderCard({
           >
             {ACTIONS_AR.assignDriver}
           </button>
+        ) : null}
+
+        {/*
+          Recall a courier who was assigned but has not collected yet (MERCH-6).
+          Once picked up it is on the road and no longer the shop's to pull back.
+        */}
+        {order.status === 'READY' &&
+        order.driver &&
+        (order.driver.assignment_status === 'ASSIGNED' ||
+          order.driver.assignment_status === 'ACCEPTED') ? (
+          recalling ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <strong style={{ fontSize: 'var(--text-sm)' }}>سحب الطلب من المندوب</strong>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                يصل المندوبَ إشعار بذلك، ويعود الطلب قابلاً للإسناد إلى غيره.
+              </span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {RECALL_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className="btn btn--danger btn--sm"
+                    disabled={runCommand.isPending}
+                    onClick={() => run({ name: 'unassign', reason })}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={runCommand.isPending}
+                onClick={() => setRecalling(false)}
+              >
+                تراجع
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setRecalling(true)}
+            >
+              سحب المندوب
+            </button>
+          )
         ) : null}
       </div>
 
@@ -443,19 +610,49 @@ function OrderCard({
   );
 }
 
+/** The payment method in words — never the raw `CASH_ON_DELIVERY` code (MERCH-1). */
+function paymentMethodAr(method: string): string {
+  if (method === 'CASH' || method === 'CASH_ON_DELIVERY') return 'الدفع: نقداً عند الاستلام';
+  return `الدفع: ${method}`;
+}
+
 /**
- * Choosing who carries the order.
+ * A readable address from the order's snapshot (MERCH-1).
  *
- * The button that opens this had no `onClick` at all — it rendered, it
- * highlighted on hover, and it did nothing, which is the worst failure a
- * control can have because it looks like the server ignored you. The two API
- * calls behind it (`/drivers/eligible` and `/orders/:id/assign-driver`) and
- * their client functions had been written and were never called from anywhere.
- *
- * Everything the server checks is shown rather than hidden: a driver who is
- * off shift or already carrying their limit stays on the list, disabled, with
- * the reason next to their name. A list that silently omits half the team
- * leaves a manager wondering where their driver went.
+ * The snapshot's shape belongs to the API, so every field is read defensively.
+ * Keys match what the order service stores: cityNameAr / districtText / street /
+ * building / floor / landmark / deliveryNotes.
+ */
+function describeAddress(address: Record<string, unknown>): string[] {
+  const read = (key: string): string | null => {
+    const value = address?.[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  };
+
+  const lines: string[] = [];
+
+  const where = [read('cityNameAr'), read('districtText'), read('street'), read('landmark')].filter(
+    Boolean,
+  );
+  if (where.length > 0) lines.push(where.join(' — '));
+
+  const place: string[] = [];
+  const building = read('building');
+  const floor = read('floor');
+  if (building) place.push(`مبنى ${building}`);
+  if (floor) place.push(`طابق ${floor}`);
+  if (place.length > 0) lines.push(place.join(' · '));
+
+  const notes = read('deliveryNotes');
+  if (notes) lines.push(`ملاحظة العنوان: ${notes}`);
+
+  return lines;
+}
+
+/**
+ * Choosing who carries the order. Everything the server checks is shown rather
+ * than hidden: a driver off shift or at their limit stays on the list, disabled,
+ * with the reason next to their name.
  */
 function DriverPicker({
   auth,
@@ -472,6 +669,9 @@ function DriverPicker({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
+  // Guards the second click of a double-click before `isPending` re-renders
+  // (MERCH-24).
+  const submitting = useRef(false);
 
   const drivers = useQuery({
     queryKey: ['eligible-drivers', auth.restaurantId, orderId],
@@ -483,8 +683,12 @@ function DriverPicker({
 
   const assign = useMutation({
     mutationFn: (driverId: string) => restaurantApi.assignDriver(auth, orderId, driverId),
-    onSuccess: onAssigned,
+    onSuccess: () => {
+      submitting.current = false;
+      onAssigned();
+    },
     onError: (assignError: unknown) => {
+      submitting.current = false;
       setChosen(null);
       setError(assignError instanceof ApiError ? assignError.messageAr : 'تعذّر تعيين السائق');
     },
@@ -547,6 +751,8 @@ function DriverPicker({
               className="btn btn--secondary"
               disabled={!driver.assignable || assign.isPending}
               onClick={() => {
+                if (submitting.current) return;
+                submitting.current = true;
                 setChosen(driver.id);
                 assign.mutate(driver.id);
               }}
@@ -570,7 +776,7 @@ function DriverPicker({
         </div>
 
         <div className="dialog__actions">
-          <button type="button" className="btn btn--ghost" onClick={onClose}>
+          <button type="button" className="btn btn--outline" onClick={onClose}>
             إغلاق
           </button>
         </div>

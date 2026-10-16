@@ -18,6 +18,7 @@ import { Door, KindBadge, Step } from '@/ui/partner-doors';
 import { useMe, useSession } from '@/lib/session';
 import { BRAND, color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, ErrorState, RemoteImage, Row, Screen, Skeleton, Text } from '@/ui';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * Owner Mode — the shop, on one screen.
@@ -931,25 +932,5 @@ function Stat({ label, value }: { label: string; value: string }) {
         {label}
       </Text>
     </View>
-  );
-}
-
-/** The bar every owner screen wears: a title and the way back out. */
-export function OwnerHeader({ title }: { title: string }) {
-  const router = useRouter();
-
-  return (
-    <Row justify="space-between" style={{ minHeight: TAP_TARGET }}>
-      <Pressable
-        onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/account'))}
-        accessibilityRole="button"
-        accessibilityLabel="رجوع"
-        style={{ width: TAP_TARGET, height: TAP_TARGET, justifyContent: 'center' }}
-      >
-        <MaterialCommunityIcons name="chevron-right" size={26} color={color.textPrimary} />
-      </Pressable>
-      <Text variant="h3">{title}</Text>
-      <View style={{ width: TAP_TARGET }} />
-    </Row>
   );
 }

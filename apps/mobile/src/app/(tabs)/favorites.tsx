@@ -1,12 +1,12 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { cuisineLabelAr } from '@jibli/contracts';
+import { arabicCuisineTags } from '@/lib/cuisine-tags';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { useServiceFee } from '@/lib/use-service-fee';
 import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, ApiError, assetUrl } from '@/lib/api';
-import { useIsGuest } from '@/lib/session';
+import { useIsGuest, useMe } from '@/lib/session';
 import { radius, space } from '@/theme';
 import { EmptyState, ErrorState, Screen, Skeleton, Text } from '@/ui';
 import { RestaurantCard } from '@/ui/catalog';
@@ -25,7 +25,7 @@ export default function FavoritesScreen() {
   const isGuest = useIsGuest();
 
   const favorites = useQuery({
-    queryKey: ['favorites'],
+    queryKey: ['favorites', useMe()?.user_id ?? null],
     queryFn: () => api.favorites(),
     enabled: !isGuest,
   });
@@ -35,7 +35,7 @@ export default function FavoritesScreen() {
       <View style={{ paddingHorizontal: space[4], paddingTop: space[2] }}>
         <Text variant="h2">المفضلة</Text>
         <Text variant="caption" tone="muted">
-          المطاعم التي حفظتها
+          المتاجر التي حفظتها
         </Text>
       </View>
 
@@ -48,8 +48,8 @@ export default function FavoritesScreen() {
            * would give them.
            */
           <EmptyState
-            title="سجّل دخولك لحفظ مطاعمك"
-            body="احفظ المطاعم التي تحبها وارجع إليها بنقرة."
+            title="سجّل دخولك لحفظ متاجرك"
+            body="احفظ المتاجر التي تحبها وارجع إليها بنقرة."
             action={{ label: 'تسجيل الدخول', onPress: () => router.push('/(auth)/phone') }}
           />
         ) : favorites.isLoading ? (
@@ -69,8 +69,8 @@ export default function FavoritesScreen() {
         ) : (favorites.data ?? []).length === 0 ? (
           <EmptyState
             title="لا مفضلات بعد"
-            body="اضغط على القلب في صفحة أي مطعم لحفظه هنا."
-            action={{ label: 'تصفّح المطاعم', onPress: () => router.push('/(tabs)') }}
+            body="اضغط على القلب في صفحة أي متجر لحفظه هنا."
+            action={{ label: 'تصفّح المتاجر', onPress: () => router.push('/(tabs)') }}
           />
         ) : (
           (favorites.data ?? []).map((restaurant) => (
@@ -78,8 +78,7 @@ export default function FavoritesScreen() {
               key={restaurant.id}
               name={restaurant.display_name}
               tags={
-                restaurant.cuisine_tags.slice(0, 3).map(cuisineLabelAr).join('، ') ||
-                restaurant.city_name_ar
+                arabicCuisineTags(restaurant.cuisine_tags, 3).join('، ') || restaurant.city_name_ar
               }
               coverUrl={restaurant.cover_asset_id ? assetUrl(restaurant.cover_asset_id) : null}
               rating={restaurant.rating}

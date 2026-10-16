@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { CollectionPanel } from '@/components/collection-panel';
 import { Dropdown } from '@/components/dropdown';
 import { Badge, Card, ErrorState, Money, Skeleton } from '@/components/ui';
@@ -49,6 +49,9 @@ export default function FinanceReportsPage() {
 
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
+  }
+  if (!session.can('finance.read.global')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة التقارير المالية" />;
   }
 
   const data = summary.data;
@@ -137,7 +140,7 @@ export default function FinanceReportsPage() {
         only trustworthy when the checks above pass, and an operator should see
         that before pressing a button that records money as received.
       */}
-      <CollectionPanel token={token} />
+      <CollectionPanel token={token} canCollect={session.can('finance.payment.record')} />
 
       {/* ── Platform revenue, each figure named precisely ─────────────────── */}
       <Card title="إيرادات المنصة" icon="commissions">

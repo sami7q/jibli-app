@@ -9,7 +9,7 @@ import {
   ORDER_STATUSES,
   success,
 } from '@jibli/contracts';
-import { assertAdminPermission } from '@jibli/auth';
+import { assertAdminPermission, hasAdminPermission } from '@jibli/auth';
 import { maskPhone, reasonSchema, uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
 import {
@@ -56,9 +56,9 @@ export function registerAdminOrderRoutes(app: FastifyInstance, ctx: AppContext):
     const query = listQuerySchema.parse(request.query);
 
     // Only a role holding customer.phone.unmask sees real numbers (plan §84).
-    const canUnmask = principal.platformRoles.some((role) =>
-      ['SUPER_ADMIN', 'OPERATIONS_ADMIN'].includes(role),
-    );
+    // Keyed on the permission, not role names, so OPERATIONS_ADMIN — which does
+    // NOT hold the permission — no longer sees full numbers (ADMIN-14).
+    const canUnmask = hasAdminPermission(principal, 'customer.phone.unmask');
 
     const conditions = [];
     if (query.scope === 'live') {
@@ -160,9 +160,7 @@ export function registerAdminOrderRoutes(app: FastifyInstance, ctx: AppContext):
       assertAdminPermission(principal, 'order.read.global');
       const { orderId } = z.object({ orderId: uuidSchema }).parse(request.params);
 
-      const canUnmask = principal.platformRoles.some((role) =>
-        ['SUPER_ADMIN', 'OPERATIONS_ADMIN'].includes(role),
-      );
+      const canUnmask = hasAdminPermission(principal, 'customer.phone.unmask');
 
       const [order] = await ctx.db
         .select({
@@ -306,6 +304,49 @@ export function registerAdminOrderRoutes(app: FastifyInstance, ctx: AppContext):
           eventType: EVENT_TYPES.ORDER_CANCELLED,
           patch: { cancellationReason: 'ADMIN_OVERRIDE' },
         });
+
+        /*
+         * Cancel the live delivery assignment too, and free its courier (FLOW-8).
+         * Otherwise the courier's screen stays live and they can still confirm
+         * the PIN and collect cash for an order the platform just cancelled —
+         * confirmDelivery now also refuses a terminal order, but stopping the
+         * assignment here is what removes it from the courier's task list.
+         */
+        const [assignment] = await tx
+          .select({ id: deliveryAssignments.id, driverId: deliveryAssignments.driverId })
+          .from(deliveryAssignments)
+          .where(
+            and(
+              eq(deliveryAssignments.orderId, orderId),
+              inArray(deliveryAssignments.status, [
+                'ASSIGNED',
+                'ACCEPTED',
+                'PICKED_UP',
+                'ARRIVED_CUSTOMER',
+              ]),
+            ),
+          )
+          .for('update')
+          .limit(1);
+
+        if (assignment) {
+          const now = new Date();
+          await tx
+            .update(deliveryAssignments)
+            .set({
+              status: 'CANCELLED',
+              cancelledAt: now,
+              cancellationReason: 'ADMIN_OVERRIDE',
+              version: sql`${deliveryAssignments.version} + 1`,
+              updatedAt: now,
+            })
+            .where(eq(deliveryAssignments.id, assignment.id));
+
+          await tx
+            .update(drivers)
+            .set({ availability: 'AVAILABLE', updatedAt: now })
+            .where(eq(drivers.id, assignment.driverId));
+        }
 
         await writeAudit(tx, {
           actorUserId: principal.userId,

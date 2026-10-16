@@ -13,8 +13,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { api } from './api';
+import { toArabicDigits } from './arabic-count';
+import { dismissReview, loadDismissedReviews } from './review-dismiss-store';
 import { playChime } from './chime';
-import { useSession } from './session';
+import { useMe, useSession } from './session';
 import { PUSH_SUPPORTED } from './push';
 import { useCart } from './cart';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -119,7 +121,7 @@ export function announcementFor(status: OrderStatus): string {
   switch (status) {
     case 'PLACED':
     case 'PENDING_RESTAURANT':
-      return 'وصل طلبك إلى المطعم';
+      return 'وصل طلبك إلى المتجر';
     case 'ACCEPTED':
       return 'قبل المطعم طلبك';
     case 'PREPARING':
@@ -168,11 +170,14 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
   const segments = useSegments() as readonly string[];
 
   const signedIn = state.status === 'ready' || state.status === 'offline-ready';
+  // Scope per-user reads by id, so the next user on a device never reads the
+  // previous one's orders out of a cache that outlived their session (CUST-5).
+  const userId = useMe()?.user_id ?? null;
 
   const orders = useQuery({
     // The same key the «طلباتي» tab uses, so the two share one fetch rather
     // than polling the same endpoint twice at different intervals.
-    queryKey: ['my-orders'],
+    queryKey: ['my-orders', userId],
     queryFn: () => api.myOrders(),
     enabled: signedIn,
     /*
@@ -303,18 +308,39 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
   // ── The rating window, a quarter of an hour after delivery ────────────────
 
   const pending = useQuery({
-    queryKey: ['pending-reviews'],
+    queryKey: ['pending-reviews', userId],
     queryFn: () => api.pendingReviews(),
     enabled: signedIn,
     staleTime: 60_000,
   });
 
   const [dismissed, setDismissed] = useState<readonly string[]>([]);
+  // Load the persisted dismissals once, so «لاحقاً» is remembered across cold
+  // starts rather than re-prompting every launch for five days (CUST-15).
+  useEffect(() => {
+    let alive = true;
+    void loadDismissedReviews().then((ids) => {
+      if (alive) setDismissed((current) => Array.from(new Set([...current, ...ids])));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const prompt = (pending.data ?? []).find((entry) => !dismissed.includes(entry.order_id)) ?? null;
 
-  // Never over sign-in or the mandatory profile: those screens are a sequence
-  // the customer has to finish, and a sheet over them is a dead end.
-  const canPrompt = signedIn && segments[0] !== '(auth)';
+  const dismiss = (orderId: string) => {
+    setDismissed((list) => [...list, orderId]);
+    void dismissReview(orderId);
+  };
+
+  /*
+   * Never over a screen that is a sequence or a different job: sign-in and the
+   * mandatory profile, the chooser the app opens on, the checkout a customer is
+   * paying through, and owner or driver mode — a sheet about an old order over
+   * any of those is a dead end or an interruption (CUST-15).
+   */
+  const PROMPT_FORBIDDEN = ['(auth)', '(owner)', '(driver)', 'choose', 'checkout'];
+  const canPrompt = signedIn && !PROMPT_FORBIDDEN.includes(segments[0] ?? '');
 
   const value = useMemo<OrderWatch>(() => ({ active, announcement }), [active, announcement]);
 
@@ -326,9 +352,9 @@ export function OrderWatchProvider({ children }: { children: ReactNode }) {
           visible
           orderId={prompt.order_id}
           restaurantName={prompt.restaurant_name}
-          onClose={() => setDismissed((list) => [...list, prompt.order_id])}
+          onClose={() => dismiss(prompt.order_id)}
           onSubmitted={() => {
-            setDismissed((list) => [...list, prompt.order_id]);
+            dismiss(prompt.order_id);
             void queryClient.invalidateQueries({ queryKey: ['pending-reviews'] });
           }}
         />
@@ -378,6 +404,23 @@ export function ActiveOrderBar() {
   const segments = useSegments() as readonly string[];
   const insets = useSafeAreaInsets();
   const tabBarHeight = useTabBarHeight();
+
+  /*
+   * The handover code, carried on the card so it is readable from any screen
+   * while a courier is on the way (CUST-1). The list `my-orders` does not carry
+   * it, so the one order in flight is asked for — sharing the ['order', id]
+   * cache with the order screen, and enabled only when a pin can exist.
+   */
+  const pinVisible =
+    active != null &&
+    ['ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].includes(active.status);
+  const pinQuery = useQuery({
+    queryKey: ['order', active?.id],
+    queryFn: () => api.order(active?.id as string),
+    enabled: pinVisible,
+    staleTime: 20_000,
+  });
+  const deliveryPin = pinVisible ? (pinQuery.data?.delivery_pin ?? null) : null;
 
   if (SCREENS_WITH_THEIR_OWN_DOCK.has(segments[0] ?? '')) return null;
 
@@ -502,6 +545,11 @@ export function ActiveOrderBar() {
             {subtitle ? (
               <Text variant="caption" tone={announcing ? 'inverse' : 'muted'} numberOfLines={1}>
                 {subtitle}
+              </Text>
+            ) : null}
+            {!announcing && deliveryPin ? (
+              <Text variant="captionBold" tone="brand" numberOfLines={1}>
+                رمز التسليم: {toArabicDigits(deliveryPin)}
               </Text>
             ) : null}
           </View>

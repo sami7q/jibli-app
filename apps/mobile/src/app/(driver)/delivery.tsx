@@ -27,8 +27,10 @@ import {
   type DriverMe,
   type DriverNavigationLinks,
 } from '@/lib/api';
-import { notify } from '@/lib/dialog';
+import { confirmAsync, notify } from '@/lib/dialog';
 import { PIECES, countAr } from '@/lib/arabic-count';
+import { useSession } from '@/lib/session';
+import { useCart } from '@/lib/cart';
 import { useWorkLive } from '@/lib/work-live';
 import { PushPrompt } from '@/ui/push-prompt';
 import {
@@ -914,8 +916,31 @@ const styles = lazySheet(() =>
 export default function DeliveryScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { signOut } = useSession();
+  const { clear: clearCart } = useCart();
   const [openAssignment, setOpenAssignment] = useState<string | null>(null);
   const { driver: live } = useWorkLive();
+
+  /*
+   * Sign out from the courier's own screen (FLOW-9): before, the only way out
+   * was to switch to customer mode and sign out from «حسابي», several non-
+   * obvious taps on a shared handset. Goes offline first so no shop assigns to
+   * a courier who has left, then clears the device like every other sign-out
+   * (CUST-5).
+   */
+  const signOutDriver = () =>
+    void confirmAsync({
+      title: 'تسجيل الخروج؟',
+      message: 'ستحتاج إلى تسجيل الدخول من جديد لاستلام التوصيلات.',
+      confirmLabel: 'خروج',
+      destructive: true,
+    }).then(async (yes) => {
+      if (!yes) return;
+      await api.setDriverAvailability('OFFLINE').catch(() => undefined);
+      await signOut();
+      queryClient.clear();
+      clearCart();
+    });
 
   const active = useQuery({
     queryKey: ['driver', 'deliveries', 'active'],
@@ -1043,16 +1068,36 @@ export default function DeliveryScreen() {
          * arrow did not say that leaving this screen is switching back to
          * ordering — it read as «back», to nowhere in particular.
          */}
-        <Pressable
-          onPress={() => router.replace('/(tabs)')}
-          accessibilityRole="button"
-          accessibilityLabel="التبديل إلى الوضع العادي"
-          hitSlop={space[2]}
-          style={({ pressed }) => [styles.modeSwitch, pressed ? { opacity: 0.7 } : null]}
-        >
-          <MaterialCommunityIcons name="swap-horizontal" size={16} color={BRAND[600]} />
-          <Text style={styles.modeSwitchText}>الوضع العادي</Text>
-        </Pressable>
+        <View style={{ flexDirection: ROW, alignItems: 'center', gap: space[2] }}>
+          <Pressable
+            onPress={() => router.replace('/(tabs)')}
+            accessibilityRole="button"
+            accessibilityLabel="التبديل إلى الوضع العادي"
+            hitSlop={space[2]}
+            style={({ pressed }) => [styles.modeSwitch, pressed ? { opacity: 0.7 } : null]}
+          >
+            <MaterialCommunityIcons name="swap-horizontal" size={16} color={BRAND[600]} />
+            <Text style={styles.modeSwitchText}>الوضع العادي</Text>
+          </Pressable>
+          {/* Sign out, from the courier's own screen (FLOW-9). */}
+          <Pressable
+            onPress={signOutDriver}
+            accessibilityRole="button"
+            accessibilityLabel="تسجيل الخروج"
+            hitSlop={space[2]}
+            style={({ pressed }) => [
+              {
+                width: TAP_TARGET - 8,
+                height: TAP_TARGET - 8,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              pressed ? { opacity: 0.7 } : null,
+            ]}
+          >
+            <MaterialCommunityIcons name="logout" size={18} color={color.textSecondary} />
+          </Pressable>
+        </View>
       </View>
 
       {/*

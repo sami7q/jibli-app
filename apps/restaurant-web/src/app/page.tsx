@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart, money, moneyCompact, percentDelta, RankedBar } from '@jibli/ui-web';
 import { Shell } from '@/components/shell';
 import { LiveBoard } from '@/components/live-board';
 import { Icon, type IconName } from '@/components/icon';
-import { portal, type DashboardOverview } from '@/lib/portal-endpoints';
+import { ApiError } from '@/lib/api';
+import { portal, type DashboardOverview, type PortalSettings } from '@/lib/portal-endpoints';
+import { closedReasonAr } from '@/lib/operational-labels';
 import { useSession } from '@/hooks/use-session';
 import { ReadinessCard } from '@/components/readiness-card';
 import { SignedOut } from '@/components/signed-out';
@@ -63,10 +65,16 @@ function DashboardShell({
       restaurants={session.restaurants}
       activeRestaurantId={session.restaurantId}
       onSwitchRestaurant={session.switchRestaurant}
-      notificationCount={data?.new_orders ?? 0}
       catalogLabel={session.words.catalogAr}
       itemLabel={session.words.itemAr}
     >
+      {/*
+        A paused or closed shop looked exactly like a quiet evening — «لا توجد
+        طلبات جديدة» and nothing else (MERCH-7). This says plainly that orders
+        are switched off, why, and offers one tap to resume when it is a pause.
+      */}
+      <OperationalBanner auth={auth} canResume={session.can('order.accept')} />
+
       {/*
         Above the board on purpose: a restaurant that is not live yet has an
         empty board, and this is the only thing on the page it can act on. It
@@ -85,6 +93,93 @@ function DashboardShell({
         canSeeFinance={session.can('finance.read')}
       />
     </Shell>
+  );
+}
+
+/**
+ * The paused / closed banner (MERCH-7).
+ *
+ * It reads the same settings the Settings screen does — the operational state
+ * is computed server-side off server time, so the dashboard shows whatever that
+ * says and never guesses. A pause can be lifted here; a shop outside its hours
+ * or with its toggle off is sent to Settings, where that lives.
+ */
+function OperationalBanner({
+  auth,
+  canResume,
+}: {
+  auth: { accessToken: string; restaurantId: string };
+  canResume: boolean;
+}) {
+  const queryClient = useQueryClient();
+
+  const settings = useQuery({
+    queryKey: ['settings', auth.restaurantId],
+    queryFn: () => portal.settings(auth),
+    staleTime: 30_000,
+  });
+
+  const resume = useMutation({
+    mutationFn: () => portal.setBusyMode(auth, 'NORMAL'),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+
+  const data: PortalSettings | undefined = settings.data;
+  // Nothing to say while loading, or when the shop is trading normally.
+  if (!data || data.accepts_orders_now) return null;
+
+  const paused = data.busy_mode === 'PAUSED';
+  const resumeAt =
+    paused && data.busy_mode_expires_at
+      ? new Date(data.busy_mode_expires_at).toLocaleTimeString('ar-IQ', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
+
+  return (
+    <section
+      className="alert-bar alert-bar--warning"
+      role="status"
+      style={{ alignItems: 'flex-start' }}
+    >
+      <Icon name="alert" className="nav__icon" aria-hidden />
+      <span style={{ flex: 1 }}>
+        <strong>المتجر لا يستقبل الطلبات الآن</strong>
+        <span style={{ display: 'block', fontWeight: 400, marginBlockStart: 4 }}>
+          {closedReasonAr(data.closed_reason)}
+          {resumeAt ? ` — يعود تلقائياً ${resumeAt}` : ''}
+        </span>
+        {resume.error ? (
+          <span
+            style={{
+              display: 'block',
+              marginBlockStart: 4,
+              color: 'var(--jibli-danger-700)',
+            }}
+          >
+            {resume.error instanceof ApiError ? resume.error.messageAr : 'تعذّر الاستئناف'}
+          </span>
+        ) : null}
+      </span>
+
+      {paused && canResume ? (
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          disabled={resume.isPending}
+          onClick={() => resume.mutate()}
+        >
+          {resume.isPending ? 'جاري الاستئناف…' : 'استئناف استقبال الطلبات'}
+        </button>
+      ) : (
+        <Link className="btn btn--outline btn--sm" href="/settings">
+          الإعدادات
+        </Link>
+      )}
+    </section>
   );
 }
 
@@ -225,9 +320,22 @@ function FinanceCard({ finance }: { finance: NonNullable<DashboardOverview['fina
         </Link>
       </div>
 
+      {/*
+        «المستحق لجيبلي» = commission + the platform service fee the courier
+        collected — the same figure, and the same label, as the commissions
+        screen. The dashboard used to show commission alone, so the two numbers
+        disagreed and the net below did not add up (MERCH-21).
+      */}
+      <div className="figure">
+        <span className="figure__label">المستحق لجيبلي — العمولة ورسوم الخدمة</span>
+        <span className="figure__value">
+          {money(finance.amount_owed_iqd ?? finance.open_commission_iqd)}
+        </span>
+      </div>
+
       <div className="figure">
         <span className="figure__label">
-          العمولة الحالية
+          منها العمولة
           {finance.commission_flat_iqd !== null
             ? ` — ${money(finance.commission_flat_iqd)} لكل طلب`
             : ''}
@@ -235,10 +343,21 @@ function FinanceCard({ finance }: { finance: NonNullable<DashboardOverview['fina
         <span className="figure__value">{money(finance.open_commission_iqd)}</span>
       </div>
 
-      {/* Null when the role sees finance but not margin (plan §86). */}
+      {finance.open_service_fee_iqd !== undefined ? (
+        <div className="figure">
+          <span className="figure__label">منها رسوم الخدمة</span>
+          <span className="figure__value">{money(finance.open_service_fee_iqd)}</span>
+        </div>
+      ) : null}
+
+      {/*
+        Net is sales minus everything owed to Jibli — the server's own snapshot,
+        not a subtraction done here, so it agrees with «المستحق لجيبلي» above.
+        Null when the role sees finance but not margin (plan §86).
+      */}
       {finance.estimated_net_iqd !== null ? (
         <div className="figure">
-          <span className="figure__label">صافي الأرباح التقديري — بعد خصم العمولة</span>
+          <span className="figure__label">صافي الأرباح التقديري — بعد خصم المستحق لجيبلي</span>
           <span className="figure__value" style={{ color: 'var(--jibli-success-700)' }}>
             {money(finance.estimated_net_iqd)}
           </span>

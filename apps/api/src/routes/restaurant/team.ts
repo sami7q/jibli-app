@@ -36,6 +36,7 @@ import {
 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
+import { pgErrorInfo } from '../../plugins/error-handler.js';
 
 /**
  * Restaurant drivers and staff (plan §45, §46, §61, §86).
@@ -572,6 +573,28 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
         if (!driver) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'driver' } });
 
         /*
+         * The driver's user row may be a self-registered customer who later
+         * became a courier — phones are one identity (plan §45). Putting a
+         * password on it would hand the shop a credential into that customer's
+         * own account, orders and addresses (FLOW-3). profile_completed_at is
+         * set only by the customer onboarding flow a courier never runs, so it
+         * is the marker that this phone belongs to a real customer.
+         */
+        const [account] = await tx
+          .select({ profileCompletedAt: users.profileCompletedAt })
+          .from(users)
+          .where(eq(users.id, driver.userId))
+          .limit(1);
+
+        if (account?.profileCompletedAt) {
+          throw new AppError(ERROR_CODES.CONFLICT, {
+            details: { reason: 'CUSTOMER_ACCOUNT_CANNOT_BE_TAKEN_OVER' },
+            messageAr:
+              'هذا الرقم يملك حساب زبون في جيبلي، ولا يمكن إصدار كلمة مرور على حسابه. استخدم رقماً آخر للمندوب.',
+          });
+        }
+
+        /*
          * A username is unique across every account in the system, so the
          * collision has to be reported as one rather than left to a constraint
          * error that reads as a server fault.
@@ -735,13 +758,11 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
           });
         } catch (error) {
           // The unique index on (restaurant, user, role) caught a duplicate.
-          if (
-            typeof error === 'object' &&
-            error !== null &&
-            (error as { code?: string }).code === '23505'
-          ) {
+          // The SQLSTATE is under the drizzle wrapper's `.cause` (MERCH-5).
+          if (pgErrorInfo(error).code === '23505') {
             throw new AppError(ERROR_CODES.CONFLICT, {
               details: { reason: 'STAFF_ALREADY_HAS_ROLE' },
+              messageAr: 'هذا الموظف مضاف بهذه الصلاحية.',
             });
           }
           throw error;

@@ -32,9 +32,15 @@ function toAsciiDigits(input: string): string {
 }
 
 /**
- * Clean a typed draft: ASCII digits only, one decimal point when allowed, no
- * grouping separators and no leading zeros. Returns what the field should
- * show — `parseNumberDraft` turns that into the number.
+ * Clean a typed draft: ASCII digits, grouping separators removed, no leading
+ * zeros. Returns what the field should show — `parseNumberDraft` turns that
+ * into the number and `isNumberDraftValid` says whether it is acceptable.
+ *
+ * In integer mode a «.» or «-» is NOT stripped (MERCH-9): stripping turned
+ * «2500.75» into «250075» and «-500» into «500» silently, charging a price
+ * nobody typed. The character stays visible so the field can be flagged invalid
+ * instead. In decimal mode one «.» is allowed and «-» is dropped — IQD has no
+ * negative price in either mode.
  */
 export function cleanNumberDraft(input: string, decimal = false): string {
   let text = toAsciiDigits(input)
@@ -42,14 +48,29 @@ export function cleanNumberDraft(input: string, decimal = false): string {
     .replace(/٫/g, '.')
     .replace(/[٬,\s]/g, '');
 
-  text = text.replace(decimal ? /[^\d.]/g : /\D/g, '');
   if (decimal) {
+    text = text.replace(/[^\d.]/g, '');
     const point = text.indexOf('.');
     if (point !== -1) text = text.slice(0, point + 1) + text.slice(point + 1).replace(/\./g, '');
+  } else {
+    // Keep digits plus any «.»/«-» the person typed, drop everything else
+    // (letters, grouping). A preserved «.»/«-» makes the draft detectably
+    // invalid rather than silently rewriting the amount.
+    text = text.replace(/[^\d.-]/g, '');
   }
 
   // «007» is 7. A lone «0», or «0.5», stays as typed.
   return text.replace(/^0+(?=\d)/, '');
+}
+
+/**
+ * Whether a draft is a value the field accepts. Empty is fine (it means 0, and
+ * the form decides whether 0 is allowed). An integer field rejects a draft
+ * carrying a «.» or «-»; a decimal field rejects a «-».
+ */
+export function isNumberDraftValid(draft: string, decimal = false): boolean {
+  if (draft === '') return true;
+  return decimal ? /^\d*\.?\d*$/.test(draft) : /^\d+$/.test(draft);
 }
 
 /** The number a draft means. Empty, or just «.», means 0. */
@@ -91,6 +112,11 @@ export function NumberField({
     setDraft((current) => (parseNumberDraft(current) === value ? current : draftFor(value)));
   }, [value]);
 
+  // Surface a rejected draft (a «.» or «-» in an integer field) rather than
+  // silently rewriting the amount (MERCH-9). The caller's own aria-invalid,
+  // if any, still wins.
+  const invalid = !isNumberDraftValid(draft, decimal);
+
   return (
     <input
       {...rest}
@@ -99,6 +125,7 @@ export function NumberField({
       dir="ltr"
       autoComplete="off"
       placeholder={placeholder}
+      aria-invalid={rest['aria-invalid'] ?? (invalid || undefined)}
       value={draft}
       onChange={(event) => {
         const next = cleanNumberDraft(event.target.value, decimal);

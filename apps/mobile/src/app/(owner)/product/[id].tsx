@@ -25,7 +25,7 @@ import {
   Skeleton,
   Text,
 } from '@/ui';
-import { OwnerHeader } from '../index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * Add a product, or change one.

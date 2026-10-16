@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PAYMENT_RECORD_METHODS } from '@jibli/contracts';
 import { SETTLEMENT_STATUS_LABELS, dateAr, dateTimeAr, NumberField } from '@jibli/ui-web';
 import type { SettlementStatus } from '@jibli/contracts';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import {
   Badge,
   Card,
@@ -97,6 +97,15 @@ export default function SettlementDetailPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('finance.read.global')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المالية" />;
+  }
+
+  // Each action mirrors the permission its route enforces (ADMIN-11).
+  const canIssue = session.can('finance.settlement.issue');
+  const canRecordPayment = session.can('finance.payment.record');
+  const canAdjust = session.can('finance.adjustment.create');
+  const canVoid = session.can('finance.settlement.void');
 
   const data = settlement.data;
   const isOpen = data ? !['PAID', 'VOID'].includes(data.status) : false;
@@ -114,7 +123,7 @@ export default function SettlementDetailPage() {
       actions={
         data ? (
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            {data.status === 'DRAFT' ? (
+            {data.status === 'DRAFT' && canIssue ? (
               <button
                 type="button"
                 className="btn btn--primary"
@@ -124,7 +133,7 @@ export default function SettlementDetailPage() {
                 {issue.isPending ? 'جاري الإصدار…' : 'إصدار الكشف'}
               </button>
             ) : null}
-            {isOpen && data.status !== 'DRAFT' ? (
+            {isOpen && data.status !== 'DRAFT' && canRecordPayment ? (
               <button
                 type="button"
                 className="btn btn--primary"
@@ -133,12 +142,12 @@ export default function SettlementDetailPage() {
                 تسجيل دفعة
               </button>
             ) : null}
-            {isOpen ? (
+            {isOpen && canAdjust ? (
               <button type="button" className="btn btn--outline" onClick={() => setAdjusting(true)}>
                 تعديل مالي
               </button>
             ) : null}
-            {data.status !== 'VOID' ? (
+            {data.status !== 'VOID' && canVoid ? (
               <button type="button" className="btn btn--danger" onClick={() => setVoiding(true)}>
                 إلغاء الكشف
               </button>

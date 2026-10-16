@@ -7,6 +7,7 @@ import { ORDER_STATUS_LABELS, type OrderStatus } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, ApiError } from '@/lib/api';
+import { countAr, MINUTES, toArabicDigits } from '@/lib/arabic-count';
 import { color, palette, radius, space, TAP_TARGET } from '@/theme';
 import { Button, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
 import { DriverCard, StatusTimeline, SummaryRow, type TimelineStep } from '@/ui/catalog';
@@ -133,8 +134,26 @@ export default function OrderScreen() {
   const justPlaced =
     placed === '1' && (data.status === 'PLACED' || data.status === 'PENDING_RESTAURANT');
 
+  /*
+   * The shop's name is carried on the order snapshot as `displayName`; the
+   * screen read `name_ar`, which the snapshot never had, so every order header
+   * (and the rating sheet opened from it) said «المطعم» (CUST-4).
+   */
   const restaurantName =
-    typeof data.restaurant?.name_ar === 'string' ? data.restaurant.name_ar : 'المطعم';
+    (typeof data.restaurant?.displayName === 'string' && data.restaurant.displayName) ||
+    (typeof data.restaurant?.name_ar === 'string' && data.restaurant.name_ar) ||
+    'المتجر';
+
+  const address = (data.delivery_address ?? {}) as Record<string, unknown>;
+  const readAddr = (key: string): string | null => {
+    const value = address[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  };
+  const addressLine =
+    [readAddr('districtText'), readAddr('street'), readAddr('building'), readAddr('landmark')]
+      .filter(Boolean)
+      .join('، ') || readAddr('cityNameAr');
+  const deliveryNote = readAddr('deliveryNotes');
 
   return (
     <Screen edges={['top']} padded={false}>
@@ -167,7 +186,21 @@ export default function OrderScreen() {
          */}
         {justPlaced ? <PlacedConfirmation orderNumber={data.public_order_number} /> : null}
 
-        <StatusBanner status={data.status} etaMinutes={data.estimated_preparation_minutes} />
+        <StatusBanner
+          status={data.status}
+          etaMinutes={data.estimated_preparation_minutes}
+          rejectionReasonAr={data.rejection_reason_ar}
+        />
+
+        {/*
+         * The handover code, shown while the order is in flight.
+         *
+         * The courier confirms delivery by entering this, and it exists nowhere
+         * else the customer can see — so without it a COD order is stuck at
+         * «قيد التوصيل» forever (CUST-1 / FLOW-1). The API returns it only to
+         * this order's own customer and only between acceptance and delivery.
+         */}
+        {data.delivery_pin ? <DeliveryPinCard pin={data.delivery_pin} /> : null}
 
         {/*
          * The driver card is the whole difference between comp 7 and comp 8,
@@ -175,7 +208,7 @@ export default function OrderScreen() {
          * somebody carrying the order now, and the customer may need to reach
          * them.
          */}
-        {data.driver ? (
+        {data.driver && isLiveOrderStatus(data.status) ? (
           <DriverCard
             name={data.driver.first_name || 'المندوب'}
             phone={data.driver.phone}
@@ -188,17 +221,76 @@ export default function OrderScreen() {
 
         <Card>
           <Row justify="space-between">
-            <View>
+            <View style={{ flex: 1 }}>
               <Text variant="smallBold">{restaurantName}</Text>
               <Text variant="caption" tone="muted">
                 طلب رقم {data.public_order_number}
               </Text>
             </View>
-            <Text variant="caption" tone="muted">
-              {formatTime(data.placed_at)}
-            </Text>
+            {/* A way to reach the shop about this order, which the screen never
+                offered (CUST-25). */}
+            {data.restaurant?.phone ? (
+              <Pressable
+                onPress={() => void Linking.openURL(`tel:${data.restaurant?.phone ?? ''}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`اتصال بـ ${restaurantName}`}
+                hitSlop={space[2]}
+                style={({ pressed }) => [
+                  {
+                    width: 40,
+                    height: 40,
+                    borderRadius: radius.full,
+                    backgroundColor: color.brandSoft,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  pressed ? { opacity: 0.7 } : null,
+                ]}
+              >
+                <MaterialCommunityIcons name="phone-outline" size={18} color={color.brand} />
+              </Pressable>
+            ) : (
+              <Text variant="caption" tone="muted">
+                {formatTime(data.placed_at)}
+              </Text>
+            )}
           </Row>
         </Card>
+
+        {/*
+         * Where it is going and what the customer asked for — both things they
+         * phone in about, both already on the order (CUST-25).
+         */}
+        {addressLine || deliveryNote || data.customer_notes ? (
+          <Card>
+            {addressLine ? (
+              <Row gap={space[2]} align="flex-start">
+                <MaterialCommunityIcons
+                  name="map-marker-outline"
+                  size={18}
+                  color={color.brand}
+                  style={{ marginTop: 2 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text variant="caption" tone="muted">
+                    عنوان التوصيل
+                  </Text>
+                  <Text variant="small">{addressLine}</Text>
+                </View>
+              </Row>
+            ) : null}
+            {deliveryNote ? (
+              <Text variant="caption" tone="secondary">
+                ملاحظة العنوان: {deliveryNote}
+              </Text>
+            ) : null}
+            {data.customer_notes ? (
+              <Text variant="caption" tone="secondary">
+                ملاحظتك: {data.customer_notes}
+              </Text>
+            ) : null}
+          </Card>
+        ) : null}
 
         <Card>
           <Text variant="smallBold" style={{ marginBottom: space[3] }}>
@@ -277,6 +369,12 @@ export default function OrderScreen() {
               شكراً، تم تسجيل تقييمك
             </Text>
           </Row>
+        ) : eligibility.data ? (
+          // The window is not a silent gap: the customer is told it opens a
+          // quarter of an hour after delivery (CUST-15).
+          <Text variant="caption" tone="muted" align="center">
+            يمكنك تقييم الطلب بعد ١٥ دقيقة من التسليم
+          </Text>
         ) : null}
 
         {/*
@@ -360,7 +458,7 @@ function PlacedConfirmation({ orderNumber }: { orderNumber: string }) {
         تم إرسال طلبك بنجاح
       </Text>
       <Text variant="small" tone="secondary" align="center">
-        وصل طلبك إلى المطعم، وسيصلك إشعار بكل تحديث على حالته.
+        وصل طلبك إلى المتجر، وسيصلك إشعار بكل تحديث على حالته.
       </Text>
       <Row gap={space[1]}>
         <Text variant="caption" tone="muted">
@@ -374,9 +472,24 @@ function PlacedConfirmation({ orderNumber }: { orderNumber: string }) {
   );
 }
 
-function StatusBanner({ status, etaMinutes }: { status: OrderStatus; etaMinutes: number }) {
+/** Statuses where the kitchen is still cooking, so a prep estimate is honest. */
+const PREPARING_STATUSES: OrderStatus[] = ['PLACED', 'PENDING_RESTAURANT', 'ACCEPTED', 'PREPARING'];
+
+function StatusBanner({
+  status,
+  etaMinutes,
+  rejectionReasonAr,
+}: {
+  status: OrderStatus;
+  etaMinutes: number;
+  rejectionReasonAr?: string | null;
+}) {
   const failed = status === 'CANCELLED' || status === 'REJECTED';
   const done = status === 'DELIVERED' || status === 'COMPLETED';
+  // The number is the kitchen's preparation estimate, not a delivery ETA, so it
+  // is labelled as what it is and shown only while the kitchen is cooking
+  // (CUST-13). Arabic plural agreement via countAr.
+  const showPrep = PREPARING_STATUSES.includes(status) && etaMinutes > 0;
 
   return (
     <View
@@ -398,11 +511,53 @@ function StatusBanner({ status, etaMinutes }: { status: OrderStatus; etaMinutes:
         </Text>
       </Row>
 
-      {!failed && !done ? (
-        <Text variant="caption" tone="secondary">
-          الوصول المتوقع خلال {etaMinutes} دقيقة تقريباً
+      {status === 'REJECTED' && rejectionReasonAr ? (
+        <Text variant="caption" tone="danger">
+          {rejectionReasonAr}
         </Text>
       ) : null}
+
+      {showPrep ? (
+        <Text variant="caption" tone="secondary">
+          مدة التحضير المتوقعة: {countAr(etaMinutes, MINUTES)}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * «رمز التسليم» — the four digits the courier must enter to close the order.
+ *
+ * Deliberately the loudest card while it is shown: a customer who cannot find
+ * it hands the courier nothing and the delivery cannot be completed.
+ */
+function DeliveryPinCard({ pin }: { pin: string }) {
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      accessibilityLabel={`رمز التسليم ${pin.split('').join(' ')}. أعطه للمندوب عند الاستلام`}
+      style={{
+        padding: space[4],
+        borderRadius: radius.lg,
+        backgroundColor: color.brandSoft,
+        borderWidth: 1.5,
+        borderColor: color.brand,
+        gap: space[2],
+      }}
+    >
+      <Row gap={space[2]}>
+        <MaterialCommunityIcons name="lock-outline" size={20} color={color.brand} />
+        <Text variant="smallBold" tone="brand">
+          رمز التسليم
+        </Text>
+      </Row>
+      <Ltr variant="display" tone="brand" style={{ letterSpacing: 8, textAlign: 'center' }}>
+        {toArabicDigits(pin)}
+      </Ltr>
+      <Text variant="caption" tone="secondary" align="center">
+        أعطه للمندوب عند الاستلام
+      </Text>
     </View>
   );
 }

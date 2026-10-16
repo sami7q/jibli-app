@@ -1,7 +1,7 @@
 import { COSMETICS_AISLES, MARKET_AISLES, type Cuisine, type MerchantType } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import type { OwnerLiveOrder } from './api';
-import { countAr, type CountedNoun } from './arabic-count';
+import { countAr, ITEMS, type CountedNoun } from './arabic-count';
 
 /**
  * The words and rules Owner Mode's catalog and order alerts share.
@@ -9,9 +9,6 @@ import { countAr, type CountedNoun } from './arabic-count';
  * No React here, so the sentences a shop owner reads on a locked screen can be
  * pinned by a test rather than checked on a phone.
  */
-
-/** «صنف واحد», «صنفان», «5 أصناف», «13 صنفاً» — units on an order. */
-export const ITEMS: CountedNoun = { one: 'صنف واحد', two: 'صنفان', few: 'أصناف', many: 'صنفاً' };
 
 /** «منتج واحد», «منتجان», «5 منتجات», «13 منتجاً» — what a category holds. */
 export const PRODUCTS: CountedNoun = {
@@ -66,9 +63,18 @@ export function describeAddress(address: Record<string, unknown>): string | null
     readText(address, 'cityNameAr'),
     readText(address, 'districtText'),
     readText(address, 'street'),
+    // The building and floor the courier is handed but the shop never saw
+    // (MERCH-32).
+    readText(address, 'building'),
+    readText(address, 'floor'),
     readText(address, 'landmark'),
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' — ') : null;
+}
+
+/** The courier note left on the address, e.g. «رن الجرس مرتين» (MERCH-32). */
+export function addressDeliveryNote(address: Record<string, unknown>): string | null {
+  return readText(address, 'deliveryNotes');
 }
 
 /** Where the order goes, in one word: the district, or the city without one. */

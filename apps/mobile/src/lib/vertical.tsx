@@ -1,6 +1,15 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { MerchantType } from '@jibli/contracts';
 import { setAccentSection } from '@/theme';
+import { clearVertical, loadVertical, saveVertical } from './secure-session';
 
 /**
  * Which half of Jibli the customer is in — food, or the market.
@@ -11,15 +20,17 @@ import { setAccentSection } from '@/theme';
  * render until it knows which one it is showing. The chooser screen exists to
  * answer that, and the Gate sends anyone without an answer to it.
  *
- * Deliberately not persisted. A customer who bought milk on Tuesday should not
- * open the app hungry on Friday and land in a grocery — and the chooser is one
- * tap, which makes forgetting the cheaper direction to be wrong in. If that
- * proves annoying in use, persisting it is a one-line change here and nothing
- * else moves.
+ * Persisted, so a reload or a deep link does not strand a customer on the
+ * chooser with a full cart and a destination in hand (CUST-7). `resolved` says
+ * whether the stored choice has been read yet, so the Gate does not redirect
+ * to the chooser in the one frame before it lands. Changing section («تبديل
+ * القسم») clears it, so that is still one tap away.
  */
 
 interface VerticalApi {
   readonly vertical: MerchantType | null;
+  /** False until the persisted choice has been read on launch. */
+  readonly resolved: boolean;
   readonly choose: (next: MerchantType) => void;
   /** Back to the chooser. The home screen's back button calls this. */
   readonly clear: () => void;
@@ -29,6 +40,22 @@ const VerticalContext = createContext<VerticalApi | null>(null);
 
 export function VerticalProvider({ children }: { children: ReactNode }) {
   const [vertical, setVertical] = useState<MerchantType | null>(null);
+  const [resolved, setResolved] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void loadVertical()
+      .then((stored) => {
+        if (!alive) return;
+        if (stored) setVertical(stored);
+      })
+      .finally(() => {
+        if (alive) setResolved(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /*
    * The section decides the app's accent, and it is set here, in render.
@@ -45,12 +72,18 @@ export function VerticalProvider({ children }: { children: ReactNode }) {
    */
   setAccentSection(vertical);
 
-  const choose = useCallback((next: MerchantType) => setVertical(next), []);
-  const clear = useCallback(() => setVertical(null), []);
+  const choose = useCallback((next: MerchantType) => {
+    setVertical(next);
+    void saveVertical(next);
+  }, []);
+  const clear = useCallback(() => {
+    setVertical(null);
+    void clearVertical();
+  }, []);
 
   const value = useMemo<VerticalApi>(
-    () => ({ vertical, choose, clear }),
-    [vertical, choose, clear],
+    () => ({ vertical, resolved, choose, clear }),
+    [vertical, resolved, choose, clear],
   );
 
   return <VerticalContext.Provider value={value}>{children}</VerticalContext.Provider>;

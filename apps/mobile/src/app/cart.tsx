@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +6,8 @@ import { formatIqdArabic, iqd } from '@jibli/money';
 import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, assetUrl } from '@/lib/api';
 import { useCart } from '@/lib/cart';
+import { continueAfterSignIn } from '@/lib/after-sign-in';
+import { confirmAsync } from '@/lib/dialog';
 import { useIsGuest } from '@/lib/session';
 import { ALIGN_END, ROW, TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
@@ -25,8 +26,10 @@ import { Stepper, SummaryRow } from '@/ui/catalog';
 export default function CartScreen() {
   const router = useRouter();
   const isGuest = useIsGuest();
-  const { cart, subtotalIqd, itemCount, setQuantity, remove, clear } = useCart();
-  const [notes, setNotes] = useState('');
+  const { cart, subtotalIqd, itemCount, setQuantity, remove, setNote, clear } = useCart();
+  // Read from the cart store, so the note is still here after a back-swipe or a
+  // reload (CUST-17).
+  const notes = cart?.note ?? '';
 
   /*
    * The service fee, read from the storefront.
@@ -51,8 +54,8 @@ export default function CartScreen() {
         <TopBar title="سلة المشتريات" onBack={goBack} />
         <EmptyState
           title="سلتك فارغة"
-          body="تصفّح المطاعم وأضف ما يعجبك."
-          action={{ label: 'تصفّح المطاعم', onPress: () => router.replace('/(tabs)') }}
+          body="تصفّح المتاجر وأضف ما يعجبك."
+          action={{ label: 'تصفّح المتاجر', onPress: () => router.replace('/(tabs)') }}
         />
       </Screen>
     );
@@ -69,10 +72,22 @@ export default function CartScreen() {
         <TopBar
           title="سلة المشتريات"
           onBack={goBack}
-          onClear={() => {
-            clear();
-            goBack();
-          }}
+          // Emptying the whole cart is destructive and was one tap with no
+          // undo (CUST-17).
+          onClear={() =>
+            void confirmAsync({
+              title: 'تفريغ السلة؟',
+              message: 'سيُحذف كل ما في سلتك.',
+              confirmLabel: 'تفريغ',
+              cancelLabel: 'تراجع',
+              destructive: true,
+            }).then((yes) => {
+              if (yes) {
+                clear();
+                goBack();
+              }
+            })
+          }
         />
       </View>
 
@@ -174,7 +189,7 @@ export default function CartScreen() {
           </Row>
           <TextInput
             value={notes}
-            onChangeText={setNotes}
+            onChangeText={setNote}
             placeholder="بدون بصل، صلصة إضافية…"
             placeholderTextColor={color.textMuted}
             multiline
@@ -264,6 +279,9 @@ export default function CartScreen() {
              * to call. Everything before this point works signed-out.
              */
             if (isGuest) {
+              // Come back to the cart after signing in, not the home screen
+              // (CUST-10).
+              continueAfterSignIn('/cart');
               router.push('/(auth)/phone');
               return;
             }

@@ -395,7 +395,9 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
           isNull(menuCategories.deletedAt),
         ),
       )
-      .orderBy(asc(menuCategories.sortOrder));
+      // createdAt breaks a sort_order tie deterministically, so categories that
+      // share an order do not flip between requests (MERCH-22).
+      .orderBy(asc(menuCategories.sortOrder), asc(menuCategories.createdAt));
 
     const items = await ctx.db
       .select()
@@ -407,7 +409,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
           isNull(menuItems.deletedAt),
         ),
       )
-      .orderBy(asc(menuItems.sortOrder));
+      .orderBy(asc(menuItems.sortOrder), asc(menuItems.createdAt));
 
     /*
      * Which items carry a required choice.

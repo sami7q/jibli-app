@@ -191,7 +191,9 @@ export function registerAdminSettingsRoutes(app: FastifyInstance, ctx: AppContex
    * matrix is reviewed in source.
    */
   app.get('/api/v1/admin/roles', { preHandler: app.authenticate }, async (request, reply) => {
-    assertAdminPermission(requirePrincipal(request), 'roles.manage');
+    // Reading the matrix is not managing it: `roles.read` so the page loads
+    // without the step-up `roles.manage` demands (ADMIN-7).
+    assertAdminPermission(requirePrincipal(request), 'roles.read');
 
     return reply.send(
       success(

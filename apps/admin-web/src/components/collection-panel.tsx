@@ -26,7 +26,14 @@ import { admin, type Collectable, type CollectionArchive } from '@/lib/admin-end
  * second kind of record. The restaurant sees the same statement in its own
  * portal, and reconciliation checks it like any other.
  */
-export function CollectionPanel({ token }: { token: string }) {
+export function CollectionPanel({
+  token,
+  canCollect = true,
+}: {
+  token: string;
+  /** Whether this role may record a collection; false hides «جمع الأرباح» (ADMIN-11). */
+  canCollect?: boolean;
+}) {
   const queryClient = useQueryClient();
   const [collecting, setCollecting] = useState<Collectable | null>(null);
   const [needsMfa, setNeedsMfa] = useState(false);
@@ -149,15 +156,16 @@ export function CollectionPanel({ token }: { token: string }) {
                   {
                     key: 'action',
                     header: '',
-                    render: (row) => (
-                      <button
-                        type="button"
-                        className="btn btn--primary btn--sm"
-                        onClick={() => setCollecting(row)}
-                      >
-                        جمع الأرباح
-                      </button>
-                    ),
+                    render: (row) =>
+                      canCollect ? (
+                        <button
+                          type="button"
+                          className="btn btn--primary btn--sm"
+                          onClick={() => setCollecting(row)}
+                        >
+                          جمع الأرباح
+                        </button>
+                      ) : null,
                   },
                 ]}
               />

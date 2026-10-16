@@ -30,15 +30,27 @@ import { restaurantScope } from './scope.js';
 const categorySchema = z.object({
   name_ar: arabicTextSchema(2, 60),
   description_ar: z.string().max(200).optional(),
-  sort_order: z.number().int().min(0).max(999).default(0),
+  // Optional on create: the server defaults it to max+1 so a new category lands
+  // last rather than tying at 0 and flipping order between requests (MERCH-22).
+  sort_order: z.number().int().min(0).max(999).optional(),
 });
+
+/**
+ * A sellable price: strictly positive and bounded (MERCH-9). The shared
+ * `iqdAmountSchema` allows 0 and reaches into the billions, so a free item or a
+ * fat-fingered «99,999,999,999» slipped through. 10,000,000 IQD (~US$7,600) is
+ * far above any real single item.
+ */
+const PRICE_MAX_IQD = 10_000_000;
+const menuPriceSchema = z.number().int().positive().max(PRICE_MAX_IQD);
+const menuCostSchema = z.number().int().min(0).max(PRICE_MAX_IQD);
 
 const itemSchema = z.object({
   category_id: uuidSchema,
   name_ar: arabicTextSchema(2, 100),
   description_ar: z.string().max(300).optional(),
-  base_price_iqd: iqdAmountSchema,
-  cost_price_iqd: iqdAmountSchema.optional(),
+  base_price_iqd: menuPriceSchema,
+  cost_price_iqd: menuCostSchema.optional(),
   sku: z.string().max(40).optional(),
   preparation_minutes_override: z.number().int().min(1).max(240).optional(),
   is_popular: z.boolean().default(false),
@@ -157,12 +169,25 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
 
       const id = uuidv7();
       await ctx.db.transaction(async (tx) => {
+        // Default to the end of the list, so the new category does not tie at 0
+        // with an existing one and flip order between requests (MERCH-22).
+        let sortOrder = body.sort_order;
+        if (sortOrder === undefined) {
+          const [maxRow] = await tx
+            .select({ max: sql<number>`COALESCE(MAX(${menuCategories.sortOrder}), -1)` })
+            .from(menuCategories)
+            .where(
+              and(eq(menuCategories.restaurantId, restaurantId), isNull(menuCategories.deletedAt)),
+            );
+          sortOrder = Number(maxRow?.max ?? -1) + 1;
+        }
+
         await tx.insert(menuCategories).values({
           id,
           restaurantId,
           nameAr: body.name_ar,
           descriptionAr: body.description_ar ?? null,
-          sortOrder: body.sort_order,
+          sortOrder,
         });
         await bumpMenuVersion(tx, restaurantId);
       });
@@ -313,6 +338,26 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
         .parse(request.body);
 
       await ctx.db.transaction(async (tx) => {
+        // Moving an item to another category must stay inside this restaurant —
+        // the same check create does. Without it an item could be reparented to
+        // a competitor's category and vanish from the owner's menu (MERCH-23).
+        if (body.category_id) {
+          const [category] = await tx
+            .select({ id: menuCategories.id })
+            .from(menuCategories)
+            .where(
+              and(
+                eq(menuCategories.id, body.category_id),
+                eq(menuCategories.restaurantId, restaurantId),
+              ),
+            )
+            .limit(1);
+
+          if (!category) {
+            throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'category' } });
+          }
+        }
+
         const updated = await tx
           .update(menuItems)
           .set({

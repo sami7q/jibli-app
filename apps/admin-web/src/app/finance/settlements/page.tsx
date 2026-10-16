@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SETTLEMENT_STATUS_LABELS, dateAr, pluralAr } from '@jibli/ui-web';
 import { SETTLEMENT_STATUSES, type SettlementStatus } from '@jibli/contracts';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { CommissionOverviewCards } from '@/components/commission-overview';
 import {
   Badge,
@@ -86,7 +86,11 @@ export default function SettlementsPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('finance.read.global')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المالية" />;
+  }
 
+  const canIssue = session.can('finance.settlement.issue');
   const failedChecks = (summary.data?.reconciliation ?? []).filter((check) => !check.passed);
 
   return (
@@ -240,7 +244,7 @@ export default function SettlementsPage() {
                 key: 'actions',
                 header: '',
                 render: (row) =>
-                  row.status === 'DRAFT' ? (
+                  row.status === 'DRAFT' && canIssue ? (
                     <button
                       type="button"
                       className="btn btn--primary btn--sm"

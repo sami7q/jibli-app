@@ -10,7 +10,7 @@ import { PRODUCTS, suggestedCategories } from '@/lib/owner-catalog';
 import { sectionOf } from '@/lib/sections';
 import { color, INPUT_TEXT_START, radius, ROW, space, TAP_TARGET, text } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
-import { OwnerHeader } from './index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * The aisles — «الأقسام» — from the phone.

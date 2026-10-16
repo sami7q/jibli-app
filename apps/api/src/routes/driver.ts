@@ -30,6 +30,7 @@ import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { confirmDelivery } from '../services/delivery-service.js';
 import { transitionOrder } from '../services/order-service.js';
+import { notifyAdmins } from '../services/admin-notification-service.js';
 
 /**
  * Driver Mode API (plan §47, §49, §71).
@@ -132,6 +133,24 @@ export function registerDriverRoutes(app: FastifyInstance, ctx: AppContext): voi
       availability: 'OFFLINE',
       defaultVehicleType: body.vehicle_type,
       plateNumber: body.plate_number ?? null,
+    });
+
+    /*
+     * Put it on the bell, the same as a shop application (FLOW-10). A courier
+     * application raised no alert at all, so an operator watching the feed never
+     * learned anyone had applied. Reuses APPLICATION_RECEIVED — it is still "an
+     * application is waiting", keyed on the driver so a resubmit does not pile
+     * up duplicate entries.
+     */
+    await notifyAdmins(ctx, {
+      kind: 'APPLICATION_RECEIVED',
+      severity: 'ATTENTION',
+      titleAr: 'طلب انضمام مندوب جديد',
+      bodyAr: `${user.fullName} — ${body.vehicle_type}`,
+      linkPath: '/drivers',
+      entityType: 'driver_application',
+      entityId: driverId,
+      dedupeKey: `driver_application:${driverId}`,
     });
 
     return reply.send(

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import type { OrderStatus } from '@jibli/contracts';
 import { api, ApiError, type OrderNotification } from '@/lib/api';
+import { useMe } from '@/lib/session';
 import { markNotificationsSeen, useUnseenNotifications } from '@/lib/notification-inbox';
 import { announcementFor } from '@/lib/order-watch';
 import { ROW, color, radius, space, TAP_TARGET } from '@/theme';
@@ -28,7 +29,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
 
   const feed = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', useMe()?.user_id ?? null],
     queryFn: () => api.notifications(),
     staleTime: 15_000,
   });
@@ -83,7 +84,7 @@ export default function NotificationsScreen() {
           <EmptyState
             title="لا توجد إشعارات بعد"
             body="ستجد هنا كل تحديث على طلباتك — من لحظة إرساله حتى تسليمه."
-            action={{ label: 'تصفّح المطاعم', onPress: () => router.replace('/(tabs)') }}
+            action={{ label: 'تصفّح المتاجر', onPress: () => router.replace('/(tabs)') }}
           />
         </View>
       ) : (

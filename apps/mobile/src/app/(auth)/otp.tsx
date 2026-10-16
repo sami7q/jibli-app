@@ -14,6 +14,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { normalizeDigits } from '@jibli/validation/arabic';
 import { formatIraqiPhoneDisplay } from '@jibli/validation/phone';
+import MaterialCommunityIcons from '@/ui/icon';
 import { Ltr } from '@/ui';
 import { api, ApiError, NetworkError } from '@/lib/api';
 import { signedInDestination } from '@/lib/after-sign-in';
@@ -175,8 +176,24 @@ export default function OtpScreen() {
 
   const complete = code.length === OTP_LENGTH;
 
+  /*
+   * «تغيير» and the back chevron both return to the number field, not the
+   * welcome screen (CUST-11): the OTP screen is pushed from there, so going
+   * back lands on the phone screen with the number ready to correct.
+   */
+  const goBackToPhone = () =>
+    router.canGoBack() ? router.back() : router.replace('/(auth)/phone');
+
   return (
     <View style={styles.container}>
+      <Pressable
+        onPress={goBackToPhone}
+        accessibilityRole="button"
+        accessibilityLabel="رجوع"
+        style={styles.back}
+      >
+        <MaterialCommunityIcons name="chevron-right" size={26} color={color.textPrimary} />
+      </Pressable>
       <View style={styles.sheet}>
         {/*
          * Two steps, and the screen says which one this is.
@@ -206,7 +223,7 @@ export default function OtpScreen() {
          * the paragraph's direction, and a nested Text inherits it.
          */}
         <Pressable
-          onPress={() => router.replace('/(auth)/welcome')}
+          onPress={goBackToPhone}
           accessibilityRole="button"
           accessibilityLabel={`تغيير الرقم، الرقم الحالي ${phone ?? ''}`}
           style={({ pressed }) => [styles.phonePill, pressed ? styles.phonePillPressed : null]}
@@ -368,6 +385,18 @@ const SUPPRESS_WEB_OUTLINE = (Platform.OS === 'web' ? { outlineStyle: 'none' } :
 const styles = lazySheet(() =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: color.surfacePage },
+
+    back: {
+      position: 'absolute',
+      top: space[10],
+      // The start corner, which in a right-to-left layout is the right one.
+      right: space[4],
+      zIndex: 1,
+      width: TAP_TARGET,
+      height: TAP_TARGET,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
     sheet: {
       flex: 1,

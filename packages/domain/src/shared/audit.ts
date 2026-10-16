@@ -138,6 +138,7 @@ export const AUDIT_ACTIONS = {
   COUPON_CREATE: 'coupon.create',
   COUPON_UPDATE: 'coupon.update',
   SUPPORT_THREAD_RESOLVE: 'support.thread.resolve',
+  SUPPORT_THREAD_REPLY: 'support.thread.reply',
   CATEGORY_CREATE: 'category.create',
   CATEGORY_UPDATE: 'category.update',
   CATEGORY_DELETE: 'category.delete',

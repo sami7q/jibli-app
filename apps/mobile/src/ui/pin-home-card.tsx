@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api } from '@/lib/api';
-import { useIsGuest } from '@/lib/session';
+import { useIsGuest, useMe } from '@/lib/session';
 import { dismissPinHome, pinHomeDismissed } from '@/lib/home-pin-store';
 import { color, radius, ROW, space } from '@/theme';
 import { Text } from '@/ui';
@@ -48,7 +48,7 @@ export function PinHomeCard() {
    * street. They get the offer too.
    */
   const addresses = useQuery({
-    queryKey: ['addresses'],
+    queryKey: ['addresses', useMe()?.user_id ?? null],
     queryFn: () => api.addresses(),
     enabled: !isGuest,
     staleTime: 5 * 60_000,

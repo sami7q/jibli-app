@@ -6,6 +6,7 @@ import {
   ERROR_CODES,
   EVENT_TYPES,
   ORDER_CANCELLATION_REASONS,
+  orderRejectionReasonLabelAr,
   success,
 } from '@jibli/contracts';
 import { assertPhoneVerified, assertProfileComplete } from '@jibli/auth';
@@ -323,6 +324,20 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
     );
   });
 
+  /**
+   * While the order is in flight, the customer may read the delivery PIN off
+   * their own screen to hand to the courier (CUST-1 / FLOW-1). Never before the
+   * shop accepts and never after delivery — a code with no live handover is
+   * noise at best. This route is already scoped to the order's owner, so the
+   * plaintext leaves the server only to the person meant to read it.
+   */
+  const PIN_VISIBLE_STATUSES: readonly string[] = [
+    'ACCEPTED',
+    'PREPARING',
+    'READY',
+    'OUT_FOR_DELIVERY',
+  ];
+
   /** Order detail and tracking timeline (plan §55). */
   app.get('/api/v1/orders/:orderId', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
@@ -399,6 +414,16 @@ export function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): void
           placed_at: order.placedAt.toISOString(),
           estimated_preparation_minutes: order.estimatedPreparationMinutes,
           customer_notes: order.customerNotes,
+          // The COD handover code, to this order's own customer only, and only
+          // while it is in flight (CUST-1). Null otherwise / when there is none.
+          delivery_pin:
+            PIN_VISIBLE_STATUSES.includes(order.status) && order.deliveryPinPlaintext
+              ? order.deliveryPinPlaintext
+              : null,
+          // The reason the shop gave, so the app can explain «مرفوض» (MERCH-20).
+          rejection_reason: order.status === 'REJECTED' ? (order.rejectionReason ?? null) : null,
+          rejection_reason_ar:
+            order.status === 'REJECTED' ? orderRejectionReasonLabelAr(order.rejectionReason) : null,
           restaurant: order.restaurantLocationSnapshotJson,
           delivery_address: order.deliveryAddressSnapshotJson,
           items: items.map((item) => ({

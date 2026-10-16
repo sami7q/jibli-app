@@ -23,6 +23,8 @@ interface CartApi {
   readonly add: (cart: Omit<Cart, 'lines'>, line: Omit<CartLine, 'key'>) => 'added' | 'replaced';
   readonly setQuantity: (key: string, quantity: number) => void;
   readonly remove: (key: string) => void;
+  /** The order note, kept with the cart so it survives a reload (CUST-17). */
+  readonly setNote: (note: string) => void;
   readonly clear: () => void;
 }
 
@@ -72,6 +74,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       },
       setQuantity: (key, quantity) => dispatch({ type: 'setQuantity', key, quantity }),
       remove: (key) => dispatch({ type: 'remove', key }),
+      setNote: (note) => dispatch({ type: 'setNote', note }),
       clear: () => dispatch({ type: 'clear' }),
     };
   }, [cart]);

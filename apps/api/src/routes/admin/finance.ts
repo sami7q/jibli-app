@@ -982,12 +982,32 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
       const [ledger] = await ctx.db
         .select({
           accrued: sql<number>`COALESCE(SUM(${ledgerEntries.amountIqd}) FILTER (WHERE ${ledgerEntries.entryType} = 'COMMISSION_ACCRUED'), 0)`,
-          collected: sql<number>`COALESCE(SUM(${ledgerEntries.amountIqd}) FILTER (WHERE ${ledgerEntries.entryType} = 'COMMISSION_PAYMENT'), 0)`,
           credits: sql<number>`COALESCE(SUM(${ledgerEntries.amountIqd}) FILTER (WHERE ${ledgerEntries.entryType} IN ('COMMISSION_CREDIT','REVERSAL')), 0)`,
           serviceFees: sql<number>`COALESCE(SUM(${ledgerEntries.amountIqd}) FILTER (WHERE ${ledgerEntries.entryType} = 'SERVICE_FEE_REVENUE'), 0)`,
         })
         .from(ledgerEntries)
         .where(gte(ledgerEntries.effectiveAt, since));
+
+      /*
+       * Collected is split into commission and service fee (ADMIN-20). The
+       * COMMISSION_PAYMENT ledger entry a collection writes is the whole amount
+       * taken — commission plus the service fee riding on the same statement —
+       * so reporting it as "commission collected" overstated commission. The
+       * statement itself carries the split: commission_total vs amount_paid.
+       */
+      const [collectedSplit] = await ctx.db
+        .select({
+          commission: sql<number>`COALESCE(SUM(${settlements.commissionTotalIqd}), 0)`,
+          paid: sql<number>`COALESCE(SUM(${settlements.amountPaidIqd}), 0)`,
+        })
+        .from(settlements)
+        .where(and(eq(settlements.status, 'PAID'), gte(settlements.paidAt, since)));
+
+      const commissionCollected = Number(collectedSplit?.commission ?? 0);
+      const serviceFeeCollected = Math.max(
+        0,
+        Number(collectedSplit?.paid ?? 0) - commissionCollected,
+      );
 
       const [outstanding] = await ctx.db
         .select({
@@ -1022,7 +1042,10 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
         success(
           {
             commission_accrued_iqd: Number(ledger?.accrued ?? 0),
-            commission_collected_iqd: Number(ledger?.collected ?? 0),
+            // Commission only — the service fee collected alongside it is now a
+            // separate figure (ADMIN-20).
+            commission_collected_iqd: commissionCollected,
+            service_fee_collected_iqd: serviceFeeCollected,
             credits_issued_iqd: Number(ledger?.credits ?? 0),
             service_fee_revenue_iqd: Number(ledger?.serviceFees ?? 0),
             outstanding_iqd: Number(outstanding?.due ?? 0),
@@ -1037,7 +1060,8 @@ export function registerAdminFinanceRoutes(app: FastifyInstance, ctx: AppContext
             })),
             definitions_ar: {
               commission_accrued: 'العمولة المستحقة على الطلبات المكتملة — ليست مبالغ محصّلة',
-              commission_collected: 'العمولة المحصّلة فعلياً من المطاعم',
+              commission_collected: 'العمولة المحصّلة فعلياً من المطاعم (بدون رسوم الخدمة)',
+              service_fee_collected: 'رسوم الخدمة المحصّلة ضمن الكشوف المدفوعة',
               outstanding: 'المبالغ الصادرة وغير المسددة بعد',
             },
           },

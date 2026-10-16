@@ -222,11 +222,31 @@ function LoginForm() {
       const status = caught instanceof ApiError ? caught.status : undefined;
 
       switch (loginFailureKind(code, status)) {
-        case 'RATE_LIMITED':
+        case 'RATE_LIMITED': {
           setFailures(failures + 1);
-          setError('محاولات كثيرة. انتظر قليلاً قبل إعادة المحاولة.');
-          setLockedFor(BACKOFF_SECONDS * 2);
+          /*
+           * A per-account lockout after repeated wrong passwords comes back as
+           * RATE_LIMITED too, but with `reason: ACCOUNT_LOCKED` and how long is
+           * left. Saying «محاولات كثيرة، انتظر قليلاً» for a 15-minute lock left
+           * the operator retrying every few seconds against a wall (ADMIN-24);
+           * name the lock and roughly how long.
+           */
+          const details = caught instanceof ApiError ? caught.details : {};
+          const retry =
+            typeof details.retryAfterSeconds === 'number' ? details.retryAfterSeconds : null;
+          if (details.reason === 'ACCOUNT_LOCKED') {
+            const minutes = retry ? Math.max(1, Math.ceil(retry / 60)) : 15;
+            setError(
+              `تم قفل الحساب مؤقتاً بعد عدة محاولات خاطئة. يمكنك المحاولة بعد ${minutes} دقيقة تقريباً.`,
+            );
+            // Keep the visible countdown short; the server holds the real lock.
+            setLockedFor(Math.min(retry ?? BACKOFF_SECONDS * 2, 60));
+          } else {
+            setError('محاولات كثيرة. انتظر قليلاً قبل إعادة المحاولة.');
+            setLockedFor(BACKOFF_SECONDS * 2);
+          }
           break;
+        }
 
         /*
          * Nothing read the password, so nothing about it was wrong — and the
@@ -351,9 +371,13 @@ function LoginForm() {
               inputMode="numeric"
               // Lets a phone offer the code from its authenticator app.
               autoComplete="one-time-code"
-              maxLength={10}
+              // A recovery code is XXXXX-XXXXX (11 chars). maxLength was 10, so
+              // the field silently truncated it and the code never matched; the
+              // dash is stripped since the server hashes the dash-less form
+              // (ADMIN-8).
+              maxLength={14}
               value={mfaCode}
-              onChange={(event) => setMfaCode(event.target.value.replace(/\s/g, ''))}
+              onChange={(event) => setMfaCode(event.target.value.replace(/[\s-]/g, ''))}
               placeholder="123456"
               required
             />

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogoUpload } from '@jibli/ui-web';
 import type { MerchantType } from '@jibli/contracts';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { Badge, Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError, adminApi } from '@/lib/api';
@@ -80,7 +80,12 @@ export default function CategoriesPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('restaurant.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المتاجر" />;
+  }
 
+  // Editing categories is a storefront config change (ADMIN-11).
+  const canManage = session.can('config.write');
   const rows = categories.data ?? [];
 
   /**
@@ -112,9 +117,11 @@ export default function CategoriesPage() {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
-        <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
-          {storefront === 'RESTAURANT' ? 'تصنيف جديد' : 'قسم جديد'}
-        </button>
+        canManage ? (
+          <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
+            {storefront === 'RESTAURANT' ? 'تصنيف جديد' : 'قسم جديد'}
+          </button>
+        ) : null
       }
     >
       <Card>
@@ -140,7 +147,7 @@ export default function CategoriesPage() {
                   <button
                     type="button"
                     className="cat__move"
-                    disabled={index === 0 || reorder.isPending}
+                    disabled={!canManage || index === 0 || reorder.isPending}
                     onClick={() => move(index, -1)}
                     aria-label={`تحريك ${category.name_ar} للأعلى`}
                   >
@@ -154,7 +161,7 @@ export default function CategoriesPage() {
                   <button
                     type="button"
                     className="cat__move"
-                    disabled={index === rows.length - 1 || reorder.isPending}
+                    disabled={!canManage || index === rows.length - 1 || reorder.isPending}
                     onClick={() => move(index, 1)}
                     aria-label={`تحريك ${category.name_ar} للأسفل`}
                   >
@@ -194,36 +201,40 @@ export default function CategoriesPage() {
                 </div>
 
                 <div className="cat__actions">
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    onClick={() => setEditing(category)}
-                  >
-                    تعديل
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    disabled={setActive.isPending}
-                    onClick={() =>
-                      setActive.mutate({ id: category.id, isActive: !category.is_active })
-                    }
-                  >
-                    {category.is_active ? 'إخفاء' : 'إظهار'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    disabled={category.restaurant_count > 0}
-                    title={
-                      category.restaurant_count > 0
-                        ? `لا يمكن حذف تصنيف فيه ${copy.countedAr}ات — أخفِه بدلاً من ذلك`
-                        : undefined
-                    }
-                    onClick={() => setDeleting(category)}
-                  >
-                    حذف
-                  </button>
+                  {canManage ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => setEditing(category)}
+                      >
+                        تعديل
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={setActive.isPending}
+                        onClick={() =>
+                          setActive.mutate({ id: category.id, isActive: !category.is_active })
+                        }
+                      >
+                        {category.is_active ? 'إخفاء' : 'إظهار'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={category.restaurant_count > 0}
+                        title={
+                          category.restaurant_count > 0
+                            ? `لا يمكن حذف تصنيف فيه ${copy.countedPluralAr} — أخفِه بدلاً من ذلك`
+                            : undefined
+                        }
+                        onClick={() => setDeleting(category)}
+                      >
+                        حذف
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </li>
             ))}

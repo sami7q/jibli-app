@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@/ui/icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatIqdArabic, iqd } from '@jibli/money';
+import { countAr, ITEMS, MINUTES } from '@/lib/arabic-count';
 import {
   ALIGN_START,
   INPUT_TEXT_START,
@@ -534,7 +535,7 @@ export function DriverCard({
         <Text variant="bodyBold">{name}</Text>
         <Text variant="caption" tone="muted">
           مندوب التوصيل
-          {etaMinutes ? ` · الوصول خلال ${etaMinutes} دقيقة` : ''}
+          {etaMinutes ? ` · الوصول خلال ${countAr(etaMinutes, MINUTES)}` : ''}
         </Text>
       </View>
 
@@ -781,7 +782,7 @@ export function CartBar({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`عرض السلة، ${count} صنف`}
+        accessibilityLabel={`عرض السلة، ${countAr(count, ITEMS)}`}
         style={({ pressed }) => [
           {
             minHeight: TAP_TARGET + 8,
@@ -799,7 +800,7 @@ export function CartBar({
         <Row gap={space[2]}>
           <MaterialCommunityIcons name="cart-outline" size={20} color={palette.white} />
           <Text variant="smallBold" tone="inverse">
-            {count} صنف
+            {countAr(count, ITEMS)}
           </Text>
         </Row>
         <Text variant="bodyBold" tone="inverse">
@@ -1039,7 +1040,7 @@ export function RestaurantCard({
           }}
         >
           <Text variant="caption" tone="inverse">
-            {etaMinutes} دقيقة
+            {countAr(etaMinutes, MINUTES)}
           </Text>
         </View>
 

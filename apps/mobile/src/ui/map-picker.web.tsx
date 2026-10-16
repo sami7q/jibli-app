@@ -15,12 +15,18 @@ import { isSamePoint, type MapPickerProps } from './map-picker-shared';
  * `srcdoc` rather than a blob or a data URL: the document is inline and never
  * touches the network to load itself.
  */
-export function MapPicker({ latitude, longitude, onPick, height = 280 }: MapPickerProps) {
+export function MapPicker({
+  latitude,
+  longitude,
+  onPick,
+  height = 280,
+  placeNoun = 'home',
+}: MapPickerProps) {
   const [ready, setReady] = useState(false);
   const frame = useRef<HTMLIFrameElement | null>(null);
 
   // Built once; see the native picker for why a rebuild per position was wrong.
-  const [html] = useState(() => MAP_PICKER_HTML(latitude ?? null, longitude ?? null));
+  const [html] = useState(() => MAP_PICKER_HTML(latitude ?? null, longitude ?? null, placeNoun));
   const lastReported = useRef<{ latitude: number; longitude: number } | null>(
     latitude != null && longitude != null ? { latitude, longitude } : null,
   );

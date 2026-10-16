@@ -5,7 +5,7 @@ import { MERCHANT_TYPE_LABELS, type MerchantType } from '@jibli/contracts';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { relativeAr } from '@jibli/ui-web';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { Badge, Card, ConfirmDialog, DataTable, ErrorState, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { adminApi, ApiError, type RestaurantApplication } from '@/lib/api';
@@ -26,6 +26,7 @@ export default function ApplicationsPage() {
   const queryClient = useQueryClient();
   const [reviewing, setReviewing] = useState<RestaurantApplication | null>(null);
   const [rejecting, setRejecting] = useState<RestaurantApplication | null>(null);
+  const [requestingInfo, setRequestingInfo] = useState<RestaurantApplication | null>(null);
 
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
@@ -56,9 +57,24 @@ export default function ApplicationsPage() {
     },
   });
 
+  const requestInfo = useMutation({
+    mutationFn: ({ id, message }: { id: string; message: string }) =>
+      adminApi.requestApplicationInfo(token, id, message),
+    onSuccess: () => {
+      setRequestingInfo(null);
+      void queryClient.invalidateQueries({ queryKey: ['admin-applications'] });
+    },
+  });
+
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('restaurant.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة طلبات الانضمام" />;
+  }
+
+  const canApprove = session.can('restaurant.approve');
+  const canReject = session.can('restaurant.reject');
 
   return (
     <AdminShell
@@ -111,6 +127,31 @@ export default function ApplicationsPage() {
                 ),
               },
               {
+                // Who applied and what they wrote — the reviewer had neither
+                // before (ADMIN-13).
+                key: 'applicant',
+                header: 'مقدّم الطلب',
+                render: (row) => (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span>{row.applicant_name ?? '—'}</span>
+                    {row.applicant_note ? (
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                        «{row.applicant_note}»
+                      </span>
+                    ) : null}
+                    {row.cuisine_tags.length > 0 ? (
+                      <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+                        {row.cuisine_tags.map((tag) => (
+                          <Badge key={tag} tone="neutral">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </span>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
                 key: 'location',
                 header: 'الموقع',
                 render: (row) => `${row.governorate_name_ar} - ${row.city_name_ar}`,
@@ -141,21 +182,34 @@ export default function ApplicationsPage() {
                 key: 'actions',
                 header: '',
                 render: (row) => (
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--sm"
-                      onClick={() => setReviewing(row)}
-                    >
-                      مراجعة
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--danger btn--sm"
-                      onClick={() => setRejecting(row)}
-                    >
-                      رفض
-                    </button>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    {canApprove ? (
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        onClick={() => setReviewing(row)}
+                      >
+                        مراجعة
+                      </button>
+                    ) : null}
+                    {canReject ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn--outline btn--sm"
+                          onClick={() => setRequestingInfo(row)}
+                        >
+                          طلب معلومات إضافية
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--danger btn--sm"
+                          onClick={() => setRejecting(row)}
+                        >
+                          رفض
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 ),
               },
@@ -190,6 +244,24 @@ export default function ApplicationsPage() {
           }
           onConfirm={(reason) => reject.mutate({ id: rejecting.id, reason })}
           onCancel={() => setRejecting(null)}
+        />
+      ) : null}
+
+      {requestingInfo ? (
+        <ConfirmDialog
+          title={`طلب معلومات من ${requestingInfo.display_name}`}
+          confirmLabel="إرسال الطلب"
+          tone="primary"
+          requireReason
+          isSubmitting={requestInfo.isPending}
+          error={requestInfo.error instanceof ApiError ? requestInfo.error.messageAr : null}
+          body={
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              يبقى الطلب مفتوحاً وتصل الرسالة إلى مقدّمه في التطبيق ليكمل ما ينقص، ثم يعاد للمراجعة.
+            </p>
+          }
+          onConfirm={(message) => requestInfo.mutate({ id: requestingInfo.id, message })}
+          onCancel={() => setRequestingInfo(null)}
         />
       ) : null}
     </AdminShell>

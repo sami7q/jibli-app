@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from '@/hooks/use-session';
+import { LiveOrdersProvider } from '@/hooks/use-live-orders';
 import { useState } from 'react';
 import { ApiError } from '@/lib/api';
 
@@ -42,7 +43,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       {/* One refresh loop per tab. See SessionProvider for why that is a
           correctness requirement and not a tidiness one. */}
-      <SessionProvider>{children}</SessionProvider>
+      <SessionProvider>
+        {/*
+          Live orders, the chime and the bell badge hoisted above every page so
+          they run wherever the owner is in the portal, not only on the
+          dashboard (MERCH-4).
+        */}
+        <LiveOrdersProvider>{children}</LiveOrdersProvider>
+      </SessionProvider>
     </QueryClientProvider>
   );
 }

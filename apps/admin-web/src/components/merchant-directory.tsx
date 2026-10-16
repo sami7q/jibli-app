@@ -14,7 +14,7 @@ import {
 } from '@jibli/contracts';
 import { formatIraqiPhoneNational } from '@jibli/validation';
 import { relativeAr } from '@jibli/ui-web';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { AreaCoverageCard } from '@/components/area-coverage';
 import { IssuePortalAccess } from '@/components/portal-credentials';
 import {
@@ -117,7 +117,10 @@ const STATUS_LABELS: Record<OperationalStatus, string> = {
 export function MerchantDirectory({ only }: { only?: MerchantType }) {
   const session = useAdminSession();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
+  const searchParams = useSearchParams();
+  // Pre-fill from the header search («?q=»): a shop name typed up there lands
+  // here already filtered (ADMIN-18).
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [status, setStatus] = useState<OperationalStatus | ''>('');
   /*
    * Which kind of partner. Empty is both, which is the directory as it was
@@ -129,7 +132,6 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
    * The activation queue: shops whose owner pressed «اطلب التفعيل» in the
    * app. The home page links here with it switched on.
    */
-  const searchParams = useSearchParams();
   const [activation, setActivation] = useState<'' | 'requested'>(
     searchParams.get('activation') === 'requested' ? 'requested' : '',
   );
@@ -201,6 +203,11 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('restaurant.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المتاجر" />;
+  }
+
+  const canCreate = session.can('restaurant.create');
 
   return (
     <AdminShell
@@ -208,16 +215,18 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
       actions={
-        <Link
-          className="btn btn--primary"
-          // The create form reads this and opens on the right kind, so the
-          // button on the markets screen cannot land on a restaurant form.
-          href={
-            only && only !== 'RESTAURANT' ? `/restaurants/new?type=${only}` : '/restaurants/new'
-          }
-        >
-          {copy.add}
-        </Link>
+        canCreate ? (
+          <Link
+            className="btn btn--primary"
+            // The create form reads this and opens on the right kind, so the
+            // button on the markets screen cannot land on a restaurant form.
+            href={
+              only && only !== 'RESTAURANT' ? `/restaurants/new?type=${only}` : '/restaurants/new'
+            }
+          >
+            {copy.add}
+          </Link>
+        ) : null
       }
     >
       <AreaCoverageCard
@@ -462,7 +471,7 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
                 render: (row) =>
                   row.has_portal_user ? (
                     <Badge tone="success">موجود</Badge>
-                  ) : (
+                  ) : canCreate ? (
                     <button
                       type="button"
                       className="btn btn--outline btn--sm"
@@ -470,6 +479,8 @@ export function MerchantDirectory({ only }: { only?: MerchantType }) {
                     >
                       إنشاء حساب
                     </button>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>لا يوجد</span>
                   ),
               },
               {

@@ -225,15 +225,24 @@ export default function MfaPage() {
                   style={{ fontFamily: 'var(--font-mono)', letterSpacing: 2 }}
                 />
                 <span className="field__hint">
-                  أدخل هذا المفتاح يدوياً في تطبيق المصادقة، أو امسح رمز QR إن كان متاحاً.
+                  أدخل هذا المفتاح يدوياً في تطبيق المصادقة، أو افتح الرابط أدناه من هاتفك ليضيفه
+                  التطبيق تلقائياً.
                 </span>
-                <button
-                  type="button"
-                  className="btn btn--outline btn--sm"
-                  onClick={() => void navigator.clipboard.writeText(enrolment.secret)}
-                >
-                  نسخ المفتاح
-                </button>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn--outline btn--sm"
+                    onClick={() => void navigator.clipboard.writeText(enrolment.secret)}
+                  >
+                    نسخ المفتاح
+                  </button>
+                  {/* The otpauth:// URI the authenticator understands. On a phone
+                      this opens the app with the account pre-filled; a QR image
+                      would need a bundled encoder the portal does not ship. */}
+                  <a className="btn btn--outline btn--sm ltr-inline" href={enrolment.uri}>
+                    فتح في تطبيق المصادقة
+                  </a>
+                </div>
               </div>
 
               <div className="field">

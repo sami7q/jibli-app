@@ -96,7 +96,7 @@ export default function PartnerApplyScreen() {
     // The session learns the new membership, so the live order engine starts.
     await refresh();
     queryClient.removeQueries({ queryKey: ['owner-shops'] });
-    router.replace('/(owner)');
+    router.replace('/(owner)/owner');
   };
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)/account'));

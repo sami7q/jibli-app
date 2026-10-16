@@ -14,7 +14,7 @@ import {
 import { requirePrincipal } from '../plugins/auth.js';
 import { checkAppVersion } from '../services/config-service.js';
 import { eq } from 'drizzle-orm';
-import { users, uuidv7 } from '@jibli/db';
+import { drivers, users, uuidv7 } from '@jibli/db';
 
 /**
  * Authentication routes (plan §10, §77).
@@ -158,6 +158,20 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
   app.post('/api/v1/auth/logout', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
     await revokeSession(ctx, principal.sessionId, 'LOGOUT');
+
+    /*
+     * A courier who signs out is no longer reachable, so they must stop being
+     * assignable — otherwise a shop hands an order to someone who closed the
+     * app (FLOW-7). Best-effort and after the session is revoked: a driver with
+     * a live delivery keeps it, but new dispatch no longer sees them.
+     */
+    if (principal.driverId) {
+      await ctx.db
+        .update(drivers)
+        .set({ availability: 'OFFLINE', updatedAt: new Date() })
+        .where(eq(drivers.id, principal.driverId));
+    }
+
     return reply.send(success({ logged_out: true }, { request_id: request.requestId }));
   });
 

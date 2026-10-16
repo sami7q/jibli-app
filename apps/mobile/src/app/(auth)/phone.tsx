@@ -16,7 +16,18 @@ import MaterialCommunityIcons from '@/ui/icon';
 import { normalizeDigits } from '@jibli/validation/arabic';
 import { tryToE164Iraq } from '@jibli/validation/phone';
 import { api, ApiError, NetworkError } from '@/lib/api';
-import { BRAND, ROW, lazySheet, TAP_TARGET, color, palette, radius, space, text } from '@/theme';
+import {
+  BRAND,
+  ROW,
+  ROW_LTR,
+  lazySheet,
+  TAP_TARGET,
+  color,
+  palette,
+  radius,
+  space,
+  text,
+} from '@/theme';
 import { IraqFlag, JibliWordmark } from '@/ui/brand';
 import { isGoogleSignInConfigured, signInWithGoogle } from '@/lib/google-signin';
 import { useSession } from '@/lib/session';
@@ -57,11 +68,25 @@ export default function PhoneScreen() {
   const canSubmit = !isSubmitting && parsed.ok;
 
   const handleChange = (value: string) => {
-    // Fold Arabic-Indic digits immediately and keep only digits, so the field
-    // shows exactly what will be sent.
-    setRawInput(normalizeDigits(value).replace(/\D/g, '').slice(0, 11));
+    // Fold Arabic-Indic digits, keep only digits, then peel the international
+    // prefixes a pasted number may carry — +964 / 00964 / 964 — before slicing,
+    // so «+964 771 000 0001» becomes the national number rather than being cut
+    // mid-prefix to «96477100» (CUST-9).
+    let digits = normalizeDigits(value).replace(/\D/g, '');
+    if (digits.startsWith('00964')) digits = digits.slice(5);
+    else if (digits.startsWith('964')) digits = digits.slice(3);
+    // A subscriber number without the trunk zero: restore it once there are
+    // enough digits for the server's national form.
+    if (!digits.startsWith('0') && digits.length >= 10) digits = `0${digits}`;
+    setRawInput(digits.slice(0, 11));
     if (error) setError(null);
   };
+
+  // Once a plausible length is typed and it still will not parse, say why —
+  // rather than a greyed button with no explanation (CUST-9).
+  const invalidHint =
+    !parsed.ok && rawInput.length >= 10 ? 'أدخل رقم موبايل عراقي يبدأ بـ ٠٧' : null;
+  const shownError = error ?? invalidHint;
 
   const handleGoogle = async () => {
     setSubmitting(true);
@@ -176,7 +201,10 @@ export default function PhoneScreen() {
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           autoComplete="tel"
-          maxLength={11}
+          // Not 11: a pasted +964/00964 form is longer than the national number
+          // it normalises to, and clipping the raw text first threw the tail
+          // away before it could be peeled (CUST-9).
+          maxLength={20}
           // The number itself reads left-to-right even inside an RTL layout.
           textAlign="left"
           accessibilityLabel="رقم الهاتف"
@@ -189,9 +217,9 @@ export default function PhoneScreen() {
         />
       </View>
 
-      {error ? (
+      {shownError ? (
         <Text style={styles.error} accessibilityRole="alert">
-          {error}
+          {shownError}
         </Text>
       ) : null}
 
@@ -289,7 +317,9 @@ const styles = lazySheet(() =>
     subtitle: { ...text.body, color: color.textMuted, textAlign: 'center' },
 
     inputRow: {
-      flexDirection: ROW,
+      // Left to right, so the country code reads «+964 771…» — the prefix on
+      // the left of the LTR number, not stranded to its right (CUST-26).
+      flexDirection: ROW_LTR,
       alignItems: 'center',
       gap: space[2],
       borderWidth: 1,
@@ -300,19 +330,21 @@ const styles = lazySheet(() =>
       minHeight: TAP_TARGET + 8,
     },
     prefix: {
-      flexDirection: ROW,
+      flexDirection: ROW_LTR,
       alignItems: 'center',
       gap: space[1],
-      // The prefix block leads on the right, so the rule that separates it from
-      // the number sits on its left. Physical, like every other position in the
-      // app: the logical pair follows the native flag.
-      paddingLeft: space[3],
-      borderLeftWidth: 1,
-      borderLeftColor: color.borderSubtle,
+      // The prefix leads on the left now, so the rule separating it from the
+      // number sits on its right.
+      paddingRight: space[3],
+      borderRightWidth: 1,
+      borderRightColor: color.borderSubtle,
     },
     prefixText: { ...text.bodyBold, color: color.textPrimary, writingDirection: 'ltr' },
     input: {
       flex: 1,
+      // Without this a flex TextInput keeps its intrinsic min width and pushes
+      // the row wider than a 320px screen (CUST-22).
+      minWidth: 0,
       ...text.body,
       color: color.textPrimary,
       paddingVertical: space[3],

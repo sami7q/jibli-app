@@ -45,6 +45,17 @@ export async function savePreferredAddressId(addressId: string): Promise<void> {
   }
 }
 
+/** Forget this device's chosen address — on sign-out, so the next user on the
+ * device does not inherit it (CUST-5). */
+export async function clearPreferredAddressId(): Promise<void> {
+  try {
+    if (isWeb) globalThis.localStorage?.removeItem(KEY);
+    else await SecureStore.deleteItemAsync(KEY);
+  } catch {
+    /* Already gone, or unwritable storage. */
+  }
+}
+
 /*
  * The choosing rule lives next door, with nothing imported, so it can be
  * tested without a React Native runtime — this file cannot be, because

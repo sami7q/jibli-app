@@ -1,11 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   AreaChart,
   BarChart,
-  AUDIT_ACTION_LABELS,
   auditActionTone,
   DonutChart,
   money,
@@ -17,7 +18,7 @@ import {
   RankedBar,
   relativeAr,
 } from '@jibli/ui-web';
-import { MERCHANT_TYPE_LABELS, type OrderStatus } from '@jibli/contracts';
+import { CUISINES, MERCHANT_TYPE_LABELS, type OrderStatus } from '@jibli/contracts';
 import { AdminShell } from '@/components/shell';
 import { Icon, type IconName } from '@/components/icon';
 import { ErrorState, Skeleton } from '@/components/ui';
@@ -25,6 +26,13 @@ import { ApiError } from '@/lib/api';
 import { admin, type AdminOverview } from '@/lib/admin-endpoints';
 import { useAdminSession } from '@/hooks/use-session';
 import { SignedOut } from '@/components/signed-out';
+import { firstPermittedPath } from '@/lib/nav';
+import { ADMIN_AUDIT_ACTION_LABELS } from '@/lib/audit-labels';
+
+/** Cuisine key → Arabic name, so the top-categories panel shows «سندويشات» not «sandwiches» (ADMIN-21). */
+const CUISINE_LABELS: Record<string, string> = Object.fromEntries(
+  CUISINES.map((cuisine) => [cuisine.key, cuisine.labelAr]),
+);
 
 /**
  * Admin dashboard (plan §130).
@@ -40,11 +48,23 @@ import { SignedOut } from '@/components/signed-out';
  */
 export default function AdminDashboardPage() {
   const session = useAdminSession();
+  const router = useRouter();
+
+  // The dashboard reads the global report. A role without it has no business
+  // here and used to land on «لا تملك صلاحية (FORBIDDEN)»; send it to its first
+  // permitted screen instead (ADMIN-11).
+  const canReports = session.status === 'authenticated' && session.can('reports.read.global');
+
+  useEffect(() => {
+    if (session.status === 'authenticated' && !session.can('reports.read.global')) {
+      router.replace(firstPermittedPath(session.can));
+    }
+  }, [session, router]);
 
   const overview = useQuery({
     queryKey: ['admin-overview'],
     queryFn: () => admin.overview(session.status === 'authenticated' ? session.accessToken : ''),
-    enabled: session.status === 'authenticated',
+    enabled: session.status === 'authenticated' && canReports,
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
@@ -60,6 +80,16 @@ export default function AdminDashboardPage() {
 
   if (session.status === 'unauthenticated') {
     return <SignedOut reason={session.reason} />;
+  }
+
+  // Redirecting (effect above): show a skeleton, not a forbidden dashboard.
+  if (!canReports) {
+    return (
+      <div style={{ padding: 'var(--space-6)' }}>
+        <Skeleton height={560} />
+        <span className="sr-only">جاري التحويل…</span>
+      </div>
+    );
   }
 
   const data = overview.data;
@@ -156,26 +186,31 @@ function StatRow({ data, isLoading }: { data: AdminOverview | undefined; isLoadi
         delta={data?.sales_delta ?? null}
         comparison="مقارنةً بالأمس"
       />
+      {/* «مكتملة»: this counts completed orders, while the donut below counts all
+          orders placed today — naming it resolves the 24-vs-44 confusion (ADMIN-21). */}
       <StatTile
         icon="orders"
         tone="green"
-        label="طلبات اليوم"
+        label="طلبات مكتملة اليوم"
         value={data ? new Intl.NumberFormat('en-US').format(data.orders_today) : '—'}
         delta={data?.orders_delta ?? null}
         comparison="مقارنةً بالأمس"
       />
+      {/* «حسابات», not «مستخدمون»: the figure counts every ACTIVE account —
+          customers, owners and drivers alike (ADMIN-21). */}
       <StatTile
         icon="users"
         tone="blue"
-        label="مستخدمون نشطون"
+        label="حسابات نشطة"
         value={data ? new Intl.NumberFormat('en-US').format(data.active_users) : '—'}
         delta={data?.users_delta ?? null}
         comparison="نمو التسجيل مقارنةً بالشهر الماضي"
       />
+      {/* «متاجر», not «مطاعم»: the count includes markets and cosmetics shops (ADMIN-21). */}
       <StatTile
         icon="restaurants"
         tone="violet"
-        label="مطاعم نشطة"
+        label="متاجر نشطة"
         value={data ? new Intl.NumberFormat('en-US').format(data.active_restaurants) : '—'}
         delta={data?.restaurants_delta ?? null}
         comparison="نمو الانضمام مقارنةً بالشهر الماضي"
@@ -340,21 +375,6 @@ function PerformancePanel({ data }: { data: AdminOverview }) {
         <PerformanceRow label="طلبات جارية الآن" value={String(data.live_orders)} />
         <PerformanceRow label="طلبات انضمام مفتوحة" value={String(data.open_applications)} />
       </div>
-
-      {/*
-        Ratings are not in Release 1 (plan §3), so the panel says what is missing
-        rather than showing a placeholder number someone might quote.
-      */}
-      <p
-        style={{
-          marginBlockStart: 'var(--space-3)',
-          marginBlockEnd: 0,
-          fontSize: 'var(--text-xs)',
-          color: 'var(--text-muted)',
-        }}
-      >
-        التقييمات غير مفعّلة في الإصدار الأول، لذلك لا يظهر هنا متوسط تقييم.
-      </p>
     </Panel>
   );
 }
@@ -410,7 +430,9 @@ function CategoriesPanel({ data }: { data: AdminOverview }) {
           {data.top_categories.map((category) => (
             <RankedBar
               key={category.name_ar}
-              label={category.name_ar}
+              // The server sends the raw cuisine key; show its Arabic name where
+              // known, falling back to the key for market categories (ADMIN-21).
+              label={CUISINE_LABELS[category.name_ar] ?? category.name_ar}
               value={category.order_count}
               max={max}
               format={(value) => `${value} طلب`}
@@ -678,7 +700,7 @@ function ActivityPanel({ data }: { data: AdminOverview }) {
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 'var(--text-sm)' }}>
-                  {AUDIT_ACTION_LABELS[entry.action] ?? entry.action}
+                  {ADMIN_AUDIT_ACTION_LABELS[entry.action] ?? entry.action}
                 </span>
                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                   {entry.actor_name ?? 'النظام'} · {relativeAr(new Date(entry.created_at))}

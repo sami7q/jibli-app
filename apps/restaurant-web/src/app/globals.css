@@ -183,6 +183,16 @@
   background: var(--jibli-ink-200);
 }
 
+/* The shop's initial, when there is no logo to show (MERCH-31). */
+.topbar__avatar--initial {
+  display: grid;
+  place-items: center;
+  background: var(--jibli-orange-100);
+  color: var(--jibli-orange-700);
+  font-weight: 800;
+  font-size: var(--text-lg);
+}
+
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 
 .card {
@@ -425,6 +435,75 @@
   gap: var(--space-2);
 }
 
+/* ── Live card detail: phone, address, options, breakdown (MERCH-1, §26) ──── */
+
+.order-card__call {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--jibli-success-700);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.order-card__call:hover {
+  text-decoration: underline;
+}
+
+.order-card__address {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.order-card__item-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The options the kitchen cooks to — quiet, but present. */
+.order-card__item-modifiers {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding-inline-start: var(--space-3);
+}
+
+/* The per-line note is in the brand colour: it is an instruction, not a label. */
+.order-card__item-note {
+  font-size: var(--text-xs);
+  color: var(--jibli-orange-700);
+  padding-inline-start: var(--space-3);
+}
+
+.order-card__breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.order-card__breakdown-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.order-card__payment {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 
 .btn {
@@ -493,6 +572,32 @@
 
 .btn--success:hover:not(:disabled) {
   background: var(--jibli-success-700);
+}
+
+/*
+  Outline and secondary were used but never defined (MERCH-31): every
+  ConfirmDialog «إلغاء», the driver picker and the login «تقديم طلب انضمام» link
+  rendered as a bare, borderless button or a blue underlined link.
+*/
+.btn--outline {
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+
+.btn--outline:hover:not(:disabled) {
+  border-color: var(--jibli-orange-500);
+  color: var(--jibli-orange-700);
+}
+
+.btn--secondary {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  border-color: var(--jibli-orange-500);
 }
 
 .btn--block {
@@ -644,17 +749,28 @@
   }
 
   .sidebar {
+    /*
+      The grid collapses to one column here, but `.main` kept `grid-column: 2`
+      below — so the implicit grid grew a second column and squeezed the whole
+      sidebar into a 33px strip at the edge while a 1292px nav row overflowed
+      inside it (MERCH-3). Both now sit in column 1, stacked by row.
+    */
     grid-column: 1;
     grid-row: 1;
+    width: 100%;
     position: static;
     height: auto;
     flex-direction: row;
     align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
     overflow-x: auto;
   }
 
   .nav {
     flex-direction: row;
+    flex-wrap: wrap;
+    flex: 1;
   }
 
   .sidebar__support {
@@ -662,8 +778,36 @@
   }
 
   .main {
+    grid-column: 1;
     grid-row: 2;
     padding: var(--space-4);
+  }
+
+  /* The header is a row of five controls on a laptop; let it stack on a phone
+     instead of pushing itself sideways off the screen (MERCH-3). */
+  .topbar {
+    flex-wrap: wrap;
+  }
+}
+
+/* Below a phone's width the greeting and the search are the first things that
+   can go: the bell, the account menu and the shop chip are what an owner needs
+   on a 390px screen (MERCH-3). */
+@media (max-width: 600px) {
+  /* Only the top-level greeting — the restaurant chip reuses `.topbar__greeting`
+     for the shop name, which must stay. */
+  .topbar > .topbar__greeting,
+  .topbar__search {
+    display: none;
+  }
+
+  .topbar {
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  .topbar__restaurant {
+    padding-inline-start: var(--space-2);
   }
 }
 

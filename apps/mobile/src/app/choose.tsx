@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -51,7 +51,10 @@ const cardColor = (section: Section) => section.ramp[600];
 export default function ChooseScreen() {
   const router = useRouter();
   const { choose } = useVertical();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  // A 320×568 phone cannot fit three full-height cards; below ~640 the cards
+  // scroll at a fixed height instead of being crushed and clipped (CUST-22).
+  const short = height < 640;
   const { area, isResolving } = useArea();
   const isGuest = useIsGuest();
   const [pickingArea, setPickingArea] = useState(false);
@@ -163,17 +166,35 @@ export default function ChooseScreen() {
         </Enter>
       </View>
 
-      <View style={{ flex: 1, gap: 10, paddingHorizontal: 14, paddingBottom: 14 }}>
-        {PANELS.map((section, index) => (
-          <Enter key={section.type} delay={180 + index * 90} style={{ flex: 1 }}>
-            <SectionCard
-              section={section}
-              artWidth={artWidth}
-              onPress={() => enter(section.type)}
-            />
-          </Enter>
-        ))}
-      </View>
+      {short ? (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ gap: 10, paddingHorizontal: 14, paddingBottom: 14 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {PANELS.map((section, index) => (
+            <Enter key={section.type} delay={180 + index * 90} style={{ height: 172 }}>
+              <SectionCard
+                section={section}
+                artWidth={artWidth}
+                onPress={() => enter(section.type)}
+              />
+            </Enter>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={{ flex: 1, gap: 10, paddingHorizontal: 14, paddingBottom: 14 }}>
+          {PANELS.map((section, index) => (
+            <Enter key={section.type} delay={180 + index * 90} style={{ flex: 1 }}>
+              <SectionCard
+                section={section}
+                artWidth={artWidth}
+                onPress={() => enter(section.type)}
+              />
+            </Enter>
+          ))}
+        </View>
+      )}
 
       {/*
         The same pickers the home screen opens: a signed-in customer chooses

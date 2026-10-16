@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dateTimeAr, NumberField } from '@jibli/ui-web';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { Badge, Card, ErrorState, MfaChallenge, Skeleton } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { ApiError } from '@/lib/api';
@@ -65,7 +65,11 @@ export default function SettingsPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('config.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة الإعدادات" />;
+  }
 
+  const canWrite = session.can('config.write');
   const entries = config.data ?? [];
   const checkoutEntry = entries.find((entry) => entry.key === 'global_checkout_enabled');
   const checkoutDisabled = checkoutEntry?.value === false;
@@ -144,13 +148,15 @@ export default function SettingsPage() {
                   <ValueDisplay value={entry.value} />
                 </div>
 
-                <button
-                  type="button"
-                  className="btn btn--outline btn--sm"
-                  onClick={() => setEditing(entry)}
-                >
-                  تعديل
-                </button>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    className="btn btn--outline btn--sm"
+                    onClick={() => setEditing(entry)}
+                  >
+                    تعديل
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
@@ -175,6 +181,12 @@ export default function SettingsPage() {
   );
 }
 
+/** Readable values for the enum-valued keys, so the row shows «نصف شهرية» not «HALF_MONTH» (ADMIN-24). */
+const VALUE_LABELS: Record<string, string> = {
+  HALF_MONTH: 'نصف شهرية',
+  MONTHLY: 'شهرية',
+};
+
 function ValueDisplay({ value }: { value: unknown }) {
   if (typeof value === 'boolean') {
     return <Badge tone={value ? 'success' : 'danger'}>{value ? 'مفعّل' : 'معطّل'}</Badge>;
@@ -182,7 +194,10 @@ function ValueDisplay({ value }: { value: unknown }) {
   if (typeof value === 'number') {
     return <span className="numeric">{new Intl.NumberFormat('en-US').format(value)}</span>;
   }
-  return <span className="ltr-inline">{String(value)}</span>;
+  const raw = String(value);
+  const labelled = VALUE_LABELS[raw];
+  if (labelled) return <span>{labelled}</span>;
+  return <span className="ltr-inline">{raw}</span>;
 }
 
 function EditConfigDialog({

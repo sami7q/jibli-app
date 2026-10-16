@@ -1,7 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError, ERROR_CODES, type PlatformRole, type RestaurantRole } from '@jibli/contracts';
-import { verifyAccessToken, type Principal } from '@jibli/auth';
+import { MFA_FRESHNESS_SECONDS, verifyAccessToken, type Principal } from '@jibli/auth';
 import { drivers, restaurantMembers, sessions, userPlatformRoles, users } from '@jibli/db';
 import type { AppContext } from '../lib/context.js';
 import { getConfig } from '../services/config-service.js';
@@ -42,6 +42,7 @@ async function resolvePrincipal(
       // Whether an authenticator exists on the account — not whether this
       // session has passed a challenge, which is `claims.mfaAt`.
       mfaEnabledAt: users.mfaEnabledAt,
+      mustChangePassword: users.mustChangePassword,
     })
     .from(users)
     .where(eq(users.id, claims.sub))
@@ -52,7 +53,16 @@ async function resolvePrincipal(
 
   // A revoked session invalidates its access tokens immediately (plan §77).
   const [session] = await ctx.db
-    .select({ id: sessions.id, revokedAt: sessions.revokedAt, expiresAt: sessions.expiresAt })
+    .select({
+      id: sessions.id,
+      revokedAt: sessions.revokedAt,
+      expiresAt: sessions.expiresAt,
+      // The step-up stamp written by /auth/mfa/verify. Read here so a fresh
+      // challenge takes effect without the client re-minting its token — the
+      // admin portal re-derives tokens through refresh, which would otherwise
+      // drop the claim and leave step-up actions permanently 401 (ADMIN-1).
+      mfaVerifiedAt: sessions.mfaVerifiedAt,
+    })
     .from(sessions)
     .where(eq(sessions.id, claims.sid))
     .limit(1);
@@ -100,6 +110,26 @@ async function resolvePrincipal(
   const mfaRequiredByPolicy =
     platformRoles.length > 0 ? await getConfig(ctx, 'require_mfa', false) : false;
 
+  /*
+   * The freshest MFA moment available: the token's claim, or the session's
+   * step-up stamp when it is still inside the freshness window. The stamp is
+   * what /auth/mfa/verify writes, so a step-up works even on a token minted
+   * before the challenge; `hasFreshMfa` still decides whether it is fresh
+   * enough for a given action.
+   */
+  const claimMfaAt = claims.mfaAt ? new Date(claims.mfaAt) : null;
+  const sessionMfaAt =
+    session.mfaVerifiedAt &&
+    Date.now() - session.mfaVerifiedAt.getTime() <= MFA_FRESHNESS_SECONDS * 1000
+      ? session.mfaVerifiedAt
+      : null;
+  const mfaAt =
+    claimMfaAt && sessionMfaAt
+      ? claimMfaAt.getTime() >= sessionMfaAt.getTime()
+        ? claimMfaAt
+        : sessionMfaAt
+      : (claimMfaAt ?? sessionMfaAt);
+
   return {
     userId: user.id,
     sessionId: session.id,
@@ -109,10 +139,40 @@ async function resolvePrincipal(
     driverId: driver && driver.status === 'ACTIVE' ? driver.id : null,
     profileCompleted: user.profileCompletedAt !== null,
     phoneVerified: user.phoneVerifiedAt !== null,
-    mfaAt: claims.mfaAt ? new Date(claims.mfaAt) : null,
+    mfaAt,
     mfaEnrolled: user.mfaEnabledAt !== null,
     mfaRequiredByPolicy,
+    mustChangePassword: user.mustChangePassword,
   };
+}
+
+/**
+ * Routes a session with a staff-issued password may still reach before it has
+ * been replaced (ADMIN-10): change the password, read who you are, or sign out.
+ * Everything else is refused.
+ */
+const PASSWORD_CHANGE_EXEMPT_ROUTES: ReadonlySet<string> = new Set([
+  '/api/v1/auth/password',
+  '/api/v1/auth/me',
+  '/api/v1/auth/portal/me',
+  '/api/v1/auth/logout',
+  '/api/v1/auth/session/logout',
+  '/api/v1/restaurant-portal/password',
+  '/api/v1/restaurant-portal/password/challenge',
+]);
+
+/**
+ * Block a must-change-password session from doing anything but changing it.
+ *
+ * The client redirects to the change screen as a courtesy; this is the control
+ * (ADMIN-10). Keyed on the matched route pattern so a query string cannot slip
+ * past the allowlist.
+ */
+function assertPasswordChanged(request: FastifyRequest): void {
+  if (!request.principal?.mustChangePassword) return;
+  const route = request.routeOptions?.url ?? request.url.split('?')[0];
+  if (route && PASSWORD_CHANGE_EXEMPT_ROUTES.has(route)) return;
+  throw new AppError(ERROR_CODES.PASSWORD_CHANGE_REQUIRED);
 }
 
 export function registerAuth(app: FastifyInstance, ctx: AppContext): void {
@@ -169,6 +229,8 @@ export function registerAuth(app: FastifyInstance, ctx: AppContext): void {
       sid: claims.sid,
       mfaAt: claims.mfaAt,
     });
+
+    assertPasswordChanged(request);
   });
 }
 

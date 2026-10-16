@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { Card } from '@/components/ui';
 import { Icon } from '@/components/icon';
 import { SessionGate } from '@/components/session-gate';
@@ -27,6 +27,9 @@ export default function InvoicesPage() {
 
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
+  }
+  if (!session.can('finance.read.global')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المالية" />;
   }
 
   return (

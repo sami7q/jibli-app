@@ -64,6 +64,16 @@ import { color, enforceRtl, palette } from '@/theme';
 enforceRtl();
 
 /*
+ * The customer tabs are the app's anchor, so a cold start resolves to Home.
+ *
+ * Owner Mode's home now lives at `/(owner)/owner`, a real URL segment, so it no
+ * longer ties with `(tabs)/index` at `/` — but this names the tabs as the
+ * initial route outright, so the first screen a reviewer sees on launch or
+ * reload is the customer home and never the seller screen (CUST-3).
+ */
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
+/*
  * Before anything can throw.
  *
  * At module scope for the same reason `enforceRtl` is: a crash during the very
@@ -237,7 +247,7 @@ export default function RootLayout() {
  */
 function Gate() {
   const { state } = useSession();
-  const { vertical } = useVertical();
+  const { vertical, resolved: verticalResolved } = useVertical();
   const router = useRouter();
   const segments = useSegments();
 
@@ -270,6 +280,19 @@ function Gate() {
     const inWorkMode = path[0] === '(driver)' || path[0] === '(owner)';
 
     /*
+     * Screens that carry their own section or do not need one, so they must
+     * survive a reload or a deep link rather than being bounced to the chooser
+     * with their contents intact (CUST-7). A shop page, a cart, a checkout, an
+     * order and the notifications feed are all about one specific thing already.
+     */
+    const carriesOwnContext =
+      path[0] === 'cart' ||
+      path[0] === 'checkout' ||
+      path[0] === 'order' ||
+      path[0] === 'restaurant' ||
+      path[0] === 'notifications';
+
+    /*
      * Nothing can render until the half is known.
      *
      * The home screen's banner, category strip and merchant list all belong to
@@ -278,10 +301,19 @@ function Gate() {
      * is the answer, and it sits outside the tabs so the tab bar does not
      * appear under a screen that is not part of the app yet.
      *
-     * Checked before the sign-in rules on purpose: browsing is public, and a
-     * guest picks a section exactly as a signed-in customer does.
+     * Only once the persisted choice has been read (`verticalResolved`), so a
+     * remembered section is not overwritten by a chooser redirect in the frame
+     * before it lands. Checked before the sign-in rules on purpose: browsing is
+     * public, and a guest picks a section exactly as a signed-in customer does.
      */
-    if (!vertical && !onChooser && !inAuth && !inWorkMode) {
+    if (
+      verticalResolved &&
+      !vertical &&
+      !onChooser &&
+      !inAuth &&
+      !inWorkMode &&
+      !carriesOwnContext
+    ) {
       router.replace('/choose');
       return;
     }
@@ -344,7 +376,7 @@ function Gate() {
       // against the other and strand someone who came to register a shop.
       router.replace(signedInDestination() as never);
     }
-  }, [state, vertical, segments, router]);
+  }, [state, vertical, verticalResolved, segments, router]);
 
   if (state.status === 'loading') {
     return (

@@ -1048,9 +1048,11 @@ export const NOTIFICATION_TEMPLATES = {
     titleAr: 'تم تسليم طلبك',
     bodyAr: `تم تسليم طلبك رقم ${orderNumber}. شكراً لاستخدامك جيبلي`,
   }),
-  orderRejected: (orderNumber: string): NotificationTemplate => ({
+  orderRejected: (orderNumber: string, reasonAr?: string | null): NotificationTemplate => ({
     titleAr: 'تعذّر قبول الطلب',
-    bodyAr: `للأسف لم يتمكن المتجر من قبول طلبك رقم ${orderNumber}`,
+    bodyAr: reasonAr
+      ? `للأسف لم يتمكن المتجر من قبول طلبك رقم ${orderNumber}. السبب: ${reasonAr}`
+      : `للأسف لم يتمكن المتجر من قبول طلبك رقم ${orderNumber}`,
   }),
   orderCancelled: (orderNumber: string): NotificationTemplate => ({
     titleAr: 'تم إلغاء الطلب',

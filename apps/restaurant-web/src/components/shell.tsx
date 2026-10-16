@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { JibliLogo, RESTAURANT_NAV } from '@jibli/ui-web';
 import { Icon, type IconName } from './icon';
 import { SessionMenu } from './session-menu';
+import { useLiveOrders } from '@/hooks/use-live-orders';
 import type { PortalRestaurant } from '@/hooks/use-session';
 
 /**
@@ -25,8 +26,6 @@ export interface ShellProps {
   restaurants?: readonly PortalRestaurant[];
   activeRestaurantId?: string;
   onSwitchRestaurant?: (restaurantId: string) => void;
-  /** Count for the topbar bell — new orders needing a decision. */
-  notificationCount?: number;
   /**
    * What this merchant calls its catalog — «القائمة» or «المنتجات».
    *
@@ -46,7 +45,6 @@ export function Shell({
   restaurants = [],
   activeRestaurantId,
   onSwitchRestaurant,
-  notificationCount = 0,
   catalogLabel = 'المنيو',
   itemLabel = 'صنف',
 }: ShellProps) {
@@ -87,7 +85,6 @@ export function Shell({
           restaurants={restaurants}
           activeRestaurantId={activeRestaurantId}
           onSwitchRestaurant={onSwitchRestaurant}
-          notificationCount={notificationCount}
           catalogLabel={catalogLabel}
           itemLabel={itemLabel}
         />
@@ -122,7 +119,6 @@ function Topbar({
   restaurants,
   activeRestaurantId,
   onSwitchRestaurant,
-  notificationCount,
   catalogLabel,
   itemLabel,
 }: Omit<ShellProps, 'children' | 'restaurants'> & {
@@ -131,6 +127,21 @@ function Topbar({
   catalogLabel: string;
   itemLabel: string;
 }) {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+
+  /*
+   * The box did nothing — no onChange, no form (MERCH-25). An owner on the
+   * phone looking up an order by number got no answer. It now submits to the
+   * order history, which does the search server-side.
+   */
+  const submitSearch = (event: React.FormEvent): void => {
+    event.preventDefault();
+    const term = query.trim();
+    if (!term) return;
+    router.push(`/orders?search=${encodeURIComponent(term)}`);
+  };
+
   return (
     <header className="topbar">
       {/*
@@ -142,19 +153,34 @@ function Topbar({
         <span>نتمنى لك يوماً موفقاً</span>
       </div>
 
-      <div className="topbar__search">
-        <Icon name="search" className="nav__icon" aria-hidden />
+      <form className="topbar__search" role="search" onSubmit={submitSearch}>
+        <button
+          type="submit"
+          aria-label="بحث"
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: 'inherit',
+            display: 'inline-flex',
+          }}
+        >
+          <Icon name="search" className="nav__icon" aria-hidden />
+        </button>
         <label htmlFor="portal-search" className="sr-only">
           {`البحث عن طلب، عميل أو ${itemLabel} في ${catalogLabel}`}
         </label>
         <input
           id="portal-search"
           type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
           placeholder={`البحث عن طلب، عميل أو ${itemLabel} في ${catalogLabel}...`}
         />
-      </div>
+      </form>
 
-      <NotificationBell count={notificationCount ?? 0} />
+      <NotificationBell />
 
       <SessionMenu userName={userName} userRoleAr="فريق الشريك" />
 
@@ -175,7 +201,11 @@ function Topbar({
  * The count is also written into the accessible name, because a red dot on an
  * icon communicates nothing to a screen reader (plan §134).
  */
-function NotificationBell({ count }: { count: number }) {
+function NotificationBell() {
+  // Fed by the portal-wide live-orders context, so the badge is correct on
+  // every page, not only the dashboard (MERCH-4).
+  const { pendingCount: count } = useLiveOrders();
+
   const label =
     count === 0
       ? 'لا توجد طلبات جديدة'
@@ -266,7 +296,13 @@ function RestaurantBadge({
 
   const body = (
     <>
-      <div className="topbar__avatar" aria-hidden="true" />
+      {/*
+        The initial, not an empty grey square (MERCH-31). The badge carries no
+        logo URL, and a blank box read as a broken image.
+      */}
+      <div className="topbar__avatar topbar__avatar--initial" aria-hidden="true">
+        {restaurantName.trim().charAt(0) || '؟'}
+      </div>
       <div className="topbar__greeting">
         <strong>{restaurantName}</strong>
         <span>

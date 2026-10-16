@@ -780,8 +780,30 @@ export interface OrderDetail {
   placed_at: string;
   estimated_preparation_minutes: number;
   customer_notes: string | null;
-  restaurant: { name_ar?: string; address_text?: string } | null;
+  /**
+   * The restaurant snapshot the order was placed against.
+   *
+   * `displayName` is the camelCase snapshot the API actually sends; the older
+   * `name_ar` is kept optional only because nothing should crash reading a
+   * cached order from before the field was named.
+   */
+  restaurant: {
+    displayName?: string;
+    name_ar?: string;
+    addressText?: string | null;
+    phone?: string | null;
+  } | null;
   delivery_address: Record<string, unknown> | null;
+  /**
+   * The 4-digit handover code, returned to the order's own customer only while
+   * it is in flight (ACCEPTED…OUT_FOR_DELIVERY) and null otherwise. The courier
+   * cannot complete the delivery without it, so it is shown on the order screen
+   * and the active-order card for the customer to read out (CUST-1 / FLOW-1).
+   */
+  delivery_pin: string | null;
+  /** Set when the order was REJECTED: the enum code and its Arabic label. */
+  rejection_reason: string | null;
+  rejection_reason_ar: string | null;
   items: {
     id: string;
     name_ar: string;
@@ -1207,6 +1229,13 @@ export const api = {
       authenticated: false,
     }),
 
+  /**
+   * End the server session. Best-effort on sign-out: the device clears its
+   * tokens regardless, but this revokes the refresh token so a copy taken before
+   * sign-out stops working (CUST-5).
+   */
+  logout: () => apiRequest<{ ok: boolean }>('/api/v1/auth/logout', { method: 'POST' }),
+
   /** Attach a verified phone to the account already signed in. */
   linkPhone: (phone: string, code: string) =>
     apiRequest<{
@@ -1236,6 +1265,17 @@ export const api = {
       method: 'POST',
       body: payload,
     }),
+
+  /** The signed-in account's own name, phone and area — `GET /profile`. */
+  profile: () =>
+    apiRequest<{
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      profile_completed: boolean;
+      governorate: { id: string; name_ar: string } | null;
+      city: { id: string; name_ar: string } | null;
+    }>('/api/v1/profile'),
 
   /** Change the saved name or default area. */
   updateProfile: (payload: { full_name?: string; governorate_id?: string; city_id?: string }) =>

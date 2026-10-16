@@ -44,6 +44,7 @@ import { effectiveCapabilitySql } from '../../services/geography-service.js';
 import { jsonbArrayContains } from '../../lib/jsonb.js';
 import { getConfig } from '../../services/config-service.js';
 import { findOwnerPhone } from '../../services/owner-phone-service.js';
+import { computeReadiness } from '../../services/readiness-service.js';
 import {
   ensureDefaultWorkingHours,
   isSelfServeMerchant,
@@ -1059,6 +1060,18 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
         }
 
         /*
+         * The readiness checklist is the gate, not just the button (ADMIN-16).
+         * Previously this endpoint activated a shop with no menu item at all,
+         * which then showed in the app as open with nothing to order.
+         */
+        const readiness = await computeReadiness(ctx, restaurantId);
+        if (readiness.blocking_failures.length > 0) {
+          throw new AppError(ERROR_CODES.RESTAURANT_NOT_READY, {
+            details: { blocking_failures: readiness.blocking_failures },
+          });
+        }
+
+        /*
          * A market or cosmetics shop made before hours were defaulted at
          * creation goes live on the default week rather than closed.
          */
@@ -1084,9 +1097,21 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           })
           .where(eq(restaurants.id, restaurantId));
 
+        /*
+         * Enable the branch, but do not blindly force `accepts_orders` true
+         * (ADMIN-16): on a reactivation that would override an owner who had
+         * paused their own shop via the «استقبال الطلبات» toggle. Only a first
+         * activation (operational status PENDING) turns ordering on, because a
+         * fresh branch defaults to not accepting and has no other way to start.
+         */
+        const firstActivation = current.operationalStatus === 'PENDING';
         await tx
           .update(restaurantBranches)
-          .set({ isActive: true, acceptsOrders: true, updatedAt: new Date() })
+          .set({
+            isActive: true,
+            ...(firstActivation ? { acceptsOrders: true } : {}),
+            updatedAt: new Date(),
+          })
           .where(eq(restaurantBranches.restaurantId, restaurantId));
 
         await writeAudit(tx, {

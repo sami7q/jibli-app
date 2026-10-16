@@ -5,14 +5,7 @@ import { ORDER_STATUSES, success, type OrderStatus } from '@jibli/contracts';
 import { commissionFeeDisplay } from '@jibli/money';
 import { assertRestaurantPermission } from '@jibli/auth';
 import { maskPhone } from '@jibli/validation';
-import {
-  deliveryAssignments,
-  drivers,
-  orders,
-  settlementLines,
-  settlements,
-  users,
-} from '@jibli/db';
+import { orders, settlementLines, settlements } from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
 
@@ -106,12 +99,12 @@ export function registerRestaurantHistoryRoutes(app: FastifyInstance, ctx: AppCo
            * keyset cursor. This takes the last driver who held it.
            */
           driverName: sql<string | null>`(
-            SELECT ${users.fullName}
-            FROM ${deliveryAssignments}
-            JOIN ${drivers} ON ${drivers.id} = ${deliveryAssignments.driverId}
-            JOIN ${users} ON ${users.id} = ${drivers.userId}
-            WHERE ${deliveryAssignments.orderId} = ${orders.id}
-            ORDER BY ${deliveryAssignments.createdAt} DESC
+            SELECT "u"."full_name"
+            FROM "delivery_assignments" "da"
+            JOIN "drivers" "d" ON "d"."id" = "da"."driver_id"
+            JOIN "users" "u" ON "u"."id" = "d"."user_id"
+            WHERE "da"."order_id" = "orders"."id"
+            ORDER BY "da"."created_at" DESC
             LIMIT 1
           )`,
         })

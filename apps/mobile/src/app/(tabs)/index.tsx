@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { cuisineLabelAr } from '@jibli/contracts';
+import { arabicCuisineTags } from '@/lib/cuisine-tags';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { useServiceFee } from '@/lib/use-service-fee';
 import { customerDeliveryFee } from '@/lib/delivery-fee';
@@ -16,11 +16,13 @@ import {
   type RestaurantCard as RestaurantSummary,
 } from '@/lib/api';
 import { useArea } from '@/lib/area';
+import { countAr, MINUTES } from '@/lib/arabic-count';
 import { ensureLocationPermissionAsked } from '@/lib/location';
+import { MODIFIERS_ENABLED } from '@/lib/menu-options';
 import { useCart } from '@/lib/cart';
-import { useIsGuest } from '@/lib/session';
+import { useIsGuest, useMe } from '@/lib/session';
 import { useUnseenCount } from '@/lib/notification-inbox';
-import { notify } from '@/lib/dialog';
+import { confirmAsync } from '@/lib/dialog';
 import {
   ALIGN_START,
   BRAND,
@@ -657,7 +659,7 @@ function NotificationBell() {
   const router = useRouter();
 
   const feed = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', useMe()?.user_id ?? null],
     queryFn: () => api.notifications(),
     staleTime: 30_000,
   });
@@ -983,9 +985,16 @@ function CategoryTile({
  * open one.
  */
 function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
-  const { add } = useCart();
+  const { add, cart } = useCart();
   const router = useRouter();
   const orderable = dish.restaurant.accepts_orders && dish.is_available;
+  /*
+   * A required-choice dish is excluded from quick-add here too (CUST-2). With
+   * modifiers on it opens the sheet to choose; with them off it cannot be
+   * ordered at all, so no control is drawn — the row still opens the shop,
+   * which shows it as «يتوفر قريباً».
+   */
+  const showAdd = orderable && (!dish.requires_choice || MODIFIERS_ENABLED);
 
   // A View, not a Pressable: the plus below is its own control, and a button
   // inside a button is invalid on the web and ambiguous on a phone.
@@ -1029,9 +1038,17 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
             {formatIqdArabic(iqd(dish.price_iqd))}
           </Text>
           <Text variant="caption" tone="secondary">
-            {dish.restaurant.estimated_preparation_minutes} دقيقة
+            التحضير {countAr(dish.restaurant.estimated_preparation_minutes, MINUTES)}
           </Text>
         </Row>
+
+        {/* Labelled, not just dimmed — a search result otherwise looks orderable
+            (CUST-23). */}
+        {!dish.is_available ? (
+          <Text variant="caption" tone="danger">
+            غير متوفر حالياً
+          </Text>
+        ) : null}
       </Pressable>
 
       <View>
@@ -1056,47 +1073,50 @@ function DishRow({ dish, onOpen }: { dish: DishResult; onOpen: () => void }) {
           )}
         </View>
 
-        {orderable ? (
+        {showAdd ? (
           <Pressable
             onPress={() => {
               /*
-               * A dish with a required choice cannot be added from here.
-               *
-               * Adding it produced a cart line with no size or bread chosen,
-               * which the quote refuses — so the customer only found out at
-               * checkout, facing «اختيارات الإضافات غير صحيحة» over a whole
-               * order with nothing naming the line at fault. The sheet needs
-               * the restaurant and the item's groups, so the row sends them to
-               * the menu with the dish named and it opens there.
+               * A dish with a required choice opens its shop instead of adding
+               * (CUST-2): with options on, the sheet collects the choice; with
+               * them off it is shown as «يتوفر قريباً», so this branch is only
+               * reached with options on.
                */
               if (dish.requires_choice) {
                 router.push(`/restaurant/${dish.restaurant.id}?item=${dish.id}`);
                 return;
               }
 
-              const result = add(
-                {
-                  restaurantId: dish.restaurant.id,
-                  branchId: dish.restaurant.branch_id,
-                  restaurantName: dish.restaurant.display_name,
-                  deliveryFeeIqd: dish.restaurant.delivery_fee_iqd,
-                  minimumOrderIqd: dish.restaurant.minimum_order_iqd,
-                },
-                {
-                  menuItemId: dish.id,
-                  nameAr: dish.name_ar,
-                  unitPriceIqd: dish.price_iqd,
-                  quantity: 1,
-                  imageAssetId: dish.image_asset_id,
-                  notes: null,
-                },
-              );
-              if (result === 'replaced') {
-                notify(
-                  'تم تفريغ السلة',
-                  'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.',
-                );
+              const meta = {
+                restaurantId: dish.restaurant.id,
+                branchId: dish.restaurant.branch_id,
+                restaurantName: dish.restaurant.display_name,
+                deliveryFeeIqd: dish.restaurant.delivery_fee_iqd,
+                minimumOrderIqd: dish.restaurant.minimum_order_iqd,
+              };
+              const line = {
+                menuItemId: dish.id,
+                nameAr: dish.name_ar,
+                unitPriceIqd: dish.price_iqd,
+                quantity: 1,
+                imageAssetId: dish.image_asset_id,
+                notes: null,
+              };
+
+              // Ask before emptying another shop's cart, rather than after
+              // (CUST-8).
+              if (cart && cart.restaurantId !== meta.restaurantId) {
+                void confirmAsync({
+                  title: 'بدء سلة جديدة؟',
+                  message: `سلتك فيها طلب من «${cart.restaurantName}». إذا أضفت من «${meta.restaurantName}» سنفرّغها.`,
+                  confirmLabel: 'تفريغ وإضافة',
+                  cancelLabel: 'إبقاء سلتي',
+                }).then((yes) => {
+                  if (yes) add(meta, line);
+                });
+                return;
               }
+              add(meta, line);
             }}
             accessibilityRole="button"
             accessibilityLabel={
@@ -1154,12 +1174,10 @@ function RestaurantSummaryCard({
       /*
        * Arabic labels, not the stored keys. `cuisine_tags` holds `shawarma`,
        * `levantine` — the contract calls them "never shown" and means it;
-       * joining the raw array put English into the middle of an Arabic card.
+       * joining the raw array put English into the middle of an Arabic card,
+       * and an untranslated key like «grocery» straight through (CUST-20).
        */
-      tags={
-        restaurant.cuisine_tags.slice(0, 3).map(cuisineLabelAr).join('، ') ||
-        restaurant.city_name_ar
-      }
+      tags={arabicCuisineTags(restaurant.cuisine_tags, 3).join('، ') || restaurant.city_name_ar}
       coverUrl={restaurant.cover_asset_id ? assetUrl(restaurant.cover_asset_id) : null}
       rating={restaurant.rating}
       ratingCount={restaurant.rating_count}

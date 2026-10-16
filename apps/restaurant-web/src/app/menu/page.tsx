@@ -1,12 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogoUpload, money, NumberField } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { ApiError, assetUrl } from '@/lib/api';
 import { portal, type MenuCategory, type MenuItem } from '@/lib/portal-endpoints';
+
+/**
+ * A sane per-item ceiling (MERCH-9). The API tolerates up to ~10 billion IQD,
+ * which is never a real menu price; a form that accepts «99,999,999,999» only
+ * turns a typo into a generic 422.
+ */
+const PRICE_MAX_IQD = 10_000_000;
+
+/**
+ * Field-level issues the server returned (MERCH-10).
+ *
+ * A 422 carries `details.issues: {field, message}[]` — an English name or an
+ * out-of-range price — which the dialog used to throw away and show only
+ * «البيانات المدخلة غير صحيحة». This pulls them into a `{field: message}` map.
+ */
+function fieldIssues(error: unknown): Record<string, string> {
+  if (!(error instanceof ApiError)) return {};
+  const issues = (error.details as { issues?: { field?: string; message?: string }[] }).issues;
+  if (!Array.isArray(issues)) return {};
+  const map: Record<string, string> = {};
+  for (const issue of issues) {
+    if (issue.field && issue.message && !(issue.field in map)) map[issue.field] = issue.message;
+  }
+  return map;
+}
 
 /**
  * Menu management (plan §19, §20, §116).
@@ -50,7 +75,9 @@ function MenuScreen({
   const [editing, setEditing] = useState<{ item: MenuItem; categoryId: string } | null>(null);
   const [addingItem, setAddingItem] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const [deleting, setDeleting] = useState<MenuItem | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<MenuCategory | null>(null);
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['menu'] });
 
@@ -69,6 +96,31 @@ function MenuScreen({
     mutationFn: (id: string) => portal.deleteItem(auth, id),
     onSuccess: () => {
       setDeleting(null);
+      invalidate();
+    },
+  });
+
+  // Hide/show a whole category (MERCH-11): a seasonal section can be switched
+  // off without deleting it and losing its items.
+  const toggleCategory = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      portal.updateCategory(auth, id, { is_active: isActive }),
+    onSuccess: invalidate,
+  });
+
+  // Reorder by swapping a category's sort_order with its neighbour's (MERCH-11).
+  const reorderCategory = useMutation({
+    mutationFn: async ({ a, b }: { a: MenuCategory; b: MenuCategory }) => {
+      await portal.updateCategory(auth, a.id, { sort_order: b.sort_order });
+      await portal.updateCategory(auth, b.id, { sort_order: a.sort_order });
+    },
+    onSuccess: invalidate,
+  });
+
+  const deleteCategory = useMutation({
+    mutationFn: (id: string) => portal.deleteCategory(auth, id),
+    onSuccess: () => {
+      setDeletingCategory(null);
       invalidate();
     },
   });
@@ -166,31 +218,90 @@ function MenuScreen({
         />
       ) : null}
 
-      {categories.map((category) => (
+      {categories.map((category, index) => (
         <CategoryCard
           key={category.id}
           category={category}
           canSeeCost={canSeeCost}
           canWrite={canWrite}
+          isFirst={index === 0}
+          isLast={index === categories.length - 1}
           onToggle={(item) =>
             toggleAvailability.mutate({ id: item.id, isAvailable: !item.is_available })
           }
           onEdit={(item) => setEditing({ item, categoryId: category.id })}
           onDelete={setDeleting}
           onAddItem={() => setAddingItem(category.id)}
+          onEditCategory={() => setEditingCategory(category)}
+          onToggleCategory={() =>
+            toggleCategory.mutate({ id: category.id, isActive: !category.is_active })
+          }
+          onMoveUp={() => {
+            const prev = categories[index - 1];
+            if (prev) reorderCategory.mutate({ a: category, b: prev });
+          }}
+          onMoveDown={() => {
+            const next = categories[index + 1];
+            if (next) reorderCategory.mutate({ a: category, b: next });
+          }}
+          onDeleteCategory={() => setDeletingCategory(category)}
           isBusy={toggleAvailability.isPending}
+          isCategoryBusy={toggleCategory.isPending || reorderCategory.isPending}
           itemWord={words.itemAr}
         />
       ))}
 
+      {reorderCategory.error || toggleCategory.error ? (
+        <ErrorState
+          message={
+            (reorderCategory.error ?? toggleCategory.error) instanceof ApiError
+              ? ((reorderCategory.error ?? toggleCategory.error) as ApiError).messageAr
+              : 'تعذّر تحديث التصنيف'
+          }
+        />
+      ) : null}
+
       {addingCategory ? (
         <CategoryDialog
           auth={auth}
+          // New categories land at the end, not tied at sort_order 0 where the
+          // customer menu order then flips between requests (MERCH-22).
+          nextSortOrder={Math.max(0, ...categories.map((category) => category.sort_order)) + 1}
           onDone={() => {
             setAddingCategory(false);
             invalidate();
           }}
           onCancel={() => setAddingCategory(false)}
+        />
+      ) : null}
+
+      {editingCategory ? (
+        <CategoryDialog
+          auth={auth}
+          category={editingCategory}
+          onDone={() => {
+            setEditingCategory(null);
+            invalidate();
+          }}
+          onCancel={() => setEditingCategory(null)}
+        />
+      ) : null}
+
+      {deletingCategory ? (
+        <ConfirmDialog
+          title={`حذف تصنيف ${deletingCategory.name_ar}`}
+          confirmLabel="حذف التصنيف"
+          isSubmitting={deleteCategory.isPending}
+          error={deleteCategory.error instanceof ApiError ? deleteCategory.error.messageAr : null}
+          body={
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+              {deletingCategory.items.length > 0
+                ? 'لا يمكن حذف تصنيف يحتوي أصنافاً. انقل أصنافه أو احذفها أولاً، أو أخفِ التصنيف بدل حذفه.'
+                : 'يُحذف التصنيف نهائياً. الطلبات السابقة لا تتأثّر.'}
+            </p>
+          }
+          onConfirm={() => deleteCategory.mutate(deletingCategory.id)}
+          onCancel={() => setDeletingCategory(null)}
         />
       ) : null}
 
@@ -245,33 +356,89 @@ function CategoryCard({
   category,
   canSeeCost,
   canWrite,
+  isFirst,
+  isLast,
   onToggle,
   onEdit,
   onDelete,
   onAddItem,
+  onEditCategory,
+  onToggleCategory,
+  onMoveUp,
+  onMoveDown,
+  onDeleteCategory,
   isBusy,
+  isCategoryBusy,
   itemWord,
 }: {
   category: MenuCategory;
   canSeeCost: boolean;
   canWrite: boolean;
+  isFirst: boolean;
+  isLast: boolean;
   onToggle: (item: MenuItem) => void;
   onEdit: (item: MenuItem) => void;
   onDelete: (item: MenuItem) => void;
   onAddItem: () => void;
+  onEditCategory: () => void;
+  onToggleCategory: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDeleteCategory: () => void;
   isBusy: boolean;
+  isCategoryBusy: boolean;
   /** Named by the merchant's type, like every other catalog word here. */
   itemWord: string;
 }) {
   return (
     <Card
-      title={category.name_ar}
+      title={category.is_active ? category.name_ar : `${category.name_ar} (مخفي)`}
       subtitle={category.description_ar ?? undefined}
       actions={
         canWrite ? (
-          <button type="button" className="btn btn--ghost btn--sm" onClick={onAddItem}>
-            {`إضافة ${itemWord}`}
-          </button>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            {/* Reorder: the customer menu follows sort_order (MERCH-11). */}
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              aria-label={`تحريك ${category.name_ar} لأعلى`}
+              disabled={isFirst || isCategoryBusy}
+              onClick={onMoveUp}
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              aria-label={`تحريك ${category.name_ar} لأسفل`}
+              disabled={isLast || isCategoryBusy}
+              onClick={onMoveDown}
+            >
+              ▼
+            </button>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              disabled={isCategoryBusy}
+              onClick={onToggleCategory}
+            >
+              {category.is_active ? 'إخفاء' : 'إظهار'}
+            </button>
+            <button type="button" className="btn btn--outline btn--sm" onClick={onEditCategory}>
+              تعديل التصنيف
+            </button>
+            <button
+              type="button"
+              className="btn btn--danger btn--sm"
+              disabled={isCategoryBusy}
+              onClick={onDeleteCategory}
+            >
+              حذف التصنيف
+            </button>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={onAddItem}>
+              {`إضافة ${itemWord}`}
+            </button>
+          </div>
         ) : null
       }
     >
@@ -447,29 +614,53 @@ function AvailabilityToggle({
 
 function CategoryDialog({
   auth,
+  category,
+  nextSortOrder,
   onDone,
   onCancel,
 }: {
   auth: PortalAuth;
+  /** Present when renaming/describing an existing category (MERCH-11). */
+  category?: MenuCategory;
+  /** Create only: where the new category sorts (MERCH-22). */
+  nextSortOrder?: number;
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [nameAr, setNameAr] = useState('');
-  const [descriptionAr, setDescriptionAr] = useState('');
+  const [nameAr, setNameAr] = useState(category?.name_ar ?? '');
+  const [descriptionAr, setDescriptionAr] = useState(category?.description_ar ?? '');
+  // The second click of a double-click lands before `isPending` re-renders
+  // (MERCH-24).
+  const submitting = useRef(false);
 
-  const create = useMutation({
-    mutationFn: () =>
-      portal.createCategory(auth, {
+  const save = useMutation({
+    mutationFn: () => {
+      const body = {
         name_ar: nameAr.trim(),
         description_ar: descriptionAr.trim() || undefined,
-      }),
+      };
+      return category
+        ? portal.updateCategory(auth, category.id, body).then(() => undefined)
+        : portal
+            .createCategory(auth, { ...body, sort_order: nextSortOrder ?? 0 })
+            .then(() => undefined);
+    },
     onSuccess: onDone,
+    onError: () => {
+      submitting.current = false;
+    },
   });
+
+  const submit = (): void => {
+    if (submitting.current) return;
+    submitting.current = true;
+    save.mutate();
+  };
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="cat-title">
       <div className="dialog">
-        <h2 id="cat-title">إضافة تصنيف</h2>
+        <h2 id="cat-title">{category ? `تعديل ${category.name_ar}` : 'إضافة تصنيف'}</h2>
 
         <div className="field">
           <label htmlFor="cat-name">اسم التصنيف</label>
@@ -490,9 +681,9 @@ function CategoryDialog({
           />
         </div>
 
-        {create.error ? (
+        {save.error ? (
           <p className="alert-bar alert-bar--danger" role="alert">
-            {create.error instanceof ApiError ? create.error.messageAr : 'تعذّرت الإضافة'}
+            {save.error instanceof ApiError ? save.error.messageAr : 'تعذّر الحفظ'}
           </p>
         ) : null}
 
@@ -500,12 +691,12 @@ function CategoryDialog({
           <button
             type="button"
             className="btn btn--primary"
-            disabled={nameAr.trim().length < 2 || create.isPending}
-            onClick={() => create.mutate()}
+            disabled={nameAr.trim().length < 2 || save.isPending}
+            onClick={submit}
           >
-            {create.isPending ? 'جاري الحفظ…' : 'إضافة'}
+            {save.isPending ? 'جاري الحفظ…' : category ? 'حفظ' : 'إضافة'}
           </button>
-          <button type="button" className="btn btn--ghost" onClick={onCancel}>
+          <button type="button" className="btn btn--outline" onClick={onCancel}>
             إلغاء
           </button>
         </div>
@@ -582,6 +773,14 @@ function ItemDialog({
   const [imagePreview, setImagePreview] = useState<string | null>(
     item?.image_asset_id ? assetUrl(item.image_asset_id) : null,
   );
+  // Server field names the user has since edited — their stale issue is cleared
+  // the moment they touch the field again (MERCH-10).
+  const [fixed, setFixed] = useState<Set<string>>(new Set());
+  const dismiss = (field: string) =>
+    setFixed((current) => (current.has(field) ? current : new Set(current).add(field)));
+  // Guards the second click of a double-click before `isPending` re-renders
+  // (MERCH-24): it created the product twice.
+  const submitting = useRef(false);
 
   const save = useMutation({
     mutationFn: () => {
@@ -601,10 +800,26 @@ function ItemDialog({
         : portal.createItem(auth, body).then(() => undefined);
     },
     onSuccess: onDone,
+    onError: () => {
+      submitting.current = false;
+    },
   });
 
-  // IQD has no minor unit, so a price is always a whole number (plan §22).
-  const priceInvalid = !Number.isInteger(price) || price <= 0;
+  const submit = (): void => {
+    if (submitting.current) return;
+    submitting.current = true;
+    setFixed(new Set());
+    save.mutate();
+  };
+
+  const issues = fieldIssues(save.error);
+  const issueFor = (field: string): string | null =>
+    fixed.has(field) ? null : (issues[field] ?? null);
+
+  // IQD has no minor unit, so a price is always a whole number (plan §22); the
+  // «.»/«-» the shared field now surfaces, and a runaway typo, are rejected
+  // here with a message rather than silently rewritten or sent on (MERCH-9).
+  const priceInvalid = !Number.isInteger(price) || price <= 0 || price > PRICE_MAX_IQD;
   const margin = price - cost;
 
   return (
@@ -617,9 +832,14 @@ function ItemDialog({
           <input
             id="item-name"
             value={nameAr}
-            onChange={(event) => setNameAr(event.target.value)}
+            onChange={(event) => {
+              setNameAr(event.target.value);
+              dismiss('name_ar');
+            }}
             placeholder="كباب عراقي"
+            aria-invalid={Boolean(issueFor('name_ar'))}
           />
+          {issueFor('name_ar') ? <span className="field__error">{issueFor('name_ar')}</span> : null}
         </div>
 
         {/*
@@ -649,8 +869,15 @@ function ItemDialog({
             id="item-desc"
             rows={2}
             value={descriptionAr}
-            onChange={(event) => setDescriptionAr(event.target.value)}
+            onChange={(event) => {
+              setDescriptionAr(event.target.value);
+              dismiss('description_ar');
+            }}
+            aria-invalid={Boolean(issueFor('description_ar'))}
           />
+          {issueFor('description_ar') ? (
+            <span className="field__error">{issueFor('description_ar')}</span>
+          ) : null}
         </div>
 
         <div className="field">
@@ -658,12 +885,22 @@ function ItemDialog({
           <NumberField
             id="item-price"
             min={0}
+            max={PRICE_MAX_IQD}
             value={price}
-            onChange={(value) => setPrice(value)}
-            aria-invalid={priceInvalid}
+            onChange={(value) => {
+              setPrice(value);
+              dismiss('base_price_iqd');
+            }}
+            aria-invalid={priceInvalid || Boolean(issueFor('base_price_iqd'))}
           />
           {priceInvalid ? (
-            <span className="field__error">السعر يجب أن يكون رقماً صحيحاً أكبر من صفر</span>
+            <span className="field__error">
+              {price > PRICE_MAX_IQD
+                ? `السعر أعلى من الحد المسموح (${money(PRICE_MAX_IQD)})`
+                : 'السعر يجب أن يكون رقماً صحيحاً أكبر من صفر'}
+            </span>
+          ) : issueFor('base_price_iqd') ? (
+            <span className="field__error">{issueFor('base_price_iqd')}</span>
           ) : null}
         </div>
 
@@ -674,12 +911,20 @@ function ItemDialog({
               <NumberField
                 id="item-cost"
                 min={0}
+                max={PRICE_MAX_IQD}
                 value={cost}
-                onChange={(value) => setCost(value)}
+                onChange={(value) => {
+                  setCost(value);
+                  dismiss('cost_price_iqd');
+                }}
+                aria-invalid={Boolean(issueFor('cost_price_iqd'))}
               />
               <span className="field__hint">
                 يُستخدم لحساب هامش الربح في تقرير الأرباح فقط، ولا يظهر للعملاء أبداً.
               </span>
+              {issueFor('cost_price_iqd') ? (
+                <span className="field__error">{issueFor('cost_price_iqd')}</span>
+              ) : null}
             </div>
 
             {cost > 0 ? (
@@ -714,11 +959,11 @@ function ItemDialog({
             type="button"
             className="btn btn--primary"
             disabled={nameAr.trim().length < 2 || priceInvalid || save.isPending}
-            onClick={() => save.mutate()}
+            onClick={submit}
           >
             {save.isPending ? 'جاري الحفظ…' : 'حفظ'}
           </button>
-          <button type="button" className="btn btn--ghost" onClick={onCancel}>
+          <button type="button" className="btn btn--outline" onClick={onCancel}>
             إلغاء
           </button>
         </div>

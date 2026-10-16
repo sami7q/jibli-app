@@ -1,15 +1,26 @@
-import { Children, Fragment, useCallback, useMemo, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Children, Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Linking, StyleSheet, TextInput, View } from 'react-native';
 import Constants from 'expo-constants';
 import { configString } from '@/lib/app-config';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError } from '@/lib/api';
 import { useArea } from '@/lib/area';
-import { useIsGuest, useSession } from '@/lib/session';
+import { useCart } from '@/lib/cart';
+import { useIsGuest, useMe, useSession } from '@/lib/session';
 import { confirmAsync, notify } from '@/lib/dialog';
-import { ALIGN_START, ROW, accent, color, radius, shadow, space } from '@/theme';
+import {
+  ALIGN_START,
+  INPUT_TEXT_START,
+  ROW,
+  accent,
+  color,
+  radius,
+  shadow,
+  space,
+  text,
+} from '@/theme';
 import { Button, Ltr, Row, Screen, Text } from '@/ui';
 import { AreaPicker } from '@/ui/area-picker';
 import { AddressSheet } from '@/ui/address-sheet';
@@ -31,6 +42,19 @@ export default function AccountScreen() {
   const router = useRouter();
   const { state, signOut, refresh, parkedAccount, switchToParked } = useSession();
   const isGuest = useIsGuest();
+  const queryClient = useQueryClient();
+  const { clear: clearCart } = useCart();
+
+  /*
+   * Sign-out wipes everything the previous user left on the device: the
+   * server session (in `signOut`), then the React-Query cache and the cart,
+   * so the next person to sign in on this phone starts clean (CUST-5).
+   */
+  const signOutAndClear = async () => {
+    await signOut();
+    queryClient.clear();
+    clearCart();
+  };
 
   /*
    * The courier application, read fresh whenever this screen is opened.
@@ -115,11 +139,24 @@ export default function AccountScreen() {
    * restaurants to show.
    */
   const addresses = useQuery({
-    queryKey: ['addresses'],
+    queryKey: ['addresses', useMe()?.user_id ?? null],
     queryFn: () => api.addresses(),
     enabled: !isGuest,
     staleTime: 5 * 60_000,
   });
+
+  /*
+   * The signed-in account's own name and number, for the header and the name
+   * editor (CUST-12). `/auth/me` carries neither the phone nor a way to edit
+   * the name, but `/profile` does.
+   */
+  const profile = useQuery({
+    queryKey: ['profile', useMe()?.user_id ?? null],
+    queryFn: () => api.profile(),
+    enabled: !isGuest,
+    staleTime: 5 * 60_000,
+  });
+  const [editingName, setEditingName] = useState(false);
 
   const home = useMemo(
     () => (addresses.data ?? []).find((entry) => entry.is_default) ?? addresses.data?.[0] ?? null,
@@ -205,7 +242,7 @@ export default function AccountScreen() {
               تتصفّح كضيف
             </Text>
             <Text variant="small" tone="secondary" style={RTL_TEXT}>
-              سجّل دخولك لحفظ عناوينك، متابعة طلباتك، وحفظ مطاعمك المفضّلة.
+              سجّل دخولك لحفظ عناوينك، متابعة طلباتك، وحفظ متاجرك المفضّلة.
             </Text>
             <Button label="تسجيل الدخول" onPress={() => router.push('/(auth)/phone')} />
           </View>
@@ -261,6 +298,11 @@ export default function AccountScreen() {
                     : `${area.governorateNameAr} — ${area.cityNameAr}`
                   : 'لم تُحدَّد المنطقة'}
               </Text>
+              {profile.data?.phone ? (
+                <Ltr variant="caption" tone="inverse" style={{ opacity: 0.9 }}>
+                  {maskIraqiPhone(profile.data.phone)}
+                </Ltr>
+              ) : null}
               {state.status === 'offline-ready' ? (
                 <Text variant="caption" tone="inverse" style={[RTL_TEXT, { opacity: 0.9 }]}>
                   أنت غير متصل — بعض البيانات قد تكون قديمة.
@@ -272,6 +314,14 @@ export default function AccountScreen() {
       </View>
 
       <Group title="حسابي">
+        {!isGuest ? (
+          <ListRow
+            label="تعديل الاسم"
+            sublabel={me?.full_name ?? 'أضف اسمك'}
+            icon={<MaterialCommunityIcons name="pencil-outline" size={20} color={color.brand} />}
+            onPress={() => setEditingName(true)}
+          />
+        ) : null}
         {isGuest ? (
           <ListRow
             label="منطقة التوصيل"
@@ -401,10 +451,10 @@ export default function AccountScreen() {
           icon={<MaterialCommunityIcons name="storefront-outline" size={20} color={color.brand} />}
           onPress={() => {
             if (parkedShop) {
-              void switchToParked().then(() => router.push('/(owner)'));
+              void switchToParked().then(() => router.push('/(owner)/owner'));
               return;
             }
-            router.push('/(owner)');
+            router.push('/(owner)/owner');
           }}
         />
       </Group>
@@ -446,7 +496,7 @@ export default function AccountScreen() {
                 confirmLabel: 'خروج',
                 destructive: true,
               }).then((yes) => {
-                if (yes) void signOut();
+                if (yes) void signOutAndClear();
               })
             }
           />
@@ -484,6 +534,15 @@ export default function AccountScreen() {
         visible={editingAddress}
         start="list"
         onClose={() => setEditingAddress(false)}
+      />
+      <EditNameSheet
+        visible={editingName}
+        currentName={me?.full_name ?? ''}
+        onSaved={() => {
+          void refresh();
+          void profile.refetch();
+        }}
+        onClose={() => setEditingName(false)}
       />
       <DeleteAccountSheet visible={deleting} onClose={() => setDeleting(false)} />
     </Screen>
@@ -563,6 +622,8 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  */
 function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { signOut } = useSession();
+  const queryClient = useQueryClient();
+  const { clear: clearCart } = useCart();
   /**
    * The failure, said in the sheet.
    *
@@ -577,8 +638,11 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
     mutationFn: () => api.deleteAccount(),
     onSuccess: async () => {
       onClose();
-      // Clears the keystore and drops the app back to the welcome screen.
+      // Clears the keystore and drops the app back to the welcome screen, then
+      // wipes the deleted account's cached data and cart (CUST-5).
       await signOut();
+      queryClient.clear();
+      clearCart();
       notify('تم حذف الحساب', 'نأسف لرحيلك. يمكنك إنشاء حساب جديد في أي وقت.');
     },
     onError: (error) =>
@@ -627,7 +691,7 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
       <Text tone="secondary">هذا الإجراء لا يمكن التراجع عنه. عند الحذف:</Text>
 
       <Bullet icon="check" text="يُحذف اسمك ورقم هاتفك وعناوينك المحفوظة." />
-      <Bullet icon="check" text="تُحذف مطاعمك المفضّلة وإشعاراتك." />
+      <Bullet icon="check" text="تُحذف متاجرك المفضّلة وإشعاراتك." />
       <Bullet icon="check" text="تُحذف تقييماتك وتعليقاتك وبلاغاتك." />
       <Bullet icon="check" text="يتم تسجيل خروجك من كل الأجهزة." />
       <Bullet
@@ -635,6 +699,105 @@ function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: (
         text="تبقى سجلات الطلبات السابقة لدى المطاعم كسجلات مالية، دون ربطها بك."
       />
       <Bullet icon="alert" text="لا يمكن الحذف أثناء وجود طلب قيد التنفيذ." />
+    </Sheet>
+  );
+}
+
+/**
+ * «+964 77• ••• ••01» — enough to recognise the number without printing it.
+ *
+ * Shown in the header so a customer can confirm which account they are in,
+ * without the whole number sitting on a screen in a shared room (CUST-12).
+ */
+function maskIraqiPhone(e164: string): string {
+  const sub = e164.replace(/^\+?964/, '');
+  if (sub.length < 4) return e164;
+  return `+964 ${sub.slice(0, 2)}• ••• ••${sub.slice(-2)}`;
+}
+
+/** Edit the saved name — the only profile field a customer can change here. */
+function EditNameSheet({
+  visible,
+  currentName,
+  onSaved,
+  onClose,
+}: {
+  visible: boolean;
+  currentName: string;
+  onSaved: () => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(currentName);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setName(currentName);
+      setProblem(null);
+    }
+  }, [visible, currentName]);
+
+  const save = useMutation({
+    mutationFn: () => api.updateProfile({ full_name: name.trim() }),
+    onSuccess: () => {
+      onSaved();
+      onClose();
+    },
+    onError: (error) =>
+      setProblem(error instanceof ApiError ? error.messageAr : 'تعذّر حفظ الاسم، حاول لاحقاً.'),
+  });
+
+  const valid = name.trim().length >= 2;
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="تعديل الاسم"
+      footer={
+        <Button
+          label="حفظ"
+          block
+          disabled={!valid || save.isPending}
+          loading={save.isPending}
+          onPress={() => save.mutate()}
+        />
+      }
+    >
+      {problem ? (
+        <View
+          style={{
+            borderRadius: radius.md,
+            backgroundColor: color.dangerSoft,
+            paddingVertical: space[2],
+            paddingHorizontal: space[3],
+          }}
+        >
+          <Text variant="caption" tone="danger">
+            {problem}
+          </Text>
+        </View>
+      ) : null}
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="اسمك الكامل"
+        placeholderTextColor={color.textMuted}
+        accessibilityLabel="الاسم"
+        style={[
+          text.body,
+          {
+            minHeight: 48,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: color.borderSubtle,
+            backgroundColor: color.surfaceCard,
+            paddingHorizontal: space[3],
+            color: color.textPrimary,
+            textAlign: INPUT_TEXT_START,
+          },
+        ]}
+      />
     </Sheet>
   );
 }

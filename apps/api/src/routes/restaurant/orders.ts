@@ -29,6 +29,7 @@ import {
 } from '@jibli/db';
 import type { AppContext } from '../../lib/context.js';
 import { restaurantScope } from './scope.js';
+import { pgErrorInfo } from '../../plugins/error-handler.js';
 import { transitionOrder } from '../../services/order-service.js';
 import { releaseInventoryForOrder } from '../../services/inventory-service.js';
 
@@ -72,6 +73,13 @@ const unassignDriverSchema = z.object({ reason: z.string().trim().min(3).max(200
  * turned down.
  */
 const ASSIGNABLE_ORDER_STATUSES: readonly OrderStatus[] = ['ACCEPTED', 'PREPARING', 'READY'];
+
+/**
+ * A driver whose app has not checked in this long is treated as gone for
+ * dispatch (FLOW-7). Presence is a heartbeat, not a toggle: a courier can leave
+ * «متاح» on and close the app.
+ */
+const HEARTBEAT_STALE_MS = 5 * 60 * 1000;
 
 export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppContext): void {
   /**
@@ -300,6 +308,7 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
           name: users.fullName,
           phone: users.phoneE164,
           availability: drivers.availability,
+          lastHeartbeatAt: drivers.lastHeartbeatAt,
           vehicleType: drivers.defaultVehicleType,
           canCollectCash: restaurantDrivers.canCollectCash,
           activeAssignments: sql<number>`(
@@ -319,6 +328,14 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
           ),
         );
 
+      // A driver whose app stopped checking in is not actually present, even if
+      // their last state was AVAILABLE — assigning to them silently stalls the
+      // order (FLOW-7). A known-but-old heartbeat marks them not assignable; a
+      // null one is left alone (freed-by-completion drivers may not have one).
+      const now = Date.now();
+      const isPresent = (lastHeartbeatAt: Date | null): boolean =>
+        lastHeartbeatAt === null || now - lastHeartbeatAt.getTime() <= HEARTBEAT_STALE_MS;
+
       return reply.send(
         success(
           rows.map((row) => ({
@@ -330,7 +347,10 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
             can_collect_cash: row.canCollectCash,
             active_assignments: Number(row.activeAssignments),
             // Release 1 default is one active delivery per driver (plan §48).
-            assignable: Number(row.activeAssignments) === 0 && row.availability !== 'OFFLINE',
+            assignable:
+              Number(row.activeAssignments) === 0 &&
+              row.availability !== 'OFFLINE' &&
+              isPresent(row.lastHeartbeatAt),
           })),
           { request_id: request.requestId },
         ),
@@ -407,14 +427,12 @@ export function registerRestaurantOrderRoutes(app: FastifyInstance, ctx: AppCont
           });
         } catch (error) {
           // Unique violation: the driver already has a live task, or this order
-          // already has one. Either way the UI must refresh (plan §113).
-          if (
-            typeof error === 'object' &&
-            error !== null &&
-            (error as { code?: string }).code === '23505'
-          ) {
+          // already has one. Either way the UI must refresh (plan §113). The
+          // SQLSTATE sits under the drizzle wrapper's `.cause` (MERCH-5/FLOW-6).
+          if (pgErrorInfo(error).code === '23505') {
             throw new AppError(ERROR_CODES.DRIVER_AT_CAPACITY, {
               details: { driverId: body.driver_id },
+              messageAr: 'المندوب مشغول بطلب آخر.',
             });
           }
           throw error;

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dateAr, LogoUpload } from '@jibli/ui-web';
 import type { MerchantType } from '@jibli/contracts';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { StorefrontTabs } from '@/components/storefront-tabs';
 import { Badge, Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { Dropdown } from '@/components/dropdown';
@@ -95,7 +95,12 @@ export default function AppearancePage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('restaurant.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المتاجر" />;
+  }
 
+  // Banners and rotation are storefront config (ADMIN-11).
+  const canManage = session.can('config.write');
   const rows = banners.data ?? [];
   const seconds = Number(
     config.data?.find((entry) => entry.key === 'banner_rotation_seconds')?.value ?? 5,
@@ -126,9 +131,11 @@ export default function AppearancePage() {
       actions={
         <>
           <StorefrontTabs value={storefront} onChange={setStorefront} />
-          <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
-            بنر جديد
-          </button>
+          {canManage ? (
+            <button type="button" className="btn btn--primary" onClick={() => setCreating(true)}>
+              بنر جديد
+            </button>
+          ) : null}
         </>
       }
     >
@@ -152,14 +159,16 @@ export default function AppearancePage() {
                 <p style={{ margin: 0, fontSize: 'var(--text-sm)' }}>
                   البنر مساحة إعلانية أعلى التطبيق — عرض، مطعم جديد، أو تصنيف تريد إبرازه.
                 </p>
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={() => setCreating(true)}
-                  style={{ marginBlockStart: 'var(--space-3)' }}
-                >
-                  أضف أول بنر
-                </button>
+                {canManage ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => setCreating(true)}
+                    style={{ marginBlockStart: 'var(--space-3)' }}
+                  >
+                    أضف أول بنر
+                  </button>
+                ) : null}
               </div>
             ) : (
               <ul className="cats">
@@ -169,7 +178,7 @@ export default function AppearancePage() {
                       <button
                         type="button"
                         className="cat__move"
-                        disabled={index === 0 || reorder.isPending}
+                        disabled={!canManage || index === 0 || reorder.isPending}
                         onClick={() => move(index, -1)}
                         aria-label={`تحريك ${banner.title_ar} للأعلى`}
                       >
@@ -183,7 +192,7 @@ export default function AppearancePage() {
                       <button
                         type="button"
                         className="cat__move"
-                        disabled={index === rows.length - 1 || reorder.isPending}
+                        disabled={!canManage || index === rows.length - 1 || reorder.isPending}
                         onClick={() => move(index, 1)}
                         aria-label={`تحريك ${banner.title_ar} للأسفل`}
                       >
@@ -204,7 +213,9 @@ export default function AppearancePage() {
                       {banner.subtitle_ar ? (
                         <span className="cat__key">{banner.subtitle_ar}</span>
                       ) : null}
-                      <span className="cat__key">{describeLink(banner)}</span>
+                      <span className="cat__key">
+                        {describeLink(banner, categories.data ?? [])}
+                      </span>
                     </div>
 
                     <div className="cat__state">
@@ -229,30 +240,34 @@ export default function AppearancePage() {
                     </div>
 
                     <div className="cat__actions">
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => setEditing(banner)}
-                      >
-                        تعديل
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        disabled={setActive.isPending}
-                        onClick={() =>
-                          setActive.mutate({ id: banner.id, isActive: !banner.is_active })
-                        }
-                      >
-                        {banner.is_active ? 'إيقاف' : 'تشغيل'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => setDeleting(banner)}
-                      >
-                        حذف
-                      </button>
+                      {canManage ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => setEditing(banner)}
+                          >
+                            تعديل
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            disabled={setActive.isPending}
+                            onClick={() =>
+                              setActive.mutate({ id: banner.id, isActive: !banner.is_active })
+                            }
+                          >
+                            {banner.is_active ? 'إيقاف' : 'تشغيل'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => setDeleting(banner)}
+                          >
+                            حذف
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                   </li>
                 ))}
@@ -271,6 +286,7 @@ export default function AppearancePage() {
                   max={20}
                   step={1}
                   value={seconds}
+                  disabled={!canManage}
                   onChange={(event) => rotation.mutate(Number(event.target.value))}
                   style={{ flex: 1 }}
                 />
@@ -377,10 +393,21 @@ export default function AppearancePage() {
   );
 }
 
-function describeLink(banner: AppBanner): string {
+/** The Baghdad calendar date (YYYY-MM-DD) of an ISO timestamp, for a date input. */
+function toBaghdadDate(iso: string | null | undefined): string {
+  if (!iso) return '';
+  // en-CA renders as YYYY-MM-DD, which is what <input type="date"> expects.
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+}
+
+function describeLink(banner: AppBanner, categories: AppCategory[]): string {
   switch (banner.link_type) {
-    case 'CATEGORY':
-      return `يفتح تصنيف: ${banner.link_value}`;
+    case 'CATEGORY': {
+      // The stored value is the category key; show its Arabic name, not «grills»
+      // (ADMIN-24). Falls back to the key if the category is gone.
+      const named = categories.find((category) => category.key === banner.link_value);
+      return `يفتح تصنيف: ${named?.name_ar ?? banner.link_value}`;
+    }
     case 'RESTAURANT':
       return 'يفتح صفحة مطعم';
     case 'URL':
@@ -586,8 +613,11 @@ function BannerDialog({
   const [preview, setPreview] = useState<string | null>(
     banner?.image_asset_id ? adminApi.assetUrl(banner.image_asset_id) : null,
   );
-  const [startsAt, setStartsAt] = useState(banner?.starts_at?.slice(0, 10) ?? '');
-  const [endsAt, setEndsAt] = useState(banner?.ends_at?.slice(0, 10) ?? '');
+  // Read back as the Baghdad calendar date, matching how it is saved (ADMIN-24).
+  // Slicing the UTC ISO shifted the day for a date stored at 00:00 Baghdad
+  // (= 21:00 UTC the day before).
+  const [startsAt, setStartsAt] = useState(toBaghdadDate(banner?.starts_at));
+  const [endsAt, setEndsAt] = useState(toBaghdadDate(banner?.ends_at));
 
   const save = useMutation({
     mutationFn: async (): Promise<void> => {
@@ -598,8 +628,10 @@ function BannerDialog({
         image_asset_id: assetId,
         link_type: linkType,
         link_value: linkType === 'NONE' ? null : linkValue.trim() || null,
-        starts_at: startsAt ? new Date(`${startsAt}T00:00:00Z`).toISOString() : null,
-        ends_at: endsAt ? new Date(`${endsAt}T23:59:59Z`).toISOString() : null,
+        // Baghdad local time (UTC+3, no DST), not UTC midnight — a date typed as
+        // «يبدأ ١ رمضان» must begin at 00:00 Baghdad, not 03:00 (ADMIN-24).
+        starts_at: startsAt ? new Date(`${startsAt}T00:00:00+03:00`).toISOString() : null,
+        ends_at: endsAt ? new Date(`${endsAt}T23:59:59+03:00`).toISOString() : null,
       };
 
       if (isNew) {

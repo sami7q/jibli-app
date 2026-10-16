@@ -54,6 +54,14 @@ export interface Principal {
    * already open — the same rule the rest of this file follows for roles.
    */
   readonly mfaRequiredByPolicy: boolean;
+  /**
+   * A staff-issued password the holder has not replaced yet (ADMIN-10).
+   *
+   * While true the session may reach nothing but the password-change endpoint,
+   * `/auth/me` and logout — enforced server-side in `authenticate`, because a
+   * client redirect is a request and not a control.
+   */
+  readonly mustChangePassword: boolean;
 }
 
 /** How recently MFA must have happened to authorise a sensitive action. */

@@ -44,7 +44,15 @@ export default function OrdersPage() {
 
 function OrdersScreen({ auth, canSeeCommission }: { auth: PortalAuth; canSeeCommission: boolean }) {
   const [status, setStatus] = useState<OrderStatus | ''>('');
-  const [search, setSearch] = useState('');
+  // Seeded from the URL so the topbar search box lands here with the term
+  // already applied (MERCH-25). Read from `window.location` rather than
+  // `useSearchParams`, which would force the page behind a Suspense boundary —
+  // the same choice the sign-in page makes.
+  const [search, setSearch] = useState(() =>
+    typeof window === 'undefined'
+      ? ''
+      : (new URLSearchParams(window.location.search).get('search') ?? ''),
+  );
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const debouncedSearch = useDebounced(search, 300);

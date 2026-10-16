@@ -656,6 +656,15 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
           throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'application' } });
         }
 
+        // Only a live application can be rejected (ADMIN-13). Rejecting an
+        // already-APPROVED one told the applicant «لم يُقبل» while the shop they
+        // now own existed.
+        if (!['UNDER_REVIEW', 'INFO_REQUESTED'].includes(application.status)) {
+          throw new AppError(ERROR_CODES.RESTAURANT_APPLICATION_INVALID_STATE, {
+            details: { status: application.status },
+          });
+        }
+
         await tx
           .update(restaurantApplications)
           .set({
@@ -677,9 +686,95 @@ export function registerAdminGeographyRoutes(app: FastifyInstance, ctx: AppConte
           reason: body.reason,
           requestId: request.requestId,
         });
+
+        // The applicant is told, as the dialog promises (ADMIN-13).
+        await enqueueOutboxEvent(tx, {
+          eventType: EVENT_TYPES.RESTAURANT_REJECTED,
+          aggregateType: 'restaurant',
+          aggregateId: applicationId,
+          requestId: request.requestId,
+          payload: {
+            restaurantId: applicationId,
+            displayName: application.displayName,
+            ownerUserId: application.applicantUserId,
+            reason: body.reason,
+          },
+        });
       });
 
       return reply.send(success({ rejected: true }, { request_id: request.requestId }));
+    },
+  );
+
+  /**
+   * Ask the applicant for more information (ADMIN-13).
+   *
+   * The app already handles INFO_REQUESTED («نحتاج معلومة إضافية») but no admin
+   * route set it. Moves the application into that state, records the note, and
+   * tells the applicant.
+   */
+  app.post(
+    '/api/v1/admin/restaurants/applications/:applicationId/request-info',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const principal = requirePrincipal(request);
+      assertAdminPermission(principal, 'restaurant.reject');
+      const { applicationId } = z.object({ applicationId: uuidSchema }).parse(request.params);
+      const body = z.object({ message: z.string().trim().min(3).max(500) }).parse(request.body);
+
+      await ctx.db.transaction(async (tx) => {
+        const [application] = await tx
+          .select()
+          .from(restaurantApplications)
+          .where(eq(restaurantApplications.id, applicationId))
+          .limit(1);
+
+        if (!application) {
+          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'application' } });
+        }
+        if (!['UNDER_REVIEW', 'INFO_REQUESTED'].includes(application.status)) {
+          throw new AppError(ERROR_CODES.RESTAURANT_APPLICATION_INVALID_STATE, {
+            details: { status: application.status },
+          });
+        }
+
+        await tx
+          .update(restaurantApplications)
+          .set({
+            status: 'INFO_REQUESTED',
+            applicantNote: body.message,
+            reviewedBy: principal.userId,
+            reviewedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(restaurantApplications.id, applicationId));
+
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: AUDIT_ACTIONS.RESTAURANT_REJECT,
+          entityType: 'restaurant_application',
+          entityId: applicationId,
+          before: { status: application.status },
+          after: { status: 'INFO_REQUESTED' },
+          reason: body.message,
+          requestId: request.requestId,
+        });
+
+        await enqueueOutboxEvent(tx, {
+          eventType: EVENT_TYPES.RESTAURANT_INFO_REQUESTED,
+          aggregateType: 'restaurant',
+          aggregateId: applicationId,
+          requestId: request.requestId,
+          payload: {
+            restaurantId: applicationId,
+            displayName: application.displayName,
+            ownerUserId: application.applicantUserId,
+            reason: body.message,
+          },
+        });
+      });
+
+      return reply.send(success({ status: 'INFO_REQUESTED' }, { request_id: request.requestId }));
     },
   );
 

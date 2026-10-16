@@ -5,7 +5,7 @@ import { isShopSupported, useOwner } from '@/lib/owner';
 import { sectionOf } from '@/lib/sections';
 import { color, radius, ROW, space, TAP_TARGET } from '@/theme';
 import { EmptyState, Row, Screen, Text } from '@/ui';
-import { OwnerHeader } from './index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * Which shop the phone is working on.
@@ -43,7 +43,7 @@ export default function OwnerShopsScreen() {
               disabled={!supported}
               onPress={async () => {
                 await owner.select(entry.id);
-                router.replace('/(owner)');
+                router.replace('/(owner)/owner');
               }}
               accessibilityRole="button"
               accessibilityState={{ selected: current, disabled: !supported }}

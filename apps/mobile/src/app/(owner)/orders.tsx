@@ -7,12 +7,12 @@ import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError, type OwnerLiveOrder, type OwnerRejectReason } from '@/lib/api';
 import { MINUTES, countAr } from '@/lib/arabic-count';
 import { useOwner } from '@/lib/owner';
-import { describeAddress } from '@/lib/owner-catalog';
+import { addressDeliveryNote, describeAddress } from '@/lib/owner-catalog';
 import { useWorkLive } from '@/lib/work-live';
 import type { RealtimeStatus } from '@/lib/realtime';
 import { BRAND, color, palette, radius, ROW, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Ltr, Row, Screen, Skeleton, Text } from '@/ui';
-import { OwnerHeader } from './index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * Orders, from the phone — the shop's live board.
@@ -359,6 +359,7 @@ function OrderCard({
   const waitedMinutes = minutesSince(order.placed_at, now);
   const late = waiting && waitedMinutes >= 5;
   const address = describeAddress(order.delivery_address);
+  const deliveryNote = addressDeliveryNote(order.delivery_address);
 
   /** «Ready in N min» from acceptance plus the shop's own estimate. */
   const readyIn =
@@ -439,6 +440,11 @@ function OrderCard({
           {address ? (
             <Text variant="caption" tone="muted" numberOfLines={2}>
               {address}
+            </Text>
+          ) : null}
+          {deliveryNote ? (
+            <Text variant="caption" tone="secondary">
+              ملاحظة التوصيل: {deliveryNote}
             </Text>
           ) : null}
         </View>

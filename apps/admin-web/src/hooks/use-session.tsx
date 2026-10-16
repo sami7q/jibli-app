@@ -32,6 +32,13 @@ export type AdminSessionState =
       permissions: AdminPermission[];
       can: (permission: AdminPermission) => boolean;
       roleAr: string;
+      /**
+       * The account signed in with a password someone else issued and has not
+       * replaced it yet (ADMIN-10). The server refuses every route but the
+       * password change itself, so the shell sends the operator there rather
+       * than letting each page render a PASSWORD_CHANGE_REQUIRED error box.
+       */
+      mustChangePassword: boolean;
     };
 
 interface MeResponse {
@@ -39,6 +46,7 @@ interface MeResponse {
   full_name: string | null;
   platform_roles: PlatformRole[];
   restaurant_roles: Record<string, string[]>;
+  must_change_password?: boolean;
 }
 
 interface RefreshResponse {
@@ -70,6 +78,16 @@ const REFRESH_MARGIN_SECONDS = 60;
 interface AdminSessionContextValue {
   readonly state: AdminSessionState;
   readonly start: () => void;
+  /**
+   * Swap the in-memory access token for a fresher one (ADMIN-1).
+   *
+   * A step-up challenge (`/auth/mfa/verify`) mints a new token carrying the
+   * `mfaAt` claim. The retried sensitive action has to present *that* token,
+   * not the one the provider is holding — which has no step-up stamp and would
+   * 401 again. The refresh loop is left running: the server now carries the
+   * step-up forward across rotation, so the next refresh keeps it too.
+   */
+  readonly applyAccessToken: (token: string) => void;
 }
 
 const AdminSessionContext = createContext<AdminSessionContextValue | null>(null);
@@ -83,6 +101,10 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
     if (started.current) return;
     started.current = true;
     setActive(true);
+  };
+
+  const applyAccessToken = (token: string): void => {
+    setState((prev) => (prev.status === 'authenticated' ? { ...prev, accessToken: token } : prev));
   };
 
   useEffect(() => {
@@ -136,6 +158,7 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
           permissions: [...granted],
           can: (permission) => granted.has(permission),
           roleAr: PLATFORM_ROLE_LABELS[primaryRole] ?? '',
+          mustChangePassword: me.must_change_password ?? false,
         });
 
         timer = setTimeout(
@@ -180,7 +203,9 @@ export function AdminSessionProvider({ children }: { children: React.ReactNode }
   }, [active]);
 
   return (
-    <AdminSessionContext.Provider value={{ state, start }}>{children}</AdminSessionContext.Provider>
+    <AdminSessionContext.Provider value={{ state, start, applyAccessToken }}>
+      {children}
+    </AdminSessionContext.Provider>
   );
 }
 
@@ -196,4 +221,19 @@ export function useAdminSession(): AdminSessionState {
     throw new Error('useAdminSession must be used inside <AdminSessionProvider>');
   }
   return context.state;
+}
+
+/**
+ * The token-swap callback, for the step-up dialog (ADMIN-1).
+ *
+ * Separate from `useAdminSession` so the common read path does not also force
+ * the `start()` effect that hook runs; this one is only used by a component
+ * that already sits inside an authenticated page.
+ */
+export function useApplyAccessToken(): (token: string) => void {
+  const context = useContext(AdminSessionContext);
+  if (!context) {
+    throw new Error('useApplyAccessToken must be used inside <AdminSessionProvider>');
+  }
+  return context.applyAccessToken;
 }

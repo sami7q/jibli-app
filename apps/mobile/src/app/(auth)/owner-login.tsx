@@ -106,7 +106,7 @@ export default function OwnerLoginScreen() {
             customerSignedIn ? { park: 'customer' } : {},
           );
 
-          router.replace('/(owner)');
+          router.replace('/(owner)/owner');
           return null;
         } catch (caught) {
           if (caught instanceof ApiError) return caught.messageAr;

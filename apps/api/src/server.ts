@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
+import Fastify, {
+  type FastifyBaseLogger,
+  type FastifyInstance,
+  type FastifyRequest,
+} from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -9,6 +13,7 @@ import websocket from '@fastify/websocket';
 import { parseCsv } from '@jibli/config';
 import { pingDatabase } from '@jibli/db';
 import { success } from '@jibli/contracts';
+import { verifyAccessToken } from '@jibli/auth';
 import type { AppContext } from './lib/context.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerAuth } from './plugins/auth.js';
@@ -157,14 +162,48 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
   });
 
   // ── Rate limiting (plan §78) ──────────────────────────────────────────────
+  //
+  // The limiter runs on `onRequest`, before `app.authenticate` (a preHandler)
+  // sets `request.principal` — so keying on the principal always fell back to
+  // the IP, and customers behind one carrier NAT or staff behind one office
+  // throttled each other (CUST-6/ADMIN-19). The key generator verifies the
+  // bearer token itself and keys by user id when present; unauthenticated
+  // traffic still keys by IP, which is what guards signup and login.
+  const rateLimitTokenConfig = {
+    accessSecret: ctx.env.JWT_ACCESS_SECRET,
+    refreshSecret: ctx.env.JWT_REFRESH_SECRET,
+    accessTtlSeconds: ctx.env.ACCESS_TOKEN_TTL_SECONDS,
+    refreshTtlSeconds: ctx.env.REFRESH_TOKEN_TTL_SECONDS,
+  };
+  const verifiedUserId = async (request: FastifyRequest): Promise<string | null> => {
+    const header = request.headers.authorization;
+    if (typeof header !== 'string') return null;
+    const [scheme, token] = header.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+    try {
+      const claims = await verifyAccessToken(token.trim(), rateLimitTokenConfig);
+      return typeof claims.sub === 'string' ? claims.sub : null;
+    } catch {
+      // A bad or expired token keys by IP, like no token at all.
+      return null;
+    }
+  };
+
   await app.register(rateLimit, {
     global: true,
-    max: ctx.env.RATE_LIMIT_GLOBAL_PER_MINUTE,
+    // A higher allowance once a verified user is on the key (not a shared IP).
+    max: (_request, key) =>
+      key.startsWith('user:')
+        ? ctx.env.RATE_LIMIT_AUTHENTICATED_PER_MINUTE
+        : ctx.env.RATE_LIMIT_GLOBAL_PER_MINUTE,
     timeWindow: '1 minute',
     // Redis-backed so the limit holds across API instances, not per process.
     redis: ctx.redis,
     nameSpace: 'ratelimit:',
-    keyGenerator: (request) => request.principal?.userId ?? request.ip,
+    keyGenerator: async (request) => {
+      const userId = await verifiedUserId(request);
+      return userId ? `user:${userId}` : `ip:${request.ip}`;
+    },
     // A limiter that fails open is better than one that takes the API down with
     // Redis; abuse is still caught by the per-endpoint OTP counters.
     skipOnError: true,

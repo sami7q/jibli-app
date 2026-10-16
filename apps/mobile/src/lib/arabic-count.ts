@@ -21,6 +21,17 @@ export interface CountedNoun {
   readonly many: string;
 }
 
+/**
+ * ASCII digits as Eastern Arabic-Indic ٠١٢٣٤٥٦٧٨٩.
+ *
+ * For the handful of bare numbers the app shows outside money and dates — the
+ * delivery PIN, above all — so «1043» reads «١٠٤٣» in an Arabic screen. The
+ * courier's pad accepts either, so this is a display choice, not a data one.
+ */
+export function toArabicDigits(value: string | number): string {
+  return String(value).replace(/[0-9]/g, (digit) => '٠١٢٣٤٥٦٧٨٩'[Number(digit)] ?? digit);
+}
+
 export function countAr(count: number, noun: CountedNoun): string {
   if (count === 1) return noun.one;
   if (count === 2) return noun.two;
@@ -33,6 +44,9 @@ export function countAr(count: number, noun: CountedNoun): string {
 export const MINUTES: CountedNoun = { one: 'دقيقة', two: 'دقيقتين', few: 'دقائق', many: 'دقيقة' };
 
 export const PIECES: CountedNoun = { one: 'قطعة واحدة', two: 'قطعتان', few: 'قطع', many: 'قطعة' };
+
+/** «صنف واحد», «صنفان», «5 أصناف», «13 صنفاً» — lines in a cart or on an order. */
+export const ITEMS: CountedNoun = { one: 'صنف واحد', two: 'صنفان', few: 'أصناف', many: 'صنفاً' };
 
 /** As the subject of a line: «طلبان جديدان بانتظار قبولك». */
 export const NEW_ORDERS: CountedNoun = {

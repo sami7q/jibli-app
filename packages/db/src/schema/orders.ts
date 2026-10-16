@@ -66,8 +66,15 @@ export const orders = pgTable(
       .notNull(),
     customerNotes: text('customer_notes'),
 
-    /** Hashed delivery PIN (plan §52). Never stored or logged in the clear. */
+    /** Hashed delivery PIN (plan §52). The source of truth for confirming delivery. */
     deliveryPinHash: text('delivery_pin_hash'),
+    /**
+     * The 4-digit PIN in the clear (migration 0025). A COD handover code the
+     * customer is meant to read, not a secret kept from them — returned ONLY to
+     * the order's own customer while the order is in flight (CUST-1 / FLOW-1),
+     * never to the owner or courier, and never logged.
+     */
+    deliveryPinPlaintext: text('delivery_pin_plaintext'),
     deliveryPinAttempts: integer('delivery_pin_attempts').notNull().default(0),
 
     estimatedPreparationMinutes: integer('estimated_preparation_minutes'),

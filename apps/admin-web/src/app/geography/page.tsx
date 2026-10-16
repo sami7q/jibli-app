@@ -1,6 +1,6 @@
 'use client';
 
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import { GeographyCoverage } from '@/components/geography-coverage';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
@@ -17,6 +17,9 @@ export default function GeographyPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('geography.read')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة التغطية" />;
+  }
 
   return (
     <AdminShell
@@ -32,7 +35,7 @@ export default function GeographyPage() {
         </span>
       </div>
 
-      <GeographyCoverage token={session.accessToken} />
+      <GeographyCoverage token={session.accessToken} canManage={session.can('geography.manage')} />
     </AdminShell>
   );
 }

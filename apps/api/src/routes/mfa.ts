@@ -10,9 +10,12 @@ import {
 } from '@jibli/contracts';
 import {
   buildTotpUri,
+  decryptSecret,
+  encryptSecret,
   generateRecoveryCodes,
   generateTotpSecret,
   hashRecoveryCode,
+  signAccessToken,
   verifyPassword,
   verifyTotpCode,
 } from '@jibli/auth';
@@ -20,6 +23,7 @@ import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
 import { mfaAttempts, mfaRecoveryCodes, sessions, users, uuidv7 } from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
+import { loadCapabilities } from '../services/session-service.js';
 
 /**
  * MFA enrolment and verification (plan §88).
@@ -154,9 +158,13 @@ export async function verifyTotpForUser(
   const looksLikeTotp = /^\d{6}$/.test(params.code);
 
   if (looksLikeTotp) {
-    const verification = verifyTotpCode(user.secret, params.code, {
-      lastUsedCounter: user.lastUsedCounter,
-    });
+    const verification = verifyTotpCode(
+      decryptSecret(user.secret, ctx.env.MFA_SECRET_ENC_KEY),
+      params.code,
+      {
+        lastUsedCounter: user.lastUsedCounter,
+      },
+    );
 
     if (!verification.valid) {
       await recordAttempt(ctx, {
@@ -284,11 +292,19 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
 
     const secret = generateTotpSecret();
+    if (!ctx.env.MFA_SECRET_ENC_KEY) {
+      ctx.logger.warn(
+        { event: 'mfa.secret_unencrypted' },
+        'MFA_SECRET_ENC_KEY is not set — TOTP secrets are stored unencrypted (ADMIN-22)',
+      );
+    }
 
     await ctx.db
       .update(users)
       .set({
-        mfaPendingSecretEncrypted: secret,
+        // Encrypted at rest when a key is configured; plaintext otherwise, with
+        // the warning above (ADMIN-22).
+        mfaPendingSecretEncrypted: encryptSecret(secret, ctx.env.MFA_SECRET_ENC_KEY),
         mfaPendingStartedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -352,7 +368,10 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
         throw new AppError(ERROR_CODES.CONFLICT, { details: { reason: 'ENROLMENT_EXPIRED' } });
       }
 
-      const verification = verifyTotpCode(user.pendingSecret, body.code);
+      const verification = verifyTotpCode(
+        decryptSecret(user.pendingSecret, ctx.env.MFA_SECRET_ENC_KEY),
+        body.code,
+      );
       if (!verification.valid) {
         throw new AppError(ERROR_CODES.OTP_INVALID, { details: { reason: 'TOTP_INVALID' } });
       }
@@ -481,17 +500,45 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
       }
     }
 
-    // Stamp the session. This is what `hasFreshMfa` reads for step-up checks.
+    // Stamp the session. This is what `hasFreshMfa` reads for step-up checks —
+    // and what resolvePrincipal now falls back to, so even the current token
+    // becomes step-up-fresh (ADMIN-1).
+    const verifiedAt = new Date();
     await ctx.db
       .update(sessions)
-      .set({ mfaVerifiedAt: new Date() })
+      .set({ mfaVerifiedAt: verifiedAt })
       .where(eq(sessions.id, principal.sessionId));
+
+    // Also hand back a fresh access token carrying the mfaAt claim, so a client
+    // that swaps its token (the admin portal) is step-up-fresh immediately
+    // without waiting for a refresh (ADMIN-1 / ADMIN-7).
+    const capabilities = await loadCapabilities(ctx, principal.userId);
+    const accessToken = await signAccessToken(
+      {
+        sub: principal.userId,
+        sid: principal.sessionId,
+        platformRoles: capabilities.platformRoles,
+        restaurantRoles: capabilities.restaurantRoles,
+        driverId: capabilities.driverId,
+        modes: capabilities.modes,
+        profileCompleted: capabilities.profileCompleted,
+        mfaAt: verifiedAt.getTime(),
+      },
+      {
+        accessSecret: ctx.env.JWT_ACCESS_SECRET,
+        refreshSecret: ctx.env.JWT_REFRESH_SECRET,
+        accessTtlSeconds: ctx.env.ACCESS_TOKEN_TTL_SECONDS,
+        refreshTtlSeconds: ctx.env.REFRESH_TOKEN_TTL_SECONDS,
+      },
+    );
 
     return reply.send(
       success(
         {
           verified: true,
-          // The client re-fetches its token so the new mfaAt claim is present.
+          // The new token carries the mfaAt claim; the client swaps to it.
+          access_token: accessToken,
+          expires_in_seconds: ctx.env.ACCESS_TOKEN_TTL_SECONDS,
           reauthentication_required: true,
         },
         { request_id: request.requestId },
@@ -528,7 +575,9 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
       }
 
       if (
-        !verifyTotpCode(user.secret, body.code, { lastUsedCounter: user.lastUsedCounter }).valid
+        !verifyTotpCode(decryptSecret(user.secret, ctx.env.MFA_SECRET_ENC_KEY), body.code, {
+          lastUsedCounter: user.lastUsedCounter,
+        }).valid
       ) {
         throw new AppError(ERROR_CODES.OTP_INVALID);
       }
@@ -581,7 +630,9 @@ export function registerMfaRoutes(app: FastifyInstance, ctx: AppContext): void {
           throw new AppError(ERROR_CODES.CONFLICT, { details: { reason: 'MFA_NOT_ENROLLED' } });
         }
         if (
-          !verifyTotpCode(user.secret, body.code, { lastUsedCounter: user.lastUsedCounter }).valid
+          !verifyTotpCode(decryptSecret(user.secret, ctx.env.MFA_SECRET_ENC_KEY), body.code, {
+            lastUsedCounter: user.lastUsedCounter,
+          }).valid
         ) {
           throw new AppError(ERROR_CODES.OTP_INVALID);
         }

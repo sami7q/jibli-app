@@ -2,7 +2,7 @@ import { and, count, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
-import { assertAdminPermission } from '@jibli/auth';
+import { assertAdminPermission, isPlatformStaff } from '@jibli/auth';
 import { uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
 import { restaurants, supportMessages, supportThreads, users, uuidv7 } from '@jibli/db';
@@ -186,7 +186,8 @@ export function registerAdminSupportRoutes(app: FastifyInstance, ctx: AppContext
     { preHandler: app.authenticate },
     async (request, reply) => {
       const principal = requirePrincipal(request);
-      assertAdminPermission(principal, 'restaurant.read');
+      // Answering as Jibli is a write: a read-only role must be refused (ADMIN-12).
+      assertAdminPermission(principal, 'support.reply');
       const { threadId } = z.object({ threadId: uuidSchema }).parse(request.params);
       const body = z
         .object({
@@ -235,6 +236,19 @@ export function registerAdminSupportRoutes(app: FastifyInstance, ctx: AppContext
             resolvedBy: body.resolve ? principal.userId : null,
           })
           .where(eq(supportThreads.id, threadId));
+
+        // A reply is an action taken on the restaurant's behalf; record who made
+        // it (ADMIN-12). The message body itself lives in support_messages.
+        await writeAudit(tx, {
+          actorUserId: principal.userId,
+          action: AUDIT_ACTIONS.SUPPORT_THREAD_REPLY,
+          entityType: 'support_thread',
+          entityId: threadId,
+          after: { resolved: body.resolve },
+          ip: clientIp(request),
+          userAgent: userAgent(request),
+          requestId: request.requestId,
+        });
       });
 
       return reply.status(201).send(success({ sent: true }, { request_id: request.requestId }));
@@ -247,7 +261,8 @@ export function registerAdminSupportRoutes(app: FastifyInstance, ctx: AppContext
     { preHandler: app.authenticate },
     async (request, reply) => {
       const principal = requirePrincipal(request);
-      assertAdminPermission(principal, 'restaurant.read');
+      // Closing a thread is a write, like answering it (ADMIN-12).
+      assertAdminPermission(principal, 'support.reply');
       const { threadId } = z.object({ threadId: uuidSchema }).parse(request.params);
       const body = z
         .object({ reason: z.string().trim().max(500).optional() })
@@ -299,6 +314,9 @@ export function registerAdminSupportRoutes(app: FastifyInstance, ctx: AppContext
     { preHandler: app.authenticate },
     async (request, reply) => {
       const principal = requirePrincipal(request);
+      // The bell is platform staff only — a plain customer must not read the
+      // feed of applicant names, addresses and low-rating alerts (ADMIN-5).
+      if (!isPlatformStaff(principal)) throw new AppError(ERROR_CODES.FORBIDDEN);
       return reply.send(
         success(
           { unread: await unreadCount(ctx, principal.userId) },
@@ -313,6 +331,7 @@ export function registerAdminSupportRoutes(app: FastifyInstance, ctx: AppContext
     { preHandler: app.authenticate },
     async (request, reply) => {
       const principal = requirePrincipal(request);
+      if (!isPlatformStaff(principal)) throw new AppError(ERROR_CODES.FORBIDDEN);
       const query = z
         .object({
           limit: z.coerce.number().int().min(1).max(100).default(30),
@@ -337,6 +356,7 @@ export function registerAdminSupportRoutes(app: FastifyInstance, ctx: AppContext
     { preHandler: app.authenticate },
     async (request, reply) => {
       const principal = requirePrincipal(request);
+      if (!isPlatformStaff(principal)) throw new AppError(ERROR_CODES.FORBIDDEN);
       const body = z
         .object({
           /** Omit to mark everything read. */

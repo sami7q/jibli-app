@@ -10,7 +10,7 @@ import {
   type VehicleType,
 } from '@jibli/contracts';
 import { tryToE164Iraq } from '@jibli/validation';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import {
   Badge,
   Card,
@@ -19,6 +19,7 @@ import {
   ErrorState,
   FilterBar,
   Money,
+  Pager,
   SearchInput,
   Select,
   Skeleton,
@@ -66,11 +67,14 @@ const VEHICLE_LABELS: Record<string, string> = {
   ON_FOOT: 'سيراً',
 };
 
+const PAGE_SIZE = 25;
+
 export default function DriversPage() {
   const session = useAdminSession();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<DriverAccountStatus | ''>('');
+  const [offset, setOffset] = useState(0);
   const [suspending, setSuspending] = useState<AdminDriver | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -78,9 +82,14 @@ export default function DriversPage() {
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const drivers = useQuery({
-    queryKey: ['admin-drivers', debouncedSearch, status],
+    queryKey: ['admin-drivers', debouncedSearch, status, offset],
     queryFn: () =>
-      admin.drivers(token, { q: debouncedSearch || undefined, status: status || undefined }),
+      admin.driversPaged(token, {
+        q: debouncedSearch || undefined,
+        status: status || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      }),
     enabled: session.status === 'authenticated',
   });
 
@@ -96,9 +105,23 @@ export default function DriversPage() {
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('driver.read.global')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة المندوبين" />;
+  }
 
-  const rows = drivers.data ?? [];
-  const totalCustody = rows.reduce((sum, row) => sum + row.cash_custody_iqd, 0);
+  const canSuspend = session.can('driver.suspend');
+  const rows = drivers.data?.data ?? [];
+  const total = Number(drivers.data?.meta.total ?? rows.length);
+  // The sum over unique drivers the server now computes — not a re-sum of rows,
+  // which over-counted couriers shared by several shops (ADMIN-4).
+  const totalCustody = Number(drivers.data?.meta.total_custody_iqd ?? 0);
+
+  const resetAnd =
+    <T,>(setter: (value: T) => void) =>
+    (value: T) => {
+      setOffset(0);
+      setter(value);
+    };
 
   return (
     <AdminShell
@@ -130,13 +153,13 @@ export default function DriversPage() {
         <FilterBar>
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={resetAnd(setSearch)}
             label="البحث عن مندوب"
             placeholder="اسم المندوب…"
           />
           <Select
             value={status}
-            onChange={setStatus}
+            onChange={resetAnd(setStatus)}
             label="حالة الحساب"
             allLabel="كل الحالات"
             options={DRIVER_ACCOUNT_STATUSES.map((value) => ({
@@ -170,8 +193,11 @@ export default function DriversPage() {
               },
               {
                 key: 'restaurant',
-                header: 'المطعم',
-                render: (row) => row.restaurant_name ?? '—',
+                header: 'المتجر',
+                render: (row) =>
+                  row.restaurants.length === 0
+                    ? '—'
+                    : row.restaurants.map((shop) => shop.name ?? '—').join('، '),
               },
               {
                 key: 'status',
@@ -240,7 +266,8 @@ export default function DriversPage() {
                 header: '',
                 render: (row) =>
                   // A pending driver is accepted in the queue above, not unsuspended here.
-                  row.status === 'PENDING_ACTIVATION' ? null : (
+                  // The control is shown only to a role that may act (ADMIN-11).
+                  row.status === 'PENDING_ACTIVATION' || !canSuspend ? null : (
                     <button
                       type="button"
                       className={`btn btn--sm ${row.status === 'ACTIVE' ? 'btn--danger' : 'btn--outline'}`}
@@ -253,6 +280,10 @@ export default function DriversPage() {
             ]}
           />
         )}
+
+        {!drivers.isLoading && !drivers.isError ? (
+          <Pager offset={offset} pageSize={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
+        ) : null}
       </Card>
 
       {adding ? (

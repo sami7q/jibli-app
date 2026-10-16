@@ -89,7 +89,7 @@ describe('where a push opens', () => {
       eventType: 'restaurant.approved',
       audience: 'restaurant',
     });
-    expect(pushDestination(push!)).toBe('/(owner)');
+    expect(pushDestination(push!)).toBe('/(owner)/owner');
   });
 
   it('never treats the approval as live work, so its banner always shows', () => {

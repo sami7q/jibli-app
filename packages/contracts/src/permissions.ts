@@ -150,6 +150,12 @@ export const ADMIN_PERMISSIONS = [
    * Every admin role reads restaurants, so reading cannot be what gates it.
    */
   'review.moderate',
+  /*
+   * Answering a restaurant's support thread as «فريق جيبلي» is a write, not the
+   * read every platform role has — a read-only analyst must not be able to post
+   * on the platform's behalf or close a thread (ADMIN-12).
+   */
+  'support.reply',
   'finance.read.global',
   'finance.settlement.generate',
   'finance.settlement.issue',
@@ -157,6 +163,12 @@ export const ADMIN_PERMISSIONS = [
   'finance.payment.record',
   'finance.adjustment.create',
   'roles.manage',
+  /*
+   * Reading the staff roster and role matrix. Separate from `roles.manage`
+   * (which grants and demands a step-up) so the roles page can load without a
+   * fresh MFA challenge the mere act of looking should not require (ADMIN-7).
+   */
+  'roles.read',
   'audit.read',
   'export.create',
   'config.read',
@@ -185,6 +197,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<PlatformRole, readonly AdminPermissi
     'driver.suspend',
     'customer.read',
     'review.moderate',
+    'support.reply',
     'config.read',
     'reports.read.global',
     'export.create',
@@ -212,6 +225,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<PlatformRole, readonly AdminPermissi
     'restaurant.create',
     'restaurant.approve',
     'restaurant.reject',
+    'support.reply',
   ],
 
   SUPPORT_AGENT: [
@@ -221,6 +235,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<PlatformRole, readonly AdminPermissi
     'driver.read.global',
     'customer.read',
     'review.moderate',
+    'support.reply',
   ],
 
   MARKETING: ['geography.read', 'restaurant.read', 'coupon.manage', 'reports.read.global'],

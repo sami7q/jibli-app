@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { JibliLogo, safeReturnPath } from '@jibli/ui-web';
 import { ApiError, apiRequest } from '@/lib/api';
 import { useAdminSession } from '@/hooks/use-session';
@@ -44,7 +43,6 @@ const REQUIREMENTS: readonly Requirement[] = [
 ];
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -113,13 +111,15 @@ export default function ChangePasswordPage() {
       });
 
       /*
-       * The server rotated the session, so the cookie this browser holds is
-       * the new one. A full navigation re-runs the session hook against it
-       * rather than reusing the access token from before the change.
+       * The change revoked the old session and rotated the refresh cookie, so
+       * the access token the provider still holds in memory is dead. A client
+       * `router.replace` keeps that provider mounted — it reused the revoked
+       * token and the dashboard loaded as «انتهت الجلسة» (ADMIN-10). A real
+       * document navigation tears the provider down and re-derives the session
+       * from the fresh cookie.
        */
       const target = safeReturnPath(new URLSearchParams(window.location.search).get('next'));
-      router.replace(target);
-      router.refresh();
+      window.location.replace(target);
     } catch (caught) {
       if (caught instanceof ApiError) {
         setError(caught.messageAr);

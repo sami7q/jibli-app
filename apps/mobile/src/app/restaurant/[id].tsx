@@ -5,15 +5,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DishPlaceholder } from '@/ui/dish-placeholder';
-import { cuisineLabelAr } from '@jibli/contracts';
+import { arabicCuisineTags } from '@/lib/cuisine-tags';
 import { formatIqdArabic, iqd } from '@jibli/money';
 import { useServiceFee } from '@/lib/use-service-fee';
 import { customerDeliveryFee } from '@/lib/delivery-fee';
 import { api, ApiError, assetUrl, type MenuItem } from '@/lib/api';
-import { useCart } from '@/lib/cart';
-import { useIsGuest } from '@/lib/session';
+import { countAr, MINUTES } from '@/lib/arabic-count';
+import { MODIFIERS_ENABLED } from '@/lib/menu-options';
+import { useCart, type Cart, type CartLine } from '@/lib/cart';
+import {
+  continueAfterSignIn,
+  rememberFavoriteIntent,
+  takeFavoriteIntent,
+} from '@/lib/after-sign-in';
+import { useIsGuest, useMe } from '@/lib/session';
 import { useVertical } from '@/lib/vertical';
-import { notify } from '@/lib/dialog';
+import { confirmAsync } from '@/lib/dialog';
 import { ROW, TAP_TARGET, accent, color, palette, radius, shadow, space } from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, ErrorState, HScroll, RemoteImage, Row, Screen, Skeleton, Text } from '@/ui';
@@ -31,26 +38,6 @@ import { CartBar, RatingPill, Sheet, Stepper } from '@/ui/catalog';
  * hours the restaurant set in its own portal, so a closed kitchen cannot be
  * ordered from no matter what this screen renders.
  */
-/**
- * Whether a dish can carry options — sizes, extras, removals.
- *
- * Off, and deliberately, until the whole path exists rather than half of it.
- * The catalog reports `requires_choice` and this screen could collect a
- * selection, but nothing downstream carries it: the cart has no field for it,
- * `POST /orders` has no parameter for it, and the API re-prices every line
- * from the menu. A choice was flattened into the order's free-text note and
- * its price added on the client only — so a customer could pick a 2,000 dinar
- * extra, watch the total rise, and be charged the base price for a dish the
- * kitchen would read about in a comment.
- *
- * Turning it off removes that, and it costs the customer nothing today: every
- * dish is orderable with one tap, which is what this stage of the product
- * needs. The code stays because the work to finish it is downstream, not here
- * — a column on the order line, a parameter on the endpoint, and pricing that
- * the server owns. Then this becomes `true`.
- */
-const MODIFIERS_ENABLED = false;
-
 export default function RestaurantScreen() {
   const { id, item: itemToOpen } = useLocalSearchParams<{ id: string; item?: string }>();
   const router = useRouter();
@@ -118,6 +105,27 @@ export default function RestaurantScreen() {
   }, [itemToOpen, restaurant.data]);
 
   /**
+   * Add a line, asking first when it would empty another shop's cart.
+   *
+   * The cart holds one shop at a time, and adding from a second used to wipe the
+   * first with only an after-the-fact «تم تفريغ السلة» — no way to keep it
+   * (CUST-8). Now the customer is asked before anything is lost, with the two
+   * shop names and the section's own noun.
+   */
+  const addToCart = async (meta: Omit<Cart, 'lines'>, line: Omit<CartLine, 'key'>) => {
+    if (cart && cart.restaurantId !== meta.restaurantId) {
+      const yes = await confirmAsync({
+        title: 'بدء سلة جديدة؟',
+        message: `سلتك فيها طلب من «${cart.restaurantName}». إذا أضفت من «${meta.restaurantName}» سنفرّغها.`,
+        confirmLabel: 'تفريغ وإضافة',
+        cancelLabel: 'إبقاء سلتي',
+      });
+      if (!yes) return;
+    }
+    add(meta, line);
+  };
+
+  /**
    * One tap, one item, no sheet.
    *
    * Straight to the cart at the listed price with no options chosen — which is
@@ -130,7 +138,7 @@ export default function RestaurantScreen() {
     const detail = restaurant.data;
     if (!detail) return;
 
-    const result = add(
+    void addToCart(
       {
         restaurantId: detail.id,
         branchId: detail.branch_id,
@@ -147,10 +155,6 @@ export default function RestaurantScreen() {
         notes: null,
       },
     );
-
-    if (result === 'replaced') {
-      notify('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
-    }
   };
 
   const categories = restaurant.data?.categories ?? [];
@@ -205,7 +209,8 @@ export default function RestaurantScreen() {
 
         <InfoCard
           name={detail.display_name}
-          tags={detail.cuisine_tags.map(cuisineLabelAr).join('، ') || detail.city_name_ar}
+          description={detail.description_ar}
+          tags={arabicCuisineTags(detail.cuisine_tags).join('، ') || detail.city_name_ar}
           logoUrl={detail.logo_asset_id ? assetUrl(detail.logo_asset_id) : null}
           rating={detail.rating}
           ratingCount={detail.rating_count}
@@ -308,20 +313,14 @@ export default function RestaurantScreen() {
       <ItemSheet
         item={openItem}
         restaurant={detail}
-        onClose={(replacedCart) => {
-          setOpenItem(null);
-          /*
-           * Told here, after the sheet is gone.
-           *
-           * `notify` draws a `Modal`, and iOS will not present one over the
-           * sheet's own — the attempt shows nothing and leaves the dialog queue
-           * believing a dialog is open, which silences every message after it.
-           * The screen underneath is not a modal, so it can say this safely.
-           */
-          if (replacedCart) {
-            notify('تم تفريغ السلة', 'السلة تحتوي طلباً من مطعم آخر، وقد استبدلناها بهذا الطلب.');
-          }
-        }}
+        onClose={() => setOpenItem(null)}
+        /*
+         * Adding is handled on the screen, not in the sheet: a cross-shop
+         * confirm is a dialog, and iOS will not present one over the sheet's own
+         * Modal. The sheet closes itself first and hands the line up, so the
+         * confirm (when needed) draws on the screen underneath (CUST-8).
+         */
+        onAdd={(meta, line) => void addToCart(meta, line)}
       />
     </Screen>
   );
@@ -456,7 +455,7 @@ function FavoriteButton({ restaurantId }: { restaurantId: string }) {
   const queryClient = useQueryClient();
 
   const favorites = useQuery({
-    queryKey: ['favorites'],
+    queryKey: ['favorites', useMe()?.user_id ?? null],
     queryFn: () => api.favorites(),
     enabled: !isGuest,
     staleTime: 60_000,
@@ -469,6 +468,20 @@ function FavoriteButton({ restaurantId }: { restaurantId: string }) {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['favorites'] }),
   });
 
+  const favorite = useMutation({
+    mutationFn: () => api.favorite(restaurantId),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['favorites'] }),
+  });
+
+  /*
+   * Finish the favourite the guest asked for before signing in (CUST-10): the
+   * heart sent them to sign in and `continueAfterSignIn` brought them back to
+   * this shop, so once they are signed in the remembered intent is honoured.
+   */
+  useEffect(() => {
+    if (!isGuest && takeFavoriteIntent(restaurantId) && !isFavorite) favorite.mutate();
+  }, [isGuest, restaurantId, isFavorite, favorite]);
+
   return (
     <CircleButton
       label={isFavorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
@@ -476,6 +489,10 @@ function FavoriteButton({ restaurantId }: { restaurantId: string }) {
       tint={isFavorite ? palette.danger[500] : palette.white}
       onPress={() => {
         if (isGuest) {
+          // Remember the shop and come back to it signed in, rather than landing
+          // on the home screen with nothing favourited (CUST-10).
+          rememberFavoriteIntent(restaurantId);
+          continueAfterSignIn(`/restaurant/${restaurantId}`);
           router.push('/(auth)/phone');
           return;
         }
@@ -487,6 +504,7 @@ function FavoriteButton({ restaurantId }: { restaurantId: string }) {
 
 function InfoCard({
   name,
+  description,
   tags,
   logoUrl,
   rating,
@@ -498,6 +516,7 @@ function InfoCard({
   orderable,
 }: {
   name: string;
+  description: string | null;
   tags: string;
   logoUrl: string | null;
   rating: number | null;
@@ -558,6 +577,17 @@ function InfoCard({
       </Row>
 
       {/*
+       * The shop's own line, under the name — both the portal and the app's
+       * owner mode promise the customer reads it, and nothing used to show it
+       * (MERCH-19).
+       */}
+      {description ? (
+        <Text variant="small" tone="secondary">
+          {description}
+        </Text>
+      ) : null}
+
+      {/*
        * Open/closed is the server's answer, computed from the hours the
        * restaurant keeps in its own portal — not something this screen decides.
        */}
@@ -580,7 +610,7 @@ function InfoCard({
         justify="space-between"
         style={{ borderTopWidth: 1, borderTopColor: color.borderSubtle, paddingTop: space[3] }}
       >
-        <Fact icon="clock-outline" label="يصل خلال" value={`${etaMinutes} دقيقة`} />
+        <Fact icon="clock-outline" label="التحضير" value={countAr(etaMinutes, MINUTES)} />
         <Fact
           icon="bike-fast"
           label="رسوم التوصيل"
@@ -690,15 +720,22 @@ function MenuItemRow({
 }) {
   const unavailable = disabled || !item.is_available;
   /*
-   * The plus is only offered where it cannot produce a broken line.
+   * A required-choice dish with modifiers off is a dead end.
    *
-   * A dish with a required group has to go through the sheet; adding it
-   * directly makes an order the kitchen cannot fill, which the server rejects
-   * at the quote — after the customer has already filled a basket.
+   * There is no way to pick the size or bread the kitchen needs, so adding it
+   * made a line the quote refuses (MODIFIER_SELECTION_INVALID) — discovered at
+   * checkout, over a whole basket. Until the sheet can collect the choice, the
+   * dish is shown as «يتوفر قريباً»: inert, and never one tap from a broken
+   * order (CUST-2).
    */
-  // With modifiers off there is nothing to choose, so every available dish
-  // takes the one-tap path.
-  const quickAddable = !unavailable && (!MODIFIERS_ENABLED || !item.requires_choice);
+  const choiceBlocked = item.requires_choice && !MODIFIERS_ENABLED;
+  const inert = unavailable || choiceBlocked;
+  /*
+   * The plus is only offered where it cannot produce a broken line. A
+   * required-choice dish always goes through the sheet (never the plus), and
+   * while modifiers are off it has no path at all.
+   */
+  const quickAddable = !inert && !item.requires_choice;
 
   /*
    * The card is a View, not a Pressable.
@@ -718,15 +755,15 @@ function MenuItemRow({
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: color.borderSubtle,
-        opacity: unavailable ? 0.55 : 1,
+        opacity: inert ? 0.55 : 1,
       }}
     >
       <Pressable
-        onPress={unavailable ? undefined : onPress}
-        disabled={unavailable}
+        onPress={inert ? undefined : onPress}
+        disabled={inert}
         accessibilityRole="button"
         accessibilityLabel={item.name_ar}
-        accessibilityState={{ disabled: unavailable }}
+        accessibilityState={{ disabled: inert }}
         style={({ pressed }) => [{ flex: 1, gap: space[1] }, pressed ? { opacity: 0.7 } : null]}
       >
         <Row gap={space[2]}>
@@ -769,6 +806,10 @@ function MenuItemRow({
         {!item.is_available ? (
           <Text variant="caption" tone="danger">
             غير متوفر حالياً
+          </Text>
+        ) : choiceBlocked ? (
+          <Text variant="caption" tone="muted">
+            يتوفر قريباً
           </Text>
         ) : null}
       </Pressable>
@@ -853,6 +894,7 @@ function ItemSheet({
   item,
   restaurant,
   onClose,
+  onAdd,
 }: {
   item: MenuItem | null;
   restaurant: {
@@ -862,10 +904,10 @@ function ItemSheet({
     delivery_fee_iqd: number;
     minimum_order_iqd: number;
   };
-  /** `replacedCart` is a message for the screen to deliver once this is gone. */
-  onClose: (replacedCart?: boolean) => void;
+  onClose: () => void;
+  /** The screen adds the line (and runs any cross-shop confirm) once closed. */
+  onAdd: (meta: Omit<Cart, 'lines'>, line: Omit<CartLine, 'key'>) => void;
 }) {
-  const { add } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [chosen, setChosen] = useState<Record<string, string[]>>({});
 
@@ -924,27 +966,27 @@ function ItemSheet({
       )
       .filter(Boolean);
 
-    const result = add(
-      {
-        restaurantId: restaurant.id,
-        branchId: restaurant.branch_id,
-        restaurantName: restaurant.display_name,
-        deliveryFeeIqd: restaurant.delivery_fee_iqd,
-        minimumOrderIqd: restaurant.minimum_order_iqd,
-      },
-      {
-        menuItemId: item.id,
-        nameAr: item.name_ar,
-        unitPriceIqd,
-        quantity,
-        imageAssetId: item.image_asset_id,
-        notes: optionNames.length > 0 ? optionNames.join('، ') : null,
-      },
-    );
+    const meta = {
+      restaurantId: restaurant.id,
+      branchId: restaurant.branch_id,
+      restaurantName: restaurant.display_name,
+      deliveryFeeIqd: restaurant.delivery_fee_iqd,
+      minimumOrderIqd: restaurant.minimum_order_iqd,
+    };
+    const line = {
+      menuItemId: item.id,
+      nameAr: item.name_ar,
+      unitPriceIqd,
+      quantity,
+      imageAssetId: item.image_asset_id,
+      notes: optionNames.length > 0 ? optionNames.join('، ') : null,
+    };
 
     reset();
-    // Handed up rather than shown: a dialog cannot be drawn over this sheet.
-    onClose(result === 'replaced');
+    // Closed first, then handed up: a cross-shop confirm cannot draw over this
+    // sheet's own Modal, so the screen adds the line once the sheet is gone.
+    onClose();
+    onAdd(meta, line);
   };
 
   return (

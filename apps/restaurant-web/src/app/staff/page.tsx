@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RESTAURANT_ROLES, type RestaurantRole } from '@jibli/contracts';
+import { iraqiPhoneSchema } from '@jibli/validation';
 import { RESTAURANT_ROLE_LABELS } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
@@ -298,23 +299,84 @@ function StaffDialog({
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<RestaurantRole>('CASHIER');
+  /**
+   * How the new staffer signs in, shown after they are added (MERCH-16).
+   *
+   * The dialog used to close silently, leaving the owner with no idea how the
+   * person they just added gets in — and the portal has no phone/OTP sign-in,
+   * so the server's «يسجّل الموظف الدخول برقم هاتفه» note was both unshown and
+   * untrue for a restaurant. We show an explicit instruction instead.
+   */
+  const [added, setAdded] = useState<{ phone: string; note: string } | null>(null);
+  const guard = useRef(false);
 
   const create = useMutation({
     mutationFn: () =>
       portal.createStaff(auth, {
         full_name: fullName.trim(),
-        phone: phone.trim(),
+        phone: phoneParsed.success ? phoneParsed.data : phone.trim(),
         role,
       }),
-    onSuccess: onDone,
+    onSuccess: (result) => {
+      guard.current = false;
+      setAdded({
+        phone: phoneParsed.success ? phoneParsed.data : phone.trim(),
+        note: result.note_ar,
+      });
+    },
+    onError: () => {
+      guard.current = false;
+    },
   });
 
   const assignableRoles = canCreateOwner
     ? RESTAURANT_ROLES
     : RESTAURANT_ROLES.filter((value) => value !== 'OWNER');
 
-  // Loose check only: the server normalises to E.164 and owns the real rule.
-  const phoneLooksValid = /^[\d\s+\-()]{10,}$/.test(phone.trim());
+  // Normalise Arabic-Indic digits and validate the Iraqi rule client-side
+  // (MERCH-12): «٠٧٧...» is accepted, «abc» is told why.
+  const phoneParsed = iraqiPhoneSchema.safeParse(phone.trim());
+  const phoneLooksValid = phoneParsed.success;
+
+  const submit = (): void => {
+    if (guard.current) return;
+    guard.current = true;
+    create.mutate();
+  };
+
+  // After adding: the owner needs to know exactly how this person gets in.
+  if (added) {
+    return (
+      <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="stf-title">
+        <div className="dialog">
+          <h2 id="stf-title">أُضيف {fullName.trim()}</h2>
+
+          <p className="alert-bar alert-bar--success" role="status">
+            <span style={{ flex: 1 }}>
+              تمت إضافة الموظف بصلاحية {RESTAURANT_ROLE_LABELS[role]}.
+            </span>
+          </p>
+
+          <div className="field">
+            <label>كيف يسجّل الموظف الدخول؟</label>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+              بوابة الشركاء تحتاج اسم مستخدم وكلمة مرور لكل موظف. تُصدِرها إدارة جيبلي لرقم الموظف{' '}
+              <span className="ltr-inline">{added.phone}</span> وتُسلَّم له؛ تواصل مع الدعم لإصدارها
+              إن لم تصل. بعدها يدخل من صفحة تسجيل الدخول نفسها التي تستخدمها.
+            </p>
+          </div>
+
+          <p className="field__hint">ملاحظة النظام: {added.note}</p>
+
+          <div className="dialog__actions">
+            <button type="button" className="btn btn--primary" onClick={onDone}>
+              تم
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="stf-title">
@@ -342,9 +404,13 @@ function StaffDialog({
             placeholder="07701234567"
             aria-invalid={phone !== '' && !phoneLooksValid}
           />
-          <span className="field__hint">
-            إن كان الرقم مسجّلاً في جيبلي سابقاً فسيُربط بالحساب نفسه، ولن يُنشأ حساب جديد.
-          </span>
+          {phone !== '' && !phoneLooksValid ? (
+            <span className="field__error">رقم هاتف عراقي غير صالح</span>
+          ) : (
+            <span className="field__hint">
+              إن كان الرقم مسجّلاً في جيبلي سابقاً فسيُربط بالحساب نفسه، ولن يُنشأ حساب جديد.
+            </span>
+          )}
         </div>
 
         <div className="field">
@@ -382,11 +448,11 @@ function StaffDialog({
             type="button"
             className="btn btn--primary"
             disabled={fullName.trim().length < 3 || !phoneLooksValid || create.isPending}
-            onClick={() => create.mutate()}
+            onClick={submit}
           >
             {create.isPending ? 'جاري الحفظ…' : 'إضافة'}
           </button>
-          <button type="button" className="btn btn--ghost" onClick={onCancel}>
+          <button type="button" className="btn btn--outline" onClick={onCancel}>
             إلغاء
           </button>
         </div>

@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TONE, relativeAr } from '@jibli/ui-web';
 import { ORDER_STATUSES, type OrderStatus } from '@jibli/contracts';
-import { AdminShell } from '@/components/shell';
+import { AdminShell, ForbiddenShell } from '@/components/shell';
 import {
   Card,
   DataTable,
   ErrorState,
   FilterBar,
   Money,
+  Pager,
   SearchInput,
   Select,
   Skeleton,
@@ -21,6 +23,8 @@ import { admin, type AdminOrder } from '@/lib/admin-endpoints';
 import { SessionGate } from '@/components/session-gate';
 import { useAdminSession } from '@/hooks/use-session';
 import { useDebounced } from '@/hooks/use-debounced';
+
+const PAGE_SIZE = 25;
 
 /**
  * The global order list, shared by three routes (plan §87).
@@ -42,19 +46,25 @@ export function OrderListScreen({
   subtitle?: string;
 }) {
   const session = useAdminSession();
-  const [search, setSearch] = useState('');
+  const searchParams = useSearchParams();
+  // Pre-fill from the header search («?q=»): typing an order number there and
+  // pressing Enter lands here already filtered (ADMIN-18).
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [status, setStatus] = useState<OrderStatus | ''>('');
+  const [offset, setOffset] = useState(0);
   const debouncedSearch = useDebounced(search, 350);
 
   const token = session.status === 'authenticated' ? session.accessToken : '';
 
   const orders = useQuery({
-    queryKey: ['admin-orders', scope, debouncedSearch, status],
+    queryKey: ['admin-orders', scope, debouncedSearch, status, offset],
     queryFn: () =>
-      admin.orders(token, {
+      admin.ordersPaged(token, {
         scope,
         q: debouncedSearch || undefined,
         status: status || undefined,
+        limit: PAGE_SIZE,
+        offset,
       }),
     enabled: session.status === 'authenticated',
     // Live orders move; a stale board is misleading in a way a stale archive
@@ -65,6 +75,21 @@ export function OrderListScreen({
   if (session.status !== 'authenticated') {
     return <SessionGate session={session} />;
   }
+  if (!session.can('order.read.global')) {
+    return <ForbiddenShell session={session} requiredAr="قراءة الطلبات" />;
+  }
+
+  const rows = orders.data?.data ?? [];
+  const total = Number(orders.data?.meta.total ?? rows.length);
+
+  // A filter change makes the current offset meaningless; reset to the first
+  // page when the search or status moves.
+  const resetAnd =
+    <T,>(setter: (value: T) => void) =>
+    (value: T) => {
+      setOffset(0);
+      setter(value);
+    };
 
   return (
     <AdminShell
@@ -72,20 +97,20 @@ export function OrderListScreen({
       {...(subtitle ? { subtitle } : {})}
       userName={session.userName || 'مدير'}
       userRoleAr={session.roleAr}
-      liveOrders={scope === 'live' ? (orders.data?.length ?? 0) : 0}
+      liveOrders={scope === 'live' ? total : 0}
     >
       <Card>
         <FilterBar>
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={resetAnd(setSearch)}
             label="البحث عن طلب"
             placeholder="رقم الطلب أو اسم العميل…"
           />
           {scope === 'all' ? (
             <Select
               value={status}
-              onChange={setStatus}
+              onChange={resetAnd(setStatus)}
               label="حالة الطلب"
               allLabel="كل الحالات"
               options={ORDER_STATUSES.map((value) => ({
@@ -109,7 +134,7 @@ export function OrderListScreen({
         ) : (
           <DataTable<AdminOrder>
             caption="قائمة الطلبات"
-            rows={orders.data ?? []}
+            rows={rows}
             keyOf={(row) => row.id}
             emptyMessage={scope === 'live' ? 'لا توجد طلبات نشطة الآن' : 'لا توجد طلبات مطابقة'}
             columns={[
@@ -178,6 +203,10 @@ export function OrderListScreen({
             ]}
           />
         )}
+
+        {!orders.isLoading && !orders.isError ? (
+          <Pager offset={offset} pageSize={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
+        ) : null}
       </Card>
     </AdminShell>
   );

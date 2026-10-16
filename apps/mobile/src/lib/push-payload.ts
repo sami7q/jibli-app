@@ -65,7 +65,7 @@ export function isLiveWork(
 
 /** Where tapping a push should take its reader. */
 export function pushDestination(push: OrderPushData): string {
-  if (push.eventType === SHOP_APPROVED) return '/(owner)';
+  if (push.eventType === SHOP_APPROVED) return '/(owner)/owner';
   switch (push.audience) {
     case 'restaurant':
       return '/(owner)/orders';

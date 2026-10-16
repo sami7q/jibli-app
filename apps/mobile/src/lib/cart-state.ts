@@ -31,13 +31,20 @@ export interface Cart {
   readonly deliveryFeeIqd: number;
   readonly minimumOrderIqd: number;
   readonly lines: readonly CartLine[];
+  /**
+   * The order note («ملاحظات للمطعم»), kept with the cart so it survives a
+   * back-swipe or a reload rather than living in the cart screen's local state
+   * (CUST-17).
+   */
+  readonly note?: string;
 }
 
 export type CartAction =
   | { type: 'restore'; cart: Cart | null }
-  | { type: 'add'; cart: Omit<Cart, 'lines'>; line: Omit<CartLine, 'key'> }
+  | { type: 'add'; cart: Omit<Cart, 'lines' | 'note'>; line: Omit<CartLine, 'key'> }
   | { type: 'setQuantity'; key: string; quantity: number }
   | { type: 'remove'; key: string }
+  | { type: 'setNote'; note: string }
   | { type: 'clear' };
 
 function lineKey(menuItemId: string, notes: string | null): string {
@@ -88,6 +95,11 @@ export function reduceCart(cart: Cart | null, action: CartAction): Cart | null {
       const lines = cart.lines.filter((line) => line.key !== action.key);
       // An empty cart is no cart: it should not keep a restaurant pinned.
       return lines.length === 0 ? null : { ...cart, lines };
+    }
+
+    case 'setNote': {
+      if (!cart) return cart;
+      return { ...cart, note: action.note };
     }
 
     case 'clear':

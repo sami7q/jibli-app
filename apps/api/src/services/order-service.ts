@@ -323,6 +323,10 @@ export async function placeOrder(
       deliveryPinHash: deliveryPin
         ? hashDeliveryPin(deliveryPin, orderId, ctx.env.OTP_HASH_PEPPER)
         : null,
+      // The customer reads this off their own screen and gives it to the
+      // courier (CUST-1). Hash stays the source of truth for verification; this
+      // is returned only to the owner of the order, only while it is in flight.
+      deliveryPinPlaintext: deliveryPin,
       estimatedPreparationMinutes: openState.estimatedPreparationMinutes,
       placedAt: now,
     });

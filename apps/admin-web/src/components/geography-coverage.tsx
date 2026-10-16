@@ -61,7 +61,14 @@ interface PendingChange {
   readonly nextValue: boolean;
 }
 
-export function GeographyCoverage({ token }: { token: string }) {
+export function GeographyCoverage({
+  token,
+  canManage = true,
+}: {
+  token: string;
+  /** Whether this role may change coverage; false disables every toggle (ADMIN-11). */
+  canManage?: boolean;
+}) {
   const queryClient = useQueryClient();
   const [selectedGovernorate, setSelectedGovernorate] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingChange | null>(null);
@@ -176,7 +183,7 @@ export function GeographyCoverage({ token }: { token: string }) {
                             nextValue: !governorate.is_enabled,
                           })
                         }
-                        disabled={applyChange.isPending}
+                        disabled={applyChange.isPending || !canManage}
                       />
                     </td>
                     {(Object.keys(CAPABILITY_LABELS) as Capability[]).map((capability) => {
@@ -203,7 +210,7 @@ export function GeographyCoverage({ token }: { token: string }) {
                                 nextValue: !ownFlag,
                               })
                             }
-                            disabled={applyChange.isPending}
+                            disabled={applyChange.isPending || !canManage}
                           />
                         </td>
                       );
@@ -245,7 +252,7 @@ export function GeographyCoverage({ token }: { token: string }) {
               cities={cities.data ?? []}
               parent={governorateById.get(selectedGovernorate)}
               onToggle={requestChange}
-              busy={applyChange.isPending}
+              busy={applyChange.isPending || !canManage}
             />
           )}
         </section>

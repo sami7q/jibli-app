@@ -10,6 +10,7 @@ import { assertOwnsAssignment, type Principal } from '@jibli/auth';
 import {
   appendLedgerEntry,
   assertOverrideAllowed,
+  DELIVERY_PIN_MAX_ATTEMPTS,
   enqueueOutboxEvent,
   verifyDeliveryPin,
   writeAudit,
@@ -65,240 +66,321 @@ export interface ConfirmDeliveryResult {
   readonly replayed: boolean;
 }
 
+/**
+ * A wrong PIN, signalled out of the main transaction (FLOW-2).
+ *
+ * The attempt counter and its audit row must survive the rejection, but they
+ * sit in the same transaction as the completion work and would roll back with
+ * the throw that reports the wrong PIN. So the wrong PIN throws this sentinel
+ * instead; the caller records the failed attempt in a committed write and then
+ * raises DELIVERY_PIN_INVALID. Without this the limit never counts down and a
+ * 4-digit code is not rate-limited at all.
+ */
+class DeliveryPinFailure extends Error {
+  constructor(
+    readonly orderId: string,
+    readonly driverId: string,
+  ) {
+    super('DELIVERY_PIN_INVALID');
+    this.name = 'DeliveryPinFailure';
+  }
+}
+
+/**
+ * Record one failed PIN attempt in its own committed transaction and return how
+ * many attempts remain. Locks the order so a concurrent attempt cannot lose an
+ * increment, and the audit row persists whatever the main transaction did.
+ */
+async function recordFailedPinAttempt(
+  ctx: AppContext,
+  orderId: string,
+  driverId: string,
+): Promise<number> {
+  return ctx.db.transaction(async (tx) => {
+    const [order] = await tx
+      .select({ attempts: orders.deliveryPinAttempts })
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .for('update')
+      .limit(1);
+
+    const attemptNumber = (order?.attempts ?? 0) + 1;
+
+    await tx.insert(deliveryPinAttempts).values({
+      id: uuidv7(),
+      orderId,
+      driverId,
+      succeeded: false,
+      attemptNumber,
+    });
+
+    await tx
+      .update(orders)
+      .set({ deliveryPinAttempts: attemptNumber, updatedAt: new Date() })
+      .where(eq(orders.id, orderId));
+
+    return Math.max(0, DELIVERY_PIN_MAX_ATTEMPTS - attemptNumber);
+  });
+}
+
+/** Order states from which a delivery can never be completed (FLOW-8). */
+const TERMINAL_ORDER_STATUSES: readonly string[] = ['CANCELLED', 'REJECTED'];
+
 export async function confirmDelivery(
   ctx: AppContext,
   input: ConfirmDeliveryInput,
 ): Promise<ConfirmDeliveryResult> {
-  return ctx.db.transaction(async (tx) => {
-    // 2. The assignment, locked so two taps cannot both complete it.
-    const [assignment] = await tx
-      .select()
-      .from(deliveryAssignments)
-      .where(eq(deliveryAssignments.id, input.assignmentId))
-      .for('update')
-      .limit(1);
+  // `.catch` rather than a surrounding try/block so the transaction body keeps
+  // its indentation: a wrong PIN throws DeliveryPinFailure out of the rolled-back
+  // transaction and is recorded in a committed write here (FLOW-2).
+  return ctx.db
+    .transaction(async (tx) => {
+      // 2. The assignment, locked so two taps cannot both complete it.
+      const [assignment] = await tx
+        .select()
+        .from(deliveryAssignments)
+        .where(eq(deliveryAssignments.id, input.assignmentId))
+        .for('update')
+        .limit(1);
 
-    if (!assignment) {
-      throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'assignment' } });
-    }
+      if (!assignment) {
+        throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'assignment' } });
+      }
 
-    // 1. The driver must own this assignment — a reassignment revokes the right
-    //    immediately, even on a screen that is already open (plan §49).
-    const isAdminOverride = input.overrideReason !== null;
-    if (!isAdminOverride) {
-      assertOwnsAssignment(input.principal, assignment.driverId);
-    }
+      // 1. The driver must own this assignment — a reassignment revokes the right
+      //    immediately, even on a screen that is already open (plan §49).
+      const isAdminOverride = input.overrideReason !== null;
+      if (!isAdminOverride) {
+        assertOwnsAssignment(input.principal, assignment.driverId);
+      }
 
-    const [order] = await tx
-      .select()
-      .from(orders)
-      .where(eq(orders.id, assignment.orderId))
-      .for('update')
-      .limit(1);
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, assignment.orderId))
+        .for('update')
+        .limit(1);
 
-    if (!order) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'order' } });
+      if (!order) throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'order' } });
 
-    // Idempotent replay: the work is already done, so report the original result.
-    if (assignment.status === 'DELIVERED' && order.paymentStatus === 'PAID_CASH') {
-      return {
-        orderId: order.id,
-        orderStatus: order.status,
-        paymentStatus: order.paymentStatus,
-        cashCollectedIqd: order.customerTotalIqd,
-        replayed: true,
-      };
-    }
+      // Idempotent replay: the work is already done, so report the original result.
+      if (assignment.status === 'DELIVERED' && order.paymentStatus === 'PAID_CASH') {
+        return {
+          orderId: order.id,
+          orderStatus: order.status,
+          paymentStatus: order.paymentStatus,
+          cashCollectedIqd: order.customerTotalIqd,
+          replayed: true,
+        };
+      }
 
-    // 3. State must permit completion.
-    assertTransition(
-      DELIVERY_TRANSITIONS,
-      {
-        from: assignment.status,
-        to: 'DELIVERED',
-        actorType: isAdminOverride ? 'ADMIN' : 'DRIVER',
-        reason: input.overrideReason,
-      },
-      ERROR_CODES.DELIVERY_CANNOT_TRANSITION,
-    );
-
-    // 4. PIN, or an audited override (plan §52).
-    if (isAdminOverride) {
-      const reason = assertOverrideAllowed(input.overrideReason);
-      await writeAudit(tx, {
-        actorUserId: input.principal.userId,
-        action: AUDIT_ACTIONS.DELIVERY_PIN_OVERRIDE,
-        entityType: 'order',
-        entityId: order.id,
-        reason,
-        requestId: input.requestId,
-        after: { assignmentId: assignment.id, driverId: assignment.driverId },
-      });
-    } else if (order.deliveryPinHash) {
-      const verification = verifyDeliveryPin({
-        submittedPin: input.deliveryPin ?? '',
-        storedHash: order.deliveryPinHash,
-        orderId: order.id,
-        pepper: ctx.env.OTP_HASH_PEPPER,
-        currentAttempts: order.deliveryPinAttempts,
-      });
-
-      await tx.insert(deliveryPinAttempts).values({
-        id: uuidv7(),
-        orderId: order.id,
-        driverId: assignment.driverId,
-        succeeded: verification.valid,
-        attemptNumber: order.deliveryPinAttempts + 1,
-      });
-
-      if (!verification.valid) {
-        await tx
-          .update(orders)
-          .set({ deliveryPinAttempts: sql`${orders.deliveryPinAttempts} + 1` })
-          .where(eq(orders.id, order.id));
-
-        // The PIN itself is never logged (plan §52).
-        throw new AppError(ERROR_CODES.DELIVERY_PIN_INVALID, {
-          details: { attemptsRemaining: verification.attemptsRemaining },
+      // A cancelled or rejected order can never be "delivered" (FLOW-8). Admin
+      // cancel from OUT_FOR_DELIVERY leaves the courier's screen live; without
+      // this the courier could still confirm and collect cash for an order the
+      // platform had already cancelled.
+      if (TERMINAL_ORDER_STATUSES.includes(order.status)) {
+        throw new AppError(ERROR_CODES.DELIVERY_CANNOT_TRANSITION, {
+          details: { reason: 'ORDER_TERMINAL', orderStatus: order.status },
+          messageAr: 'أُلغي هذا الطلب ولا يمكن إتمام توصيله.',
         });
       }
-    }
 
-    const now = new Date();
+      // 3. State must permit completion.
+      assertTransition(
+        DELIVERY_TRANSITIONS,
+        {
+          from: assignment.status,
+          to: 'DELIVERED',
+          actorType: isAdminOverride ? 'ADMIN' : 'DRIVER',
+          reason: input.overrideReason,
+        },
+        ERROR_CODES.DELIVERY_CANNOT_TRANSITION,
+      );
 
-    // 5. Assignment delivered.
-    await tx
-      .update(deliveryAssignments)
-      .set({
-        status: 'DELIVERED',
-        deliveredAt: now,
-        version: sql`${deliveryAssignments.version} + 1`,
-        updatedAt: now,
-      })
-      .where(eq(deliveryAssignments.id, assignment.id));
+      // 4. PIN, or an audited override (plan §52).
+      if (isAdminOverride) {
+        const reason = assertOverrideAllowed(input.overrideReason);
+        await writeAudit(tx, {
+          actorUserId: input.principal.userId,
+          action: AUDIT_ACTIONS.DELIVERY_PIN_OVERRIDE,
+          entityType: 'order',
+          entityId: order.id,
+          reason,
+          requestId: input.requestId,
+          after: { assignmentId: assignment.id, driverId: assignment.driverId },
+        });
+      } else if (order.deliveryPinHash) {
+        // May throw DELIVERY_PIN_ATTEMPTS_EXCEEDED when the (already committed)
+        // counter is at the limit — that rolls this transaction back with
+        // nothing written, which is correct: the lock is already engaged.
+        const verification = verifyDeliveryPin({
+          submittedPin: input.deliveryPin ?? '',
+          storedHash: order.deliveryPinHash,
+          orderId: order.id,
+          pepper: ctx.env.OTP_HASH_PEPPER,
+          currentAttempts: order.deliveryPinAttempts,
+        });
 
-    // 6 & 7. Order delivered, completed, and paid in cash — in one write, so
-    // the DB check constraint linking COMPLETED to PAID_CASH always holds.
-    await tx
-      .update(orders)
-      .set({
-        status: 'COMPLETED',
-        paymentStatus: 'PAID_CASH',
-        deliveredAt: now,
-        completedAt: now,
-        version: sql`${orders.version} + 1`,
-        updatedAt: now,
-      })
-      .where(eq(orders.id, order.id));
+        if (!verification.valid) {
+          // Record the failure OUTSIDE this transaction so the increment and
+          // audit survive the rollback that reporting the wrong PIN forces
+          // (FLOW-2). The PIN itself is never logged (plan §52).
+          throw new DeliveryPinFailure(order.id, assignment.driverId);
+        }
 
-    // 9. Finalise any inventory still merely reserved. One shared
-    //    implementation, so placement, release and consumption can never drift
-    //    apart in how they move the reserved and on-hand columns.
-    await consumeInventoryForOrder(tx, order.id);
+        // A successful attempt audits atomically with the completion below.
+        await tx.insert(deliveryPinAttempts).values({
+          id: uuidv7(),
+          orderId: order.id,
+          driverId: assignment.driverId,
+          succeeded: true,
+          attemptNumber: order.deliveryPinAttempts + 1,
+        });
+      }
 
-    // 11. Commission accrual. The idempotency key is the order, so a retry
-    //     collides with the unique index rather than accruing a second time.
-    await appendLedgerEntry(tx, {
-      restaurantId: order.restaurantId,
-      orderId: order.id,
-      entryType: 'COMMISSION_ACCRUED',
-      amountIqd: order.commissionAmountIqd,
-      effectiveAt: now,
-      idempotencyKey: `commission:${order.id}`,
-      metadata: {
-        commissionBaseIqd: order.commissionBaseIqd,
-        commissionFlatIqdSnapshot: order.commissionFlatIqdSnapshot,
-      },
-    });
+      const now = new Date();
 
-    // 10. Platform service fee revenue, tracked separately from what the
-    //     restaurant owes (plan §39).
-    if (order.platformServiceFeeIqd > 0) {
+      // 5. Assignment delivered.
+      await tx
+        .update(deliveryAssignments)
+        .set({
+          status: 'DELIVERED',
+          deliveredAt: now,
+          version: sql`${deliveryAssignments.version} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(deliveryAssignments.id, assignment.id));
+
+      // 6 & 7. Order delivered, completed, and paid in cash — in one write, so
+      // the DB check constraint linking COMPLETED to PAID_CASH always holds.
+      await tx
+        .update(orders)
+        .set({
+          status: 'COMPLETED',
+          paymentStatus: 'PAID_CASH',
+          deliveredAt: now,
+          completedAt: now,
+          version: sql`${orders.version} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(orders.id, order.id));
+
+      // 9. Finalise any inventory still merely reserved. One shared
+      //    implementation, so placement, release and consumption can never drift
+      //    apart in how they move the reserved and on-hand columns.
+      await consumeInventoryForOrder(tx, order.id);
+
+      // 11. Commission accrual. The idempotency key is the order, so a retry
+      //     collides with the unique index rather than accruing a second time.
       await appendLedgerEntry(tx, {
         restaurantId: order.restaurantId,
         orderId: order.id,
-        entryType: 'SERVICE_FEE_REVENUE',
-        amountIqd: order.platformServiceFeeIqd,
+        entryType: 'COMMISSION_ACCRUED',
+        amountIqd: order.commissionAmountIqd,
         effectiveAt: now,
-        idempotencyKey: `service_fee:${order.id}`,
+        idempotencyKey: `commission:${order.id}`,
+        metadata: {
+          commissionBaseIqd: order.commissionBaseIqd,
+          commissionFlatIqdSnapshot: order.commissionFlatIqdSnapshot,
+        },
       });
-    }
 
-    // 12. Driver cash custody — restaurant cash, not a Jibli payment (plan §54).
-    await tx.insert(driverCashEvents).values({
-      id: uuidv7(),
-      driverId: assignment.driverId,
-      restaurantId: order.restaurantId,
-      type: 'ORDER_CASH_COLLECTED',
-      amountIqd: order.customerTotalIqd,
-      orderId: order.id,
-      actorUserId: input.principal.userId,
-      idempotencyKey: `cod:${order.id}`,
-    });
+      // 10. Platform service fee revenue, tracked separately from what the
+      //     restaurant owes (plan §39).
+      if (order.platformServiceFeeIqd > 0) {
+        await appendLedgerEntry(tx, {
+          restaurantId: order.restaurantId,
+          orderId: order.id,
+          entryType: 'SERVICE_FEE_REVENUE',
+          amountIqd: order.platformServiceFeeIqd,
+          effectiveAt: now,
+          idempotencyKey: `service_fee:${order.id}`,
+        });
+      }
 
-    // The driver is free for the next task.
-    await tx
-      .update(drivers)
-      .set({ availability: 'AVAILABLE', updatedAt: now })
-      .where(eq(drivers.id, assignment.driverId));
-
-    // 13. Status history for both transitions.
-    await tx.insert(orderStatusHistory).values([
-      {
+      // 12. Driver cash custody — restaurant cash, not a Jibli payment (plan §54).
+      await tx.insert(driverCashEvents).values({
         id: uuidv7(),
-        orderId: order.id,
-        fromStatus: order.status,
-        toStatus: 'DELIVERED',
-        actorType: isAdminOverride ? 'ADMIN' : 'DRIVER',
-        actorUserId: input.principal.userId,
-        reason: input.overrideReason,
-      },
-      {
-        id: uuidv7(),
-        orderId: order.id,
-        fromStatus: 'DELIVERED',
-        toStatus: 'COMPLETED',
-        actorType: 'SYSTEM',
-        actorUserId: null,
-      },
-    ]);
-
-    // 14. Outbox events, in the same transaction.
-    await enqueueOutboxEvent(tx, {
-      eventType: EVENT_TYPES.ORDER_COMPLETED,
-      aggregateType: 'order',
-      aggregateId: order.id,
-      aggregateVersion: order.version + 1,
-      requestId: input.requestId,
-      payload: {
-        orderId: order.id,
-        publicOrderNumber: order.publicOrderNumber,
-        restaurantId: order.restaurantId,
-        branchId: order.branchId,
-        customerId: order.userId,
-        status: 'COMPLETED',
-        customerTotalIqd: order.customerTotalIqd,
-        itemCount: 0,
-        customerFirstName: order.customerNameSnapshot.split(' ')[0] ?? '',
-      },
-    });
-
-    ctx.logger.info(
-      {
-        event: 'delivery.completed',
-        orderId: order.id,
         driverId: assignment.driverId,
-        requestId: input.requestId,
-      },
-      'COD delivery completed',
-    );
+        restaurantId: order.restaurantId,
+        type: 'ORDER_CASH_COLLECTED',
+        amountIqd: order.customerTotalIqd,
+        orderId: order.id,
+        actorUserId: input.principal.userId,
+        idempotencyKey: `cod:${order.id}`,
+      });
 
-    // 15. Commit happens when this callback returns.
-    return {
-      orderId: order.id,
-      orderStatus: 'COMPLETED',
-      paymentStatus: 'PAID_CASH',
-      cashCollectedIqd: order.customerTotalIqd,
-      replayed: false,
-    };
-  });
+      // The driver is free for the next task.
+      await tx
+        .update(drivers)
+        .set({ availability: 'AVAILABLE', updatedAt: now })
+        .where(eq(drivers.id, assignment.driverId));
+
+      // 13. Status history for both transitions.
+      await tx.insert(orderStatusHistory).values([
+        {
+          id: uuidv7(),
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: 'DELIVERED',
+          actorType: isAdminOverride ? 'ADMIN' : 'DRIVER',
+          actorUserId: input.principal.userId,
+          reason: input.overrideReason,
+        },
+        {
+          id: uuidv7(),
+          orderId: order.id,
+          fromStatus: 'DELIVERED',
+          toStatus: 'COMPLETED',
+          actorType: 'SYSTEM',
+          actorUserId: null,
+        },
+      ]);
+
+      // 14. Outbox events, in the same transaction.
+      await enqueueOutboxEvent(tx, {
+        eventType: EVENT_TYPES.ORDER_COMPLETED,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        aggregateVersion: order.version + 1,
+        requestId: input.requestId,
+        payload: {
+          orderId: order.id,
+          publicOrderNumber: order.publicOrderNumber,
+          restaurantId: order.restaurantId,
+          branchId: order.branchId,
+          customerId: order.userId,
+          status: 'COMPLETED',
+          customerTotalIqd: order.customerTotalIqd,
+          itemCount: 0,
+          customerFirstName: order.customerNameSnapshot.split(' ')[0] ?? '',
+        },
+      });
+
+      ctx.logger.info(
+        {
+          event: 'delivery.completed',
+          orderId: order.id,
+          driverId: assignment.driverId,
+          requestId: input.requestId,
+        },
+        'COD delivery completed',
+      );
+
+      // 15. Commit happens when this callback returns.
+      return {
+        orderId: order.id,
+        orderStatus: 'COMPLETED',
+        paymentStatus: 'PAID_CASH',
+        cashCollectedIqd: order.customerTotalIqd,
+        replayed: false,
+      };
+    })
+    .catch(async (error) => {
+      if (error instanceof DeliveryPinFailure) {
+        const attemptsRemaining = await recordFailedPinAttempt(ctx, error.orderId, error.driverId);
+        throw new AppError(ERROR_CODES.DELIVERY_PIN_INVALID, { details: { attemptsRemaining } });
+      }
+      throw error;
+    });
 }

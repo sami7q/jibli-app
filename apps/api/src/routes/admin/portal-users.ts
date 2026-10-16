@@ -5,10 +5,50 @@ import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { assertAdminPermission, generatePortalPassword, hashPassword } from '@jibli/auth';
 import { reasonSchema, suggestUsername, usernameSchema, uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, writeAudit } from '@jibli/domain';
-import { restaurantMembers, restaurants, users, uuidv7 } from '@jibli/db';
+import {
+  restaurantMembers,
+  restaurants,
+  userPlatformRoles,
+  users,
+  uuidv7,
+  type Transaction,
+} from '@jibli/db';
 import { clientIp, userAgent, type AppContext } from '../../lib/context.js';
 import { requirePrincipal } from '../../plugins/auth.js';
 import { revokeSessionChain } from '../../services/session-service.js';
+
+/**
+ * These endpoints act on *restaurant portal* users, not platform staff. A
+ * target that holds a platform role, or that is not an active member of any
+ * restaurant, is refused — otherwise an Onboarding/Operations staffer could
+ * reset or suspend a SUPER_ADMIN and take over the platform (ADMIN-6). A
+ * platform staff account's own credentials are managed through the staff
+ * endpoints (reserved to roles.manage), never here.
+ */
+async function assertRestaurantPortalTarget(tx: Transaction, userId: string): Promise<void> {
+  const platformRoles = await tx
+    .select({ role: userPlatformRoles.role })
+    .from(userPlatformRoles)
+    .where(and(eq(userPlatformRoles.userId, userId), isNull(userPlatformRoles.revokedAt)))
+    .limit(1);
+
+  if (platformRoles.length > 0) {
+    throw new AppError(ERROR_CODES.FORBIDDEN, {
+      details: { reason: 'TARGET_IS_PLATFORM_STAFF' },
+      messageAr: 'لا يمكن تنفيذ هذا الإجراء على حساب موظف منصة.',
+    });
+  }
+
+  const [membership] = await tx
+    .select({ id: restaurantMembers.id })
+    .from(restaurantMembers)
+    .where(and(eq(restaurantMembers.userId, userId), eq(restaurantMembers.isActive, true)))
+    .limit(1);
+
+  if (!membership) {
+    throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'portal_user' } });
+  }
+}
 
 /**
  * Restaurant portal credentials, issued by Jibli staff (plan §69, §85, §1854).
@@ -268,6 +308,8 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
           throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'portal_user' } });
         }
 
+        await assertRestaurantPortalTarget(tx, userId);
+
         await tx
           .update(users)
           .set({
@@ -333,6 +375,8 @@ export function registerAdminPortalUserRoutes(app: FastifyInstance, ctx: AppCont
         if (!target?.username) {
           throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'portal_user' } });
         }
+
+        await assertRestaurantPortalTarget(tx, userId);
 
         await tx
           .update(users)

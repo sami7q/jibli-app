@@ -29,13 +29,34 @@ const PG_UNIQUE_VIOLATION = '23505';
 const PG_FOREIGN_KEY_VIOLATION = '23503';
 const PG_CHECK_VIOLATION = '23514';
 
+/**
+ * The SQLSTATE and constraint from a thrown database error.
+ *
+ * drizzle-orm 0.45 wraps the postgres driver's error in a `DrizzleQueryError`
+ * and carries the real error under `.cause`, so reading `.code` off the thrown
+ * object alone finds nothing and every unique/FK/check violation became a 500
+ * (MERCH-5 / FLOW-6). This walks the cause chain to the row that actually
+ * carries the SQLSTATE.
+ */
+export function pgErrorInfo(error: unknown): { code?: string; constraint?: string } {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth += 1) {
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === 'string') {
+      const constraint =
+        (current as { constraint_name?: unknown }).constraint_name ??
+        (current as { constraint?: unknown }).constraint;
+      return { code, constraint: typeof constraint === 'string' ? constraint : undefined };
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return {};
+}
+
 function fromDatabaseError(error: unknown): AppError | null {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
-  const code = (error as { code?: unknown }).code;
-  const constraint =
-    (error as { constraint_name?: unknown }).constraint_name ??
-    (error as { constraint?: unknown }).constraint;
-  const constraintName = typeof constraint === 'string' ? constraint : undefined;
+  const { code, constraint } = pgErrorInfo(error);
+  if (code === undefined) return null;
+  const constraintName = constraint;
 
   switch (code) {
     case PG_UNIQUE_VIOLATION:

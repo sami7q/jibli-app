@@ -71,6 +71,7 @@ export function PortalCredentials({
   restaurantName,
   recoveryPhone = null,
   isShop = false,
+  canManage = true,
 }: {
   token: string;
   restaurantId: string;
@@ -79,6 +80,8 @@ export function PortalCredentials({
   recoveryPhone?: string | null;
   /** A market or a cosmetics shop, whose owner can change the password from the app. */
   isShop?: boolean;
+  /** Whether this role may issue/reset/suspend logins; false hides those controls (ADMIN-11). */
+  canManage?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
@@ -127,13 +130,15 @@ export function PortalCredentials({
       icon="roles"
       subtitle="اسم المستخدم وكلمة المرور التي يدخل بها المطعم"
       actions={
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={() => setCreating(true)}
-        >
-          إنشاء حساب دخول
-        </button>
+        canManage ? (
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={() => setCreating(true)}
+          >
+            إنشاء حساب دخول
+          </button>
+        ) : null
       }
     >
       {portalUsers.isError ? (
@@ -221,22 +226,26 @@ export function PortalCredentials({
                       )}
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          className="btn btn--ghost btn--sm"
-                          onClick={() => setResetting(user)}
-                        >
-                          إعادة تعيين كلمة المرور
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn btn--${user.is_active ? 'danger' : 'ghost'} btn--sm`}
-                          onClick={() => setToggling(user)}
-                        >
-                          {user.is_active ? 'إيقاف الدخول' : 'إعادة التفعيل'}
-                        </button>
-                      </div>
+                      {canManage ? (
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => setResetting(user)}
+                          >
+                            إعادة تعيين كلمة المرور
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn btn--${user.is_active ? 'danger' : 'ghost'} btn--sm`}
+                            onClick={() => setToggling(user)}
+                          >
+                            {user.is_active ? 'إيقاف الدخول' : 'إعادة التفعيل'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
                     </td>
                   </tr>
                 ))}

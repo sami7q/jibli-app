@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { OrderListScreen } from '@/components/order-list-screen';
 
 /**
@@ -10,10 +11,12 @@ import { OrderListScreen } from '@/components/order-list-screen';
  */
 export default function LiveOrdersPage() {
   return (
-    <OrderListScreen
-      scope="live"
-      title="الطلبات الحية"
-      subtitle="الطلبات النشطة الآن عبر جميع المطاعم — يتم التحديث تلقائياً"
-    />
+    <Suspense fallback={null}>
+      <OrderListScreen
+        scope="live"
+        title="الطلبات الحية"
+        subtitle="الطلبات النشطة الآن عبر جميع المطاعم — يتم التحديث تلقائياً"
+      />
+    </Suspense>
   );
 }

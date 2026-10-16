@@ -26,6 +26,7 @@ function principal(overrides: Partial<Principal> = {}): Principal {
     mfaAt: null,
     mfaEnrolled: false,
     mfaRequiredByPolicy: true,
+    mustChangePassword: false,
     ...overrides,
   };
 }

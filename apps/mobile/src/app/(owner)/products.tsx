@@ -11,7 +11,7 @@ import { accent, color, radius, ROW, shadow, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, RemoteImage, Row, Screen, Skeleton, Text } from '@/ui';
 import { SearchBar } from '@/ui/catalog';
 import { missingImageGlyph } from '@/ui/section-glyph';
-import { OwnerHeader } from './index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * Everything the shop sells, as a shopkeeper needs to see it.

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
 import { assertAdminPermission } from '@jibli/auth';
-import { reasonSchema, uuidSchema } from '@jibli/validation';
+import { uuidSchema } from '@jibli/validation';
 import { AUDIT_ACTIONS, appendLedgerEntry, writeAudit } from '@jibli/domain';
 import { addIqd, iqd } from '@jibli/money';
 import {
@@ -113,7 +113,10 @@ export function registerAdminCollectionRoutes(app: FastifyInstance, ctx: AppCont
           restaurant_id: uuidSchema,
           method: z.enum(['CASH', 'BANK_TRANSFER', 'OTHER']).default('CASH'),
           reference: z.string().trim().max(120).optional(),
-          note: reasonSchema.optional(),
+          // A free-form optional note, not a reason that must justify an action:
+          // reasonSchema's minimum length rejected a one-word note on a field
+          // labelled «اختياري» (ADMIN-20).
+          note: z.string().trim().max(500).optional(),
         })
         .parse(request.body);
 

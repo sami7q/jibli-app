@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { VEHICLE_TYPES, type VehicleType } from '@jibli/contracts';
+import { iraqiPhoneSchema } from '@jibli/validation';
 import { DRIVER_AVAILABILITY_LABELS, VEHICLE_TYPE_LABELS, money, NumberField } from '@jibli/ui-web';
 import { PortalPage, type PortalAuth } from '@/components/portal-page';
 import { Card, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
@@ -579,6 +580,7 @@ function HandoverDialog({
   // Generated once per dialog: retrying a timed-out submit must not record the
   // handover twice (plan §28).
   const [idempotencyKey] = useState(() => newIdempotencyKey('handover'));
+  const guard = useRef(false);
 
   const submit = useMutation({
     mutationFn: () =>
@@ -593,7 +595,18 @@ function HandoverDialog({
         idempotencyKey,
       ),
     onSuccess: onDone,
+    onError: () => {
+      guard.current = false;
+    },
   });
+
+  // The idempotency key already makes a replay safe; the ref still stops a
+  // second in-flight submit from a double-click (MERCH-24).
+  const run = (): void => {
+    if (guard.current) return;
+    guard.current = true;
+    submit.mutate();
+  };
 
   const invalid = !Number.isInteger(amount) || amount <= 0 || amount > row.current_custody_iqd;
 
@@ -664,7 +677,7 @@ function HandoverDialog({
             type="button"
             className="btn btn--primary"
             disabled={invalid || submit.isPending}
-            onClick={() => submit.mutate()}
+            onClick={run}
           >
             {submit.isPending ? 'جاري التسجيل…' : 'تأكيد الاستلام'}
           </button>
@@ -692,22 +705,37 @@ function DriverDialog({
   const [plate, setPlate] = useState('');
   const [canCollectCash, setCanCollectCash] = useState(true);
   const [note, setNote] = useState('');
+  // Guards the second click of a double-click before `isPending` re-renders
+  // (MERCH-24).
+  const submitting = useRef(false);
 
   const create = useMutation({
     mutationFn: () =>
       portal.createDriver(auth, {
         full_name: fullName.trim(),
-        phone: phone.trim(),
+        phone: phoneParsed.success ? phoneParsed.data : phone.trim(),
         vehicle_type: vehicleType,
         plate_number: plate.trim() || undefined,
         can_collect_cash: canCollectCash,
         internal_note: note.trim() || undefined,
       }),
     onSuccess: onDone,
+    onError: () => {
+      submitting.current = false;
+    },
   });
 
-  // Loose check only: the server normalises to E.164 and owns the real rule.
-  const phoneLooksValid = /^[\d\s+\-()]{10,}$/.test(phone.trim());
+  // Normalise Arabic-Indic digits and validate the Iraqi rule client-side, so
+  // «٠٧٧...» is accepted and «abc» is told why rather than leaving «إضافة»
+  // disabled with no message (MERCH-12).
+  const phoneParsed = iraqiPhoneSchema.safeParse(phone.trim());
+  const phoneLooksValid = phoneParsed.success;
+
+  const submit = (): void => {
+    if (submitting.current) return;
+    submitting.current = true;
+    create.mutate();
+  };
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="drv-title">
@@ -735,9 +763,13 @@ function DriverDialog({
             placeholder="07701234567"
             aria-invalid={phone !== '' && !phoneLooksValid}
           />
-          <span className="field__hint">
-            رقم عراقي للهاتف المحمول. يستخدمه المندوب لتسجيل الدخول إلى التطبيق برمز تحقّق.
-          </span>
+          {phone !== '' && !phoneLooksValid ? (
+            <span className="field__error">رقم هاتف عراقي غير صالح</span>
+          ) : (
+            <span className="field__hint">
+              رقم عراقي للهاتف المحمول. يستخدمه المندوب لتسجيل الدخول إلى التطبيق برمز تحقّق.
+            </span>
+          )}
         </div>
 
         <div className="field">
@@ -791,7 +823,7 @@ function DriverDialog({
             type="button"
             className="btn btn--primary"
             disabled={fullName.trim().length < 3 || !phoneLooksValid || create.isPending}
-            onClick={() => create.mutate()}
+            onClick={submit}
           >
             {create.isPending ? 'جاري الحفظ…' : 'إضافة'}
           </button>
@@ -833,11 +865,25 @@ function CredentialsDialog({
   const [username, setUsername] = useState(() => suggestUsername(driver.phone));
   const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const guard = useRef(false);
 
   const issue = useMutation({
     mutationFn: () => portal.issueDriverCredentials(auth, driver.id, username.trim()),
-    onSuccess: (result) => setIssued({ username: result.username, password: result.password }),
+    onSuccess: (result) => {
+      guard.current = false;
+      setIssued({ username: result.username, password: result.password });
+    },
+    onError: () => {
+      guard.current = false;
+    },
   });
+
+  // A double-click would reset the password twice and show the second (MERCH-24).
+  const runIssue = (): void => {
+    if (guard.current) return;
+    guard.current = true;
+    issue.mutate();
+  };
 
   const copy = async (): Promise<void> => {
     if (!issued) return;
@@ -925,7 +971,7 @@ function CredentialsDialog({
                 type="button"
                 className="btn btn--primary"
                 disabled={issue.isPending || username.trim().length < 3}
-                onClick={() => issue.mutate()}
+                onClick={runIssue}
               >
                 {issue.isPending ? 'جارٍ الإصدار…' : 'إصدار بيانات الدخول'}
               </button>
@@ -959,6 +1005,7 @@ function EditDriverDialog({
 }) {
   const [canCollectCash, setCanCollectCash] = useState(driver.can_collect_cash);
   const [note, setNote] = useState(driver.internal_note ?? '');
+  const guard = useRef(false);
 
   const save = useMutation({
     mutationFn: () =>
@@ -967,7 +1014,16 @@ function EditDriverDialog({
         internal_note: note.trim() || undefined,
       }),
     onSuccess: onDone,
+    onError: () => {
+      guard.current = false;
+    },
   });
+
+  const submit = (): void => {
+    if (guard.current) return;
+    guard.current = true;
+    save.mutate();
+  };
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="edt-title">
@@ -1007,7 +1063,7 @@ function EditDriverDialog({
             type="button"
             className="btn btn--primary"
             disabled={save.isPending}
-            onClick={() => save.mutate()}
+            onClick={submit}
           >
             {save.isPending ? 'جاري الحفظ…' : 'حفظ'}
           </button>

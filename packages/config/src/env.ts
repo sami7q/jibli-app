@@ -73,6 +73,16 @@ const authSchema = z.object({
   REFRESH_ROTATION_LEEWAY_SECONDS: z.coerce.number().int().min(0).max(300).default(60),
   /** Pepper for hashing OTP codes and delivery PINs at rest. */
   OTP_HASH_PEPPER: secret,
+  /**
+   * Key for encrypting TOTP secrets at rest (AES-256-GCM) (ADMIN-22).
+   *
+   * Optional and reversible: unset, secrets are stored as before and the API
+   * logs a warning; set, new and re-enrolled secrets are encrypted and legacy
+   * plaintext rows keep working until re-enrolment. Any string works — it is
+   * hashed to a 32-byte key. Rotating it invalidates existing encrypted seeds,
+   * so admins re-enrol; keep it in the secret manager, never in the database.
+   */
+  MFA_SECRET_ENC_KEY: z.string().min(16).optional(),
   SESSION_COOKIE_NAME: z.string().default('jibli_session'),
   SESSION_COOKIE_DOMAIN: z.string().optional(),
 });
@@ -308,7 +318,21 @@ const apiSchema = z.object({
   /** Comma-separated browser origins allowed to send credentialed requests. */
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3001'),
   TRUST_PROXY: booleanish.default(false),
+  /**
+   * Per-minute request budget for unauthenticated traffic, keyed by IP.
+   *
+   * Low on purpose: an IP with no verified session is many subscribers behind
+   * one CGNAT, so this bucket is shared and the limit guards signup/login abuse.
+   */
   RATE_LIMIT_GLOBAL_PER_MINUTE: z.coerce.number().int().default(300),
+  /**
+   * Per-minute budget once a valid token identifies a user (CUST-6/ADMIN-19).
+   *
+   * Keyed by user id, not IP, so customers behind the same carrier NAT and
+   * staff behind one office address no longer throttle each other. Higher than
+   * the IP budget because it is one person's traffic, not a whole network's.
+   */
+  RATE_LIMIT_AUTHENTICATED_PER_MINUTE: z.coerce.number().int().default(1200),
   REQUEST_BODY_LIMIT_BYTES: z.coerce
     .number()
     .int()

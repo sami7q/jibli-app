@@ -28,7 +28,7 @@ import {
 } from '@/lib/owner-hours';
 import { color, radius, ROW, space, TAP_TARGET } from '@/theme';
 import { Button, EmptyState, ErrorState, Row, Screen, Skeleton, Text } from '@/ui';
-import { OwnerHeader } from './index';
+import { OwnerHeader } from '@/ui/owner-header';
 
 /**
  * Working hours, on a phone, in under a minute.

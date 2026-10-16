@@ -33,6 +33,7 @@ export const ERROR_CODES = {
   PROFILE_ALREADY_COMPLETED_CONFLICT: 'PROFILE_ALREADY_COMPLETED_CONFLICT',
   MFA_REQUIRED: 'MFA_REQUIRED',
   REAUTHENTICATION_REQUIRED: 'REAUTHENTICATION_REQUIRED',
+  PASSWORD_CHANGE_REQUIRED: 'PASSWORD_CHANGE_REQUIRED',
 
   // ── Geography (plan §76) ───────────────────────────────────────────────────
   GOVERNORATE_NOT_AVAILABLE: 'GOVERNORATE_NOT_AVAILABLE',
@@ -134,6 +135,7 @@ export const ERROR_MESSAGES_AR: Record<ErrorCode, string> = {
   PROFILE_ALREADY_COMPLETED_CONFLICT: 'تم إكمال معلومات الحساب مسبقاً',
   MFA_REQUIRED: 'مطلوب التحقق بخطوتين للمتابعة',
   REAUTHENTICATION_REQUIRED: 'الرجاء تأكيد هويتك مرة أخرى للمتابعة',
+  PASSWORD_CHANGE_REQUIRED: 'يجب تغيير كلمة المرور قبل المتابعة',
 
   GOVERNORATE_NOT_AVAILABLE: 'هذه المحافظة غير متاحة حالياً',
   CITY_NOT_AVAILABLE: 'هذه المدينة غير متاحة حالياً',
@@ -220,6 +222,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   PROFILE_ALREADY_COMPLETED_CONFLICT: 409,
   MFA_REQUIRED: 401,
   REAUTHENTICATION_REQUIRED: 401,
+  PASSWORD_CHANGE_REQUIRED: 403,
 
   GOVERNORATE_NOT_AVAILABLE: 409,
   CITY_NOT_AVAILABLE: 409,

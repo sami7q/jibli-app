@@ -176,6 +176,30 @@ export const ORDER_REJECTION_REASONS = [
 ] as const;
 export type OrderRejectionReason = (typeof ORDER_REJECTION_REASONS)[number];
 
+/**
+ * Arabic labels for the reason the customer is shown when a shop rejects an
+ * order (MERCH-20). Mirrors the owner-side picker so the customer sees the same
+ * words the shop chose. A stored reason outside the list (legacy or free text)
+ * is surfaced as the generic «سبب آخر».
+ */
+export const ORDER_REJECTION_REASON_LABELS_AR: Record<OrderRejectionReason, string> = {
+  ITEM_UNAVAILABLE: 'صنف غير متوفر',
+  TOO_BUSY: 'ضغط كبير الآن',
+  CLOSING: 'المتجر يغلق',
+  ADDRESS_ISSUE: 'مشكلة في العنوان',
+  CUSTOMER_UNREACHABLE: 'تعذّر الوصول للعميل',
+  OTHER: 'سبب آخر',
+};
+
+/** The Arabic label for a stored rejection reason, falling back to «سبب آخر». */
+export function orderRejectionReasonLabelAr(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  return (
+    ORDER_REJECTION_REASON_LABELS_AR[reason as OrderRejectionReason] ??
+    ORDER_REJECTION_REASON_LABELS_AR.OTHER
+  );
+}
+
 export const ORDER_CANCELLATION_REASONS = [
   'CUSTOMER_CHANGED_MIND',
   'CUSTOMER_UNREACHABLE',

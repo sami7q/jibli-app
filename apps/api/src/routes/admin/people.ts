@@ -12,12 +12,19 @@ import {
   VEHICLE_TYPES,
   success,
 } from '@jibli/contracts';
-import { assertAdminPermission, hasAdminPermission } from '@jibli/auth';
+import {
+  assertAdminPermission,
+  generatePortalPassword,
+  hasAdminPermission,
+  hashPassword,
+} from '@jibli/auth';
 import {
   displayNameSchema,
   iraqiPhoneSchema,
   maskPhone,
   reasonSchema,
+  tryToE164Iraq,
+  usernameSchema,
   uuidSchema,
 } from '@jibli/validation';
 import { AUDIT_ACTIONS, computeCustody, enqueueOutboxEvent, writeAudit } from '@jibli/domain';
@@ -71,12 +78,20 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       })
       .parse(request.query);
 
-    const canUnmask = principal.platformRoles.includes('SUPER_ADMIN');
+    // Keyed on the permission, not a role name, so the unmask rule matches the
+    // rest of the admin surface (ADMIN-14).
+    const canUnmask = hasAdminPermission(principal, 'customer.phone.unmask');
 
     const conditions = [isNull(users.deletedAt)];
     if (query.status) conditions.push(eq(users.status, query.status));
     if (query.city_id) conditions.push(eq(users.profileCityId, query.city_id));
     if (query.q) {
+      /*
+       * A phone-looking query is normalised to E.164 before matching, so the
+       * local form the operator naturally types («07740000016») finds the
+       * stored «+9647740000016» (ADMIN-14). The raw ILIKE stays for partials.
+       */
+      const normalizedPhone = tryToE164Iraq(query.q);
       /*
        * Searches the restaurant name too. Someone looking for the owner of
        * "مندي حضرموت" knows the restaurant, not the person — that is the whole
@@ -86,6 +101,7 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         or(
           ilike(users.fullName, `%${query.q}%`),
           ilike(users.phoneE164, `%${query.q}%`),
+          ...(normalizedPhone.ok ? [eq(users.phoneE164, normalizedPhone.value)] : []),
           ilike(users.username, `%${query.q}%`),
           sql`EXISTS (
             SELECT 1 FROM ${restaurantMembers}
@@ -310,16 +326,37 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         status: z.enum(DRIVER_ACCOUNT_STATUSES).optional(),
         restaurant_id: uuidSchema.optional(),
         limit: z.coerce.number().int().min(1).max(100).default(25),
+        offset: z.coerce.number().int().min(0).max(10_000).default(0),
       })
       .parse(request.query);
 
     const canUnmask = principal.platformRoles.includes('SUPER_ADMIN');
 
+    /*
+     * One row per driver (ADMIN-4). The previous join to restaurant_drivers
+     * emitted a driver once per shop they work for, so a courier hired by four
+     * shops appeared four times and the custody banner — summing rows — counted
+     * their cash four times over. Membership is filtered with EXISTS and
+     * collected separately into a `restaurants` array.
+     */
     const conditions = [];
     if (query.status) conditions.push(eq(drivers.status, query.status));
-    if (query.restaurant_id)
-      conditions.push(eq(restaurantDrivers.restaurantId, query.restaurant_id));
+    if (query.restaurant_id) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${restaurantDrivers}
+          WHERE ${restaurantDrivers.driverId} = ${drivers.id}
+            AND ${restaurantDrivers.restaurantId} = ${query.restaurant_id}
+        )` as never,
+      );
+    }
     if (query.q) conditions.push(ilike(users.fullName, `%${query.q}%`));
+
+    const [totalRow] = await ctx.db
+      .select({ value: count() })
+      .from(drivers)
+      .innerJoin(users, eq(drivers.userId, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     const rows = await ctx.db
       .select({
@@ -330,8 +367,6 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         availability: drivers.availability,
         vehicleType: drivers.defaultVehicleType,
         lastHeartbeatAt: drivers.lastHeartbeatAt,
-        restaurantName: restaurants.displayName,
-        restaurantId: restaurants.id,
         activeAssignments: sql<number>`(
           SELECT COUNT(*) FROM ${deliveryAssignments}
           WHERE ${deliveryAssignments.driverId} = ${drivers.id}
@@ -345,18 +380,37 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       })
       .from(drivers)
       .innerJoin(users, eq(drivers.userId, users.id))
-      .leftJoin(restaurantDrivers, eq(restaurantDrivers.driverId, drivers.id))
-      .leftJoin(restaurants, eq(restaurantDrivers.restaurantId, restaurants.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(drivers.createdAt))
-      .limit(query.limit);
+      .limit(query.limit)
+      .offset(query.offset);
 
+    const driverIds = rows.map((row) => row.driverId);
+
+    // Memberships gathered once and grouped, so each driver carries the shops
+    // they work for rather than appearing once per shop.
+    const shopsByDriver = new Map<string, { id: string; name: string | null }[]>();
     // Cash custody per driver. Derived from events rather than a stored total,
     // so it can always be re-proved from history (plan §96).
-    const driverIds = rows.map((row) => row.driverId);
     const custodyByDriver = new Map<string, number>();
 
     if (driverIds.length > 0) {
+      const memberships = await ctx.db
+        .select({
+          driverId: restaurantDrivers.driverId,
+          restaurantId: restaurants.id,
+          restaurantName: restaurants.displayName,
+        })
+        .from(restaurantDrivers)
+        .innerJoin(restaurants, eq(restaurantDrivers.restaurantId, restaurants.id))
+        .where(inArray(restaurantDrivers.driverId, driverIds));
+
+      for (const membership of memberships) {
+        const list = shopsByDriver.get(membership.driverId) ?? [];
+        list.push({ id: membership.restaurantId, name: membership.restaurantName });
+        shopsByDriver.set(membership.driverId, list);
+      }
+
       const events = await ctx.db
         .select({
           driverId: driverCashEvents.driverId,
@@ -378,6 +432,13 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
       }
     }
 
+    // Total custody over unique drivers on this page — the banner summed rows
+    // and over-counted shared couriers (ADMIN-4).
+    const totalCustodyIqd = driverIds.reduce(
+      (sum, driverId) => sum + (custodyByDriver.get(driverId) ?? 0),
+      0,
+    );
+
     return reply.send(
       success(
         rows.map((row) => ({
@@ -388,15 +449,22 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
           status: row.status,
           availability: row.availability,
           vehicle_type: row.vehicleType,
-          restaurant_id: row.restaurantId,
-          restaurant_name: row.restaurantName,
+          restaurants: (shopsByDriver.get(row.driverId) ?? []).map((shop) => ({
+            id: shop.id,
+            name: shop.name,
+          })),
           active_assignments: Number(row.activeAssignments),
           completed_deliveries: Number(row.completedDeliveries),
           // Restaurant cash the driver is holding — never a Jibli balance.
           cash_custody_iqd: custodyByDriver.get(row.driverId) ?? 0,
           last_seen_at: row.lastHeartbeatAt?.toISOString() ?? null,
         })),
-        { request_id: request.requestId },
+        {
+          request_id: request.requestId,
+          total: totalRow?.value ?? 0,
+          page_size: query.limit,
+          total_custody_iqd: totalCustodyIqd,
+        },
       ),
     );
   });
@@ -841,7 +909,9 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
   // ── Platform staff and roles (plan §62, §87) ──────────────────────────────
 
   app.get('/api/v1/admin/staff', { preHandler: app.authenticate }, async (request, reply) => {
-    assertAdminPermission(requirePrincipal(request), 'roles.manage');
+    // A read, not a change: `roles.read` so the page loads without a step-up
+    // challenge that merely looking should not demand (ADMIN-7).
+    assertAdminPermission(requirePrincipal(request), 'roles.read');
 
     const rows = await ctx.db
       .select({
@@ -895,6 +965,90 @@ export function registerAdminPeopleRoutes(app: FastifyInstance, ctx: AppContext)
         request_id: request.requestId,
         mfa_gap_count: staff.filter((m) => m.mfa_required && !m.mfa_enabled).length,
       }),
+    );
+  });
+
+  /**
+   * Create a platform staff account (ADMIN-7).
+   *
+   * There was no way to make a staff login at all — new staff had to be
+   * bootstrapped by the CLI. This creates the account with a username and a
+   * one-time password (shown once, stored only as a hash), grants the role, and
+   * flags must_change_password so the holder replaces it on first sign-in.
+   * Gated on `roles.manage`, which demands a fresh MFA challenge (plan §88).
+   */
+  app.post('/api/v1/admin/staff', { preHandler: app.authenticate }, async (request, reply) => {
+    const principal = requirePrincipal(request);
+    assertAdminPermission(principal, 'roles.manage');
+    const body = z
+      .object({
+        username: usernameSchema,
+        full_name: displayNameSchema(3, 80),
+        role: z.enum(PLATFORM_ROLES),
+      })
+      .parse(request.body);
+
+    const password = generatePortalPassword({ username: body.username });
+    const passwordHash = await hashPassword(password);
+    const userId = uuidv7();
+
+    await ctx.db.transaction(async (tx) => {
+      const [taken] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(sql`lower(${users.username}) = ${body.username}`)
+        .limit(1);
+
+      if (taken) {
+        throw new AppError(ERROR_CODES.CONFLICT, {
+          details: { reason: 'USERNAME_TAKEN', field: 'username' },
+        });
+      }
+
+      await tx.insert(users).values({
+        id: userId,
+        username: body.username,
+        // Staff sign in by username; no phone and no customer profile.
+        phoneE164: null,
+        fullName: body.full_name,
+        passwordHash,
+        mustChangePassword: true,
+        passwordChangedAt: new Date(),
+        status: 'ACTIVE',
+      });
+
+      await tx.insert(userPlatformRoles).values({
+        id: uuidv7(),
+        userId,
+        role: body.role,
+        grantedBy: principal.userId,
+      });
+
+      await writeAudit(tx, {
+        actorUserId: principal.userId,
+        action: AUDIT_ACTIONS.ROLE_GRANT,
+        entityType: 'user',
+        entityId: userId,
+        // The password never reaches the audit log in any form (plan §1512).
+        after: { username: body.username, role: body.role, created: true },
+        ip: clientIp(request),
+        userAgent: userAgent(request),
+        requestId: request.requestId,
+      });
+    });
+
+    return reply.status(201).send(
+      success(
+        {
+          user_id: userId,
+          username: body.username,
+          // Shown exactly once; nothing stores it in plaintext.
+          password,
+          must_change_password: true,
+          note_ar: 'انسخ كلمة المرور الآن — لن تظهر مرة أخرى. سيُطلب تغييرها عند أول دخول.',
+        },
+        { request_id: request.requestId },
+      ),
     );
   });
 
