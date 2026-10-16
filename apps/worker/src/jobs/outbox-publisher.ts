@@ -7,7 +7,7 @@ import {
   type DeliveryEventPayload,
 } from '@jibli/contracts';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { NOTIFICATION_TEMPLATES } from '@jibli/notifications';
+import { NOTIFICATION_TEMPLATES, WORK_ALERT_SOUND } from '@jibli/notifications';
 import { nextAttemptDelayMs, OUTBOX_MAX_ATTEMPTS } from '@jibli/domain';
 import {
   deliveryAssignments,
@@ -208,7 +208,7 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
         bodyAr: notification.bodyAr,
         data,
         channelId: work ? 'work' : 'orders',
-        ...(work ? { sound: 'new-order.wav' } : {}),
+        ...(work ? { sound: WORK_ALERT_SOUND } : {}),
       })),
     );
 

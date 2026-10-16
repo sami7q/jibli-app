@@ -739,7 +739,7 @@ export interface PushMessage {
   /** Android channel / iOS category for order alerts. */
   readonly channelId?: string;
   /**
-   * A sound bundled into the app (`new-order.wav`), or the system default.
+   * A sound bundled into the app (`WORK_ALERT_SOUND`), or the system default.
    * iOS plays the named file; Android takes the sound from the channel, which
    * is why work alerts also travel on their own `work` channel.
    */
@@ -1006,6 +1006,18 @@ export interface NotificationTemplate {
   readonly titleAr: string;
   readonly bodyAr: string;
 }
+
+/**
+ * The sound a shop's new order and a courier's task play, by file name.
+ *
+ * The worker names it in every "work" push and the app bundles a file of the
+ * same name (`apps/mobile/assets/sounds`). iOS looks the name up in the app
+ * bundle and plays nothing it cannot find — the worker sent `new-order.wav`
+ * for weeks after the file became `new_order.wav` (Android refuses hyphens in
+ * resource names), so a new order arrived silently on an iPhone. One constant,
+ * and a test that the file exists, keep the two from drifting again.
+ */
+export const WORK_ALERT_SOUND = 'new_order.wav';
 
 /**
  * Bodies deliberately omit addresses and phone numbers: a push body can appear

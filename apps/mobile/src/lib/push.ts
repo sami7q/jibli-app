@@ -126,6 +126,21 @@ export async function pushPermission(): Promise<PushPermission> {
   }
 }
 
+/**
+ * Whether an outcome means "this phone will not be reached when the app is
+ * closed" — as opposed to a place where push was never expected (Expo Go,
+ * the web preview, a simulator, a development build without a project id).
+ *
+ * The registration failure itself is swallowed so it can never block an
+ * order, and that silence is exactly what hid a release build without FCM
+ * credentials: every token request failed, no phone was ever registered,
+ * and no shop owner knew their phone would not ring with the app closed.
+ */
+export function isPushBroken(outcome: PushOutcome | undefined): boolean {
+  if (!outcome || outcome.status !== 'unavailable') return false;
+  return !['expo go or web', 'simulator', 'no project id'].includes(outcome.reason);
+}
+
 export type PushOutcome =
   | { status: 'registered'; token: string }
   | { status: 'denied' }
