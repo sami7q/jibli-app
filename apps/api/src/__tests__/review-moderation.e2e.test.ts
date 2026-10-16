@@ -7,9 +7,9 @@ import {
   orders,
   providers,
   restaurantBranches,
+  restaurantMembers,
   restaurants,
   reviewReports,
-  userAddresses,
   userBlocks,
   users,
   uuidv7,
@@ -30,7 +30,8 @@ import {
 
 /**
  * User-generated content, against a real database: reports that hide a review
- * on the third reporter, blocks that stay personal, the moderator's decision,
+ * on the third independent reporter (never the shop's own staff, never accounts
+ * that have not received an order), blocks that stay personal, the moderator's decision,
  * and a deleted account taking its reviews — and its stars — with it.
  */
 
@@ -52,7 +53,10 @@ interface Fixture {
   readonly restaurantId: string;
   readonly author: string;
   readonly readers: string[];
+  readonly staff: string[];
+  readonly strangers: string[];
   readonly reviewId: string;
+  readonly staffReviewId: string;
 }
 
 async function person(db: Database, cityId: string, governorateId: string, name: string) {
@@ -96,16 +100,6 @@ async function buildFixture(): Promise<Fixture> {
     await person(db, city.id, city.governorateId, 'قارئ ثالث'),
   ];
 
-  const addressId = uuidv7();
-  await db.insert(userAddresses).values({
-    id: addressId,
-    userId: author,
-    governorateId: city.governorateId,
-    cityId: city.id,
-    districtText: 'الكرادة',
-    isDefault: true,
-  });
-
   const providerId = uuidv7();
   await db
     .insert(providers)
@@ -129,48 +123,75 @@ async function buildFixture(): Promise<Fixture> {
     addressText: 'بغداد',
   });
 
-  const orderId = uuidv7();
-  await db.insert(orders).values({
-    id: orderId,
-    publicOrderNumber: `JR${Date.now().toString().slice(-7)}`,
-    userId: author,
-    restaurantId,
-    branchId,
-    addressId,
-    status: 'COMPLETED',
-    paymentStatus: 'PAID_CASH',
-    placedAt: new Date(Date.now() - 3_600_000),
-    deliveredAt: new Date(),
-    completedAt: new Date(),
-    itemsSubtotalIqd: 10_000,
-    deliveryFeeIqd: 0,
-    platformServiceFeeIqd: 0,
-    discountTotalIqd: 0,
-    customerTotalIqd: 10_000,
-    commissionBaseIqd: 10_000,
-    commissionFlatIqdSnapshot: 500,
-    commissionAmountIqd: 500,
-    restaurantNetSnapshotIqd: 9_500,
-    customerNameSnapshot: 'كاتب التقييم',
-    customerPhoneSnapshot: '+9647700000001',
-    deliveryAddressSnapshotJson: { cityId: city.id },
-    restaurantLocationSnapshotJson: { branchId },
-  });
+  const delivered = async (userId: string): Promise<string> => {
+    const id = uuidv7();
+    await db.insert(orders).values({
+      id,
+      publicOrderNumber: `JR${Math.random().toString().slice(2, 9)}`,
+      userId,
+      restaurantId,
+      branchId,
+      status: 'COMPLETED',
+      paymentStatus: 'PAID_CASH',
+      placedAt: new Date(Date.now() - 3_600_000),
+      deliveredAt: new Date(),
+      completedAt: new Date(),
+      itemsSubtotalIqd: 10_000,
+      deliveryFeeIqd: 0,
+      platformServiceFeeIqd: 0,
+      discountTotalIqd: 0,
+      customerTotalIqd: 10_000,
+      commissionBaseIqd: 10_000,
+      commissionFlatIqdSnapshot: 500,
+      commissionAmountIqd: 500,
+      restaurantNetSnapshotIqd: 9_500,
+      customerNameSnapshot: 'x',
+      customerPhoneSnapshot: '+9647700000001',
+      deliveryAddressSnapshotJson: { cityId: city.id },
+      restaurantLocationSnapshotJson: { branchId },
+    });
+    return id;
+  };
 
-  const reviewId = uuidv7();
-  await db.insert(orderReviews).values({
-    id: reviewId,
-    orderId,
-    userId: author,
-    restaurantId,
-    rating: 1,
-    comment: 'تعليق سيُبلَّغ عنه',
-    termsAcceptedAt: new Date(),
-  });
+  const review = async (rating: number, comment: string): Promise<string> => {
+    const id = uuidv7();
+    await db.insert(orderReviews).values({
+      id,
+      orderId: await delivered(author),
+      userId: author,
+      restaurantId,
+      rating,
+      comment,
+      termsAcceptedAt: new Date(),
+    });
+    return id;
+  };
+
+  const reviewId = await review(1, 'تعليق سيُبلَّغ عنه');
+  const staffReviewId = await review(2, 'تعليق لا يعجب المتجر');
   await db
     .update(restaurants)
-    .set({ ratingAverage: 1, ratingCount: 1 })
+    .set({ ratingAverage: 1.5, ratingCount: 2 })
     .where(eq(restaurants.id, restaurantId));
+
+  // Readers are real customers: each has received an order.
+  for (const reader of readers) await delivered(reader);
+
+  // The shop's own people — customers too, so only membership disqualifies them.
+  const staff: string[] = [];
+  for (const role of ['OWNER', 'MANAGER', 'CASHIER'] as const) {
+    const id = await person(db, city.id, city.governorateId, `موظف ${role}`);
+    await db.insert(restaurantMembers).values({ id: uuidv7(), restaurantId, userId: id, role });
+    await delivered(id);
+    staff.push(id);
+  }
+
+  // Fresh sign-ups that have never received anything.
+  const strangers = [
+    await person(db, city.id, city.governorateId, 'حساب جديد ١'),
+    await person(db, city.id, city.governorateId, 'حساب جديد ٢'),
+    await person(db, city.id, city.governorateId, 'حساب جديد ٣'),
+  ];
 
   const ctx = { db, logger: silent } as unknown as AppContext;
 
@@ -180,7 +201,10 @@ async function buildFixture(): Promise<Fixture> {
     restaurantId,
     author,
     readers,
+    staff,
+    strangers,
     reviewId,
+    staffReviewId,
     cleanup: async () => {
       await client.end();
     },
@@ -247,7 +271,29 @@ describeWithDb('review moderation (end to end)', () => {
       .select()
       .from(restaurants)
       .where(eq(restaurants.id, fx.restaurantId));
-    expect(shop?.ratingCount).toBe(0);
+    expect(shop?.ratingCount).toBe(1);
+  });
+
+  it("the shop's staff and order-less accounts reach the queue but cannot hide a review", async () => {
+    for (const reporter of [...fx.staff, ...fx.strangers]) {
+      const result = await reportReview(fx.ctx, {
+        reviewId: fx.staffReviewId,
+        reporterUserId: reporter,
+        reason: 'FALSE',
+      });
+      expect(result).toEqual({ reported: true, hidden: false });
+    }
+
+    const [review] = await fx.db
+      .select()
+      .from(orderReviews)
+      .where(eq(orderReviews.id, fx.staffReviewId));
+    expect(review?.isHidden).toBe(false);
+
+    const item = (await moderationQueue(fx.ctx)).find(
+      (entry) => entry.review_id === fx.staffReviewId,
+    );
+    expect(item?.open_reports).toBe(6);
   });
 
   it('puts the reported review in the queue with its reasons and notes', async () => {
@@ -264,7 +310,7 @@ describeWithDb('review moderation (end to end)', () => {
       action: 'PUBLISH',
       moderatorId: fx.readers[0]!,
     });
-    expect(result.count).toBe(1);
+    expect(result.count).toBe(2);
 
     const reports = await fx.db
       .select({ status: reviewReports.status })
@@ -301,7 +347,7 @@ describeWithDb('review moderation (end to end)', () => {
 
   it("deleting the author's account deletes their reviews, reports, blocks and stars", async () => {
     const removed = await fx.db.transaction((tx) => deleteUserContent(tx, fx.author));
-    expect(removed.reviews).toBe(1);
+    expect(removed.reviews).toBe(2);
     expect(removed.restaurants).toEqual([fx.restaurantId]);
 
     expect(

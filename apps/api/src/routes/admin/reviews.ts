@@ -100,7 +100,7 @@ export function registerAdminReviewRoutes(app: FastifyInstance, ctx: AppContext)
     { preHandler: app.authenticate },
     async (request, reply) => {
       const principal = requirePrincipal(request);
-      assertAdminPermission(principal, 'restaurant.read');
+      assertAdminPermission(principal, 'review.moderate');
       const { reviewId } = z.object({ reviewId: uuidSchema }).parse(request.params);
       const body = z
         .object({ action: z.enum(['PUBLISH', 'HIDE']), reason: reasonSchema })
@@ -145,7 +145,7 @@ export function registerAdminReviewRoutes(app: FastifyInstance, ctx: AppContext)
     { preHandler: app.authenticate },
     async (request, reply) => {
       const principal = requirePrincipal(request);
-      assertAdminPermission(principal, 'restaurant.read');
+      assertAdminPermission(principal, 'review.moderate');
       const { reviewId } = z.object({ reviewId: uuidSchema }).parse(request.params);
       const body = z.object({ hidden: z.boolean(), reason: reasonSchema }).parse(request.body);
 

@@ -145,6 +145,11 @@ export const ADMIN_PERMISSIONS = [
   'customer.read',
   'customer.block',
   'customer.phone.unmask',
+  /*
+   * Hiding or publishing a customer's review changes what a shop is rated.
+   * Every admin role reads restaurants, so reading cannot be what gates it.
+   */
+  'review.moderate',
   'finance.read.global',
   'finance.settlement.generate',
   'finance.settlement.issue',
@@ -179,6 +184,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<PlatformRole, readonly AdminPermissi
     'driver.create',
     'driver.suspend',
     'customer.read',
+    'review.moderate',
     'config.read',
     'reports.read.global',
     'export.create',
@@ -214,6 +220,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<PlatformRole, readonly AdminPermissi
     'order.read.global',
     'driver.read.global',
     'customer.read',
+    'review.moderate',
   ],
 
   MARKETING: ['geography.read', 'restaurant.read', 'coupon.manage', 'reports.read.global'],

@@ -3,6 +3,7 @@ import { AppError, ERROR_CODES } from '@jibli/contracts';
 import {
   orderReviews,
   orders,
+  restaurantMembers,
   restaurants,
   reviewReports,
   userBlocks,
@@ -24,6 +25,11 @@ import { recomputeRating } from './review-service.js';
  * the review before anyone looks, because three independent people objecting
  * is a signal worth acting on at 3 a.m. A block is personal: the blocker stops
  * seeing that author's reviews, and nobody else's view changes.
+ *
+ * Only independent reporters count toward hiding: not the shop's own staff (an
+ * owner, a manager and a cashier would otherwise bury any bad review of their
+ * shop), and only people who have received at least one order, so three
+ * throwaway sign-ups cannot do it either. Their reports still reach the queue.
  */
 
 /**
@@ -100,7 +106,22 @@ export async function reportReview(
     const [open] = await tx
       .select({ total: sql<number>`COUNT(*)` })
       .from(reviewReports)
-      .where(and(eq(reviewReports.reviewId, review.id), eq(reviewReports.status, 'OPEN')));
+      .where(
+        and(
+          eq(reviewReports.reviewId, review.id),
+          eq(reviewReports.status, 'OPEN'),
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${restaurantMembers}
+            WHERE ${restaurantMembers.userId} = ${reviewReports.reporterUserId}
+              AND ${restaurantMembers.restaurantId} = ${review.restaurantId}
+          )`,
+          sql`EXISTS (
+            SELECT 1 FROM ${orders}
+            WHERE ${orders.userId} = ${reviewReports.reporterUserId}
+              AND ${orders.status} = 'COMPLETED'
+          )`,
+        ),
+      );
 
     let hidden = review.isHidden;
     if (!review.isHidden && Number(open?.total ?? 0) >= AUTO_HIDE_REPORTS) {
