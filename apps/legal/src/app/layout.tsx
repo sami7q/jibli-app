@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Cairo, IBM_Plex_Mono } from 'next/font/google';
+import { CONTACT_EMAIL, SUPPORT_PHONE } from './contact';
 import { Tabs } from './tabs';
 import './globals.css';
 
@@ -84,7 +85,16 @@ export default function RootLayout({ children }: { children: ReactNode }): React
           <div className="footer__inner">
             <p>
               جيبلي — خدمة توصيل تعمل داخل العراق. للأسئلة حول بياناتك:{' '}
-              <a href="mailto:privacy@jibli.iq">privacy@jibli.iq</a>
+              <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+              {SUPPORT_PHONE ? (
+                <>
+                  {' '}
+                  — الدعم:{' '}
+                  <a href={`tel:${SUPPORT_PHONE}`} dir="ltr">
+                    {SUPPORT_PHONE}
+                  </a>
+                </>
+              ) : null}
             </p>
           </div>
         </footer>

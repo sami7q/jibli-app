@@ -48,12 +48,20 @@ export type PickOutcome =
  */
 export async function pickImage(source: PickSource, tier: ImageTier): Promise<PickOutcome> {
   try {
-    // The browser has its own file dialog and asks nothing beforehand.
-    if (Platform.OS !== 'web') {
-      const permission =
-        source === 'camera'
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    /*
+     * Only the camera asks first.
+     *
+     * The library opens the system photo picker — PHPicker on iOS, the Android
+     * photo picker (back-ported to old versions through Play services) — which
+     * runs outside the app and needs no permission at all. Asking anyway was
+     * worse than redundant: on Android 12 and below the request is for the
+     * storage pair, which `blockedPermissions` strips from the manifest, so it
+     * always came back «denied» and the owner was sent to a settings switch
+     * that does not exist; on iOS it raised a full-library prompt for a picker
+     * that never reads the library. The browser has its own file dialog.
+     */
+    if (Platform.OS !== 'web' && source === 'camera') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) return { status: 'denied', source };
     }
 

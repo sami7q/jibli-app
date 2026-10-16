@@ -1394,7 +1394,7 @@ export async function upsertDemoShop(
 
     // ── Owner account for the restaurant portal ─────────────────────────
     const [existingOwner] = await tx
-      .select({ id: users.id })
+      .select({ id: users.id, status: users.status })
       .from(users)
       .where(eq(users.username, demo.ownerUsername))
       .limit(1);
@@ -1402,10 +1402,22 @@ export async function upsertDemoShop(
     let ownerId: string;
     if (existingOwner) {
       ownerId = existingOwner.id;
-      await tx
-        .update(users)
-        .set({ fullName: demo.ownerName, passwordHash, status: 'ACTIVE', updatedAt: now })
-        .where(eq(users.id, ownerId));
+      /*
+       * A switched-off sample login stays off.
+       *
+       * Migrations 0023 and 0024 deactivated these accounts and cleared their
+       * passwords on any database that had them, because `DEMO_PASSWORD` sits
+       * in a public repository. Re-seeding used to write that password back
+       * and set the account ACTIVE again — so one `pnpm db:seed` against the
+       * wrong DATABASE_URL, under any APP_ENV but `production`, reopened every
+       * sample shop to anyone who has read this file.
+       */
+      if (existingOwner.status !== 'DEACTIVATED') {
+        await tx
+          .update(users)
+          .set({ fullName: demo.ownerName, passwordHash, status: 'ACTIVE', updatedAt: now })
+          .where(eq(users.id, ownerId));
+      }
     } else {
       ownerId = uuidv7();
       await tx.insert(users).values({
@@ -1606,6 +1618,27 @@ export async function upsertDemoShop(
   });
 }
 
+/** The reason migration 0024 writes on every sample shop it retires. */
+export const SAMPLE_RETIRED_REASON = 'retired: sample shop (migration 0024)';
+
+/**
+ * Whether migration 0024 retired this sample shop.
+ *
+ * A retired sample stays retired. Re-seeding rewrites a sample shop ACTIVE,
+ * open, with its invented rating and its owner's published password — which
+ * is right on a laptop and exactly what 0024 undid on a database real people
+ * order from. That database runs under `APP_ENV=staging` until launch, so the
+ * environment cannot be what tells the two apart; the shop's own row can.
+ */
+async function isRetiredSample(db: Database, partnerCode: string): Promise<boolean> {
+  const [row] = await db
+    .select({ reason: restaurants.suspendedReason })
+    .from(restaurants)
+    .where(eq(restaurants.partnerCode, partnerCode))
+    .limit(1);
+  return row?.reason === SAMPLE_RETIRED_REASON;
+}
+
 /**
  * Create (or refresh) the demo marketplace in one city.
  *
@@ -1644,6 +1677,7 @@ export async function seedDemoMarketplace(db: Database, cityCode: string): Promi
     const target =
       demo.cityCode && demo.cityCode !== cityCode ? await findCity(db, demo.cityCode) : city;
     if (!target) continue;
+    if (await isRetiredSample(db, demo.partnerCode)) continue;
     await upsertDemoShop(db, demo, target, passwordHash, result);
   }
 

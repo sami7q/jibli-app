@@ -44,6 +44,9 @@ export default defineConfig({
       '@jibli/validation': pkg('validation'),
       '@jibli/contracts': pkg('contracts'),
       '@jibli/db/migrate': fileURLToPath(new URL('./packages/db/src/migrate.ts', import.meta.url)),
+      '@jibli/db/seed/demo': fileURLToPath(
+        new URL('./packages/db/src/seed/demo-marketplace.ts', import.meta.url),
+      ),
       '@jibli/db/seed': fileURLToPath(
         new URL('./packages/db/src/seed/geography.ts', import.meta.url),
       ),

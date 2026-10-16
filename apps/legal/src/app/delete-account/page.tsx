@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import type { Metadata } from 'next';
+import { CONTACT_EMAIL } from '../contact';
 
 export const metadata: Metadata = {
   title: 'حذف الحساب',
@@ -98,7 +99,7 @@ export default function DeleteAccountPage(): ReactElement {
           <h2>إن لم تستطع الوصول إلى التطبيق</h2>
           <p>
             إن فقدت هاتفك أو رقمك ولم تعد تستطيع الدخول، أرسل بريداً إلى{' '}
-            <a href="mailto:privacy@jibli.iq">privacy@jibli.iq</a> من أي عنوان، واذكر رقم الهاتف
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> من أي عنوان، واذكر رقم الهاتف
             المسجَّل. نتحقّق من أنك صاحبه قبل الحذف — لأن طلباً كهذا من شخص آخر يعني حذف حسابك أنت —
             وننفّذ خلال ٣٠ يوماً كحدّ أقصى، وعادةً خلال أيام.
           </p>

@@ -25,22 +25,22 @@ The forms ask about the app, not the role, so the answers below are the union.
 
 ## What is collected
 
-| Data                          | Who        | Required?                      | Source                                              | Why                                             |
-| ----------------------------- | ---------- | ------------------------------ | --------------------------------------------------- | ----------------------------------------------- |
-| Name                          | all        | yes                            | `users.full_name`                                   | the shop and driver know whom the order is for  |
-| Phone number                  | all        | yes                            | `users.phone_e164`, order snapshot                  | sign-in, the driver calls on arrival            |
-| Delivery address (text)       | customer   | yes, to order                  | `user_addresses`, order snapshot                    | delivery                                        |
-| Precise location              | customer   | **optional** (map pin)         | `user_addresses.latitude/longitude`                 | delivery; the app works without it              |
-| Approximate location          | customer   | optional                       | `ACCESS_COARSE_LOCATION` is declared alongside fine | same pin, when the user grants only approximate |
-| Purchase history              | customer   | yes                            | `orders`, `order_items`                             | the order itself, receipts, support             |
-| Photos                        | shop owner | optional                       | product and shop images, uploaded to storage        | shown to customers on purpose                   |
-| Other user content (reviews)  | customer   | optional                       | `order_reviews`, `review_reports`, `user_blocks`    | ratings, comments, reports and blocks           |
-| Device push token             | all        | optional                       | `user_devices`                                      | order notifications                             |
-| Device model, OS, app version | all        | optional (with the push token) | `user_devices`                                      | diagnose a notification that does not arrive    |
-| User ID                       | all        | yes                            | `users.id`; `users.username` for owners and drivers | the account itself                              |
-| IP address and user agent     | all        | yes                            | `sessions`, `otp_challenges`, `login_attempts`      | security: stop automated sign-in abuse          |
-| Email address                 | customer   | only with Google sign-in       | `users.email`                                       | recognise the Google account next time          |
-| Crash logs                    | all        | only when a Sentry DSN is set  | Sentry                                              | fix crashes                                     |
+| Data                          | Who                  | Required?                      | Source                                                                  | Why                                             |
+| ----------------------------- | -------------------- | ------------------------------ | ----------------------------------------------------------------------- | ----------------------------------------------- |
+| Name                          | all                  | yes                            | `users.full_name`                                                       | the shop and driver know whom the order is for  |
+| Phone number                  | all                  | yes                            | `users.phone_e164`, order snapshot                                      | sign-in, the driver calls on arrival            |
+| Delivery address (text)       | customer             | yes, to order                  | `user_addresses`, order snapshot                                        | delivery                                        |
+| Precise location              | customer, shop owner | **optional** (map pin)         | `user_addresses.latitude/longitude`; the shop's pin from «تعديل المتجر» | delivery; the app works without it              |
+| Approximate location          | customer             | optional                       | `ACCESS_COARSE_LOCATION` is declared alongside fine                     | same pin, when the user grants only approximate |
+| Purchase history              | customer             | yes                            | `orders`, `order_items`                                                 | the order itself, receipts, support             |
+| Photos                        | shop owner           | optional                       | product and shop images, uploaded to storage                            | shown to customers on purpose                   |
+| Other user content (reviews)  | customer             | optional                       | `order_reviews`, `review_reports`, `user_blocks`                        | ratings, comments, reports and blocks           |
+| Device push token             | all                  | optional                       | `user_devices`                                                          | order notifications                             |
+| Device model, OS, app version | all                  | optional (with the push token) | `user_devices`                                                          | diagnose a notification that does not arrive    |
+| User ID                       | all                  | yes                            | `users.id`; `users.username` for owners and drivers                     | the account itself                              |
+| IP address and user agent     | all                  | yes                            | `sessions`, `otp_challenges`, `login_attempts`                          | security: stop automated sign-in abuse          |
+| Email address                 | customer             | only with Google sign-in       | `users.email`                                                           | recognise the Google account next time          |
+| Crash logs                    | all                  | only when a Sentry DSN is set  | Sentry                                                                  | fix crashes                                     |
 
 **Email and crash logs are conditional on the build.** Release 1 signs in
 with phone and code only: `app.config.ts` refuses a store build that carries
@@ -61,6 +61,11 @@ the privacy policy states it.
 **Not collected:** payment card or bank data (cash on delivery only),
 contacts, SMS, call logs, calendar, health, audio, files, browsing history,
 advertising ID, installed apps, background location.
+
+**Advertising ID (Play Console → App content → Advertising ID): No.** There is
+no ad SDK and no Firebase Analytics, and `com.google.android.gms.permission.AD_ID`
+is removed from the merged manifest by `android.blockedPermissions` in
+`app.config.ts`, so the upload agrees with the answer.
 
 ## Google Play — Data safety form
 
@@ -162,6 +167,11 @@ policy and App Store Guideline 1.2 into play. What answers them:
   filed, its blocks and the admin bell entries that quoted its comments, and
   recomputes each shop's rating (`deleteUserContent`).
 
-For App Review notes: "Reviews are moderated: comments are screened
-automatically, readers can report a review and block its author, and reports
-are handled by our team from an admin queue."
+For App Review notes — and keep it to what the app does: the customer app
+shows a shop's average rating, never other customers' comments, so a
+reviewer looking for a «report» button in the app will not find one. "A
+customer can leave a star rating and an optional comment after a delivered
+order. Comments are not shown to other customers in the app; they are shown
+to the reviewed shop only. Comments are screened automatically before anyone
+reads them, the shop can report a comment or block its author, and reports
+are handled by our team from an admin queue within 24 hours."

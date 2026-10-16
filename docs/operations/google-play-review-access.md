@@ -115,7 +115,8 @@ idempotently — run it again before every submission and it refreshes rather
 than duplicates:
 
 - **Customer** on the review number: `ACTIVE`, phone verified, profile
-  complete, named «مراجع Google Play», in the chosen city, with one saved
+  complete, named «حساب المراجعة» (store-neutral: the same account serves App
+  Review, and an iOS app must not show «Google Play»), in the chosen city, with one saved
   address («المنزل»). No password, no roles. No orders.
 - **Shop** «ماركت المراجعة» (partner code `REVIEW-GP-1`): an `ACTIVE` market in
   the same city, open around the clock, eight products in three aisles, with a
@@ -138,7 +139,7 @@ the schema's message names which of the three is wrong.
 
 From a phone with the production build: welcome → «تسجيل الدخول» → the review
 number → «إرسال رمز التحقق» → the review code → home. Then «حسابي» shows
-«مراجع Google Play» and the saved address. Sign out, and sign in with the owner
+«حساب المراجعة» and the saved address. Sign out, and sign in with the owner
 and the courier as described below.
 
 ### 5. Keep the API awake
@@ -224,9 +225,9 @@ Password: <GOOGLE_PLAY_REVIEW_DRIVER_PASSWORD>
 3. Enter the username and password above and tap "دخول".
 4. You land on the delivery screen ("التوصيل"): assigned deliveries, the
    "استلمت" (picked up) and "سلّمت" (delivered) actions, and cash collected.
-   With no live orders the list is empty by design. Location is used only
-   while this screen is open, to show the delivery point; there is no
-   background location and no live tracking.
+   With no live orders the list is empty by design. Courier mode does not
+   read the device location at all; there is no background location and no
+   live tracking.
 
 Notes
 - The service operates in Iraq only. Restaurants and shops are listed per

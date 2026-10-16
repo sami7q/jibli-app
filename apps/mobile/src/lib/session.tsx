@@ -8,6 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
+import { onlineManager } from '@tanstack/react-query';
 import { apiRequest, ApiError, NetworkError } from './api';
 import {
   clearParkedSession,
@@ -111,6 +113,9 @@ interface SessionApi {
   readonly continueAsGuest: () => Promise<void>;
 }
 
+/** How long an unconfirmed session waits before asking the server again. */
+const OFFLINE_RECHECK_MS = 20_000;
+
 const SessionContext = createContext<SessionApi | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -194,6 +199,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void resolve();
     void loadParkedSession().then((parked) => setParkedAccount(parked?.kind ?? null));
   }, [resolve]);
+
+  /*
+   * «Offline» is a guess about the network, so it is re-tested.
+   *
+   * A launch whose `/auth/me` timed out — no signal in a lift, or an API still
+   * waking from idle — committed `offline-ready` with no user and nothing ever
+   * asked again: the account tab said «أنت غير متصل» on a working connection,
+   * and a shop's or courier's live order alerts never started, because they
+   * wait for a `me`. Ask again when the app comes back to the foreground, when
+   * the network returns, and on a timer while it lasts; each failed attempt
+   * commits a fresh state, which re-arms the timer.
+   */
+  useEffect(() => {
+    if (state.status !== 'offline-ready' || state.me) return;
+    const retry = () => void resolve();
+    const timer = setTimeout(retry, OFFLINE_RECHECK_MS);
+    const appState = AppState.addEventListener('change', (next) => {
+      if (next === 'active') retry();
+    });
+    const unsubscribeOnline = onlineManager.subscribe((online) => {
+      if (online) retry();
+    });
+    return () => {
+      clearTimeout(timer);
+      appState.remove();
+      unsubscribeOnline();
+    };
+  }, [state, resolve]);
 
   const api = useMemo<SessionApi>(
     () => ({

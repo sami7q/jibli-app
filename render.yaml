@@ -52,12 +52,38 @@ services:
     dockerfilePath: ./infra/docker/Dockerfile.service
     dockerContext: .
     dockerCommand: node build/api/index.mjs
-    # `free` spins down after 15 minutes idle and takes about a minute to wake.
-    # Fine for a pilot; move to a paid instance before real customers, or the
-    # first order of the morning waits for a cold start.
-    plan: free
+    # Always on. `free` spun down after 15 minutes idle and took up to a minute
+    # to wake — measured at 23 s for the first request on 2026-10-16 — which is
+    # longer than the app's 15 s read timeout: a store reviewer opening the app
+    # cold saw «تعذّر الاتصال», and the first order of the morning waited on a
+    # cold start. `0.5c-512mb` is the smallest paid size, the same as the
+    # worker's. A synced Blueprint applies this value, so a plan changed only in
+    # the dashboard is put back here on the next sync — change it in this file.
+    plan: 0.5c-512mb
     region: frankfurt
     healthCheckPath: /health/live
+    # Deploy only when something the API image is built from has changed.
+    # Without a filter every push to main rebuilt and restarted the API —
+    # a copy edit on the legal site, a mobile-only fix, a README. The list is
+    # what infra/docker/Dockerfile.service copies and compiles: the API and
+    # worker sources, every workspace package, the install manifests (it copies
+    # each app's package.json, the mobile one included, to install the
+    # workspace), the bundler and the Docker files themselves.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - apps/worker/**
+        - apps/*/package.json
+        - packages/**
+        - infra/docker/**
+        - scripts/bundle.mjs
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - .npmrc
+        - .dockerignore
+        - tsconfig.base.json
+        - tsconfig.json
     envVars:
       - fromGroup: jibli-secrets
 
@@ -306,6 +332,22 @@ services:
     dockerCommand: node build/worker/index.mjs
     plan: 0.5c-512mb
     region: frankfurt
+    # The same image as the API, so the same filter (see jibli-api above).
+    buildFilter:
+      paths:
+        - apps/api/**
+        - apps/worker/**
+        - apps/*/package.json
+        - packages/**
+        - infra/docker/**
+        - scripts/bundle.mjs
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - .npmrc
+        - .dockerignore
+        - tsconfig.base.json
+        - tsconfig.json
     envVars:
       - fromGroup: jibli-secrets
       - key: NODE_ENV

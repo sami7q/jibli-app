@@ -59,9 +59,19 @@ import {
  */
 
 const PARTNER_CODE = 'REVIEW-GP-1';
-const CUSTOMER_NAME = 'مراجع Google Play';
-const OWNER_NAME = 'مراجع Google Play — صاحب المتجر';
-const DRIVER_NAME = 'مراجع Google Play — مندوب';
+/*
+ * Store-neutral, because the same accounts serve App Review.
+ *
+ * These names are drawn in the app — the header of «حسابي», the customer on an
+ * owner's order card, the owner's courier picker — and an iOS binary that
+ * shows «Google Play» to an Apple reviewer is guideline 2.3.10 (no other
+ * platform's name in the app). Earlier runs wrote the old name, which is
+ * still recognised as this account so a re-run renames rather than refuses.
+ */
+const CUSTOMER_NAME = 'حساب المراجعة';
+const LEGACY_CUSTOMER_NAMES: readonly string[] = ['مراجع Google Play'];
+const OWNER_NAME = 'حساب المراجعة — صاحب المتجر';
+const DRIVER_NAME = 'حساب المراجعة — مندوب';
 const ADDRESS_LABEL = 'المنزل';
 
 interface Settings {
@@ -398,7 +408,10 @@ async function upsertCustomer(
       .limit(1);
     const isEmptyStub =
       existing.fullName === null && existing.profileCompletedAt === null && !anyOrder;
-    if (existing.fullName !== CUSTOMER_NAME && !isEmptyStub) {
+    const isReviewCustomer =
+      existing.fullName === CUSTOMER_NAME ||
+      (existing.fullName !== null && LEGACY_CUSTOMER_NAMES.includes(existing.fullName));
+    if (!isReviewCustomer && !isEmptyStub) {
       fail(
         'The review number already belongs to an account that is not the review customer. ' +
           'Pick a number nobody uses.',
@@ -627,7 +640,7 @@ async function upsertDriver(
       driverId,
       canCollectCash: true,
       isActive: true,
-      internalNote: 'Google Play review courier',
+      internalNote: 'Store review courier',
     });
   }
 }
@@ -685,7 +698,7 @@ async function removeAll(
     .set({
       operationalStatus: 'SUSPENDED',
       suspendedAt: now,
-      suspendedReason: 'Google Play review finished',
+      suspendedReason: 'Store review finished',
       updatedAt: now,
     })
     .where(eq(restaurants.partnerCode, PARTNER_CODE))

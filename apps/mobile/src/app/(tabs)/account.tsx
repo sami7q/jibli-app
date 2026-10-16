@@ -150,6 +150,22 @@ export default function AccountScreen() {
     );
   };
 
+  /*
+   * A call first, WhatsApp when the device cannot place one.
+   *
+   * `tel:` is refused on an iPad, an iPod and a simulator — and App Review
+   * runs iPhone apps on iPads — so «المساعدة والدعم» answered «تعذّر الفتح»
+   * there, which reads as no way to reach anyone (guideline 1.5). `wa.me`
+   * opens WhatsApp where it is installed and the browser where it is not,
+   * and the number itself is the last answer if neither opens.
+   */
+  const contactSupport = () => {
+    const phone = extra.supportPhone ?? '';
+    void Linking.openURL(`tel:${phone}`)
+      .catch(() => Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`))
+      .catch(() => notify('المساعدة والدعم', `تواصل معنا على الرقم ${phone}`));
+  };
+
   return (
     <Screen scroll edges={['top']} padded={false}>
       {/* The same top inset as the other tabs, so the four titles sit on one line. */}
@@ -398,7 +414,7 @@ export default function AccountScreen() {
           label="المساعدة والدعم"
           sublabel="تواصل معنا مباشرة"
           icon={<MaterialCommunityIcons name="headset" size={20} color={color.brand} />}
-          onPress={() => open(`tel:${extra?.supportPhone ?? ''}`)}
+          onPress={contactSupport}
         />
         <ListRow
           label="سياسة الخصوصية"

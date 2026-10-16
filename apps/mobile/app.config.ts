@@ -494,11 +494,16 @@ const config: ExpoConfig = {
       /*
        * One capability, and the string says exactly what it is for.
        *
-       * Foreground location only, used once — when the customer taps «تحديد
-       * موقعي» while saving a delivery address — to attach a point to it. The
-       * app never reads a position in the background and never tracks anyone:
-       * there is no background entitlement here and ADR-0005 explains why
-       * there is no driver tracking either.
+       * Foreground location only, for two things: the delivery pin on a saved
+       * address, and an owner pinning their shop in «تعديل المتجر». The
+       * prompt itself is raised once from the home screen
+       * (`ensureLocationPermissionAsked`), before either form is open — so the
+       * string names both uses rather than one tap, because a purpose string
+       * that describes a moment other than the one the dialog appears in is
+       * the mismatch App Review cites under 5.1.1. The app never reads a
+       * position in the background and never tracks anyone: there is no
+       * background entitlement here and ADR-0005 explains why there is no
+       * driver tracking either.
        *
        * The camera and the photo library are declared by the `expo-image-picker`
        * plugin below, with their own strings, because Owner Mode photographs
@@ -507,7 +512,7 @@ const config: ExpoConfig = {
        * microphone is switched off on both media plugins.
        */
       NSLocationWhenInUseUsageDescription:
-        'لتحديد موقع التوصيل بدقة عند حفظ عنوانك. يمكنك دائماً كتابة العنوان يدوياً بدلاً من ذلك.',
+        'يستخدم جيبلي موقعك أثناء استخدام التطبيق فقط: لوضع نقطة التوصيل على الخريطة عند حفظ عنوانك، ولتحديد موقع متجرك إن كنت صاحب متجر. لا نتتبّع موقعك في الخلفية، ويمكنك دائماً كتابة العنوان يدوياً.',
     },
   },
   android: {
@@ -557,6 +562,13 @@ const config: ExpoConfig = {
       'android.permission.USE_FINGERPRINT',
       // Belt to the braces above: no module here records anything.
       'android.permission.RECORD_AUDIO',
+      /*
+       * No advertising SDK and no Firebase Analytics, so nothing should read
+       * the advertising ID. Removed explicitly so the merged manifest agrees
+       * with the Play Console answer «Advertising ID: No» whatever a future
+       * Google library pulls in — a mismatch blocks the release at upload.
+       */
+      'com.google.android.gms.permission.AD_ID',
     ],
     /*
      * Firebase, which is how a push notification reaches an Android phone at all.
@@ -601,7 +613,7 @@ const config: ExpoConfig = {
       'expo-location',
       {
         locationWhenInUsePermission:
-          'لتحديد موقع التوصيل بدقة عند حفظ عنوانك. يمكنك دائماً كتابة العنوان يدوياً بدلاً من ذلك.',
+          'يستخدم جيبلي موقعك أثناء استخدام التطبيق فقط: لوضع نقطة التوصيل على الخريطة عند حفظ عنوانك، ولتحديد موقع متجرك إن كنت صاحب متجر. لا نتتبّع موقعك في الخلفية، ويمكنك دائماً كتابة العنوان يدوياً.',
         locationAlwaysPermission: false,
         locationAlwaysAndWhenInUsePermission: false,
         motionUsagePermission: false,

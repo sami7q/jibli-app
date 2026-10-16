@@ -4,6 +4,12 @@ What is already handled in the repository, and what is still a form somebody
 has to fill in. Written to be read once before the first submission and again
 before each one after.
 
+> **Start with `launch-checklist.md`** — the current state and the order of the
+> remaining steps (16 October 2026). The Apple review text is in
+> `app-store-review-access.md`. Two sections below are history now: the legal
+> URLs resolve (`legal-weld-seven.vercel.app`) and the real OTP gateway is live;
+> the API's plan is set to `0.5c-512mb` in `render.yaml`.
+
 ## Handled in code
 
 Each of these is a documented rejection reason that has already been closed.
@@ -326,7 +332,9 @@ here is a common rejection.
   it. All "linked to the user", none for tracking. There is no advertising
   SDK and no third-party analytics, so **App Tracking Transparency does not
   apply** and no `NSUserTrackingUsageDescription` should be added.
-- **Age rating.** No objectionable content; food delivery is 4+.
+- **Age rating.** No objectionable content. Answer «User-Generated Content»
+  **Yes** (review comments) and accept the rating Apple computes — see
+  `app-store-review-access.md`.
 - **Demo account.** Review needs one that works from anywhere. Customers sign
   in with a code only, so the demo account is the review number with its
   fixed code (`GOOGLE_PLAY_REVIEW_*`, created by `pnpm review:provision`) —
