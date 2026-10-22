@@ -9,7 +9,7 @@
  */
 
 export interface MapPickerProps {
-  /** Where the pin is. Falls back to the centre of Baghdad. */
+  /** Where the pin is. Falls back to the centre of Haditha. */
   readonly latitude?: number | null;
   readonly longitude?: number | null;
   readonly onPick: (coordinates: { latitude: number; longitude: number }) => void;

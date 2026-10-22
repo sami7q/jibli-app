@@ -32,7 +32,7 @@ const { MAP_PICKER_HTML } = await import('./map-picker-html');
  * is that the map never reports a position nobody chose.
  */
 
-const BAGHDAD_CENTRE = { latitude: 33.3128, longitude: 44.3615 };
+const HADITHA_CENTRE = { latitude: 34.1397, longitude: 42.3778 };
 
 /** The `send({type:'pick'…})` calls the generated document will make on load. */
 function opensByReporting(html: string): boolean {
@@ -59,8 +59,8 @@ describe('the map picker only reports a point somebody chose', () => {
 
   it('still centres somewhere real when it has nothing', () => {
     const html = MAP_PICKER_HTML(null, null);
-    expect(html).toContain(String(BAGHDAD_CENTRE.latitude));
-    expect(html).toContain(String(BAGHDAD_CENTRE.longitude));
+    expect(html).toContain(String(HADITHA_CENTRE.latitude));
+    expect(html).toContain(String(HADITHA_CENTRE.longitude));
   });
 
   /*

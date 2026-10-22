@@ -25,7 +25,7 @@ Checked against the code on 16 October 2026.
    request took 23 s on 2026-10-16, past the app's 15 s read timeout.
 4. **Content the reviewer will see.** Production must hold no sample shop
    (migration 0024 retires them) and at least the review market. Check the
-   home screen in Baghdad from a guest session the day you submit.
+   home screen in Haditha from a guest session the day you submit.
 
 ## App Review Information — what goes in each field
 
@@ -100,7 +100,7 @@ SUPPORT
 place calls, it opens WhatsApp or the browser instead.
 
 The service operates in Iraq only. Shops are listed per city; the review
-accounts are in Baghdad.
+accounts are in Haditha (Anbar), the launch city.
 Privacy: https://legal-weld-seven.vercel.app/privacy
 Terms: https://legal-weld-seven.vercel.app/terms
 Account deletion: https://legal-weld-seven.vercel.app/delete-account

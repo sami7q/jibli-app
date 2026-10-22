@@ -127,7 +127,40 @@ function assertPassword(label: string, password: string, username: string): void
 }
 
 /** The review market: a shelf of ordinary groceries, open around the clock. */
-function reviewShop(ownerUsername: string): DemoRestaurant {
+/*
+ * Where the review shop and the reviewer's address read as being. Keyed by
+ * city so the text agrees with the city the accounts are provisioned in — a
+ * Karrada street on a shop listed in Haditha is the first thing a reviewer
+ * would notice. A city not listed here gets street text without a district
+ * name and no map point, as a customer's typed address would.
+ */
+interface ReviewPlace {
+  readonly shopAddress: string;
+  readonly district: string;
+  readonly point: { readonly latitude: number; readonly longitude: number } | null;
+}
+
+const REVIEW_PLACES: Readonly<Record<string, ReviewPlace>> = {
+  'IQ-BG-BAGHDAD': {
+    shopAddress: 'شارع الكرادة داخل، بغداد',
+    district: 'الكرادة',
+    point: { latitude: 33.3128, longitude: 44.3925 },
+  },
+  'IQ-AN-HADITHA': {
+    shopAddress: 'الشارع العام، مركز حديثة',
+    district: 'مركز حديثة',
+    point: { latitude: 34.1397, longitude: 42.3778 },
+  },
+};
+
+function reviewPlace(cityCode: string): ReviewPlace {
+  return (
+    REVIEW_PLACES[cityCode] ?? { shopAddress: 'الشارع العام', district: 'المركز', point: null }
+  );
+}
+
+function reviewShop(ownerUsername: string, cityCode: string): DemoRestaurant {
+  const place = reviewPlace(cityCode);
   const allDay = Object.fromEntries(
     [0, 1, 2, 3, 4, 5, 6].map((day) => [day, ['00:00', '24:00'] as const]),
   ) as Record<number, readonly [string, string]>;
@@ -144,8 +177,8 @@ function reviewShop(ownerUsername: string): DemoRestaurant {
     prepMinutes: 15,
     rating: null,
     ratingCount: 0,
-    address: 'شارع الكرادة داخل، بغداد',
-    district: 'الكرادة',
+    address: place.shopAddress,
+    district: place.district,
     phone: '+9647700000000',
     ownerUsername,
     ownerName: OWNER_NAME,
@@ -304,7 +337,7 @@ async function main(): Promise<void> {
       };
       await upsertDemoShop(
         db,
-        reviewShop(ownerUsername),
+        reviewShop(ownerUsername, settings.cityCode),
         shopCity,
         await hashPassword(settings.ownerPassword),
         counts,
@@ -496,18 +529,18 @@ async function upsertAddress(
 
   // A point only where it is known to be inside the city; elsewhere the
   // address stands on its text, as a customer's can.
-  const inBaghdad = cityCode === 'IQ-BG-BAGHDAD';
+  const place = reviewPlace(cityCode);
   const values = {
     label: ADDRESS_LABEL,
     governorateId,
     cityId,
-    districtText: 'الكرادة',
+    districtText: place.district,
     street: 'شارع ٦٢',
     building: 'عمارة ٤',
     floor: '٢',
     landmark: 'قرب صيدلية النور',
-    latitude: inBaghdad ? 33.3128 : null,
-    longitude: inBaghdad ? 44.3925 : null,
+    latitude: place.point?.latitude ?? null,
+    longitude: place.point?.longitude ?? null,
     deliveryNotes: 'حساب مراجعة — لا يوجد مستلم حقيقي',
     isDefault: true,
     deletedAt: null,

@@ -31,8 +31,8 @@ export type MapPickerMessage =
   | { readonly type: 'ready' }
   | { readonly type: 'failed' };
 
-/** Baghdad, Tahrir Square. Somewhere real to open when there is nothing saved. */
-const FALLBACK = { latitude: 33.3128, longitude: 44.3615 };
+/** Haditha town centre, the launch city. Somewhere real to open when there is nothing saved. */
+const FALLBACK = { latitude: 34.1397, longitude: 42.3778 };
 
 /** Close enough to tell one house from the next four. */
 export const PIN_ZOOM = 17;

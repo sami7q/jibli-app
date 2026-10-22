@@ -107,7 +107,8 @@ pnpm review:provision
 ```
 
 Add `-- --dry-run` to see what it would do first. `GOOGLE_PLAY_REVIEW_CITY_CODE`
-picks the city (default `IQ-BG-BAGHDAD`); it must be enabled for ordering, and
+picks the city (default `IQ-BG-BAGHDAD`; production uses `IQ-AN-HADITHA`, the
+launch city); it must be enabled for ordering, and
 the script stops with instructions if it is not.
 
 What it writes (`packages/db/src/scripts/provision-review-accounts.ts`),
@@ -231,7 +232,7 @@ Password: <GOOGLE_PLAY_REVIEW_DRIVER_PASSWORD>
 
 Notes
 - The service operates in Iraq only. Restaurants and shops are listed per
-  city; the review accounts are set up in Baghdad, where content exists.
+  city; the review accounts are set up in Haditha (Anbar), the launch city.
 - No account on this list has administrative rights.
 - Account deletion is available in-app under "حسابي" → "حذف حسابي", and
   described at https://legal-weld-seven.vercel.app/delete-account

@@ -230,7 +230,7 @@ characters each:
 | Play      | en     | `Jibli — Food Delivery Iraq`  |
 
 Apple's keyword field (100 characters, comma-separated, no spaces after commas):
-`توصيل,طعام,مطاعم,ماركت,اكل,طلبات,بغداد,العراق,delivery,food,iraq,baghdad`.
+`توصيل,طعام,مطاعم,ماركت,اكل,طلبات,حديثة,الأنبار,العراق,delivery,food,iraq,haditha`.
 Do not repeat the app name in it — the title and subtitle are already indexed,
 and Apple combines terms, so `توصيل` plus `طعام` covers the phrase. Play has no
 keyword field; it ranks from the two descriptions, so both names belong there in

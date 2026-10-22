@@ -21,7 +21,7 @@ On that push, Render:
 Vercel rebuilds the legal site (contact address now configurable).
 
 After it: `/health/live` and `/health/ready` 200, and a guest browsing
-Baghdad sees the review market and nothing else.
+Haditha (the only enabled city) sees the review market and nothing else.
 
 ## 1. Before building
 
