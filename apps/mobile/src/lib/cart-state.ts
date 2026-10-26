@@ -32,7 +32,7 @@ export interface Cart {
   readonly minimumOrderIqd: number;
   readonly lines: readonly CartLine[];
   /**
-   * The order note («ملاحظات للمطعم»), kept with the cart so it survives a
+   * The order note («ملاحظات للمتجر»), kept with the cart so it survives a
    * back-swipe or a reload rather than living in the cart screen's local state
    * (CUST-17).
    */

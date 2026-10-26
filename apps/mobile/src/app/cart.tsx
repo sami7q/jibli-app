@@ -185,12 +185,12 @@ export default function CartScreen() {
         <View style={{ gap: space[2] }}>
           <Row gap={space[2]}>
             <MaterialCommunityIcons name="note-text-outline" size={18} color={color.textMuted} />
-            <Text variant="smallBold">ملاحظات للمطعم</Text>
+            <Text variant="smallBold">ملاحظات للمتجر</Text>
           </Row>
           <TextInput
             value={notes}
             onChangeText={setNote}
-            placeholder="بدون بصل، صلصة إضافية…"
+            placeholder="أي تفاصيل يحتاجها المتجر لتجهيز طلبك…"
             placeholderTextColor={color.textMuted}
             multiline
             maxLength={300}
