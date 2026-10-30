@@ -513,17 +513,6 @@ const config: ExpoConfig = {
        */
       NSLocationWhenInUseUsageDescription:
         'يستخدم جيبلي موقعك أثناء استخدام التطبيق فقط: لوضع نقطة التوصيل على الخريطة عند حفظ عنوانك، ولتحديد موقع متجرك إن كنت صاحب متجر. لا نتتبّع موقعك في الخلفية، ويمكنك دائماً كتابة العنوان يدوياً.',
-      /*
-       * Required by App Store processing, not by anything the app does.
-       *
-       * expo-location compiles in its motion-activity API (CMMotionActivity),
-       * and Apple refuses the upload outright (ITMS-90683) when a binary links
-       * a protected API without a purpose string — build 1.0.0 (5) was rejected
-       * for exactly this. The app never asks for motion access, so the dialog
-       * this string belongs to never appears; the text says so plainly.
-       */
-      NSMotionUsageDescription:
-        'لا يطلب جيبلي الوصول إلى بيانات الحركة ولا يستخدمها. هذا الوصف مطلوب لأن مكتبة الموقع التي يعتمد عليها التطبيق تتضمّن هذه الخاصية.',
     },
   },
   android: {
@@ -627,7 +616,17 @@ const config: ExpoConfig = {
           'يستخدم جيبلي موقعك أثناء استخدام التطبيق فقط: لوضع نقطة التوصيل على الخريطة عند حفظ عنوانك، ولتحديد موقع متجرك إن كنت صاحب متجر. لا نتتبّع موقعك في الخلفية، ويمكنك دائماً كتابة العنوان يدوياً.',
         locationAlwaysPermission: false,
         locationAlwaysAndWhenInUsePermission: false,
-        motionUsagePermission: false,
+        /*
+         * Not `false` like the two above, because App Store processing refuses
+         * the binary without it. expo-location links its motion-activity API
+         * (CMMotionActivity), and Apple rejects any upload that links a
+         * protected API with no purpose string (ITMS-90683) — build 1.0.0 (5)
+         * was refused for exactly this, and `false` here is what removed the
+         * key: the plugin deletes it. The app never asks for motion access,
+         * so this dialog never appears; the text says so plainly.
+         */
+        motionUsagePermission:
+          'لا يطلب جيبلي الوصول إلى بيانات الحركة ولا يستخدمها. هذا الوصف مطلوب لأن مكتبة الموقع التي يعتمد عليها التطبيق تتضمّن هذه الخاصية.',
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
         isAndroidForegroundServiceEnabled: false,
