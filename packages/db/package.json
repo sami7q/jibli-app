@@ -25,7 +25,8 @@
     "reset": "tsx src/scripts/reset.ts",
     "studio": "drizzle-kit studio",
     "review:provision": "tsx src/scripts/provision-review-accounts.ts",
-    "bootstrap-admin": "tsx src/scripts/bootstrap-admin.ts"
+    "bootstrap-admin": "tsx src/scripts/bootstrap-admin.ts",
+    "partner:provision": "tsx src/scripts/provision-partner-shops.ts"
   },
   "dependencies": {
     "@jibli/auth": "workspace:*",
