@@ -250,7 +250,7 @@ export default function ApplyPage() {
             rows={2}
             value={form.address_text}
             onChange={(event) => set('address_text', event.target.value)}
-            placeholder="المنصور، شارع الأميرات، مقابل..."
+            placeholder="حديثة، الشارع العام، مقابل..."
             required
           />
         </div>

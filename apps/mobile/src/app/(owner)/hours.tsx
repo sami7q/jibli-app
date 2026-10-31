@@ -123,7 +123,7 @@ export default function OwnerHoursScreen() {
                 <Text variant="bodyBold">متى يستقبل متجرك الطلبات؟</Text>
               </Row>
               <Text variant="small" tone="secondary">
-                خارج هذه الأوقات يرى الزبون «مغلق الآن» ويعود لاحقاً. بتوقيت بغداد.
+                خارج هذه الأوقات يرى الزبون «مغلق الآن» ويعود لاحقاً. بتوقيت العراق.
               </Text>
               {!loaded.configured ? (
                 <Text variant="caption" tone="brand">

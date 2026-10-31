@@ -358,7 +358,7 @@ function ApplyForm({
         <Input
           value={address}
           onChangeText={setAddress}
-          placeholder="مثال: المنصور، شارع ١٤ رمضان، قرب جامع الرحمن"
+          placeholder="مثال: حديثة، الشارع العام، قرب الجسر"
           maxLength={300}
           multiline
           style={{

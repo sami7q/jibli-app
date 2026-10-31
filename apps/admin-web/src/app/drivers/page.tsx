@@ -459,7 +459,7 @@ function AddDriverDialog({
             dir="ltr"
             value={plate}
             onChange={(event) => setPlate(event.target.value)}
-            placeholder="12345 بغداد"
+            placeholder="12345 الأنبار"
             maxLength={20}
           />
         </div>

@@ -530,7 +530,7 @@ function HoursCard({
   const invalidDay = days.find((day) => !day.isClosed && day.opensAtMinute === day.closesAtMinute);
 
   return (
-    <Card title="ساعات العمل" subtitle="بتوقيت بغداد. يمكن أن تمتد الفترة بعد منتصف الليل">
+    <Card title="ساعات العمل" subtitle="بتوقيت العراق. يمكن أن تمتد الفترة بعد منتصف الليل">
       <div className="table-wrap">
         <table className="table">
           <thead>
