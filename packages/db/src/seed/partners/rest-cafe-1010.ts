@@ -13,8 +13,9 @@ import type { DemoRestaurant } from '../demo-marketplace.js';
  * required option group, because the customer app shows a dish with a required
  * group as «يتوفر قريباً» until option selection ships.
  *
- * Opening hours, delivery fee and minimum order are provisional until the
- * restaurant confirms them; the owner can change all three from Owner Mode.
+ * Hours (12:00–24:00 daily), delivery fee (2,000 IQD), minimum order
+ * (2,500 IQD) and the orders phone are as the restaurant confirmed them on
+ * 31 October 2026; the owner can change them from Owner Mode.
  */
 
 type Menu = DemoRestaurant['menu'];
@@ -374,7 +375,7 @@ export const REST_CAFE_1010_LOGO_URL =
 
 export function restCafe1010(ownerUsername: string): DemoRestaurant {
   const hours = Object.fromEntries(
-    [0, 1, 2, 3, 4, 5, 6].map((day) => [day, ['11:00', '24:00'] as const]),
+    [0, 1, 2, 3, 4, 5, 6].map((day) => [day, ['12:00', '24:00'] as const]),
   ) as Record<number, readonly [string, string]>;
 
   return {
@@ -384,7 +385,7 @@ export function restCafe1010(ownerUsername: string): DemoRestaurant {
     cityCode: 'IQ-AN-HADITHA',
     description: 'مطعم وكافيه في حديثة: برجر، بيتزا، دجاج مقلي، ستيك، مشروبات وحلويات.',
     cuisines: ['burger', 'pizza', 'chicken', 'fast_food', 'shawarma'],
-    minimumOrderIqd: 0,
+    minimumOrderIqd: 2500,
     deliveryFeeIqd: 2000,
     prepMinutes: 25,
     rating: null,
