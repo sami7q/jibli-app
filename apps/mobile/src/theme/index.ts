@@ -392,6 +392,17 @@ export let TEXT_START: TextStyle['textAlign'] = textStartFor(LAID_OUT_RTL);
 export const INPUT_TEXT_START: TextStyle['textAlign'] = 'right';
 
 function textStartFor(mirrored: boolean): TextStyle['textAlign'] {
+  /*
+   * iOS flips the word too, and unconditionally: once the layout is mirrored,
+   * React Native's text layout swaps `right` for `left` before handing it to
+   * TextKit (`RCTAttributedTextUtils.mm`). So `'right'` put every label on
+   * the left in exactly the store builds — the account rows, a shop whose
+   * name opens with Latin («10:10 Rest & Cafe»). `'auto'` is the one value it
+   * leaves alone; it reaches TextKit as natural alignment, which follows the
+   * paragraph's base direction, and `Text` sets that to right-to-left. Right
+   * edge in every state, mirrored or not, whatever the first letter is.
+   */
+  if (Platform.OS === 'ios') return 'auto';
   return Platform.OS === 'android' && mirrored ? 'left' : 'right';
 }
 

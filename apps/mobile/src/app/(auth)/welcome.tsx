@@ -237,7 +237,8 @@ export default function WelcomeScreen() {
             block
             onPress={() => {
               clearAfterSignIn();
-              void continueAsGuest();
+              // On to the sections, the same place a sign-in leads.
+              void continueAsGuest().then(() => router.replace('/choose'));
             }}
           />
 

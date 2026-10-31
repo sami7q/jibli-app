@@ -347,13 +347,12 @@ export function SummaryRow({
 // ── ListRow ─────────────────────────────────────────────────────────────────
 
 /**
- * The account screen's row: tile, label, chevron.
+ * The account screen's row: the words at the right edge, the icon at the left.
  *
- * It used to take an `rtl` flag, because for one release the account screen
- * was the only right-to-left screen in the app and turning the rest over was a
- * decision nobody had made yet. That decision has been made — the whole app
- * reads right-to-left now — so the flag is gone rather than left behind as a
- * prop every call site would have to remember to pass.
+ * The label is what the row is, so it takes the edge Arabic is read from, and
+ * the tile sits across from it at the far side — where the chevron used to
+ * be, doing the chevron's job of saying "this opens something". A chevron as
+ * well would put two marks in that corner for one meaning.
  */
 export function ListRow({
   label,
@@ -390,12 +389,6 @@ export function ListRow({
         pressed ? { backgroundColor: color.surfaceSunken } : null,
       ]}
     >
-      {icon ? (
-        <IconTile size={40} tone={destructive ? 'neutral' : 'brand'}>
-          {icon}
-        </IconTile>
-      ) : null}
-
       <View style={{ flex: 1 }}>
         <Text variant="bodyBold" tone={destructive ? 'danger' : 'primary'} style={RTL_TEXT}>
           {label}
@@ -422,11 +415,13 @@ export function ListRow({
         </View>
       ) : null}
 
-      {/*
-       * `chevron-left` is correct under RTL: the row opens a screen that
-       * slides in from the start edge, which is the left here.
-       */}
-      <MaterialCommunityIcons name="chevron-left" size={22} color={color.textMuted} />
+      {icon ? (
+        <IconTile size={40} tone={destructive ? 'neutral' : 'brand'}>
+          {icon}
+        </IconTile>
+      ) : (
+        <MaterialCommunityIcons name="chevron-left" size={22} color={color.textMuted} />
+      )}
     </Pressable>
   );
 }

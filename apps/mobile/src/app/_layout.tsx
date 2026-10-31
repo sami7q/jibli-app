@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -40,6 +40,7 @@ import { ErrorBoundary } from '@/lib/error-boundary';
 import { startMonitoring } from '@/lib/monitoring';
 import { DialogHost } from '@/ui/dialog-host';
 import { DirectionProbe } from '@/ui/direction-probe';
+import { LaunchIntro } from '@/ui/launch-intro';
 import { ICON_FONT, ICON_FONT_FAMILY } from '@/ui/icon';
 import { color, enforceRtl, palette } from '@/theme';
 
@@ -257,6 +258,16 @@ function Gate() {
    */
   usePushNavigation();
 
+  /*
+   * The opening animation plays on every launch, over whatever the router is
+   * setting up underneath (see `LaunchIntro`), and the launch's own routing
+   * decision is made exactly once — later navigation inside the app is the
+   * customer's, not something to second-guess.
+   */
+  const [introDone, setIntroDone] = useState(false);
+  const finishIntro = useCallback(() => setIntroDone(true), []);
+  const launchRouted = useRef(false);
+
   useEffect(() => {
     if (state.status === 'loading') return;
 
@@ -266,7 +277,6 @@ function Gate() {
     // as plain strings here rather than fighting the generated type.
     const path = segments as readonly string[];
     const inAuth = path[0] === '(auth)';
-    const onWelcome = path[1] === 'welcome';
     const onChooser = path[0] === 'choose';
     /*
      * The two groups that are not the customer app.
@@ -291,6 +301,35 @@ function Gate() {
       path[0] === 'order' ||
       path[0] === 'restaurant' ||
       path[0] === 'notifications';
+
+    /*
+     * Where a launch begins.
+     *
+     * Signed in: straight to the three sections — «طعام / كوزمتك / ماركت» —
+     * every time, so the app opens on the question it is built around rather
+     * than on whichever list was open last. A shop owner opens onto their
+     * shop. Not signed in, a guest included: the welcome screen, which signs
+     * in or registers and still offers browsing as a guest (App Store
+     * 5.1.1(ii)); both of its doors lead on to the sections.
+     *
+     * A launch that arrives somewhere specific — a notification opening an
+     * order, a link to a shop, a courier or owner screen — is left where it is.
+     */
+    if (!launchRouted.current) {
+      launchRouted.current = true;
+      if (!carriesOwnContext && !inWorkMode && !inAuth) {
+        if (state.status === 'ready' || state.status === 'offline-ready') {
+          const me = state.me;
+          const ownsShop = Object.keys(me?.restaurant_roles ?? {}).length > 0;
+          router.replace((ownsShop ? '/(owner)/owner' : '/choose') as never);
+          return;
+        }
+        if (state.status === 'guest') {
+          router.replace('/(auth)/welcome');
+          return;
+        }
+      }
+    }
 
     /*
      * Nothing can render until the half is known.
@@ -337,10 +376,7 @@ function Gate() {
      * Reaching sign-in from inside the app is a deliberate move, not something
      * to redirect away from.
      */
-    if (state.status === 'guest') {
-      if (onWelcome) router.replace('/(tabs)');
-      return;
-    }
+    if (state.status === 'guest') return;
 
     if (state.status === 'needs-profile' && path[1] !== 'profile') {
       router.replace('/(auth)/profile');
@@ -378,13 +414,24 @@ function Gate() {
     }
   }, [state, vertical, verticalResolved, segments, router]);
 
-  if (state.status === 'loading') {
-    return (
-      <View style={{ flex: 1, backgroundColor: color.brand, justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={palette.white} />
-      </View>
-    );
-  }
-
-  return <Slot />;
+  /*
+   * One tree whether or not the session has answered, so the intro starts the
+   * moment the app opens and keeps running while the session resolves under
+   * it, instead of a spinner first and the animation after.
+   */
+  const loading = state.status === 'loading';
+  return (
+    <View style={{ flex: 1, backgroundColor: loading ? color.brand : undefined }}>
+      {loading ? (
+        introDone ? (
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={palette.white} />
+          </View>
+        ) : null
+      ) : (
+        <Slot />
+      )}
+      {introDone ? null : <LaunchIntro onDone={finishIntro} />}
+    </View>
+  );
 }

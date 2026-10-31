@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -119,6 +120,13 @@ export function Text({
          * on the right. An explicit `align` or style `textAlign` still wins.
          */
         { textAlign: align === 'center' ? ('center' as const) : TEXT_START },
+        /*
+         * The paragraph's base direction, which is what `TEXT_START` resolves
+         * against on iOS. Without it a line opening with a Latin name or a
+         * number is a left-to-right paragraph and sits on the left. `Ltr`
+         * overrides it for the runs that really do read left-to-right.
+         */
+        { writingDirection: 'rtl' as const },
         style,
       ]}
       /*
@@ -509,10 +517,39 @@ export function HScroll({
   children,
   contentContainerStyle,
   onContentSizeChange,
+  onLayout,
+  onScrollBeginDrag,
   ...props
 }: Omit<ScrollViewProps, 'horizontal'> & { children: ReactNode }) {
   const view = useRef<ScrollView>(null);
   const settled = useRef(false);
+  const touched = useRef(false);
+  const viewport = useRef(0);
+  const content = useRef(0);
+
+  /*
+   * iOS, mirrored: the strip has to be put at its start by hand, and kept
+   * there until the customer touches it.
+   *
+   * React Native draws an RTL horizontal scroller on iOS by flipping it, and
+   * converts offsets between JavaScript and the flipped view
+   * (`RCTScrollViewComponentView`): to JavaScript the right-hand end, where
+   * the first category sits, is the *largest* offset. When the content
+   * changes size after the first layout — the categories arriving, a tile's
+   * image settling — the view keeps the JavaScript offset of 0, which is the
+   * left-hand end, and the home strip opened on its last category with the
+   * first ones cut off at the right edge. So every size change before the
+   * first drag sends it back to the far end in JavaScript's terms, which is
+   * the right-hand end on screen. `scrollToEnd` will not do: the native
+   * command skips the conversion and lands on the left.
+   */
+  const pinStartOnIos = () => {
+    if (Platform.OS !== 'ios' || !LAID_OUT_RTL || touched.current) return;
+    const overflow = content.current - viewport.current;
+    if (viewport.current > 0 && overflow > 0) {
+      view.current?.scrollTo({ x: overflow, animated: false });
+    }
+  };
 
   return (
     <ScrollView
@@ -521,11 +558,22 @@ export function HScroll({
       showsHorizontalScrollIndicator={false}
       {...props}
       contentContainerStyle={[{ flexDirection: ROW, flexGrow: 1 }, contentContainerStyle]}
+      onLayout={(event) => {
+        viewport.current = event.nativeEvent.layout.width;
+        pinStartOnIos();
+        onLayout?.(event);
+      }}
+      onScrollBeginDrag={(event) => {
+        touched.current = true;
+        onScrollBeginDrag?.(event);
+      }}
       onContentSizeChange={(width, height) => {
+        content.current = width;
         if (!LAID_OUT_RTL && !settled.current && width > 0) {
           settled.current = true;
           view.current?.scrollToEnd({ animated: false });
         }
+        pinStartOnIos();
         onContentSizeChange?.(width, height);
       }}
     >

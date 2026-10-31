@@ -24,7 +24,7 @@ export function continueAfterSignIn(path: string): void {
 }
 
 /** Where a finished sign-in should go: the remembered place, or `fallback`. */
-export function signedInDestination(fallback = '/(tabs)'): string {
+export function signedInDestination(fallback = '/choose'): string {
   return destination ?? fallback;
 }
 
