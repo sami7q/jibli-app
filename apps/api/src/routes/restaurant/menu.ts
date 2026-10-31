@@ -638,4 +638,182 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
       return reply.send(success({ attached: body.attached }, { request_id: request.requestId }));
     },
   );
+
+  /*
+   * Editing an options group after it exists.
+   *
+   * Groups could be created and attached but never changed, so a typo in
+   * «الحجم» or a new price for «كبير» meant building the group again and
+   * re-attaching it to every dish. These edit in place. Nothing is deleted:
+   * an order placed yesterday still points at its modifiers, so a group is
+   * switched off and an option marked unavailable instead.
+   */
+
+  /** Which groups are attached to one item, active or not — for the owner's editor. */
+  app.get(
+    '/api/v1/restaurant-portal/menu/items/:itemId/modifier-groups',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { principal, restaurantId } = restaurantScope(request);
+      assertRestaurantPermission(principal, restaurantId, 'menu.read');
+      const { itemId } = z.object({ itemId: uuidSchema }).parse(request.params);
+
+      const rows = await ctx.db
+        .select({ groupId: itemModifierGroups.groupId })
+        .from(itemModifierGroups)
+        .innerJoin(menuItems, eq(menuItems.id, itemModifierGroups.itemId))
+        .where(and(eq(itemModifierGroups.itemId, itemId), eq(menuItems.restaurantId, restaurantId)));
+
+      return reply.send(
+        success({ group_ids: rows.map((row) => row.groupId) }, { request_id: request.requestId }),
+      );
+    },
+  );
+
+  app.patch(
+    '/api/v1/restaurant-portal/menu/modifier-groups/:groupId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { principal, restaurantId } = restaurantScope(request);
+      assertRestaurantPermission(principal, restaurantId, 'menu.write');
+      const { groupId } = z.object({ groupId: uuidSchema }).parse(request.params);
+      const body = z
+        .object({
+          name_ar: arabicTextSchema(2, 60).optional(),
+          min_select: z.number().int().min(0).max(20).optional(),
+          max_select: z.number().int().min(1).max(20).optional(),
+          is_required: z.boolean().optional(),
+          is_active: z.boolean().optional(),
+        })
+        .parse(request.body);
+
+      await ctx.db.transaction(async (tx) => {
+        const [group] = await tx
+          .select()
+          .from(modifierGroups)
+          .where(and(eq(modifierGroups.id, groupId), eq(modifierGroups.restaurantId, restaurantId)))
+          .limit(1);
+        if (!group) {
+          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'modifier_group' } });
+        }
+
+        // The same rules as creation, checked against the values after the edit.
+        const minSelect = body.min_select ?? group.minSelect;
+        const maxSelect = body.max_select ?? group.maxSelect;
+        const isRequired = body.is_required ?? group.isRequired;
+        if (maxSelect < minSelect) {
+          throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+            details: { message: 'الحد الأقصى للاختيار لا يمكن أن يقل عن الحد الأدنى' },
+          });
+        }
+        if (isRequired && minSelect < 1) {
+          throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+            details: { message: 'المجموعة الإلزامية يجب أن تسمح باختيار واحد على الأقل' },
+          });
+        }
+
+        await tx
+          .update(modifierGroups)
+          .set({
+            ...(body.name_ar ? { nameAr: body.name_ar } : {}),
+            minSelect,
+            maxSelect,
+            isRequired,
+            ...(body.is_active !== undefined ? { isActive: body.is_active } : {}),
+          })
+          .where(eq(modifierGroups.id, groupId));
+        await bumpMenuVersion(tx, restaurantId);
+      });
+
+      return reply.send(success({ updated: true }, { request_id: request.requestId }));
+    },
+  );
+
+  /** One more option in an existing group — «كبير جداً» added to «الحجم». */
+  app.post(
+    '/api/v1/restaurant-portal/menu/modifier-groups/:groupId/modifiers',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { principal, restaurantId } = restaurantScope(request);
+      assertRestaurantPermission(principal, restaurantId, 'menu.write');
+      const { groupId } = z.object({ groupId: uuidSchema }).parse(request.params);
+      const body = z
+        .object({ name_ar: arabicTextSchema(1, 60), price_iqd: iqdAmountSchema.default(0) })
+        .parse(request.body);
+
+      const id = uuidv7();
+      await ctx.db.transaction(async (tx) => {
+        const [group] = await tx
+          .select({ id: modifierGroups.id })
+          .from(modifierGroups)
+          .where(and(eq(modifierGroups.id, groupId), eq(modifierGroups.restaurantId, restaurantId)))
+          .limit(1);
+        if (!group) {
+          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'modifier_group' } });
+        }
+        const [countRow] = await tx
+          .select({ total: count() })
+          .from(modifiers)
+          .where(eq(modifiers.groupId, groupId));
+        const total = Number(countRow?.total ?? 0);
+        if (total >= 20) {
+          throw new AppError(ERROR_CODES.VALIDATION_FAILED, {
+            details: { message: 'المجموعة الواحدة تتسع لعشرين خياراً على الأكثر' },
+          });
+        }
+        await tx.insert(modifiers).values({
+          id,
+          groupId,
+          nameAr: body.name_ar,
+          priceIqd: body.price_iqd,
+          sortOrder: total,
+        });
+        await bumpMenuVersion(tx, restaurantId);
+      });
+
+      return reply.status(201).send(success({ id }, { request_id: request.requestId }));
+    },
+  );
+
+  /** Rename an option, change its price, or mark it unavailable. */
+  app.patch(
+    '/api/v1/restaurant-portal/menu/modifiers/:modifierId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { principal, restaurantId } = restaurantScope(request);
+      assertRestaurantPermission(principal, restaurantId, 'menu.write');
+      const { modifierId } = z.object({ modifierId: uuidSchema }).parse(request.params);
+      const body = z
+        .object({
+          name_ar: arabicTextSchema(1, 60).optional(),
+          price_iqd: iqdAmountSchema.optional(),
+          is_available: z.boolean().optional(),
+        })
+        .parse(request.body);
+
+      await ctx.db.transaction(async (tx) => {
+        // Tenant guard through the group: an option belongs to whoever owns its group.
+        const [owned] = await tx
+          .select({ id: modifiers.id })
+          .from(modifiers)
+          .innerJoin(modifierGroups, eq(modifierGroups.id, modifiers.groupId))
+          .where(and(eq(modifiers.id, modifierId), eq(modifierGroups.restaurantId, restaurantId)))
+          .limit(1);
+        if (!owned) {
+          throw new AppError(ERROR_CODES.NOT_FOUND, { details: { entity: 'modifier' } });
+        }
+        await tx
+          .update(modifiers)
+          .set({
+            ...(body.name_ar ? { nameAr: body.name_ar } : {}),
+            ...(body.price_iqd !== undefined ? { priceIqd: body.price_iqd } : {}),
+            ...(body.is_available !== undefined ? { isAvailable: body.is_available } : {}),
+          })
+          .where(eq(modifiers.id, modifierId));
+        await bumpMenuVersion(tx, restaurantId);
+      });
+
+      return reply.send(success({ updated: true }, { request_id: request.requestId }));
+    },
+  );
 }

@@ -98,6 +98,8 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
                 : null,
               /* The id as well: the phone stores it back on the product form's terms. */
               logo_asset_id: row.restaurant.logoAssetId,
+              /* The wide picture above the menu, set by the shop like the logo. */
+              cover_asset_id: row.restaurant.coverAssetId,
               partner_code: row.restaurant.partnerCode,
               operational_status: row.restaurant.operationalStatus,
               cuisine_tags: row.restaurant.cuisineTags,
@@ -387,6 +389,8 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
           description_ar: z.string().max(300).optional(),
           /** Asset id from POST /api/v1/uploads. Null clears the logo. */
           logo_asset_id: uuidSchema.nullable().optional(),
+          /** The cover above the menu, from the same upload. Null clears it. */
+          cover_asset_id: uuidSchema.nullable().optional(),
           minimum_order_iqd: z.number().int().min(0).max(1_000_000).optional(),
           delivery_fee_iqd: z.number().int().min(0).max(1_000_000).optional(),
           base_preparation_minutes: z.number().int().min(5).max(240).optional(),
@@ -413,6 +417,7 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
           body.display_name !== undefined ||
           body.description_ar !== undefined ||
           body.logo_asset_id !== undefined ||
+          body.cover_asset_id !== undefined ||
           body.minimum_order_iqd !== undefined
         ) {
           await tx
@@ -421,6 +426,7 @@ export function registerRestaurantSettingsRoutes(app: FastifyInstance, ctx: AppC
               ...(body.display_name !== undefined ? { displayName: body.display_name } : {}),
               ...(body.description_ar !== undefined ? { descriptionAr: body.description_ar } : {}),
               ...(body.logo_asset_id !== undefined ? { logoAssetId: body.logo_asset_id } : {}),
+              ...(body.cover_asset_id !== undefined ? { coverAssetId: body.cover_asset_id } : {}),
               ...(body.minimum_order_iqd !== undefined
                 ? { minimumOrderIqd: body.minimum_order_iqd }
                 : {}),
