@@ -126,6 +126,14 @@ export default function OwnerProductsScreen() {
       <View style={{ paddingHorizontal: space[4], paddingTop: space[2], gap: space[3] }}>
         <OwnerHeader title={noun} />
 
+        {shop.merchant_type === 'RESTAURANT' ? (
+          // The phone edits a dish's name, price, photo and availability; the
+          // options it carries (sizes, extras) live on the web portal.
+          <Text variant="caption" tone="muted">
+            خيارات الأطباق (الأحجام والإضافات) تُعدَّل من لوحة التحكم على المتصفّح.
+          </Text>
+        ) : null}
+
         <Row gap={space[2]}>
           <View style={{ flex: 1 }}>
             <SearchBar

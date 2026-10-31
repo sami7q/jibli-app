@@ -31,19 +31,10 @@ export function judgeShopSignIn(shops: readonly OwnerShop[]): ShopSignInVerdict 
     };
   }
 
-  /*
-   * Every shop on the account is a restaurant, and the app does not serve
-   * those on purpose (see `owner-vertical.ts`). Named, because the commonest
-   * way to get here is a market that was filed as a restaurant by mistake —
-   * and the fix for that is one field in Admin, not a new account.
-   */
-  const names = shops.map((shop) => `«${shop.display_name}»`).join(' و');
-  const filed = shops.length === 1 ? 'مسجّل في جيبلي كمطعم' : 'مسجّلة في جيبلي كمطاعم';
+  // Every kind of shop is served now, so this is only reached by a kind the
+  // app does not know yet — a newer server than this build.
   return {
     kind: 'refused',
-    message:
-      `${names} ${filed}، وقوائم المطاعم تُدار من لوحة التحكم على المتصفّح. ` +
-      'إن كان ماركت أو متجر تجميل فنوعه مسجّل خطأً: يصحّحه فريق جيبلي من لوحة الإدارة ' +
-      '(صفحة المتجر ← نوع الشريك)، ثم يفتح هنا بنفس اسم المستخدم وكلمة المرور.',
+    message: 'نوع هذا المتجر غير مدعوم في هذا الإصدار من التطبيق. حدّث جيبلي، أو استخدم لوحة التحكم على المتصفّح.',
   };
 }

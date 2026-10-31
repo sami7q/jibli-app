@@ -35,16 +35,15 @@ describe('judgeShopSignIn', () => {
   });
 
   /*
-   * The order of the list is the database's, not the owner's. An account that
-   * manages a restaurant and a market must open the market, whichever comes
-   * first — the restaurant is not a reason to refuse.
+   * An account holding several shops opens the first; the others are one tap
+   * away on the shop switcher. A restaurant is no longer a reason to skip one.
    */
-  it('opens the market on an account that also holds a restaurant', () => {
+  it('opens the first shop on an account that holds several', () => {
     const verdict = judgeShopSignIn([
       shop({ id: 'r', display_name: 'مطعم البيت', merchant_type: 'RESTAURANT' }),
       shop({ id: 'm' }),
     ]);
-    expect(verdict).toMatchObject({ kind: 'open', shop: { id: 'm' } });
+    expect(verdict).toMatchObject({ kind: 'open', shop: { id: 'r' } });
   });
 
   it('refuses an account with no shop, and says so', () => {
@@ -53,26 +52,10 @@ describe('judgeShopSignIn', () => {
     if (verdict.kind === 'refused') expect(verdict.message).toContain('لا يتبع أي متجر');
   });
 
-  it('names the restaurant and where it is managed when that is all the account holds', () => {
+  it('opens a restaurant', () => {
     const verdict = judgeShopSignIn([
-      shop({ display_name: 'مطعم البيت', merchant_type: 'RESTAURANT' }),
+      shop({ id: 'r', display_name: 'مطعم البيت', merchant_type: 'RESTAURANT' }),
     ]);
-    expect(verdict.kind).toBe('refused');
-    if (verdict.kind !== 'refused') return;
-    expect(verdict.message).toContain('«مطعم البيت»');
-    expect(verdict.message).toContain('لوحة التحكم');
-    // The way out of the mistaken case, named rather than left to support.
-    expect(verdict.message).toContain('نوع الشريك');
-  });
-
-  it('lists every restaurant when there are several', () => {
-    const verdict = judgeShopSignIn([
-      shop({ id: 'a', display_name: 'مطعم البيت', merchant_type: 'RESTAURANT' }),
-      shop({ id: 'b', display_name: 'مطعم النخيل', merchant_type: 'RESTAURANT' }),
-    ]);
-    if (verdict.kind !== 'refused') throw new Error('expected a refusal');
-    expect(verdict.message).toContain('«مطعم البيت»');
-    expect(verdict.message).toContain('«مطعم النخيل»');
-    expect(verdict.message).toContain('مسجّلة');
+    expect(verdict).toMatchObject({ kind: 'open', shop: { id: 'r' } });
   });
 });

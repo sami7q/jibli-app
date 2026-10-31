@@ -28,13 +28,12 @@ describe('which shops Owner Mode serves', () => {
   });
 
   /*
-   * Not an oversight, and the test says so out loud. A dish carries modifier
-   * groups with required/optional rules and a price per option; the phone form
-   * has three fields. Shipping it for restaurants would be the market's form
-   * silently losing half of a kitchen's menu.
+   * A kitchen needs the orders board, the open/closed switch and sold-out
+   * toggles as much as a grocer does. The options a dish carries are edited on
+   * the web portal; the phone never touches them.
    */
-  it('does not serve a restaurant, on purpose', () => {
-    expect(isShopSupported(restaurant)).toBe(false);
+  it('serves a restaurant', () => {
+    expect(isShopSupported(restaurant)).toBe(true);
   });
 
   /*

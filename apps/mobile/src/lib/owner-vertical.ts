@@ -11,6 +11,7 @@ import type { OwnerShop } from './api';
 
 /** What Owner Mode is built for, by `restaurants.merchant_type`. */
 export const SUPPORTED_MERCHANT_TYPES: readonly OwnerShop['merchant_type'][] = [
+  'RESTAURANT',
   'MARKET',
   'COSMETICS',
 ];
@@ -18,11 +19,15 @@ export const SUPPORTED_MERCHANT_TYPES: readonly OwnerShop['merchant_type'][] = [
 /**
  * Whether Owner Mode has anything to offer this shop.
  *
- * A restaurant is excluded deliberately rather than by omission. A dish carries
- * modifier groups — size, bread, extras — with required/optional rules and a
- * price per option, and editing that on a phone is a worse tool than the web
- * portal, not a faster one. A grocery product is a name, a price, a photo and a
- * category, which is the shape a phone is good at.
+ * Every kind, restaurants included. A restaurant was once kept out because a
+ * dish carries modifier groups — size, bread, extras — that the phone's
+ * three-field form cannot edit. But the part of Owner Mode a kitchen needs
+ * most is not the form: it is the order arriving with a sound, accepting it,
+ * and moving it to ready, plus opening, closing and marking a dish sold out.
+ * Those are the same for a grill as for a grocer. So a restaurant signs in
+ * like any shop; the products screen edits names, prices, photos and
+ * availability — which never touches a dish's options — and says that the
+ * options themselves are edited on the web portal.
  */
 export function isShopSupported(shop: Pick<OwnerShop, 'merchant_type'>): boolean {
   return SUPPORTED_MERCHANT_TYPES.includes(shop.merchant_type);
