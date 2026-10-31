@@ -672,8 +672,18 @@ const styles = lazySheet(() =>
     statusDot: { width: 12, height: 12, borderRadius: 6 },
     statusDotOn: { backgroundColor: color.success },
     statusDotOff: { backgroundColor: palette.ink[300] },
-    statusTitle: { ...text.bodyBold, color: color.textPrimary, textAlign: TEXT_START, writingDirection: 'rtl' },
-    statusBody: { ...text.caption, color: color.textMuted, textAlign: TEXT_START, writingDirection: 'rtl' },
+    statusTitle: {
+      ...text.bodyBold,
+      color: color.textPrimary,
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
+    },
+    statusBody: {
+      ...text.caption,
+      color: color.textMuted,
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
+    },
     statsRow: { flexDirection: ROW, gap: space[3] },
     statBox: {
       flex: 1,
@@ -817,8 +827,18 @@ const styles = lazySheet(() =>
       justifyContent: 'center',
       backgroundColor: BRAND[50],
     },
-    placeName: { ...text.bodyBold, color: color.textPrimary, textAlign: TEXT_START, writingDirection: 'rtl' },
-    placeAddress: { ...text.small, color: color.textSecondary, textAlign: TEXT_START, writingDirection: 'rtl' },
+    placeName: {
+      ...text.bodyBold,
+      color: color.textPrimary,
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
+    },
+    placeAddress: {
+      ...text.small,
+      color: color.textSecondary,
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
+    },
 
     stageChip: { paddingHorizontal: space[2], paddingVertical: 2, borderRadius: radius.full },
     stageReady: { backgroundColor: color.successSoft },
@@ -833,8 +853,20 @@ const styles = lazySheet(() =>
     },
     itemsToggleText: { ...text.smallBold, color: color.textSecondary },
     itemRow: { alignItems: 'flex-start' },
-    itemQty: { ...text.smallBold, color: color.textPrimary, minWidth: 28, textAlign: TEXT_START, writingDirection: 'rtl' },
-    itemName: { ...text.small, color: color.textPrimary, flex: 1, textAlign: TEXT_START, writingDirection: 'rtl' },
+    itemQty: {
+      ...text.smallBold,
+      color: color.textPrimary,
+      minWidth: 28,
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
+    },
+    itemName: {
+      ...text.small,
+      color: color.textPrimary,
+      flex: 1,
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
+    },
 
     note: {
       ...text.small,
@@ -842,10 +874,16 @@ const styles = lazySheet(() =>
       backgroundColor: palette.ink[100],
       padding: space[3],
       borderRadius: radius.sm,
-      textAlign: TEXT_START, writingDirection: 'rtl',
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
     },
 
-    sectionTitle: { ...text.h3, color: color.textPrimary, textAlign: TEXT_START, writingDirection: 'rtl' },
+    sectionTitle: {
+      ...text.h3,
+      color: color.textPrimary,
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
+    },
     hint: { ...text.small, color: color.textMuted, textAlign: TEXT_START, writingDirection: 'rtl' },
     waitingNote: { ...text.caption, color: color.warningStrong, textAlign: 'center' },
 
@@ -886,7 +924,8 @@ const styles = lazySheet(() =>
       backgroundColor: color.warningSoft,
       padding: space[3],
       borderRadius: radius.sm,
-      textAlign: TEXT_START, writingDirection: 'rtl',
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
     },
     error: {
       ...text.small,
@@ -894,7 +933,8 @@ const styles = lazySheet(() =>
       backgroundColor: color.dangerSoft,
       padding: space[3],
       borderRadius: radius.sm,
-      textAlign: TEXT_START, writingDirection: 'rtl',
+      textAlign: TEXT_START,
+      writingDirection: 'rtl',
     },
   }),
 );

@@ -31,6 +31,7 @@ import {
   shadow,
   space,
   text,
+  INPUT_TEXT_START,
 } from '@/theme';
 
 /**
@@ -483,6 +484,7 @@ const styles = lazySheet(() =>
       borderRadius: radius.md,
       paddingHorizontal: space[4],
       minHeight: TAP_TARGET,
+      textAlign: INPUT_TEXT_START,
       ...SUPPRESS_WEB_OUTLINE,
     },
     inputInvalid: { borderColor: color.danger, backgroundColor: color.dangerSoft },

@@ -9,7 +9,18 @@ import { useCart } from '@/lib/cart';
 import { continueAfterSignIn } from '@/lib/after-sign-in';
 import { confirmAsync } from '@/lib/dialog';
 import { useIsGuest } from '@/lib/session';
-import { ALIGN_END, ROW, TAP_TARGET, accent, color, radius, shadow, space, text } from '@/theme';
+import {
+  ALIGN_END,
+  ROW,
+  TAP_TARGET,
+  accent,
+  color,
+  radius,
+  shadow,
+  space,
+  text,
+  INPUT_TEXT_START,
+} from '@/theme';
 import { missingImageGlyph } from '@/ui/section-glyph';
 import { Button, EmptyState, RemoteImage, Row, Screen, Text } from '@/ui';
 import { Stepper, SummaryRow } from '@/ui/catalog';
@@ -204,6 +215,7 @@ export default function CartScreen() {
                 backgroundColor: color.surfaceCard,
                 padding: space[3],
                 color: color.textPrimary,
+                textAlign: INPUT_TEXT_START,
                 textAlignVertical: 'top',
               },
             ]}

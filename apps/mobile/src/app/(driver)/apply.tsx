@@ -6,7 +6,7 @@ import MaterialCommunityIcons from '@/ui/icon';
 import { api, ApiError } from '@/lib/api';
 import { useIsGuest, useSession } from '@/lib/session';
 import { notify } from '@/lib/dialog';
-import { BRAND, TAP_TARGET, color, radius, space, text } from '@/theme';
+import { BRAND, TAP_TARGET, color, radius, space, text, INPUT_TEXT_START } from '@/theme';
 import { Button, EmptyState, Row, Screen, Skeleton, Text } from '@/ui';
 
 /**
@@ -217,7 +217,7 @@ export default function DriverApplyScreen() {
                 <TextInput
                   value={plate}
                   onChangeText={setPlate}
-                  placeholder="مثال: بغداد ١٢٣٤٥"
+                  placeholder="مثال: الأنبار ١٢٣٤٥"
                   placeholderTextColor={color.textMuted}
                   accessibilityLabel="رقم المركبة"
                   maxLength={20}
@@ -231,6 +231,7 @@ export default function DriverApplyScreen() {
                       backgroundColor: color.surfaceCard,
                       paddingHorizontal: space[3],
                       color: color.textPrimary,
+                      textAlign: INPUT_TEXT_START,
                     },
                   ]}
                 />
