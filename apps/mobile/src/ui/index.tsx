@@ -161,9 +161,34 @@ export function Text({
        * narrower than it draws it, so every auto-width chip and badge wrapped
        * its last word onto a second line.
        */}
-      {children}
+      {isolateLatinLead(children)}
     </RNText>
   );
+}
+
+/** The first letter that has a direction, Latin or Arabic script. */
+const FIRST_STRONG = /[A-Za-z\u00C0-\u024F]|[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+
+/**
+ * A line that opens in Latin, kept in its own order inside a right-to-left
+ * paragraph.
+ *
+ * `Text` sets the paragraph to right-to-left so iOS puts every line at the
+ * right edge. A name like «10:10 Rest & Cafe» is then laid out by the bidi
+ * algorithm as part of a right-to-left line, and the leading number is moved
+ * to the far end: «Rest & Cafe 10:10». Wrapping the string in a left-to-right
+ * isolate (U+2066 … U+2069) keeps it reading as written while the paragraph
+ * still sits on the right. Only for a plain string whose first letter is
+ * Latin; Arabic and mixed lines that open in Arabic are untouched. Not on
+ * Android, which ignores `writingDirection` and so never reorders the name —
+ * and where an invisible mark was measured narrower than it drew, wrapping
+ * auto-width chips (see the note above).
+ */
+function isolateLatinLead(children: ReactNode): ReactNode {
+  if (Platform.OS === 'android' || typeof children !== 'string') return children;
+  const first = children.match(FIRST_STRONG)?.[0];
+  if (!first || !/[A-Za-z\u00C0-\u024F]/.test(first)) return children;
+  return `\u2066${children}\u2069`;
 }
 
 /**

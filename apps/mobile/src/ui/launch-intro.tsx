@@ -64,6 +64,9 @@ export function LaunchIntro({ onDone }: { onDone: () => void }) {
           alignItems: 'center',
           justifyContent: 'center',
           opacity,
+          // The letters fly in from past the edges; on the web that widened
+          // the page. A phone clips at the glass anyway.
+          overflow: 'hidden',
           zIndex: 1000,
           elevation: 1000,
         },

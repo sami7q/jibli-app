@@ -589,18 +589,18 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
              *
              * Rows with a sublabel are taller than rows without one, and
              * with nothing between them the group read as a stack of
-             * uneven blocks. The rule starts where the words start — past
-             * the tile and its gap, on the right — so the tiles stay a clean
-             * column. Physical sides, because `ROW` pins the tile to the
-             * right in both layout modes.
+             * uneven blocks. The rule runs under the words, from the right
+             * edge to just short of the tile on the left, so the tiles stay
+             * a clean column. Physical sides, because `ROW` pins the label
+             * to the right and the tile to the left in both layout modes.
              */}
             {index > 0 ? (
               <View
                 style={{
                   height: StyleSheet.hairlineWidth,
                   backgroundColor: color.borderSubtle,
-                  marginLeft: space[3],
-                  marginRight: space[3] + 40 + space[3],
+                  marginRight: space[3],
+                  marginLeft: space[3] + 40 + space[3],
                 }}
               />
             ) : null}
