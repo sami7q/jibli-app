@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
@@ -71,13 +72,48 @@ export default function RestaurantScreen() {
    */
   const scroller = useRef<ScrollView>(null);
   const sectionTops = useRef<Record<string, number>>({});
+  /** Where the dish list starts in the scroll, and how tall the pinned tabs are. */
+  const listTop = useRef(0);
+  const tabsHeight = useRef(0);
+  /** While a tap's scroll is travelling, the scroll handler leaves the highlight alone. */
+  const jumping = useRef(false);
+  const insets = useSafeAreaInsets();
+  /** Whether the tabs are pinned under the status bar, which then needs clearing. */
+  const [stuck, setStuck] = useState(false);
 
+  /*
+   * The tabs stay pinned at the top of the screen once the menu is reached,
+   * so a customer twenty dishes down can still jump to «المشروبات». A
+   * section's position is measured inside the list, so the list's own offset
+   * and the tabs' height are added to land the heading just under the tabs.
+   */
   const jumpTo = (categoryId: string) => {
     setActiveCategory(categoryId);
     const top = sectionTops.current[categoryId];
     if (top !== undefined) {
-      scroller.current?.scrollTo({ y: Math.max(0, top - space[2]), animated: true });
+      jumping.current = true;
+      setTimeout(() => {
+        jumping.current = false;
+      }, 600);
+      scroller.current?.scrollTo({
+        y: Math.max(0, listTop.current + top - tabsHeight.current - insets.top),
+        animated: true,
+      });
     }
+  };
+
+  /** The highlight follows the reading: the last section whose heading has passed the tabs. */
+  const followScroll = (y: number) => {
+    const pinned = menuTop.current !== null && y >= menuTop.current;
+    if (pinned !== stuck) setStuck(pinned);
+    if (jumping.current) return;
+    let current: string | null = null;
+    for (const [id, top] of Object.entries(sectionTops.current)) {
+      if (listTop.current + top - tabsHeight.current - insets.top - space[4] <= y) {
+        if (current === null || top > (sectionTops.current[current] ?? -1)) current = id;
+      }
+    }
+    if (current && current !== activeCategory) setActiveCategory(current);
   };
 
   const { add } = useCart();
@@ -238,12 +274,34 @@ export default function RestaurantScreen() {
   const detail = restaurant.data;
   const cartIsThisRestaurant = cart?.restaurantId === detail.id;
 
+  const menuTabs = (
+    <>
+      {sections.length > 0 && currentSection ? (
+        <SectionTabs sections={sections} active={currentSection} onSelect={chooseSection} />
+      ) : null}
+      <CategoryTabs
+        categories={visibleCategories.map((category) => ({
+          id: category.id,
+          name: category.name_ar,
+        }))}
+        active={
+          activeCategory && visibleCategories.some((c) => c.id === activeCategory)
+            ? activeCategory
+            : (visibleCategories[0]?.id ?? null)
+        }
+        onSelect={jumpTo}
+      />
+    </>
+  );
+
   return (
     <Screen padded={false} edges={[]} background={color.surfacePage}>
       <ScrollView
         ref={scroller}
         contentContainerStyle={{ paddingBottom: itemCount > 0 ? 120 : space[8] }}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={64}
+        onScroll={(event) => followScroll(event.nativeEvent.contentOffset.y)}
       >
         <Cover
           coverUrl={detail.cover_asset_id ? assetUrl(detail.cover_asset_id) : null}
@@ -301,34 +359,26 @@ export default function RestaurantScreen() {
               لم تُضف {menuNoun} بعد.
             </Text>
           </View>
-        ) : (
-          <>
-            <View
-              onLayout={(event) => {
-                menuTop.current = event.nativeEvent.layout.y;
-              }}
-            >
-              {sections.length > 0 && currentSection ? (
-                <SectionTabs
-                  sections={sections}
-                  active={currentSection}
-                  onSelect={chooseSection}
-                />
-              ) : null}
-              <CategoryTabs
-                categories={visibleCategories.map((category) => ({
-                  id: category.id,
-                  name: category.name_ar,
-                }))}
-                active={
-                  activeCategory && visibleCategories.some((c) => c.id === activeCategory)
-                    ? activeCategory
-                    : (visibleCategories[0]?.id ?? null)
-                }
-                onSelect={jumpTo}
-              />
-            </View>
+        ) : null}
 
+        {shownCategories.length > 0 ? (
+          <View
+            onLayout={(event) => {
+              menuTop.current = event.nativeEvent.layout.y;
+              tabsHeight.current = event.nativeEvent.layout.height;
+            }}
+            style={{ paddingBottom: space[2] }}
+          >
+            {menuTabs}
+          </View>
+        ) : null}
+
+        {shownCategories.length > 0 ? (
+          <View
+            onLayout={(event) => {
+              listTop.current = event.nativeEvent.layout.y;
+            }}
+          >
             {visibleCategories.map((category) => (
               <View
                 key={category.id}
@@ -357,9 +407,35 @@ export default function RestaurantScreen() {
                 </View>
               </View>
             ))}
-          </>
-        )}
+          </View>
+        ) : null}
       </ScrollView>
+
+      {/*
+       * The same tabs, pinned under the status bar once the menu has scrolled
+       * past them — so a customer twenty dishes down can still jump to
+       * «المشروبات». A copy laid over the list rather than a sticky header:
+       * it behaves the same on iOS, Android and the web, and the list beneath
+       * keeps its own layout.
+       */}
+      {stuck && shownCategories.length > 0 ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            paddingTop: insets.top,
+            paddingBottom: space[2],
+            backgroundColor: color.surfacePage,
+            borderBottomWidth: 1,
+            borderBottomColor: color.borderSubtle,
+            ...shadow.sm,
+          }}
+        >
+          {menuTabs}
+        </View>
+      ) : null}
 
       {/*
        * The cart bar rides above the content rather than living at the bottom
@@ -774,7 +850,9 @@ function SectionTabs({
   }
 
   return (
-    <HScroll contentContainerStyle={{ paddingHorizontal: space[4], paddingTop: space[5], gap: space[2] }}>
+    <HScroll
+      contentContainerStyle={{ paddingHorizontal: space[4], paddingTop: space[5], gap: space[2] }}
+    >
       {tabs}
     </HScroll>
   );

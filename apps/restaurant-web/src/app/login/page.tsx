@@ -273,7 +273,7 @@ function LoginForm() {
             // Lowercased as typed: the server compares case-insensitively,
             // and showing the normalised form avoids "but I typed it right".
             onChange={(event) => setUsername(event.target.value.toLowerCase().trim())}
-            placeholder="mataam-baghdad"
+            placeholder="rest.haditha"
             required
           />
         </div>
