@@ -621,6 +621,11 @@ export interface MenuCategory {
   id: string;
   name_ar: string;
   description_ar: string | null;
+  /**
+   * The main section this category sits under («الأطعمة», «المشروبات»), or
+   * null for a flat menu. Absent on an API deployed before sections existed.
+   */
+  section_ar?: string | null;
   items: MenuItem[];
 }
 
@@ -927,6 +932,8 @@ export interface OwnerProduct {
 export interface OwnerCategory {
   readonly id: string;
   readonly name_ar: string;
+  /** The main section above this category; null leaves it ungrouped. */
+  readonly section_ar?: string | null;
   readonly sort_order: number;
   readonly is_active: boolean;
   readonly items: OwnerProduct[];
@@ -1616,7 +1623,10 @@ export const api = {
   ownerCatalog: (restaurantId: string) =>
     apiRequest<OwnerCatalog>('/api/v1/restaurant-portal/menu', { restaurantId }),
 
-  ownerCreateCategory: (restaurantId: string, body: { name_ar: string; sort_order?: number }) =>
+  ownerCreateCategory: (
+    restaurantId: string,
+    body: { name_ar: string; section_ar?: string | null; sort_order?: number },
+  ) =>
     apiRequest<{ id: string }>('/api/v1/restaurant-portal/menu/categories', {
       method: 'POST',
       restaurantId,
@@ -1627,7 +1637,7 @@ export const api = {
   ownerUpdateCategory: (
     restaurantId: string,
     categoryId: string,
-    body: { name_ar?: string; sort_order?: number; is_active?: boolean },
+    body: { name_ar?: string; section_ar?: string | null; sort_order?: number; is_active?: boolean },
   ) =>
     apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/menu/categories/${categoryId}`, {
       method: 'PATCH',

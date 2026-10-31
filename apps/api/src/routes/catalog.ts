@@ -493,6 +493,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: AppContext): vo
             id: category.id,
             name_ar: category.nameAr,
             description_ar: category.descriptionAr,
+            section_ar: category.sectionAr,
             items: items
               .filter((item) => item.categoryId === category.id)
               .map((item) => ({

@@ -30,6 +30,8 @@ export interface MenuCategory {
   id: string;
   name_ar: string;
   description_ar: string | null;
+  /** The main section above this category («المشروبات»), or null. */
+  section_ar?: string | null;
   sort_order: number;
   is_active: boolean;
   items: MenuItem[];

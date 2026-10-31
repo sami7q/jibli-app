@@ -30,6 +30,18 @@ import { restaurantScope } from './scope.js';
 const categorySchema = z.object({
   name_ar: arabicTextSchema(2, 60),
   description_ar: z.string().max(200).optional(),
+  /*
+   * The main section above this category («الأطعمة», «المشروبات»). Trimmed,
+   * and an empty string clears it — the form's field left blank — so the menu
+   * goes back to showing this category ungrouped.
+   */
+  section_ar: z
+    .string()
+    .trim()
+    .max(40)
+    .nullable()
+    .optional()
+    .transform((value) => (value === '' ? null : value)),
   // Optional on create: the server defaults it to max+1 so a new category lands
   // last rather than tying at 0 and flipping order between requests (MERCH-22).
   sort_order: z.number().int().min(0).max(999).optional(),
@@ -125,6 +137,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
               id: category.id,
               name_ar: category.nameAr,
               description_ar: category.descriptionAr,
+              section_ar: category.sectionAr,
               sort_order: category.sortOrder,
               is_active: category.isActive,
               items: items
@@ -187,6 +200,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
           restaurantId,
           nameAr: body.name_ar,
           descriptionAr: body.description_ar ?? null,
+          sectionAr: body.section_ar ?? null,
           sortOrder,
         });
         await bumpMenuVersion(tx, restaurantId);
@@ -216,6 +230,7 @@ export function registerRestaurantMenuRoutes(app: FastifyInstance, ctx: AppConte
           .set({
             ...(body.name_ar ? { nameAr: body.name_ar } : {}),
             ...(body.description_ar !== undefined ? { descriptionAr: body.description_ar } : {}),
+            ...(body.section_ar !== undefined ? { sectionAr: body.section_ar } : {}),
             ...(body.sort_order !== undefined ? { sortOrder: body.sort_order } : {}),
             ...(body.is_active !== undefined ? { isActive: body.is_active } : {}),
             updatedAt: new Date(),

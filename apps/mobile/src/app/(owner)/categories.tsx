@@ -81,6 +81,21 @@ export default function OwnerCategoriesScreen() {
     onError: (caught) => notify('تعذّر التعديل', explain(caught, 'حاول مرة أخرى.')),
   });
 
+  const setSection = useMutation({
+    mutationFn: ({ id, section }: { id: string; section: string | null }) =>
+      api.ownerUpdateCategory(shop?.id as string, id, { section_ar: section }),
+    onSuccess: invalidate,
+    onError: (caught) => notify('تعذّر التعديل', explain(caught, 'حاول مرة أخرى.')),
+  });
+
+  /** The main sections this shop already uses, for one-tap reuse. */
+  const sectionNames = useMemo(
+    () => [
+      ...new Set(categories.map((entry) => entry.section_ar).filter((name): name is string => !!name)),
+    ],
+    [categories],
+  );
+
   const toggle = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       api.ownerUpdateCategory(shop?.id as string, id, { is_active: active }),
@@ -256,12 +271,20 @@ export default function OwnerCategoriesScreen() {
             <Text variant="smallBold" tone="secondary">
               أقسام متجرك ({categories.length})
             </Text>
+            <Text variant="caption" tone="muted">
+              يمكنك جمع الأقسام تحت أقسام رئيسية مثل «الأطعمة» و«المشروبات» و«الحلويات»، فتظهر
+              للزبون أوضح.
+            </Text>
             {categories.map((entry) => (
               <CategoryRow
                 key={entry.id}
                 category={entry}
                 canWrite={canWrite}
-                busy={rename.isPending || toggle.isPending || remove.isPending}
+                busy={
+                  rename.isPending || toggle.isPending || remove.isPending || setSection.isPending
+                }
+                sections={sectionNames}
+                onSection={(section) => setSection.mutate({ id: entry.id, section })}
                 onRename={(name) => rename.mutate({ id: entry.id, name })}
                 onToggle={() => toggle.mutate({ id: entry.id, active: !entry.is_active })}
                 onRemove={() =>
@@ -290,6 +313,8 @@ function CategoryRow({
   category,
   canWrite,
   busy,
+  sections,
+  onSection,
   onRename,
   onToggle,
   onRemove,
@@ -297,6 +322,10 @@ function CategoryRow({
   category: OwnerCategory;
   canWrite: boolean;
   busy: boolean;
+  /** Main sections already in use in this shop. */
+  sections: string[];
+  /** Null takes the category out of any main section. */
+  onSection: (section: string | null) => void;
   onRename: (name: string) => void;
   onToggle: () => void;
   onRemove: () => void;
@@ -305,6 +334,15 @@ function CategoryRow({
   const [name, setName] = useState(category.name_ar);
   const count = category.items.length;
   const hidden = !category.is_active;
+  const [pickingSection, setPickingSection] = useState(false);
+  const [sectionDraft, setSectionDraft] = useState('');
+  const current = category.section_ar ?? null;
+
+  const pickSection = (next: string | null) => {
+    setPickingSection(false);
+    setSectionDraft('');
+    if (next !== current) onSection(next);
+  };
 
   const commit = () => {
     const next = name.trim();
@@ -391,6 +429,93 @@ function CategoryRow({
           </Row>
         ) : null}
       </Row>
+      {/*
+       * The main section this category sits under. One tap on a section the
+       * shop already uses, or a new name typed once and then offered for the
+       * rest — so «المشروبات» is spelled the same way on all six drinks.
+       */}
+      <Row gap={space[2]}>
+        <Text variant="caption" tone="muted">
+          القسم الرئيسي:
+        </Text>
+        <Text variant="captionBold" tone={current ? 'brand' : 'muted'}>
+          {current ?? 'بدون'}
+        </Text>
+        {canWrite && !pickingSection ? (
+          <Pressable
+            onPress={() => setPickingSection(true)}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={`تغيير القسم الرئيسي لـ ${category.name_ar}`}
+            hitSlop={8}
+          >
+            <Text variant="captionBold" tone="brand">
+              تغيير
+            </Text>
+          </Pressable>
+        ) : null}
+      </Row>
+      {pickingSection ? (
+        <View style={{ gap: space[2] }}>
+          <View style={{ flexDirection: ROW, flexWrap: 'wrap', gap: space[2] }}>
+            {[...sections.filter((name) => name !== current), ...(current ? [null] : [])].map(
+              (name) => (
+                <Pressable
+                  key={name ?? 'none'}
+                  onPress={() => pickSection(name)}
+                  accessibilityRole="button"
+                  accessibilityLabel={name ?? 'بدون قسم رئيسي'}
+                  style={{
+                    minHeight: TAP_TARGET - 8,
+                    paddingHorizontal: space[3],
+                    justifyContent: 'center',
+                    borderRadius: radius.full,
+                    borderWidth: 1,
+                    borderColor: color.brand,
+                    backgroundColor: color.surfaceCard,
+                  }}
+                >
+                  <Text variant="small">{name ?? 'بدون'}</Text>
+                </Pressable>
+              ),
+            )}
+          </View>
+          <Row gap={space[2]}>
+            <TextInput
+              value={sectionDraft}
+              onChangeText={setSectionDraft}
+              placeholder="قسم رئيسي جديد، مثال: المشروبات"
+              placeholderTextColor={color.textMuted}
+              accessibilityLabel="اسم القسم الرئيسي"
+              maxLength={40}
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (sectionDraft.trim().length >= 2) pickSection(sectionDraft.trim());
+              }}
+              style={[
+                text.body,
+                {
+                  flex: 1,
+                  minHeight: TAP_TARGET,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: color.borderSubtle,
+                  backgroundColor: color.surfacePage,
+                  paddingHorizontal: space[3],
+                  color: color.textPrimary,
+                  textAlign: INPUT_TEXT_START,
+                },
+              ]}
+            />
+            <Button
+              label="حفظ"
+              disabled={sectionDraft.trim().length < 2}
+              onPress={() => pickSection(sectionDraft.trim())}
+            />
+            <Button label="إلغاء" variant="secondary" onPress={() => setPickingSection(false)} />
+          </Row>
+        </View>
+      ) : null}
       {busy ? <ActivityIndicator color={color.brand} /> : null}
     </View>
   );

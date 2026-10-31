@@ -19,6 +19,14 @@ export const menuCategories = pgTable(
       .references(() => restaurants.id, { onDelete: 'cascade' }),
     nameAr: text('name_ar').notNull(),
     descriptionAr: text('description_ar'),
+    /**
+     * The main section this category sits under — «الأطعمة», «المشروبات»,
+     * «الحلويات». Free text the shop writes, not a lookup table: a menu has
+     * three or four of them and they are the shop's own words. Categories
+     * sharing a section are grouped under one top-level tab in the app; null
+     * means the menu is flat and shows its categories as before.
+     */
+    sectionAr: text('section_ar'),
     sortOrder: integer('sort_order').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: createdAt(),

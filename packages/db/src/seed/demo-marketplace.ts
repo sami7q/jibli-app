@@ -91,6 +91,8 @@ interface DemoItem {
 interface DemoCategory {
   readonly name: string;
   readonly description?: string;
+  /** The main section it sits under in the app («المشروبات»); absent is flat. */
+  readonly section?: string;
   readonly items: readonly DemoItem[];
 }
 
@@ -1527,6 +1529,7 @@ export async function upsertDemoShop(
           .update(menuCategories)
           .set({
             descriptionAr: category.description ?? null,
+            sectionAr: category.section ?? null,
             sortOrder: categoryIndex,
             isActive: true,
             updatedAt: now,
@@ -1538,6 +1541,7 @@ export async function upsertDemoShop(
           restaurantId,
           nameAr: category.name,
           descriptionAr: category.description ?? null,
+          sectionAr: category.section ?? null,
           sortOrder: categoryIndex,
           isActive: true,
         });

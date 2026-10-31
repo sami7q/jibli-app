@@ -139,6 +139,9 @@ function MenuScreen({
 
   const data = menu.data;
   const categories = data?.categories ?? [];
+  const sectionNames = [
+    ...new Set(categories.map((category) => category.section_ar).filter((name): name is string => !!name)),
+  ];
   const canSeeCost = data?.can_see_cost ?? false;
   const allItems = categories.flatMap((category) => category.items);
   const soldOut = allItems.filter((item) => !item.is_available).length;
@@ -264,6 +267,7 @@ function MenuScreen({
       {addingCategory ? (
         <CategoryDialog
           auth={auth}
+          sections={sectionNames}
           // New categories land at the end, not tied at sort_order 0 where the
           // customer menu order then flips between requests (MERCH-22).
           nextSortOrder={Math.max(0, ...categories.map((category) => category.sort_order)) + 1}
@@ -278,6 +282,7 @@ function MenuScreen({
       {editingCategory ? (
         <CategoryDialog
           auth={auth}
+          sections={sectionNames}
           category={editingCategory}
           onDone={() => {
             setEditingCategory(null);
@@ -393,7 +398,11 @@ function CategoryCard({
   return (
     <Card
       title={category.is_active ? category.name_ar : `${category.name_ar} (مخفي)`}
-      subtitle={category.description_ar ?? undefined}
+      subtitle={
+        [category.section_ar ? `القسم الرئيسي: ${category.section_ar}` : null, category.description_ar]
+          .filter(Boolean)
+          .join(' · ') || undefined
+      }
       actions={
         canWrite ? (
           <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
@@ -615,11 +624,14 @@ function AvailabilityToggle({
 function CategoryDialog({
   auth,
   category,
+  sections,
   nextSortOrder,
   onDone,
   onCancel,
 }: {
   auth: PortalAuth;
+  /** Main sections the menu already uses, offered so they are spelled alike. */
+  sections: string[];
   /** Present when renaming/describing an existing category (MERCH-11). */
   category?: MenuCategory;
   /** Create only: where the new category sorts (MERCH-22). */
@@ -629,6 +641,7 @@ function CategoryDialog({
 }) {
   const [nameAr, setNameAr] = useState(category?.name_ar ?? '');
   const [descriptionAr, setDescriptionAr] = useState(category?.description_ar ?? '');
+  const [sectionAr, setSectionAr] = useState(category?.section_ar ?? '');
   // The second click of a double-click lands before `isPending` re-renders
   // (MERCH-24).
   const submitting = useRef(false);
@@ -638,6 +651,8 @@ function CategoryDialog({
       const body = {
         name_ar: nameAr.trim(),
         description_ar: descriptionAr.trim() || undefined,
+        // Empty clears it: the category goes back to the ungrouped menu.
+        section_ar: sectionAr.trim() || null,
       };
       return category
         ? portal.updateCategory(auth, category.id, body).then(() => undefined)
@@ -670,6 +685,26 @@ function CategoryDialog({
             onChange={(event) => setNameAr(event.target.value)}
             placeholder="الأطباق الرئيسية"
           />
+        </div>
+
+        <div className="field">
+          <label htmlFor="cat-section">القسم الرئيسي (اختياري)</label>
+          <input
+            id="cat-section"
+            list="cat-section-options"
+            value={sectionAr}
+            maxLength={40}
+            onChange={(event) => setSectionAr(event.target.value)}
+            placeholder="الأطعمة، المشروبات، الحلويات…"
+          />
+          <datalist id="cat-section-options">
+            {sections.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+          <p className="muted" style={{ fontSize: 'var(--text-xs)', marginTop: 4 }}>
+            التصنيفات التي تحمل القسم نفسه تظهر معاً تحت تبويب واحد في التطبيق.
+          </p>
         </div>
 
         <div className="field">

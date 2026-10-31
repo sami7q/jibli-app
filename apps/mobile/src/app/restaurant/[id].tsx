@@ -54,6 +54,10 @@ export default function RestaurantScreen() {
   const serviceFee = useServiceFee();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  /** The main section showing, when the menu has them («الأطعمة»…). */
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  /** Where the tabs begin in the scroll, so a section change can return to them. */
+  const menuTop = useRef<number | null>(null);
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
   /** So arriving with `?item=` opens the sheet once and not again on every render. */
   const autoOpened = useRef(false);
@@ -163,6 +167,46 @@ export default function RestaurantScreen() {
     [categories],
   );
 
+  /*
+   * The menu's main sections, in the order their first category appears.
+   *
+   * A shop that has named sections gets two levels: a bar of a few big tabs
+   * — «الأطعمة / المشروبات / الحلويات» — and, under the one chosen, the
+   * categories in it. Twenty small chips in one strip was the alternative,
+   * and nobody could read it. A category the shop left without a section
+   * goes under «أخرى» rather than disappearing. A menu with no sections at all
+   * is flat, exactly as before.
+   */
+  const sections = useMemo(() => {
+    if (!shownCategories.some((category) => category.section_ar)) return [];
+    const names: string[] = [];
+    for (const category of shownCategories) {
+      const name = category.section_ar || OTHER_SECTION;
+      if (!names.includes(name)) names.push(name);
+    }
+    return names;
+  }, [shownCategories]);
+
+  const currentSection =
+    activeSection && sections.includes(activeSection) ? activeSection : (sections[0] ?? null);
+  const visibleCategories = currentSection
+    ? shownCategories.filter(
+        (category) => (category.section_ar || OTHER_SECTION) === currentSection,
+      )
+    : shownCategories;
+
+  const chooseSection = (name: string) => {
+    if (name === currentSection) return;
+    setActiveSection(name);
+    setActiveCategory(null);
+    // The categories below are about to be a different list; positions
+    // measured for the old one would send a tap to the wrong place.
+    sectionTops.current = {};
+    if (menuTop.current !== null) {
+      scroller.current?.scrollTo({ y: Math.max(0, menuTop.current - space[2]), animated: true });
+    }
+  };
+
   if (restaurant.isLoading) {
     return (
       <Screen padded={false} edges={['top']}>
@@ -259,16 +303,33 @@ export default function RestaurantScreen() {
           </View>
         ) : (
           <>
-            <CategoryTabs
-              categories={shownCategories.map((category) => ({
-                id: category.id,
-                name: category.name_ar,
-              }))}
-              active={activeCategory ?? shownCategories[0]?.id ?? null}
-              onSelect={jumpTo}
-            />
+            <View
+              onLayout={(event) => {
+                menuTop.current = event.nativeEvent.layout.y;
+              }}
+            >
+              {sections.length > 0 && currentSection ? (
+                <SectionTabs
+                  sections={sections}
+                  active={currentSection}
+                  onSelect={chooseSection}
+                />
+              ) : null}
+              <CategoryTabs
+                categories={visibleCategories.map((category) => ({
+                  id: category.id,
+                  name: category.name_ar,
+                }))}
+                active={
+                  activeCategory && visibleCategories.some((c) => c.id === activeCategory)
+                    ? activeCategory
+                    : (visibleCategories[0]?.id ?? null)
+                }
+                onSelect={jumpTo}
+              />
+            </View>
 
-            {shownCategories.map((category) => (
+            {visibleCategories.map((category) => (
               <View
                 key={category.id}
                 onLayout={(event) => {
@@ -648,6 +709,77 @@ function Fact({
   );
 }
 
+/** The heading for categories a sectioned menu left without a section. */
+const OTHER_SECTION = 'أخرى';
+
+/**
+ * The menu's main sections: a few large tabs, one per section.
+ *
+ * Laid out across the full width when they fit — three or four words, each
+ * a clear target — and scrolling only past that. The selected one is filled;
+ * the rest are outlined, so which half of the menu is showing is never in
+ * doubt.
+ */
+function SectionTabs({
+  sections,
+  active,
+  onSelect,
+}: {
+  sections: string[];
+  active: string;
+  onSelect: (name: string) => void;
+}) {
+  const tabs = sections.map((name) => {
+    const selected = name === active;
+    return (
+      <Pressable
+        key={name}
+        onPress={() => onSelect(name)}
+        accessibilityRole="tab"
+        accessibilityState={{ selected }}
+        accessibilityLabel={name}
+        style={{
+          flexGrow: 1,
+          minHeight: TAP_TARGET + 4,
+          paddingHorizontal: space[5],
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: radius.xl,
+          backgroundColor: selected ? color.brand : color.surfaceCard,
+          borderWidth: 1.5,
+          borderColor: selected ? color.brand : color.borderSubtle,
+        }}
+      >
+        <Text variant="h3" align="center" tone={selected ? 'inverse' : 'primary'}>
+          {name}
+        </Text>
+      </Pressable>
+    );
+  });
+
+  if (sections.length <= 4) {
+    return (
+      <View
+        accessibilityRole="tablist"
+        style={{
+          flexDirection: ROW,
+          gap: space[2],
+          paddingHorizontal: space[4],
+          paddingTop: space[5],
+        }}
+      >
+        {tabs}
+      </View>
+    );
+  }
+
+  return (
+    <HScroll contentContainerStyle={{ paddingHorizontal: space[4], paddingTop: space[5], gap: space[2] }}>
+      {tabs}
+    </HScroll>
+  );
+}
+
 function CategoryTabs({
   categories,
   active,
@@ -661,7 +793,8 @@ function CategoryTabs({
     <HScroll
       contentContainerStyle={{
         paddingHorizontal: space[4],
-        paddingTop: space[4],
+        paddingTop: space[3],
+        paddingBottom: space[1],
         gap: space[2],
       }}
     >
@@ -675,8 +808,8 @@ function CategoryTabs({
             accessibilityState={{ selected }}
             accessibilityLabel={category.name}
             style={{
-              minHeight: TAP_TARGET - 8,
-              paddingHorizontal: space[4],
+              minHeight: TAP_TARGET,
+              paddingHorizontal: space[5],
               justifyContent: 'center',
               borderRadius: radius.full,
               backgroundColor: selected ? color.brand : color.surfaceCard,
@@ -684,7 +817,7 @@ function CategoryTabs({
               borderColor: selected ? color.brand : color.borderSubtle,
             }}
           >
-            <Text variant="smallBold" tone={selected ? 'inverse' : 'secondary'}>
+            <Text variant="bodyBold" tone={selected ? 'inverse' : 'primary'}>
               {category.name}
             </Text>
           </Pressable>

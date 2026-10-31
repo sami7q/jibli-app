@@ -58,9 +58,18 @@ const pizza = (name: string, description: string | null, medium: number, large: 
     ['كبير', large],
   ]);
 
+/*
+ * The three main sections the app shows above the categories, the way the
+ * restaurant's own printed menu is divided.
+ */
+const FOOD = 'الأطعمة';
+const DRINKS = 'المشروبات';
+const SWEETS = 'الحلويات';
+
 const MENU: Menu = [
   {
     name: 'سلطات',
+    section: FOOD,
     items: [
       item('سلطة بالي ايلاند', 8000),
       item('فتوش', 5000),
@@ -75,6 +84,7 @@ const MENU: Menu = [
   },
   {
     name: 'مقبلات ساخنة',
+    section: FOOD,
     items: [
       item('فنكر صغير', 1500),
       item('فنكر كبير', 2000),
@@ -89,6 +99,7 @@ const MENU: Menu = [
   },
   {
     name: 'الأطباق الإيطالية',
+    section: FOOD,
     items: [
       item('سباغيتي بولونيز', 8000),
       item('بيني بولونيز', 8000),
@@ -98,6 +109,7 @@ const MENU: Menu = [
   },
   {
     name: 'الأطباق الغربية',
+    section: FOOD,
     items: [
       item('ستراغنوف لحم', 14000),
       item('ستراغنوف دجاج', 12000),
@@ -109,6 +121,7 @@ const MENU: Menu = [
   },
   {
     name: 'ستيك',
+    section: FOOD,
     items: [
       ...choices('ستيك لحم', 'فيلي لحم عجل، خضراوات سوتيه، بطاطا بيوريه، صلصة حسب الطلب', [
         ['عادي', 14000],
@@ -123,6 +136,7 @@ const MENU: Menu = [
   },
   {
     name: 'بيتزا',
+    section: FOOD,
     items: [
       ...pizza('بيتزا دجاج', 'مع الخضار أو بدون حسب الطلب', 10000, 12000),
       ...pizza('بيتزا لحم', 'مع الخضار أو بدون حسب الطلب', 12000, 14000),
@@ -140,6 +154,7 @@ const MENU: Menu = [
   },
   {
     name: 'ساندويش لحم',
+    section: FOOD,
     items: [
       ...sandwich(
         'برجر الفطر',
@@ -202,10 +217,12 @@ const MENU: Menu = [
   },
   {
     name: 'الشاورما',
+    section: FOOD,
     items: [item('ساندويش شاورما دجاج', 3500), item('وجبة شاورما دجاج عربي', 5000)],
   },
   {
     name: 'ريزو',
+    section: FOOD,
     items: [
       item('ريزو كلاسيك', 5000),
       item('ريزو حار (سبايسي)', 5000),
@@ -219,6 +236,7 @@ const MENU: Menu = [
   },
   {
     name: 'توستر',
+    section: FOOD,
     items: [
       item('توستر كلاسيك', 4000),
       item('توستر مدخن', 6000),
@@ -229,6 +247,7 @@ const MENU: Menu = [
   },
   {
     name: 'ساندويش دجاج',
+    section: FOOD,
     items: [
       ...sandwich('زنجر', 'صدر دجاج مقرمش، صلصة الزنجر، خس — حار أو عادي', 4000, 5000),
       ...sandwich('فلر', '٣ شرائح، جبن، شرائح ديك رومي، خس، طماطم', 7000, 8000),
@@ -253,6 +272,7 @@ const MENU: Menu = [
   },
   {
     name: 'دجاج مقلي',
+    section: FOOD,
     items: [
       item('كرسبي ٣ قطع', 7000),
       item('كرسبي ٥ قطع', 9000),
@@ -267,10 +287,12 @@ const MENU: Menu = [
   },
   {
     name: 'مشروبات غازية',
+    section: DRINKS,
     items: [item('ماء', 250), item('كولا', 500), item('كولا ماكنة', 1000)],
   },
   {
     name: 'مشروبات ساخنة',
+    section: DRINKS,
     items: [
       item('شاي', 500),
       item('قهوة عربية', 2000),
@@ -294,6 +316,7 @@ const MENU: Menu = [
   },
   {
     name: 'ميلك شيك',
+    section: DRINKS,
     items: [
       item('ميلك شيك نوتيلا', 4000),
       item('ميلك شيك فراولة', 4000),
@@ -306,6 +329,7 @@ const MENU: Menu = [
   },
   {
     name: 'موهيتو',
+    section: DRINKS,
     items: [
       item('موهيتو كلاسيك', 3000),
       item('موهيتو بلو', 3000),
@@ -318,6 +342,7 @@ const MENU: Menu = [
   },
   {
     name: 'سموذي',
+    section: DRINKS,
     items: [
       item('سموذي برتقال', 3000),
       item('سموذي فراولة', 3500),
@@ -330,6 +355,7 @@ const MENU: Menu = [
   },
   {
     name: 'كريب',
+    section: SWEETS,
     items: [
       item('كريب 10:10', 6000),
       item('كريب فواكه', 5000),
@@ -344,6 +370,7 @@ const MENU: Menu = [
   },
   {
     name: 'وافل',
+    section: SWEETS,
     items: [
       item('وافل فواكه', 5000),
       item('وافل أوريو', 5000),
@@ -358,6 +385,7 @@ const MENU: Menu = [
   },
   {
     name: 'بان كيك',
+    section: SWEETS,
     items: [
       item('بان كيك فواكه', 5000),
       item('بان كيك كندر', 5000),
