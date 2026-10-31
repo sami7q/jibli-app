@@ -2929,3 +2929,48 @@ html {
   padding-inline-start: var(--space-3);
   border-inline-start: 2px solid var(--border-subtle, #eceef1);
 }
+
+/* ── Section tabs: the screens inside one sidebar section ───────────────── */
+.section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-4);
+}
+
+.section-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.section-tabs__tab:hover {
+  color: var(--text-primary);
+  background: var(--surface-sunken);
+}
+
+.section-tabs__tab--active {
+  color: var(--jibli-orange-600);
+  border-bottom-color: var(--jibli-orange-600);
+}
+
+@media (max-width: 720px) {
+  .section-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-inline: var(--space-4);
+  }
+  .section-tabs__tab {
+    white-space: nowrap;
+  }
+}

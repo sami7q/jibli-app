@@ -74,6 +74,8 @@ function writeStoredChoice(enabled: boolean): void {
 
 export class OrderAlertManager {
   private audioContext: AudioContext | null = null;
+  /** The decoded «ka-ching», loaded once the context is open. */
+  private register: AudioBuffer | null = null;
   private enabled = false;
   private readonly pending = new Map<string, { firstSeenAt: number; lastAlertedAt: number }>();
   /** Orders already announced, so a realtime replay cannot re-trigger a chime. */
@@ -172,6 +174,23 @@ export class OrderAlertManager {
     this.audioContext ??= new AudioCtor();
     // Safari starts suspended even inside a gesture unless resumed.
     if (this.audioContext.state === 'suspended') await this.audioContext.resume();
+    void this.loadRegister();
+  }
+
+  /*
+   * The cash-register sound the phone plays, fetched once and decoded. Until
+   * it arrives — or if it never does, on a connection that drops it — the
+   * synthesised chime below stands in, so an order is never silent.
+   */
+  private async loadRegister(): Promise<void> {
+    if (this.register || !this.audioContext) return;
+    try {
+      const response = await fetch('/sounds/new-order.wav');
+      if (!response.ok) return;
+      this.register = await this.audioContext.decodeAudioData(await response.arrayBuffer());
+    } catch {
+      // The fallback chime covers it.
+    }
   }
 
   private gestureResume: (() => void) | null = null;
@@ -295,12 +314,24 @@ export class OrderAlertManager {
   }
 
   /**
-   * Synthesise the chime rather than loading an audio file: no asset to fail on
-   * a weak connection, and no autoplay-blocked <audio> element.
+   * A cash register — the same «ka-ching» the phone rings — played through the
+   * already-unlocked context, so no autoplay-blocked <audio> element. An
+   * escalation (an order still waiting) rings it twice.
    */
   private playChime(escalated: boolean): void {
     const context = this.audioContext;
     if (!context || context.state !== 'running') return;
+
+    if (this.register) {
+      const strikes = escalated ? [0, 0.9] : [0];
+      for (const offset of strikes) {
+        const source = context.createBufferSource();
+        source.buffer = this.register;
+        source.connect(context.destination);
+        source.start(context.currentTime + offset);
+      }
+      return;
+    }
 
     // Two rising notes; the escalated version is a third higher and repeats.
     const notes = escalated ? [880, 1174, 880, 1174] : [784, 1046];

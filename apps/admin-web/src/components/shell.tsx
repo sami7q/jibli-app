@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
-import { ADMIN_NAV, dateWithWeekdayAr, JibliLogo } from '@jibli/ui-web';
+import { dateWithWeekdayAr, JibliLogo } from '@jibli/ui-web';
 import { Icon, type IconName } from './icon';
 import { SessionMenu } from './session-menu';
 import { NotificationBell } from './notification-bell';
+import { OrderSound } from './order-sound';
 import { ForbiddenState } from './ui';
 import { useAdminSession, type AdminSessionState } from '@/hooks/use-session';
 import { admin } from '@/lib/admin-endpoints';
-import { canOpen } from '@/lib/nav';
+import { ADMIN_SECTIONS, sectionFor, visibleTabs, type AdminSection } from '@/lib/nav';
 
 /**
  * Admin shell (plan §130).
@@ -86,6 +87,10 @@ export function AdminShell({
     '/orders/live': liveOrders,
     '/drivers': driverApplications.data?.length ?? 0,
   };
+  const pathname = usePathname();
+  const current = sectionFor(pathname);
+  const can = session.status === 'authenticated' ? session.can : () => false;
+  const currentTabs = current ? visibleTabs(current, can) : [];
 
   return (
     <div className="shell">
@@ -99,28 +104,21 @@ export function AdminShell({
           aria-label="القائمة الرئيسية"
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}
         >
-          {ADMIN_NAV.map((section, index) => {
-            // Hide a link a role cannot open; drop a group left with nothing in
-            // it, so the sidebar shows only what this role actually reaches
-            // (ADMIN-11).
-            const items =
-              session.status === 'authenticated'
-                ? section.items.filter((item) => canOpen(item.href, session.can))
-                : [];
-            if (items.length === 0) return null;
+          {ADMIN_SECTIONS.map((section) => {
+            // A section opens on the first tab this role may see, and is gone
+            // when it may see none (ADMIN-11).
+            const tabs = visibleTabs(section, can);
+            const first = tabs[0];
+            if (!first) return null;
             return (
-              <div className="nav-group" key={section.group ?? `root-${index}`}>
-                {section.group ? <div className="nav-group__title">{section.group}</div> : null}
-                {items.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    href={item.href}
-                    icon={item.icon as IconName}
-                    label={item.labelAr}
-                    badge={badges[item.href] ?? 0}
-                  />
-                ))}
-              </div>
+              <NavLink
+                key={section.labelAr}
+                href={first.href}
+                icon={section.icon}
+                label={section.labelAr}
+                active={current === section}
+                badge={tabs.reduce((sum, tab) => sum + (badges[tab.href] ?? 0), 0)}
+              />
             );
           })}
         </nav>
@@ -152,10 +150,23 @@ export function AdminShell({
 
           <AdminSearch />
 
+          {session.status === 'authenticated' && session.can('order.read.global') ? (
+            <OrderSound token={bellToken} />
+          ) : null}
+
           <NotificationBell token={bellToken} />
 
           <SessionMenu userName={userName} userRoleAr={userRoleAr} />
         </header>
+
+        {current && currentTabs.length > 1 ? (
+          <SectionTabs
+            section={current}
+            tabs={currentTabs}
+            pathname={pathname}
+            badges={badges}
+          />
+        ) : null}
 
         {children}
 
@@ -275,21 +286,59 @@ export function ForbiddenShell({
   );
 }
 
+/**
+ * The screens inside the current section, as tabs under the header.
+ *
+ * Exact matching: tabs share prefixes (/orders and /orders/live), so a prefix
+ * match would light two at once. A detail page (an order, a shop) lights none,
+ * and the sidebar still says which section it is in.
+ */
+function SectionTabs({
+  section,
+  tabs,
+  pathname,
+  badges,
+}: {
+  section: AdminSection;
+  tabs: AdminSection['tabs'];
+  pathname: string;
+  badges: Record<string, number>;
+}) {
+  return (
+    <nav className="section-tabs" aria-label={section.labelAr}>
+      {tabs.map((tab) => {
+        const active = pathname === tab.href;
+        const badge = badges[tab.href] ?? 0;
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            className={`section-tabs__tab${active ? ' section-tabs__tab--active' : ''}`}
+            aria-current={active ? 'page' : undefined}
+          >
+            {tab.labelAr}
+            {badge > 0 ? <span className="nav__badge">{badge}</span> : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function NavLink({
   href,
   icon,
   label,
+  active,
   badge,
 }: {
   href: string;
   icon: IconName;
   label: string;
+  active: boolean;
   badge: number;
 }) {
-  const pathname = usePathname();
-  // Exact match everywhere: admin sections share prefixes (/orders vs
-  // /orders/live), and a prefix match would highlight two links at once.
-  const isActive = pathname === href;
+  const isActive = active;
 
   return (
     <Link

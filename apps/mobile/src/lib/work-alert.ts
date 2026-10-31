@@ -8,7 +8,7 @@ import { playChime } from './chime';
  * For the two people who are waited on: a shop owner with an order on the
  * board, and a courier with a task. The customer's own chime (`chime.ts`) is
  * soft on purpose — it is news. This is a call to act, so it is the bundled
- * `new_order.wav` (three rising bell notes, twice) at full volume, with a
+ * `new_order.wav` (a cash register's «ka-ching», `scripts/make-ka-ching.py`) at full volume, with a
  * vibration a phone face-down on a counter still makes heard.
  *
  * It plays in silent mode on iOS: an owner who silenced the phone for a
