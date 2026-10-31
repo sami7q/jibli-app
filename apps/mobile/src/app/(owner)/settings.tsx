@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { normalizeDigits } from '@jibli/validation/arabic';
 import { formatIqdArabic, iqd } from '@jibli/money';
-import { api, ApiError, assetUrl, type OwnerSettingsInput } from '@/lib/api';
+import { api, ApiError, assetUrl, type OwnerBusyMode, type OwnerSettingsInput } from '@/lib/api';
 import { notify } from '@/lib/dialog';
 import { captureCurrentLocation, LOCATION_MESSAGES_AR } from '@/lib/location';
 import { useOwner } from '@/lib/owner';
@@ -65,6 +65,7 @@ export default function OwnerSettingsScreen() {
   const [phone, setPhone] = useState('');
   const [deliveryFee, setDeliveryFee] = useState('');
   const [minimumOrder, setMinimumOrder] = useState('');
+  const [prepMinutes, setPrepMinutes] = useState('');
   const [acceptsOrders, setAcceptsOrders] = useState(true);
   const [touched, setTouched] = useState(false);
   const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -80,6 +81,7 @@ export default function OwnerSettingsScreen() {
     setPhone(data.branch.phone ?? '');
     setDeliveryFee(String(data.branch.delivery_fee_iqd));
     setMinimumOrder(String(data.restaurant.minimum_order_iqd));
+    setPrepMinutes(String(data.branch.base_preparation_minutes));
     setAcceptsOrders(data.branch.accepts_orders);
   }, [settings.data, touched]);
 
@@ -97,6 +99,9 @@ export default function OwnerSettingsScreen() {
   const nameValid = name.trim().length >= 2;
   const feeValid = Number.isFinite(feeIqd) && feeIqd >= 0;
   const minimumValid = Number.isFinite(minimumIqd) && minimumIqd >= 0;
+  const prep = number(prepMinutes);
+  // The server's own bounds: five minutes to four hours.
+  const prepValid = Number.isFinite(prep) && prep >= 5 && prep <= 240;
 
   /** Only what changed, so an untouched field never overwrites the portal's. */
   const changes = (): OwnerSettingsInput => {
@@ -113,6 +118,9 @@ export default function OwnerSettingsScreen() {
       body.minimum_order_iqd = minimumIqd;
     }
     if (acceptsOrders !== data.branch.accepts_orders) body.accepts_orders = acceptsOrders;
+    if (prepValid && prep !== data.branch.base_preparation_minutes) {
+      body.base_preparation_minutes = prep;
+    }
     return body as OwnerSettingsInput;
   };
   const pending = changes();
@@ -151,6 +159,47 @@ export default function OwnerSettingsScreen() {
           ? caught.messageAr
           : String(caught instanceof Error ? caught.message : caught),
       ),
+  });
+
+  /*
+   * The cover: the wide picture across the top of the shop's page. Same path
+   * as the logo, wider tier, its own field.
+   */
+  const cover = useMutation({
+    mutationFn: async (source: PickSource) => {
+      if (!shop) return false;
+      const picked = await pickImage(source, 'photo');
+      if (picked.status !== 'picked') {
+        const message = describePickOutcome(picked);
+        if (message) throw new Error(message);
+        return false;
+      }
+      const assetId = await uploadShopImage(shop.id, picked.dataUrl, 'RESTAURANT_COVER');
+      await api.ownerUpdateSettings(shop.id, { cover_asset_id: assetId });
+      return true;
+    },
+    onSuccess: async (changed) => {
+      if (changed) await refresh();
+    },
+    onError: (caught) =>
+      notify(
+        'تعذّر تغيير صورة الغلاف',
+        caught instanceof ApiError
+          ? caught.messageAr
+          : String(caught instanceof Error ? caught.message : caught),
+      ),
+  });
+
+  /*
+   * A rush. «مشغول» and «مشغول جداً» stretch the time the customer is quoted
+   * for an hour and then lapse by themselves, so nobody has to remember to
+   * switch it back when the rush ends.
+   */
+  const busy = useMutation({
+    mutationFn: (mode: OwnerBusyMode) =>
+      api.ownerSetBusyMode(shop?.id as string, mode, mode === 'NORMAL' ? undefined : 60),
+    onSuccess: refresh,
+    onError: (caught) => notify('تعذّر التغيير', explain(caught)),
   });
 
   /** The shop's first pin. The server refuses a second one; the portal moves it. */
@@ -203,6 +252,8 @@ export default function OwnerSettingsScreen() {
   const section = sectionOf(shop.merchant_type);
   const data = settings.data;
   const logoAssetId = data?.restaurant.logo_asset_id ?? null;
+  const coverAssetId = data?.restaurant.cover_asset_id ?? null;
+  const busyMode: OwnerBusyMode = data?.busy_mode ?? 'NORMAL';
   const live = shop.operational_status === 'ACTIVE';
   const hoursWeek = weekFromServer(data?.working_hours);
   const hoursConfigured = hoursWeek.configured;
@@ -339,6 +390,62 @@ export default function OwnerSettingsScreen() {
                     {clearLogo.isPending ? 'جارٍ الإزالة…' : 'إزالة الصورة'}
                   </Text>
                 </Pressable>
+              ) : null}
+            </View>
+
+            {/* ── The cover ───────────────────────────────────────────── */}
+            <View
+              style={{
+                gap: space[2],
+                padding: space[3],
+                borderRadius: radius.xl,
+                backgroundColor: color.surfaceCard,
+                borderWidth: 1,
+                borderColor: color.borderSubtle,
+              }}
+            >
+              <Text variant="smallBold">صورة الغلاف</Text>
+              <View
+                style={{
+                  height: 120,
+                  borderRadius: radius.lg,
+                  overflow: 'hidden',
+                  backgroundColor: section.ramp[50],
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {coverAssetId ? (
+                  <RemoteImage
+                    uri={assetUrl(coverAssetId)}
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                ) : (
+                  <MaterialCommunityIcons name="image-outline" size={36} color={section.ramp[500]} />
+                )}
+              </View>
+              <Text variant="caption" tone="muted">
+                تظهر أعلى صفحة متجرك عند الزبون. الأفضل صورة عريضة لأطباقك أو للمحل.
+              </Text>
+              {canWrite ? (
+                <Row gap={space[2]}>
+                  <Button
+                    label="التقاط صورة"
+                    size="md"
+                    variant="secondary"
+                    loading={cover.isPending && cover.variables === 'camera'}
+                    disabled={cover.isPending}
+                    onPress={() => cover.mutate('camera')}
+                  />
+                  <Button
+                    label="من الصور"
+                    size="md"
+                    variant="secondary"
+                    loading={cover.isPending && cover.variables === 'library'}
+                    disabled={cover.isPending}
+                    onPress={() => cover.mutate('library')}
+                  />
+                </Row>
               ) : null}
             </View>
 
@@ -486,12 +593,78 @@ export default function OwnerSettingsScreen() {
               </View>
             </Row>
 
+            <Field
+              label="وقت التحضير المعتاد"
+              hint={
+                prepValid
+                  ? `${prep} دقيقة — هذا ما يُقال للزبون عند الطلب`
+                  : 'بين 5 و240 دقيقة'
+              }
+              error={prepMinutes && !prepValid ? 'بين 5 و240 دقيقة' : null}
+            >
+              <TextInput
+                value={prepMinutes}
+                editable={canWrite}
+                onChangeText={(value) => {
+                  setPrepMinutes(value);
+                  setTouched(true);
+                }}
+                keyboardType="number-pad"
+                maxLength={3}
+                accessibilityLabel="وقت التحضير بالدقائق"
+                style={[
+                  field(Boolean(prepMinutes) && !prepValid),
+                  { writingDirection: 'ltr', textAlign: 'left' },
+                ]}
+              />
+            </Field>
+
+            {/* ── A rush ──────────────────────────────────────────────── */}
+            <View style={{ gap: space[2] }}>
+              <Text variant="smallBold" tone="secondary">
+                ضغط العمل الآن
+              </Text>
+              <View style={{ flexDirection: ROW, flexWrap: 'wrap', gap: space[2] }}>
+                {BUSY_CHOICES.map((choice) => {
+                  const selected = busyMode === choice.mode;
+                  return (
+                    <Pressable
+                      key={choice.mode}
+                      disabled={!canWrite || busy.isPending}
+                      onPress={() => busy.mutate(choice.mode)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={choice.label}
+                      style={{
+                        minHeight: TAP_TARGET - 4,
+                        paddingHorizontal: space[4],
+                        justifyContent: 'center',
+                        borderRadius: radius.full,
+                        borderWidth: 1,
+                        borderColor: selected ? color.brand : color.borderSubtle,
+                        backgroundColor: selected ? color.brand : color.surfaceCard,
+                      }}
+                    >
+                      <Text variant="smallBold" tone={selected ? 'inverse' : 'primary'}>
+                        {choice.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text variant="caption" tone="muted">
+                «مشغول» يزيد وقت التحضير عند الزبائن لمدة ساعة ثم يعود عادياً تلقائياً.
+              </Text>
+            </View>
+
             {canWrite ? (
               <Button
                 label={save.isPending ? 'جارٍ الحفظ…' : dirty ? 'حفظ التغييرات' : 'لا تغييرات'}
                 block
                 size="lg"
-                disabled={!dirty || !nameValid || !feeValid || !minimumValid || save.isPending}
+                disabled={
+                  !dirty || !nameValid || !feeValid || !minimumValid || !prepValid || save.isPending
+                }
                 loading={save.isPending}
                 onPress={() => save.mutate()}
               />
@@ -682,3 +855,9 @@ export default function OwnerSettingsScreen() {
     </Screen>
   );
 }
+
+const BUSY_CHOICES: readonly { mode: OwnerBusyMode; label: string }[] = [
+  { mode: 'NORMAL', label: 'عادي' },
+  { mode: 'BUSY', label: 'مشغول' },
+  { mode: 'VERY_BUSY', label: 'مشغول جداً' },
+];

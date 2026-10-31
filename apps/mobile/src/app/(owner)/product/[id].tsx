@@ -478,6 +478,10 @@ export default function OwnerProductScreen() {
             </View>
           ) : null}
 
+          {!isNew && existing ? (
+            <ItemOptions shopId={shop.id} itemId={id} canWrite={canWrite} />
+          ) : null}
+
           <Button
             label={isNew ? 'إضافة المنتج' : 'حفظ التعديل'}
             block
@@ -852,3 +856,110 @@ const PRODUCT_EXAMPLE: Record<MerchantType, string> = {
   MARKET: 'حليب طازج ١ لتر',
   COSMETICS: 'أحمر شفاه مات',
 };
+
+/**
+ * Which options groups this dish carries — «الحجم»، «الإضافات».
+ *
+ * Each group the shop has defined is a chip: filled when attached, outlined
+ * when not, one tap to change and saved at once. Groups themselves are
+ * written on «خيارات الأطباق», one tap away, so a pizza's sizes are typed
+ * once for every pizza.
+ */
+function ItemOptions({
+  shopId,
+  itemId,
+  canWrite,
+}: {
+  shopId: string;
+  itemId: string;
+  canWrite: boolean;
+}) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const groups = useQuery({
+    queryKey: ['owner-modifier-groups', shopId],
+    queryFn: () => api.ownerModifierGroups(shopId),
+  });
+  const attached = useQuery({
+    queryKey: ['owner-item-modifier-groups', shopId, itemId],
+    queryFn: () => api.ownerItemModifierGroups(shopId, itemId),
+  });
+
+  const toggle = useMutation({
+    mutationFn: ({ groupId, on }: { groupId: string; on: boolean }) =>
+      api.ownerAttachModifierGroup(shopId, itemId, groupId, on),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['owner-item-modifier-groups', shopId, itemId] }),
+    onError: (caught) =>
+      notify('تعذّر التعديل', caught instanceof ApiError ? caught.messageAr : 'حاول مرة أخرى.'),
+  });
+
+  const ids = new Set(attached.data?.group_ids ?? []);
+  const list = groups.data ?? [];
+
+  return (
+    <View
+      style={{
+        padding: space[3],
+        gap: space[2],
+        borderRadius: radius.lg,
+        backgroundColor: color.surfaceCard,
+        borderWidth: 1,
+        borderColor: color.borderSubtle,
+      }}
+    >
+      <Text variant="smallBold">الخيارات (الأحجام والإضافات)</Text>
+      {groups.isLoading || attached.isLoading ? (
+        <ActivityIndicator color={color.brand} />
+      ) : list.length === 0 ? (
+        <Text variant="caption" tone="muted">
+          لا مجموعات خيارات بعد. أنشئ «الحجم» أو «الإضافات» مرة واحدة ثم اربطها هنا.
+        </Text>
+      ) : (
+        <View style={{ flexDirection: ROW, flexWrap: 'wrap', gap: space[2] }}>
+          {list.map((group) => {
+            const on = ids.has(group.id);
+            return (
+              <Pressable
+                key={group.id}
+                disabled={!canWrite || toggle.isPending}
+                onPress={() => toggle.mutate({ groupId: group.id, on: !on })}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                accessibilityLabel={group.name_ar}
+                style={{
+                  flexDirection: ROW,
+                  alignItems: 'center',
+                  gap: space[1],
+                  minHeight: TAP_TARGET - 6,
+                  paddingHorizontal: space[3],
+                  borderRadius: radius.full,
+                  borderWidth: 1,
+                  borderColor: on ? color.brand : color.borderSubtle,
+                  backgroundColor: on ? color.brand : color.surfaceCard,
+                }}
+              >
+                {on ? (
+                  <MaterialCommunityIcons name="check" size={16} color={color.textInverse} />
+                ) : null}
+                <Text variant="small" tone={on ? 'inverse' : 'primary'}>
+                  {group.name_ar}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+      <Pressable
+        onPress={() => router.push('/(owner)/options' as never)}
+        accessibilityRole="button"
+        style={{ minHeight: TAP_TARGET - 8, justifyContent: 'center' }}
+      >
+        <Text variant="smallBold" tone="brand">
+          إدارة مجموعات الخيارات
+        </Text>
+      </Pressable>
+    </View>
+  );
+}

@@ -125,7 +125,7 @@ async function shrink(
 export async function uploadShopImage(
   shopId: string,
   dataUrl: string,
-  purpose: 'MENU_ITEM' | 'RESTAURANT_LOGO',
+  purpose: 'MENU_ITEM' | 'RESTAURANT_LOGO' | 'RESTAURANT_COVER',
 ): Promise<string> {
   const stored = await api.ownerUploadImage(shopId, dataUrl, purpose);
   return stored.asset_id;

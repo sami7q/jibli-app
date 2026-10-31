@@ -485,6 +485,28 @@ export default function OwnerHomeScreen() {
             </Row>
 
             {/*
+              The other two things a shop runs from here: the options its
+              dishes carry (sizes, extras) and its own couriers, whom an order
+              is handed to.
+            */}
+            <Row gap={space[3]}>
+              <Tile
+                icon="tune-variant"
+                title="الخيارات"
+                caption="الأحجام والإضافات"
+                onPress={() => router.push('/(owner)/options' as never)}
+              />
+              {owner.can('driver.read') ? (
+                <Tile
+                  icon="moped-outline"
+                  title="المندوبون"
+                  caption="أضف وفعّل مندوبيك"
+                  onPress={() => router.push('/(owner)/drivers' as never)}
+                />
+              ) : null}
+            </Row>
+
+            {/*
               The two numbers that are to-dos rather than facts: a product with
               no photograph is the commonest reason a customer scrolls past it,
               and the phone is the device that fixes that.

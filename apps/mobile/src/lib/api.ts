@@ -959,6 +959,8 @@ export interface OwnerSettings {
     readonly logo_url: string | null;
     /** Absent on an API deployed before the phone could change the picture. */
     readonly logo_asset_id?: string | null;
+    /** The wide picture above the menu. Absent on an API older than the phone's cover control. */
+    readonly cover_asset_id?: string | null;
     readonly partner_code: string;
     readonly operational_status: string;
     readonly cuisine_tags: string[];
@@ -984,6 +986,9 @@ export interface OwnerSettings {
   readonly accepts_orders_now: boolean;
   readonly closed_reason: string | null;
   readonly estimated_preparation_minutes: number;
+  /** A rush setting that stretches the preparation estimate, and when it lapses. */
+  readonly busy_mode?: OwnerBusyMode;
+  readonly busy_mode_expires_at?: string | null;
   /** The weekly schedule; only the days that have a row. Empty until somebody sets it. */
   readonly working_hours?: OwnerWorkingHour[];
 }
@@ -1015,6 +1020,8 @@ export interface OwnerSettingsInput {
   readonly description_ar?: string;
   /** Null clears the picture. */
   readonly logo_asset_id?: string | null;
+  /** Null clears the cover. */
+  readonly cover_asset_id?: string | null;
   readonly minimum_order_iqd?: number;
   readonly delivery_fee_iqd?: number;
   readonly base_preparation_minutes?: number;
@@ -1023,6 +1030,54 @@ export interface OwnerSettingsInput {
   /** The shop's first pin, from the app. Refused once one exists. */
   readonly latitude?: number;
   readonly longitude?: number;
+}
+
+export type OwnerBusyMode = 'NORMAL' | 'BUSY' | 'VERY_BUSY' | 'PAUSED';
+
+/** One choice inside an options group — «كبير»، «جبنة إضافية». */
+export interface OwnerModifier {
+  readonly id: string;
+  readonly name_ar: string;
+  readonly price_iqd: number;
+  readonly is_available: boolean;
+}
+
+/** An options group a shop defines once and attaches to as many dishes as use it. */
+export interface OwnerModifierGroup {
+  readonly id: string;
+  readonly name_ar: string;
+  readonly min_select: number;
+  readonly max_select: number;
+  readonly is_required: boolean;
+  readonly is_active: boolean;
+  readonly modifiers: OwnerModifier[];
+}
+
+/** What creating a group takes: its rules and at least one option. */
+export interface OwnerModifierGroupInput {
+  readonly name_ar: string;
+  readonly min_select: number;
+  readonly max_select: number;
+  readonly is_required: boolean;
+  readonly modifiers: { readonly name_ar: string; readonly price_iqd: number }[];
+}
+
+export type OwnerVehicleType = 'MOTORCYCLE' | 'CAR' | 'BICYCLE' | 'ON_FOOT';
+
+/** One of the shop's own couriers — `GET /restaurant-portal/drivers`. */
+export interface OwnerDriver {
+  readonly id: string;
+  readonly full_name: string | null;
+  readonly phone: string;
+  readonly status: string;
+  readonly availability: string;
+  readonly vehicle_type: string;
+  readonly plate_number: string | null;
+  readonly can_collect_cash: boolean;
+  readonly is_active: boolean;
+  readonly activated: boolean;
+  readonly active_assignments: number;
+  readonly cash_custody_iqd: number;
 }
 
 /** One line of the readiness checklist — `GET /restaurant-portal/readiness`. */
@@ -1752,4 +1807,124 @@ export const api = {
       restaurantId,
       body: { data, purpose, restaurant_id: restaurantId },
     }),
+
+  /** A rush setting: stretches the estimate for a while, then lapses by itself. */
+  ownerSetBusyMode: (restaurantId: string, busyMode: OwnerBusyMode, expiresInMinutes?: number) =>
+    apiRequest<unknown>('/api/v1/restaurant-portal/settings/busy-mode', {
+      method: 'POST',
+      restaurantId,
+      body: {
+        busy_mode: busyMode,
+        ...(expiresInMinutes === undefined ? {} : { expires_in_minutes: expiresInMinutes }),
+      },
+    }),
+
+  // ── Options groups (sizes, extras) ──────────────────────────────────────
+
+  ownerModifierGroups: (restaurantId: string) =>
+    apiRequest<OwnerModifierGroup[]>('/api/v1/restaurant-portal/menu/modifier-groups', {
+      restaurantId,
+    }),
+
+  ownerCreateModifierGroup: (restaurantId: string, body: OwnerModifierGroupInput) =>
+    apiRequest<{ id: string }>('/api/v1/restaurant-portal/menu/modifier-groups', {
+      method: 'POST',
+      restaurantId,
+      body,
+    }),
+
+  ownerUpdateModifierGroup: (
+    restaurantId: string,
+    groupId: string,
+    body: Partial<Omit<OwnerModifierGroupInput, 'modifiers'>> & { is_active?: boolean },
+  ) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/menu/modifier-groups/${groupId}`, {
+      method: 'PATCH',
+      restaurantId,
+      body,
+    }),
+
+  ownerAddModifier: (
+    restaurantId: string,
+    groupId: string,
+    body: { name_ar: string; price_iqd: number },
+  ) =>
+    apiRequest<{ id: string }>(
+      `/api/v1/restaurant-portal/menu/modifier-groups/${groupId}/modifiers`,
+      { method: 'POST', restaurantId, body },
+    ),
+
+  ownerUpdateModifier: (
+    restaurantId: string,
+    modifierId: string,
+    body: { name_ar?: string; price_iqd?: number; is_available?: boolean },
+  ) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/menu/modifiers/${modifierId}`, {
+      method: 'PATCH',
+      restaurantId,
+      body,
+    }),
+
+  /** The ids of the groups attached to one dish. */
+  ownerItemModifierGroups: (restaurantId: string, itemId: string) =>
+    apiRequest<{ group_ids: string[] }>(
+      `/api/v1/restaurant-portal/menu/items/${itemId}/modifier-groups`,
+      { restaurantId },
+    ),
+
+  ownerAttachModifierGroup: (
+    restaurantId: string,
+    itemId: string,
+    groupId: string,
+    attached: boolean,
+  ) =>
+    apiRequest<{ attached: boolean }>(
+      `/api/v1/restaurant-portal/menu/items/${itemId}/modifier-groups`,
+      { method: 'POST', restaurantId, body: { group_id: groupId, attached } },
+    ),
+
+  // ── The shop's couriers ─────────────────────────────────────────────────
+
+  ownerDrivers: (restaurantId: string) =>
+    apiRequest<OwnerDriver[]>('/api/v1/restaurant-portal/drivers', { restaurantId }),
+
+  ownerCreateDriver: (
+    restaurantId: string,
+    body: {
+      full_name: string;
+      phone: string;
+      vehicle_type: OwnerVehicleType;
+      plate_number?: string;
+      can_collect_cash: boolean;
+    },
+  ) =>
+    apiRequest<{ driver_id: string; note_ar: string }>('/api/v1/restaurant-portal/drivers', {
+      method: 'POST',
+      restaurantId,
+      body,
+    }),
+
+  ownerUpdateDriver: (
+    restaurantId: string,
+    driverId: string,
+    body: { can_collect_cash?: boolean; is_active?: boolean },
+  ) =>
+    apiRequest<{ updated: boolean }>(`/api/v1/restaurant-portal/drivers/${driverId}`, {
+      method: 'PATCH',
+      restaurantId,
+      body,
+    }),
+
+  ownerActivateDriver: (restaurantId: string, driverId: string) =>
+    apiRequest<{ status: string }>(`/api/v1/restaurant-portal/drivers/${driverId}/activate`, {
+      method: 'POST',
+      restaurantId,
+    }),
+
+  /** A username and a one-time password for the courier's own sign-in, shown once. */
+  ownerIssueDriverCredentials: (restaurantId: string, driverId: string, username: string) =>
+    apiRequest<{ username: string; password: string; note_ar: string }>(
+      `/api/v1/restaurant-portal/drivers/${driverId}/credentials`,
+      { method: 'POST', restaurantId, body: { username } },
+    ),
 };
