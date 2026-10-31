@@ -206,8 +206,8 @@ export default function OtpScreen() {
         <Text style={styles.step}>الخطوة ١ من ٢</Text>
 
         <Text style={styles.title}>أدخل رمز التحقق</Text>
-        {/* WhatsApp only: production sends `provider=whatsapp` (render.yaml). */}
-        <Text style={styles.subtitle}>أرسلناه إلى رقمك عبر واتساب</Text>
+        {/* WhatsApp first, a text message where WhatsApp is missing (render.yaml). */}
+        <Text style={styles.subtitle}>أرسلناه إلى رقمك عبر واتساب أو رسالة نصية</Text>
 
         {/*
          * The number, and a way back to it.

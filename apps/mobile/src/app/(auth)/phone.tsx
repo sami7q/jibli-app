@@ -239,13 +239,14 @@ export default function PhoneScreen() {
       </Pressable>
 
       {/*
-       * The channel, named. WhatsApp only: that is what the deployed gateway
-       * sends (render.yaml, provider=whatsapp), and a customer who reads
-       * «SMS» here and watches the wrong app is a customer who gives up.
+       * The channel, named. The gateway (OTPIQ, `provider=auto` in
+       * render.yaml) tries WhatsApp first and falls back to a text message
+       * for a number that is not on WhatsApp — so both are named, and nobody
+       * waits in the one app the code did not go to.
        */}
       <View style={styles.channel}>
         <MaterialCommunityIcons name="whatsapp" size={18} color={color.textMuted} />
-        <Text style={styles.channelText}>سيصلك رمز التحقق عبر واتساب</Text>
+        <Text style={styles.channelText}>سيصلك رمز التحقق عبر واتساب أو رسالة نصية</Text>
       </View>
 
       {/*

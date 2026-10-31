@@ -908,8 +908,8 @@ function CategoryTabs({
 /** The dish thumbnail in the menu list. See the note where it is used. */
 const DISH_THUMB = 112;
 
-/** The placeholder mark inside the sheet's 16:9 frame, when there is no photo. */
-const SHEET_DISH = 132;
+/** The placeholder mark in the sheet's short band, when there is no photo. */
+const SHEET_DISH = 88;
 
 function MenuItemRow({
   item,
@@ -1229,15 +1229,16 @@ function ItemSheet({
        * larger and got a smaller view of it: no picture at all.
        *
        * 16:9 across the full width, so a plate shot fills it rather than
-       * floating in a letterboxed box. The placeholder keeps the same frame,
-       * seeded by the item, so a dish with no photograph is still a dish rather
-       * than a gap.
+       * floating in a letterboxed box. A dish with no photograph gets a short
+       * band with its seeded mark instead: the full frame was half the sheet
+       * of empty tint, pushing the options and the price below the fold for
+       * nothing to look at.
        */}
       {item ? (
         <View
           style={{
             width: '100%',
-            aspectRatio: 16 / 9,
+            ...(item.image_asset_id ? { aspectRatio: 16 / 9 } : { height: 112 }),
             borderRadius: radius.lg,
             overflow: 'hidden',
             backgroundColor: color.brandSoft,
