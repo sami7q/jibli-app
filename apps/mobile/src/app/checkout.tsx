@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { formatIqdArabic, iqd } from '@jibli/money';
@@ -35,6 +36,7 @@ import { loadPreferredAddressId, resolvePreferred } from '@/lib/preferred-addres
  */
 export default function CheckoutScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { notes } = useLocalSearchParams<{ notes?: string }>();
   const { cart, clear } = useCart();
@@ -376,7 +378,8 @@ export default function CheckoutScreen() {
         style={{
           paddingHorizontal: space[4],
           paddingTop: space[3],
-          paddingBottom: space[6],
+          // Clear Android's button bar / the home indicator (edge-to-edge).
+          paddingBottom: Math.max(space[6], insets.bottom + space[3]),
           backgroundColor: color.surfaceCard,
           borderTopLeftRadius: radius.xl,
           borderTopRightRadius: radius.xl,

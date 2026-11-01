@@ -764,11 +764,13 @@ export function CartBar({
   onPress: () => void;
   bottom?: number;
 }) {
+  // Above Android's button bar and iOS's home indicator, never behind them.
+  const insets = useSafeAreaInsets();
   return (
     <View
       style={{
         position: 'absolute',
-        bottom,
+        bottom: Math.max(bottom, insets.bottom + space[3]),
         // Equal insets, so physical sides are unambiguous in either direction.
         left: space[4],
         right: space[4],

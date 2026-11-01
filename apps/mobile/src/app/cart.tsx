@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
@@ -36,6 +37,7 @@ import { Stepper, SummaryRow } from '@/ui/catalog';
  */
 export default function CartScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const isGuest = useIsGuest();
   const { cart, subtotalIqd, itemCount, setQuantity, remove, setNote, clear } = useCart();
   // Read from the cart store, so the note is still here after a back-swipe or a
@@ -264,7 +266,10 @@ export default function CartScreen() {
       <View
         style={{
           padding: space[4],
-          paddingBottom: space[6],
+          // The screen is edge-to-edge: on a phone with Android's button bar
+          // the button sat half behind it. Clear the bar, or the home
+          // indicator, and never go below the old spacing.
+          paddingBottom: Math.max(space[6], insets.bottom + space[3]),
           backgroundColor: color.surfaceCard,
           borderTopWidth: 1,
           borderTopColor: color.borderSubtle,
