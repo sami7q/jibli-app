@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { sql } from 'drizzle-orm';
 import Fastify, {
   type FastifyBaseLogger,
   type FastifyInstance,
@@ -245,6 +246,33 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
      * instance keeps running and keeps saying why.
      */
     const ready = dbOk && redisOk && ctx.schema.ok;
+
+    /*
+     * Whether the worker is keeping up — the one process this endpoint cannot
+     * see directly. Every push and every realtime fan-out leaves through the
+     * outbox, and only the worker drains it; with the worker stopped, orders
+     * still place and screens still poll, so nothing looks broken except that
+     * no notification ever arrives on a closed phone. Events still pending
+     * after two minutes say so in one number. Counts only, never content; a
+     * failed count is reported as null rather than failing the probe.
+     */
+    const outbox = dbOk
+      ? await ctx.db
+          .execute(
+            sql`select count(*) filter (where status = 'PENDING' and created_at < now() - interval '2 minutes')::int as stuck,
+                       max(published_at) as last_published
+                from outbox_events where created_at > now() - interval '1 day'`,
+          )
+          .then((rows) => {
+            const row = (rows as unknown as { stuck: number; last_published: Date | null }[])[0];
+            return {
+              pending_over_2_min: row?.stuck ?? 0,
+              last_published_at: row?.last_published ? new Date(row.last_published).toISOString() : null,
+            };
+          })
+          .catch(() => null)
+      : null;
+
     return reply.status(ready ? 200 : 503).send({
       status: ready ? 'ok' : 'degraded',
       checks: { database: dbOk, redis: redisOk, schema: ctx.schema.ok },
@@ -260,6 +288,7 @@ export async function buildServer(ctx: AppContext): Promise<BuiltServer> {
       // Operational visibility, not a health signal: zero connections is
       // normal at 4am and must never fail the probe.
       realtime_connections: realtimeRef.current?.connectionCount() ?? 0,
+      worker_outbox: outbox,
       /*
        * Where a sign-in code actually goes. Visibility, not a health signal.
        *
