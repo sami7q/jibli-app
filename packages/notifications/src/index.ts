@@ -879,6 +879,9 @@ export class ExpoPushProvider implements PushProvider {
 
     if (sendable.length === 0) return results;
 
+    /** Ticket ids Expo accepted, whose receipts are read a little later. */
+    const accepted: string[] = [];
+
     for (const chunk of this.client.chunkPushNotifications(sendable.map((s) => s.payload))) {
       /*
        * Which caller indices this chunk covers.
@@ -915,6 +918,7 @@ export class ExpoPushProvider implements PushProvider {
         if (ticket.status === 'ok') {
           // Accepted by Expo. Not the same as delivered — see the class note.
           results[target.index] = { ok: true };
+          if (ticket.id) accepted.push(ticket.id);
           continue;
         }
 
@@ -946,7 +950,68 @@ export class ExpoPushProvider implements PushProvider {
       }
     }
 
+    const okCount = results.filter((result) => result?.ok).length;
+    this.logger.info(
+      { event: 'push.sent', provider: this.name, accepted: okCount, total: messages.length },
+      'Push batch handed to Expo',
+    );
+    if (accepted.length > 0) this.checkReceiptsLater(accepted);
+
     return results;
+  }
+
+  /*
+   * What happened after Expo accepted the message.
+   *
+   * A ticket only says Expo queued it; whether Apple or Google delivered it
+   * arrives later as a receipt. Nothing read the receipts, so a broken APNs
+   * key or FCM credential looked exactly like success: SENT in the table, no
+   * error in the log, and nothing on any closed phone. Thirty seconds after a
+   * batch, its receipts are fetched once and every failure is logged with its
+   * code (`InvalidCredentials`, `MismatchSenderId`, `DeviceNotRegistered`…).
+   * Best effort, in process, and never retried: it exists to make a delivery
+   * problem visible, not to deliver.
+   */
+  private checkReceiptsLater(ticketIds: string[]): void {
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          for (const chunk of this.client.chunkPushNotificationReceiptIds(ticketIds)) {
+            const receipts = await this.client.getPushNotificationReceiptsAsync(chunk);
+            let delivered = 0;
+            for (const receipt of Object.values(receipts)) {
+              if (receipt.status === 'ok') {
+                delivered += 1;
+                continue;
+              }
+              this.logger.warn(
+                {
+                  event: 'push.receipt_error',
+                  provider: this.name,
+                  code: receipt.details?.error ?? 'UNKNOWN',
+                  message: receipt.message,
+                },
+                'Push not delivered by Apple/Google',
+              );
+            }
+            this.logger.info(
+              { event: 'push.receipts', provider: this.name, delivered, checked: chunk.length },
+              'Push receipts checked',
+            );
+          }
+        } catch (error) {
+          this.logger.warn(
+            {
+              event: 'push.receipts_failed',
+              reason: error instanceof Error ? error.message : String(error),
+            },
+            'Could not fetch push receipts',
+          );
+        }
+      })();
+    }, 30_000);
+    // Never keep the process alive just to read receipts.
+    timer.unref?.();
   }
 }
 

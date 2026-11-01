@@ -196,6 +196,12 @@ async function publishEvent(ctx: WorkerContext, event: OutboxEventRow): Promise<
       );
 
     if (devices.length === 0) {
+      // Said out loud: «no notification arrived» is most often this — the
+      // account never registered a phone (or registered it to another account).
+      ctx.logger.info(
+        { event: 'push.no_device', eventType: event.eventType, audience: notification.audience },
+        'Push skipped: recipient has no registered phone',
+      );
       await ctx.db
         .update(notificationDeliveries)
         .set({ status: 'SKIPPED', failureReason: 'NO_ACTIVE_DEVICE' })
