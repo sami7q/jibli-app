@@ -237,6 +237,28 @@ export async function registerForPush(): Promise<PushOutcome> {
   }
 }
 
+/**
+ * Re-register on every launch where permission is already granted — never asks.
+ *
+ * Registration used to happen only at checkout (customers) and on opening
+ * owner or courier mode, so a customer who signed in on a new phone and had
+ * not ordered from it yet had no token, and a token the push service rotated
+ * stayed stale until the next order. Saying "this phone, this account" on
+ * launch costs one request and keeps every account reachable with the app
+ * closed. A phone that has not granted permission is left alone: the prompt
+ * belongs to a moment the customer can see the point of.
+ */
+export async function refreshPushIfGranted(): Promise<void> {
+  try {
+    if (!Notifications || !Constants.isDevice) return;
+    const existing = await Notifications.getPermissionsAsync();
+    if (!existing.granted) return;
+    await registerForPush();
+  } catch {
+    // Same rule as registration: never the reason anything else fails.
+  }
+}
+
 // ── Opening the thing the notification is about ─────────────────────────────
 
 /**

@@ -24,7 +24,7 @@ import Cairo_800ExtraBold from '@expo-google-fonts/cairo/Cairo_800ExtraBold.ttf'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiError, NetworkError } from '@/lib/api';
-import { usePushNavigation } from '@/lib/push';
+import { refreshPushIfGranted, usePushNavigation } from '@/lib/push';
 import { SessionProvider, useSession } from '@/lib/session';
 import { signedInDestination } from '@/lib/after-sign-in';
 import { UpdateGate } from '@/ui/update-gate';
@@ -267,6 +267,16 @@ function Gate() {
   const [introDone, setIntroDone] = useState(false);
   const finishIntro = useCallback(() => setIntroDone(true), []);
   const launchRouted = useRef(false);
+
+  // Keep this phone's push token current for whoever is signed in (push.ts).
+  const pushRefreshedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.status !== 'ready' && state.status !== 'needs-profile') return;
+    const id = state.me.user_id;
+    if (pushRefreshedFor.current === id) return;
+    pushRefreshedFor.current = id;
+    void refreshPushIfGranted();
+  }, [state]);
 
   useEffect(() => {
     if (state.status === 'loading') return;
