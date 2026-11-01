@@ -13,8 +13,8 @@ import {
 } from '../services/session-service.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { checkAppVersion } from '../services/config-service.js';
-import { eq } from 'drizzle-orm';
-import { drivers, users, uuidv7 } from '@jibli/db';
+import { and, eq } from 'drizzle-orm';
+import { drivers, restaurantDrivers, users, uuidv7 } from '@jibli/db';
 
 /**
  * Authentication routes (plan §10, §77).
@@ -100,6 +100,8 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       code: body.code,
       requestId: request.requestId,
     });
+
+    await activateInvitedDriver(ctx, verification.userId);
 
     const session = await issueSession(ctx, {
       userId: verification.userId,
@@ -407,4 +409,45 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
       ),
     );
   });
+}
+
+/**
+ * A courier a shop added by phone number becomes active the first time they
+ * sign in with that number.
+ *
+ * The shop's «إضافة مندوب» form takes a name and a phone, and its note told
+ * the courier to activate themselves by signing in with the number and a
+ * code — but nothing on that path activated anything. The courier signed in,
+ * stayed «بانتظار التفعيل», saw no courier mode, and the only other door
+ * («دخول المندوبين») asked for a username and password nobody had issued.
+ *
+ * Proving the number is the activation: the shop vouched for the person by
+ * adding them, and the code proves this is that person's phone. Only a driver
+ * a shop has attached is activated this way; someone who applied on their
+ * own (`driver.ts`) still waits for the platform's approval, and a suspended
+ * driver is never touched.
+ */
+async function activateInvitedDriver(ctx: AppContext, userId: string): Promise<void> {
+  const [driver] = await ctx.db
+    .select({ id: drivers.id, status: drivers.status })
+    .from(drivers)
+    .where(eq(drivers.userId, userId))
+    .limit(1);
+  if (!driver || driver.status !== 'PENDING_ACTIVATION') return;
+
+  const [membership] = await ctx.db
+    .select({ id: restaurantDrivers.id })
+    .from(restaurantDrivers)
+    .where(and(eq(restaurantDrivers.driverId, driver.id), eq(restaurantDrivers.isActive, true)))
+    .limit(1);
+  if (!membership) return;
+
+  await ctx.db
+    .update(drivers)
+    .set({ status: 'ACTIVE', activatedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(drivers.id, driver.id), eq(drivers.status, 'PENDING_ACTIVATION')));
+  ctx.logger.info(
+    { event: 'driver.activated_by_otp', driverId: driver.id },
+    'Shop-invited courier activated by signing in with their number',
+  );
 }

@@ -28,6 +28,7 @@ export function PortalSignIn({
   subtitle,
   footnote,
   usernameExample = 'ahmed.ali',
+  alternative,
   onSubmit,
 }: {
   title: string;
@@ -43,6 +44,16 @@ export function PortalSignIn({
    * because the field was in fact empty, and had no way to tell why.
    */
   usernameExample?: string;
+  /**
+   * A second way in, offered above the form for the people this form is not
+   * for — a courier a shop added by phone number has no username at all.
+   */
+  alternative?: {
+    readonly title: string;
+    readonly body: string;
+    readonly action: string;
+    readonly onPress: () => void;
+  };
   /**
    * Resolve to `null` when the sign-in is accepted and the caller has navigated
    * away; resolve to an Arabic message to show it under the fields.
@@ -131,6 +142,25 @@ export function PortalSignIn({
           {subtitle}
         </Text>
       </View>
+
+      {alternative ? (
+        <View
+          style={{
+            padding: space[3],
+            gap: space[2],
+            borderRadius: radius.lg,
+            backgroundColor: BRAND[50],
+            borderWidth: 1,
+            borderColor: BRAND[200],
+          }}
+        >
+          <Text variant="smallBold">{alternative.title}</Text>
+          <Text variant="caption" tone="secondary">
+            {alternative.body}
+          </Text>
+          <Button label={alternative.action} block onPress={alternative.onPress} />
+        </View>
+      ) : null}
 
       <View style={{ gap: space[1] }}>
         <Text variant="caption" tone="muted">

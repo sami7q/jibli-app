@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { api, ApiError, NetworkError } from '@/lib/api';
+import { continueAfterSignIn } from '@/lib/after-sign-in';
 import { useSession } from '@/lib/session';
 import { PortalSignIn } from '@/ui/portal-sign-in';
 
@@ -17,6 +18,12 @@ import { PortalSignIn } from '@/ui/portal-sign-in';
  * often shared: a code sent to that number reaches whoever is holding it.
  *
  * The form itself is `PortalSignIn`, shared with the owner's door.
+ *
+ * Most couriers never had a username, though: a shop adds a courier by name
+ * and phone number, and that courier signs in with the number and a code like
+ * anyone else — the first such sign-in activates them (`auth.ts`). So that way
+ * in sits above the form, named for exactly the person who needs it, and
+ * leads straight to courier mode afterwards.
  */
 export default function DriverLoginScreen() {
   const router = useRouter();
@@ -25,8 +32,17 @@ export default function DriverLoginScreen() {
   return (
     <PortalSignIn
       title="دخول المندوبين"
-      subtitle="اسم المستخدم وكلمة المرور من المطعم الذي تعمل معه."
-      footnote="نسيت بياناتك؟ اطلب من المطعم إصدارها من جديد."
+      subtitle="إن أعطاك المطعم اسم مستخدم وكلمة مرور فأدخلهما هنا."
+      footnote="نسيت بياناتك؟ اطلب من المطعم إصدارها من جديد، أو ادخل برقم هاتفك."
+      alternative={{
+        title: 'أضافك المطعم برقم هاتفك؟',
+        body: 'لا تحتاج اسم مستخدم. ادخل برقم الهاتف الذي سجّله المطعم ورمز التحقق، فيظهر لك وضع المندوب مباشرة.',
+        action: 'الدخول برقم الهاتف',
+        onPress: () => {
+          continueAfterSignIn('/(driver)/delivery');
+          router.push('/(auth)/phone');
+        },
+      }}
       onSubmit={async (username, password) => {
         try {
           const result = await api.passwordSignIn(username, password);

@@ -132,10 +132,17 @@ export default function OtpScreen() {
       // The server decides where the user goes next: profile completion is
       // mandatory and the client does not get to skip it (plan §11).
       // A sign-in started from «سجّل متجرك» continues to the application form.
+      //
+      // A courier is not held by the customer profile (session.tsx says the
+      // same): one a shop added by phone lands in courier mode, which is
+      // where they came from «دخول المندوبين» to go.
+      const isCourier = result.user.modes?.includes('DRIVER') ?? false;
       router.replace(
-        (result.next_step === 'COMPLETE_PROFILE'
+        (result.next_step === 'COMPLETE_PROFILE' && !isCourier
           ? '/(auth)/profile'
-          : signedInDestination()) as never,
+          : isCourier
+            ? signedInDestination('/(driver)/delivery')
+            : signedInDestination()) as never,
       );
     } catch (caught) {
       setCode('');

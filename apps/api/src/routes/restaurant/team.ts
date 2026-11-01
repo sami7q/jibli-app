@@ -298,7 +298,7 @@ export function registerRestaurantTeamRoutes(app: FastifyInstance, ctx: AppConte
           {
             driver_id: result.driverId,
             note_ar:
-              'أُنشئ حساب السائق. يفعّله السائق بنفسه بتسجيل الدخول في تطبيق جيبلي برقم هاتفه ورمز التحقق.',
+              'أُضيف المندوب. يفتح تطبيق جيبلي ويسجّل الدخول برقم هاتفه هذا ورمز التحقق (زر «تسجيل الدخول»)، فيتفعّل حسابه ويظهر له وضع المندوب مباشرة. لا يحتاج اسم مستخدم ولا كلمة مرور.',
           },
           { request_id: request.requestId },
         ),

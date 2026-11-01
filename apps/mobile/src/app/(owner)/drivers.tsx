@@ -53,8 +53,8 @@ export default function OwnerDriversScreen() {
         <OwnerHeader title="المندوبون" />
 
         <Text variant="small" tone="secondary">
-          مندوبو متجرك. المفعّل منهم يظهر لك عند إسناد طلب، ويدخل إلى وضع المندوب في تطبيق جيبلي
-          باسم المستخدم وكلمة المرور اللذين تصدرهما له هنا.
+          مندوبو متجرك. أضف المندوب باسمه ورقم هاتفه، ثم يسجّل هو الدخول في تطبيق جيبلي بنفس الرقم
+          ورمز التحقق، فيتفعّل ويظهر لك عند إسناد الطلبات. لا يحتاج اسم مستخدم ولا كلمة مرور.
         </Text>
 
         {canWrite ? (
@@ -88,7 +88,7 @@ export default function OwnerDriversScreen() {
         ) : (drivers.data ?? []).length === 0 ? (
           <EmptyState
             title="لا مندوبين بعد"
-            body="أضف مندوبك الأول برقم هاتفه، ثم فعّله وأصدر له بيانات الدخول."
+            body="أضف مندوبك الأول باسمه ورقم هاتفه، ثم يدخل هو برقمه ورمز التحقق."
           />
         ) : (
           (drivers.data ?? []).map((driver) => (
@@ -178,7 +178,10 @@ function NewDriverForm({
         can_collect_cash: cash,
       }),
     onSuccess: (result) => {
-      notify('تمت الإضافة', result.note_ar || 'فعّل المندوب ثم أصدر له بيانات الدخول.');
+      notify(
+        'تمت الإضافة',
+        result.note_ar || 'يدخل المندوب برقم هاتفه ورمز التحقق، فيتفعّل حسابه.',
+      );
       onDone();
     },
     onError: (caught) => notify('تعذّرت الإضافة', explain(caught)),
@@ -304,7 +307,8 @@ function DriverCard({
   });
 
   const toggle = useMutation({
-    mutationFn: (isActive: boolean) => api.ownerUpdateDriver(shopId, driver.id, { is_active: isActive }),
+    mutationFn: (isActive: boolean) =>
+      api.ownerUpdateDriver(shopId, driver.id, { is_active: isActive }),
     onSuccess: onChanged,
     onError: (caught) => notify('تعذّر التعديل', explain(caught)),
   });
@@ -427,7 +431,9 @@ function DriverCard({
             style={{ minHeight: TAP_TARGET - 8, justifyContent: 'center' }}
           >
             <Text variant="smallBold" tone="brand">
-              {driver.activated ? 'إصدار بيانات دخول جديدة' : 'إصدار بيانات الدخول'}
+              {driver.activated
+                ? 'إصدار اسم مستخدم وكلمة مرور جديدة (اختياري)'
+                : 'إصدار اسم مستخدم وكلمة مرور (اختياري)'}
             </Text>
           </Pressable>
         )
