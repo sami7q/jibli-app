@@ -719,12 +719,14 @@ export function registerAdminRestaurantRoutes(app: FastifyInstance, ctx: AppCont
           isActive: false,
           acceptsOrders: false,
           deliveryFeeIqd: body.delivery_fee_iqd,
+          // The platform default for now (owner, 2026-11-02); the shop
+          // changes it from its settings.
+          basePreparationMinutes: 35,
         });
 
-        // A shop opens on a default week; a kitchen still sets its own.
-        if (isSelfServeMerchant(body.merchant_type)) {
-          await ensureDefaultWorkingHours(tx, branchId);
-        }
+        // Every shop opens on the default week — restaurants too, by the
+        // owner's decision of 2026-11-02 — and sets its own from «ساعات العمل».
+        await ensureDefaultWorkingHours(tx, branchId);
 
         await tx.insert(restaurantMembers).values({
           id: uuidv7(),

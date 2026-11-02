@@ -62,7 +62,9 @@ export default function NewRestaurantPage() {
     create_access: true,
     portal_username: '',
     settlement_policy: 'HALF_MONTH' as 'HALF_MONTH' | 'MONTHLY',
-    minimum_order_iqd: 0,
+    // The platform defaults for every Haditha shop for now: 2,000 minimum,
+    // 2,000 delivery (2,500 with the service fee, as the customer sees it).
+    minimum_order_iqd: 2000,
     delivery_fee_iqd: 2000,
     override_coverage: false,
     reason: '',
