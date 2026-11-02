@@ -413,9 +413,12 @@ export function restCafe1010(ownerUsername: string): DemoRestaurant {
     cityCode: 'IQ-AN-HADITHA',
     description: 'مطعم وكافيه في حديثة: برجر، بيتزا، دجاج مقلي، ستيك، مشروبات وحلويات.',
     cuisines: ['burger', 'pizza', 'chicken', 'fast_food', 'shawarma'],
-    minimumOrderIqd: 2500,
+    // The platform's defaults for every Haditha shop for now (owner, 2026-11-02):
+    // a 2,000 minimum, 35 minutes, and 2,000 delivery — 2,500 with Jibli's
+    // service fee, which is the figure the customer sees.
+    minimumOrderIqd: 2000,
     deliveryFeeIqd: 2000,
-    prepMinutes: 25,
+    prepMinutes: 35,
     rating: null,
     ratingCount: 0,
     address: 'حديثة',

@@ -10,8 +10,7 @@ import type { DemoRestaurant } from '../demo-marketplace.js';
  * own rather than options, because the menu prices them independently of any
  * dish; a shop can turn them into options later from «خيارات الأطباق».
  *
- * Hours, fees and phone are the shop's business answers, set from
- * `B_LABAN_DETAILS` below once the owner confirms them.
+ * Hours and fees follow the platform defaults in `B_LABAN_DETAILS` below.
  */
 
 type Menu = DemoRestaurant['menu'];
@@ -211,15 +210,18 @@ const MENU: Menu = [
 ];
 
 /**
- * The shop's own answers. `confirmed: false` until the owner gives them; the
- * provisioning script refuses to publish a shop whose details are guesses.
+ * The platform's defaults for every Haditha shop for now (owner, 2026-11-02):
+ * a 2,000 minimum, 35 minutes to prepare, and a 2,000 delivery fee — 2,500
+ * with Jibli's service fee, which is what the customer sees — open noon to
+ * midnight like 10:10. The shop's own phone is not known yet and is left empty
+ * for the shop to set from «إعدادات المتجر».
  */
 export const B_LABAN_DETAILS = {
-  confirmed: false,
   opensAt: '12:00',
   closesAt: '24:00',
-  minimumOrderIqd: 0,
+  minimumOrderIqd: 2000,
   deliveryFeeIqd: 2000,
+  prepMinutes: 35,
   phone: '',
 } as const;
 
@@ -240,7 +242,7 @@ export function bLaban(ownerUsername: string): DemoRestaurant {
     cuisines: ['desserts', 'ice_cream', 'juices'],
     minimumOrderIqd: B_LABAN_DETAILS.minimumOrderIqd,
     deliveryFeeIqd: B_LABAN_DETAILS.deliveryFeeIqd,
-    prepMinutes: 15,
+    prepMinutes: B_LABAN_DETAILS.prepMinutes,
     rating: null,
     ratingCount: 0,
     address: 'حديثة',
