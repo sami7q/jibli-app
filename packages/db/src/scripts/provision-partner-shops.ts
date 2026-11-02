@@ -9,6 +9,7 @@ import { findCity, upsertDemoShop, type ShopSeedCounts } from '../seed/demo-mark
 import { upsertImageAsset } from '../seed/demo-images.js';
 import { REST_CAFE_1010_LOGO_URL, restCafe1010 } from '../seed/partners/rest-cafe-1010.js';
 import { bLaban } from '../seed/partners/b-laban.js';
+import { AJEENA_LOGO_URL, ajeena } from '../seed/partners/ajeena.js';
 import type { DemoRestaurant } from '../seed/demo-marketplace.js';
 
 /**
@@ -53,6 +54,13 @@ const PARTNERS: readonly {
     build: bLaban,
     usernameEnv: 'PARTNER_BLABAN_OWNER_USERNAME',
     passwordEnv: 'PARTNER_BLABAN_OWNER_PASSWORD',
+  },
+  {
+    label: 'Ajeena',
+    build: ajeena,
+    usernameEnv: 'PARTNER_AJEENA_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_AJEENA_OWNER_PASSWORD',
+    logoUrl: AJEENA_LOGO_URL,
   },
 ];
 
