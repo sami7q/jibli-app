@@ -353,6 +353,32 @@ export async function revokeSessionByRefreshToken(
     );
 }
 
+/**
+ * The user a refresh token signs in, if its session is still live.
+ *
+ * Proof that the caller holds another account on the same phone — the app's
+ * parked account — without that account's bearer token: only the hash is
+ * stored, so the token itself is never kept.
+ */
+export async function liveSessionUserId(
+  ctx: AppContext,
+  refreshToken: string,
+): Promise<string | null> {
+  const [row] = await ctx.db
+    .select({ userId: sessions.userId, expiresAt: sessions.expiresAt })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.refreshTokenHash, hashRefreshToken(refreshToken)),
+        isNull(sessions.revokedAt),
+        isNull(sessions.supersededBySessionId),
+      ),
+    )
+    .limit(1);
+  if (!row || row.expiresAt.getTime() <= Date.now()) return null;
+  return row.userId;
+}
+
 /** Revoke every live session for a user — used on suspension and role removal. */
 export async function revokeSessionChain(
   ctx: AppContext,

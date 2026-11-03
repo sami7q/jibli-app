@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, notInArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { AppError, ERROR_CODES, success } from '@jibli/contracts';
@@ -22,6 +22,7 @@ import type { AppContext } from '../lib/context.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { deleteUserContent } from '../services/review-moderation-service.js';
 import { assertSelectableGeography, resolveCity } from '../services/geography-service.js';
+import { liveSessionUserId } from '../services/session-service.js';
 
 /**
  * Customer profile and delivery addresses (plan §11, §12, §13, §68).
@@ -344,15 +345,18 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
         platform: z.enum(['IOS', 'ANDROID', 'WEB']),
         push_token: z.string().min(10).max(512),
         app_version: z.string().max(20).optional(),
+        /** The phone's other (parked) account, proven by its refresh token. */
+        parked_refresh_token: z.string().min(20).max(512).optional(),
       })
       .parse(request.body);
 
     /*
-     * One row per phone per account. A shop owner who also orders as a
-     * customer on the same phone must keep receiving the shop's new orders
-     * after the customer side registers too, so registering never takes the
-     * phone away from another account. A phone handed on is cleaned up by
-     * sign-out, which revokes that account's row (POST /api/v1/auth/logout).
+     * One row per phone per account, for at most the accounts signed in on
+     * this phone right now: the caller and, when it proves it holds one, the
+     * app's parked account. A shop owner who also orders as a customer keeps
+     * the shop's new orders on the same phone — and every other account that
+     * once registered this phone (handed on, signed out with no signal) loses
+     * it here, enforced by the server rather than by a best-effort logout.
      */
     await ctx.db
       .insert(userDevices)
@@ -375,6 +379,22 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
           updatedAt: new Date(),
         },
       });
+
+    const keep = [principal.userId];
+    if (body.parked_refresh_token) {
+      const parkedUserId = await liveSessionUserId(ctx, body.parked_refresh_token);
+      if (parkedUserId && parkedUserId !== principal.userId) keep.push(parkedUserId);
+    }
+    await ctx.db
+      .update(userDevices)
+      .set({ revokedAt: new Date(), revokedReason: 'NOT_SIGNED_IN_ON_DEVICE', updatedAt: new Date() })
+      .where(
+        and(
+          eq(userDevices.pushToken, body.push_token),
+          notInArray(userDevices.userId, keep),
+          isNull(userDevices.revokedAt),
+        ),
+      );
 
     return reply.send(success({ registered: true }, { request_id: request.requestId }));
   });

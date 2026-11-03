@@ -258,7 +258,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
          * holds the query client and the cart); the preferred id is a bare
          * storage key, so it is cleared here with the tokens.
          */
-        await apiClient.logout(currentPushToken()).catch(() => undefined);
+        const parked = await loadParkedSession();
+        await apiClient
+          .logout(currentPushToken(), parked?.refreshToken)
+          .catch(() => undefined);
         await Promise.all([
           clearSession(),
           clearParkedSession(),

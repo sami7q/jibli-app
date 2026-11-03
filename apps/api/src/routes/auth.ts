@@ -9,11 +9,13 @@ import {
   issueSession,
   loadCapabilities,
   refreshSession,
+  liveSessionUserId,
   revokeSession,
+  revokeSessionByRefreshToken,
 } from '../services/session-service.js';
 import { requirePrincipal } from '../plugins/auth.js';
 import { checkAppVersion } from '../services/config-service.js';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { drivers, restaurantDrivers, userDevices, users, uuidv7 } from '@jibli/db';
 
 /**
@@ -167,17 +169,27 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
      * shop owner signing out of the customer side still gets the shop's
      * orders — and a phone handed on no longer receives this account's.
      */
-    const pushToken = z
-      .object({ push_token: z.string().min(10).max(512).optional() })
+    const body = z
+      .object({
+        push_token: z.string().min(10).max(512).optional(),
+        /** Signing out of the app signs out its parked account too. */
+        parked_refresh_token: z.string().min(20).max(512).optional(),
+      })
       .safeParse(request.body ?? {});
-    if (pushToken.success && pushToken.data.push_token) {
+    const signedOut = [principal.userId];
+    if (body.success && body.data.parked_refresh_token) {
+      const parkedUserId = await liveSessionUserId(ctx, body.data.parked_refresh_token);
+      await revokeSessionByRefreshToken(ctx, body.data.parked_refresh_token, 'LOGOUT');
+      if (parkedUserId) signedOut.push(parkedUserId);
+    }
+    if (body.success && body.data.push_token) {
       await ctx.db
         .update(userDevices)
         .set({ revokedAt: new Date(), revokedReason: 'LOGOUT', updatedAt: new Date() })
         .where(
           and(
-            eq(userDevices.userId, principal.userId),
-            eq(userDevices.pushToken, pushToken.data.push_token),
+            inArray(userDevices.userId, signedOut),
+            eq(userDevices.pushToken, body.data.push_token),
           ),
         );
     }

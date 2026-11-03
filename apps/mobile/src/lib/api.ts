@@ -1296,11 +1296,14 @@ export const api = {
    * tokens regardless, but this revokes the refresh token so a copy taken before
    * sign-out stops working (CUST-5).
    */
-  logout: (pushToken?: string | null) =>
+  logout: (pushToken?: string | null, parkedRefreshToken?: string | null) =>
     apiRequest<{ ok: boolean }>('/api/v1/auth/logout', {
       method: 'POST',
-      // The phone stops ringing for this account, and only this account.
-      body: pushToken ? { push_token: pushToken } : {},
+      // The phone stops ringing for the accounts signed out of it.
+      body: {
+        ...(pushToken ? { push_token: pushToken } : {}),
+        ...(parkedRefreshToken ? { parked_refresh_token: parkedRefreshToken } : {}),
+      },
     }),
 
   /** Attach a verified phone to the account already signed in. */

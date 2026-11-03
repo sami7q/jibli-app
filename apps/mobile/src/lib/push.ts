@@ -5,6 +5,7 @@ import type * as ExpoNotifications from 'expo-notifications';
 import { configNested } from './app-config';
 import { useRouter } from 'expo-router';
 import { apiRequest } from './api';
+import { loadParkedSession } from './secure-session';
 import { isLiveWork, pushDestination, readOrderPush } from './push-payload';
 import { emitWorkSignal, hasWorkListeners } from './work-signals';
 
@@ -230,12 +231,19 @@ export async function registerForPush(): Promise<PushOutcome> {
     // `/api/v1/devices`, not under /driver or /profile: the table is keyed on
     // the user, and a customer needs push for "your order was accepted"
     // exactly as a driver needs it for a new assignment.
+    /*
+     * The server keeps this phone for the signed-in account and, proven by its
+     * refresh token, the parked one — a shop owner's shop and their own
+     * customer account — and drops it from every other account.
+     */
+    const parked = await loadParkedSession();
     await apiRequest('/api/v1/devices', {
       method: 'POST',
       body: {
         push_token: token,
         platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
         app_version: Constants.expoConfig?.version ?? '1.0.0',
+        ...(parked ? { parked_refresh_token: parked.refreshToken } : {}),
       },
     });
 
