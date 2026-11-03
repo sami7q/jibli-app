@@ -233,7 +233,9 @@ export const userDevices = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex('user_devices_token_key').on(table.pushToken),
+    // Per account, not per phone: one phone can serve a shop owner's shop and
+    // their own customer account at once (migration 0027).
+    uniqueIndex('user_devices_token_user_key').on(table.pushToken, table.userId),
     index('user_devices_user_idx').on(table.userId, table.revokedAt),
   ],
 );

@@ -12,6 +12,7 @@ import { AppState } from 'react-native';
 import { onlineManager } from '@tanstack/react-query';
 import { api as apiClient, apiRequest, ApiError, NetworkError } from './api';
 import { clearPreferredAddressId } from './preferred-address';
+import { currentPushToken } from './push';
 import {
   clearParkedSession,
   clearSession,
@@ -257,7 +258,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
          * holds the query client and the cart); the preferred id is a bare
          * storage key, so it is cleared here with the tokens.
          */
-        await apiClient.logout().catch(() => undefined);
+        await apiClient.logout(currentPushToken()).catch(() => undefined);
         await Promise.all([
           clearSession(),
           clearParkedSession(),

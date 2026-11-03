@@ -188,11 +188,11 @@ function OwnerEngine({
   });
 
   /*
-   * Push, once per account on this phone. The token moves to whichever account
-   * registered it last, so a phone that signed in as a customer and then as a
-   * shop has to say so — otherwise the shop's new orders go to the customer.
-   * Asked here, at the first moment the value is obvious: this account has a
-   * shop and orders will come to it.
+   * Push, once per account on this phone, the moment owner mode opens. The
+   * server keeps the phone registered for every account signed in on it
+   * (migration 0027), so this adds the shop without taking the phone away
+   * from the owner's own customer account. Asked here, at the first moment the
+   * value is obvious: this account has a shop and orders will come to it.
    */
   const registeredFor = useRef<string | null>(null);
   useEffect(() => {

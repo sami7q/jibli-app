@@ -350,6 +350,8 @@ export interface AdminOrder {
   phone_masked: boolean;
   restaurant_id: string;
   restaurant_name: string;
+  /** The branch's phone; absent on the detail payload. */
+  restaurant_phone?: string | null;
   city_name_ar: string;
   driver_name: string | null;
 }

@@ -14,7 +14,7 @@ import {
 import { requirePrincipal } from '../plugins/auth.js';
 import { checkAppVersion } from '../services/config-service.js';
 import { and, eq } from 'drizzle-orm';
-import { drivers, restaurantDrivers, users, uuidv7 } from '@jibli/db';
+import { drivers, restaurantDrivers, userDevices, users, uuidv7 } from '@jibli/db';
 
 /**
  * Authentication routes (plan §10, §77).
@@ -160,6 +160,27 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
   app.post('/api/v1/auth/logout', { preHandler: app.authenticate }, async (request, reply) => {
     const principal = requirePrincipal(request);
     await revokeSession(ctx, principal.sessionId, 'LOGOUT');
+
+    /*
+     * The phone stops ringing for this account. A token is registered per
+     * account (migration 0027), so the phone keeps its other accounts — a
+     * shop owner signing out of the customer side still gets the shop's
+     * orders — and a phone handed on no longer receives this account's.
+     */
+    const pushToken = z
+      .object({ push_token: z.string().min(10).max(512).optional() })
+      .safeParse(request.body ?? {});
+    if (pushToken.success && pushToken.data.push_token) {
+      await ctx.db
+        .update(userDevices)
+        .set({ revokedAt: new Date(), revokedReason: 'LOGOUT', updatedAt: new Date() })
+        .where(
+          and(
+            eq(userDevices.userId, principal.userId),
+            eq(userDevices.pushToken, pushToken.data.push_token),
+          ),
+        );
+    }
 
     /*
      * A courier who signs out is no longer reachable, so they must stop being

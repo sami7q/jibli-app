@@ -9,6 +9,7 @@ import { Icon, type IconName } from './icon';
 import { SessionMenu } from './session-menu';
 import { NotificationBell } from './notification-bell';
 import { OrderSound } from './order-sound';
+import { OverdueOrdersAlert } from './overdue-orders-alert';
 import { ForbiddenState } from './ui';
 import { useAdminSession, type AdminSessionState } from '@/hooks/use-session';
 import { admin } from '@/lib/admin-endpoints';
@@ -166,6 +167,10 @@ export function AdminShell({
             pathname={pathname}
             badges={badges}
           />
+        ) : null}
+
+        {session.status === 'authenticated' && session.can('order.read.global') ? (
+          <OverdueOrdersAlert token={bellToken} />
         ) : null}
 
         {children}

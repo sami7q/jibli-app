@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { admin } from '@/lib/admin-endpoints';
+import { overdueOrders } from '@/lib/overdue-orders';
+import { useLiveOrders } from '@/lib/use-live-orders';
 import { Icon } from './icon';
 
 const STORAGE_KEY = 'jibli.admin.order-sound';
@@ -19,6 +19,9 @@ const STORAGE_KEY = 'jibli.admin.order-sound';
  * as a button that says so; one click turns it on and is remembered. The
  * same button mutes it. The first poll after turning on only learns what is
  * already there — it rings for what arrives next, not for the backlog.
+ *
+ * While any order has waited three minutes for its shop to accept, it rings
+ * again every minute, alongside the «لم يُقبل بعد» alert in the shell.
  */
 export function OrderSound({ token }: { token: string }) {
   const [enabled, setEnabled] = useState(false);
@@ -85,12 +88,7 @@ export function OrderSound({ token }: { token: string }) {
     ring();
   };
 
-  const live = useQuery({
-    queryKey: ['admin-order-sound'],
-    queryFn: () => admin.ordersPaged(token, { scope: 'live', limit: 50, offset: 0 }),
-    enabled: token !== '' && enabled,
-    refetchInterval: 15_000,
-  });
+  const live = useLiveOrders(token);
 
   useEffect(() => {
     const rows = live.data?.data;
@@ -104,6 +102,16 @@ export function OrderSound({ token }: { token: string }) {
     for (const id of ids) seen.current.add(id);
     if (fresh.length > 0) ring();
   }, [live.data, enabled]);
+
+  // The reminder: once a minute while a shop has left an order unaccepted.
+  const rows = live.data?.data;
+  useEffect(() => {
+    if (!enabled || !rows) return;
+    const timer = window.setInterval(() => {
+      if (overdueOrders(rows, Date.now()).length > 0) ring();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [rows, enabled]);
 
   const label = enabled ? 'صوت الطلبات مفعّل' : wanted ? 'اضغط لتشغيل الصوت' : 'تشغيل صوت الطلبات';
 

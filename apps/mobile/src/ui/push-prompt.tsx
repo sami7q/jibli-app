@@ -1,4 +1,5 @@
-import { Linking, Pressable, View } from 'react-native';
+import { useEffect } from 'react';
+import { AppState, Linking, Pressable, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@/ui/icon';
 import { Text } from '@/ui';
@@ -40,6 +41,20 @@ export function PushPrompt({ audience }: { audience: 'owner' | 'driver' }) {
     enabled: permission.data === 'granted',
     staleTime: 10 * 60_000,
   });
+
+  /*
+   * Back from the system settings with notifications switched on, the banner
+   * should go and the phone should register there and then — not after the
+   * 30-second cache, and not on the next launch.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      void queryClient.invalidateQueries({ queryKey: ['push-permission'] });
+      void queryClient.invalidateQueries({ queryKey: ['push-registration'] });
+    });
+    return () => subscription.remove();
+  }, [queryClient]);
 
   const state = permission.data;
   if (state === 'granted' && isPushBroken(registration.data)) {

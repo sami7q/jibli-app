@@ -141,6 +141,19 @@ export function isPushBroken(outcome: PushOutcome | undefined): boolean {
   return !['expo go or web', 'simulator', 'no project id'].includes(outcome.reason);
 }
 
+/**
+ * The token this phone last registered, for sign-out to revoke.
+ *
+ * In memory only: it is re-read from the push service on every launch where
+ * permission is granted (`refreshPushIfGranted`), so it is known by the time
+ * anyone can reach the sign-out button.
+ */
+let registeredToken: string | null = null;
+
+export function currentPushToken(): string | null {
+  return registeredToken;
+}
+
 export type PushOutcome =
   | { status: 'registered'; token: string }
   | { status: 'denied' }
@@ -226,6 +239,7 @@ export async function registerForPush(): Promise<PushOutcome> {
       },
     });
 
+    registeredToken = token;
     return { status: 'registered', token };
   } catch (error) {
     /*

@@ -348,9 +348,11 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
       .parse(request.body);
 
     /*
-     * Conflict on the token, not the user: one person may carry two phones, and
-     * a phone handed on to someone else must follow the token to its new owner
-     * rather than keep pushing another user's orders to it.
+     * One row per phone per account. A shop owner who also orders as a
+     * customer on the same phone must keep receiving the shop's new orders
+     * after the customer side registers too, so registering never takes the
+     * phone away from another account. A phone handed on is cleaned up by
+     * sign-out, which revokes that account's row (POST /api/v1/auth/logout).
      */
     await ctx.db
       .insert(userDevices)
@@ -363,8 +365,15 @@ export function registerProfileRoutes(app: FastifyInstance, ctx: AppContext): vo
         lastSeenAt: new Date(),
       })
       .onConflictDoUpdate({
-        target: userDevices.pushToken,
-        set: { userId: principal.userId, lastSeenAt: new Date(), revokedAt: null },
+        target: [userDevices.pushToken, userDevices.userId],
+        set: {
+          platform: body.platform,
+          appVersion: body.app_version ?? null,
+          lastSeenAt: new Date(),
+          revokedAt: null,
+          revokedReason: null,
+          updatedAt: new Date(),
+        },
       });
 
     return reply.send(success({ registered: true }, { request_id: request.requestId }));

@@ -2974,3 +2974,56 @@ html {
     white-space: nowrap;
   }
 }
+
+/* «لم يُقبل بعد» — orders a shop has left waiting three minutes or more. */
+.overdue-alert {
+  margin: 12px 24px 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid #f04438;
+  background: #fef3f2;
+  color: #912018;
+  animation: overdue-pulse 2s ease-in-out infinite;
+}
+.overdue-alert__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.overdue-alert__head span {
+  color: #b42318;
+  font-size: 0.9em;
+}
+.overdue-alert__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.overdue-alert__list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: center;
+  font-weight: 600;
+}
+.overdue-alert__list a {
+  color: #912018;
+  text-decoration: underline;
+}
+.overdue-alert__muted {
+  font-weight: 400;
+  opacity: 0.75;
+}
+@keyframes overdue-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 68, 56, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(240, 68, 56, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overdue-alert { animation: none; }
+}
+@media (max-width: 640px) {
+  .overdue-alert { margin: 12px 16px 0; }
+}

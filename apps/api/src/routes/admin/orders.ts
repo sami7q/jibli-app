@@ -94,6 +94,9 @@ export function registerAdminOrderRoutes(app: FastifyInstance, ctx: AppContext):
         customerPhone: orders.customerPhoneSnapshot,
         restaurantName: restaurants.displayName,
         restaurantId: orders.restaurantId,
+        // The branch's own number, so an operator can call a shop that has
+        // not accepted an order (the admin «لم يُقبل بعد» alert).
+        restaurantPhone: restaurantBranches.phone,
         cityNameAr: cities.nameAr,
         driverName: users.fullName,
       })
@@ -143,6 +146,7 @@ export function registerAdminOrderRoutes(app: FastifyInstance, ctx: AppContext):
           phone_masked: !canUnmask,
           restaurant_id: row.restaurantId,
           restaurant_name: row.restaurantName,
+          restaurant_phone: row.restaurantPhone,
           city_name_ar: row.cityNameAr,
           driver_name: row.driverName,
         })),
