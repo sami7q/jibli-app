@@ -10,6 +10,7 @@ import { upsertImageAsset } from '../seed/demo-images.js';
 import { REST_CAFE_1010_LOGO_URL, restCafe1010 } from '../seed/partners/rest-cafe-1010.js';
 import { bLaban } from '../seed/partners/b-laban.js';
 import { AJEENA_LOGO_URL, ajeena } from '../seed/partners/ajeena.js';
+import { LACASA_COVER_FILE, LACASA_LOGO_FILE, lacasa } from '../seed/partners/lacasa.js';
 import type { DemoRestaurant } from '../seed/demo-marketplace.js';
 
 /**
@@ -25,7 +26,12 @@ import type { DemoRestaurant } from '../seed/demo-marketplace.js';
  *     pnpm --filter @jibli/db partner:provision
  */
 
-async function fetchImage(url: string): Promise<{ bytes: Buffer; contentType: string }> {
+async function fetchImage(url: string | URL): Promise<{ bytes: Buffer; contentType: string }> {
+  if (url instanceof URL && url.protocol === 'file:') {
+    // A logo we hold ourselves, cropped from what the shop published.
+    const { readFile } = await import('node:fs/promises');
+    return { bytes: await readFile(url), contentType: 'image/jpeg' };
+  }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url} answered ${response.status}`);
   return {
@@ -40,7 +46,8 @@ const PARTNERS: readonly {
   readonly build: (ownerUsername: string) => DemoRestaurant;
   readonly usernameEnv: string;
   readonly passwordEnv: string;
-  readonly logoUrl?: string;
+  readonly logoUrl?: string | URL;
+  readonly coverUrl?: string | URL;
 }[] = [
   {
     label: '10:10',
@@ -61,6 +68,14 @@ const PARTNERS: readonly {
     usernameEnv: 'PARTNER_AJEENA_OWNER_USERNAME',
     passwordEnv: 'PARTNER_AJEENA_OWNER_PASSWORD',
     logoUrl: AJEENA_LOGO_URL,
+  },
+  {
+    label: 'En LaCasa',
+    build: lacasa,
+    usernameEnv: 'PARTNER_LACASA_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_LACASA_OWNER_PASSWORD',
+    logoUrl: LACASA_LOGO_FILE,
+    coverUrl: LACASA_COVER_FILE,
   },
 ];
 
@@ -143,6 +158,32 @@ async function main(): Promise<void> {
           .set({ logoAssetId, updatedAt: new Date() })
           .where(eq(restaurants.id, row.id));
         logoNote = 'real logo';
+      }
+
+      if (partner.coverUrl) {
+        const [row] = await db
+          .select({ id: restaurants.id })
+          .from(restaurants)
+          .where(eq(restaurants.partnerCode, shop.partnerCode))
+          .limit(1);
+        if (!row) throw new Error(`${shop.partnerCode} vanished after the upsert`);
+        const cover = await fetchImage(partner.coverUrl);
+        const coverAssetId = await upsertImageAsset(
+          db,
+          {
+            storageKey: `partners/${shop.partnerCode}/cover`,
+            png: cover.bytes,
+            width: null,
+            height: null,
+            contentType: cover.contentType,
+          },
+          row.id,
+        );
+        await db
+          .update(restaurants)
+          .set({ coverAssetId, updatedAt: new Date() })
+          .where(eq(restaurants.id, row.id));
+        logoNote += ', cover';
       }
 
       console.log(
