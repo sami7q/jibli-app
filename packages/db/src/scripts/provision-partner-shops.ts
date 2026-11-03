@@ -11,6 +11,7 @@ import { REST_CAFE_1010_LOGO_URL, restCafe1010 } from '../seed/partners/rest-caf
 import { bLaban } from '../seed/partners/b-laban.js';
 import { AJEENA_LOGO_URL, ajeena } from '../seed/partners/ajeena.js';
 import { LACASA_COVER_FILE, LACASA_LOGO_FILE, lacasa } from '../seed/partners/lacasa.js';
+import { MR_DEEK_LOGO_FILE, mrDeek } from '../seed/partners/mrdeek.js';
 import type { DemoRestaurant } from '../seed/demo-marketplace.js';
 
 /**
@@ -76,6 +77,14 @@ const PARTNERS: readonly {
     passwordEnv: 'PARTNER_LACASA_OWNER_PASSWORD',
     logoUrl: LACASA_LOGO_FILE,
     coverUrl: LACASA_COVER_FILE,
+  },
+  {
+    label: 'Mr. Deek',
+    build: mrDeek,
+    usernameEnv: 'PARTNER_MRDEEK_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_MRDEEK_OWNER_PASSWORD',
+    logoUrl: MR_DEEK_LOGO_FILE,
+    coverUrl: MR_DEEK_LOGO_FILE,
   },
 ];
 

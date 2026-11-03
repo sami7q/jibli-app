@@ -36,7 +36,9 @@ function fold(name: string): string {
     .replace(/\([^)]*\)/g, '')
     .replace(/[أإآ]/g, 'ا')
     .replace(/ة/g, 'ه')
-    .replace(/[ـً-ْ]/g, '')
+    // Tatweel and the harakat, matched one mark at a time on purpose.
+    // eslint-disable-next-line no-misleading-character-class
+    .replace(/[\u0640\u064B-\u0652]/g, '')
     .replace(/ساندوتش/g, 'ساندويش')
     .replace(/\s+/g, ' ')
     .trim();
