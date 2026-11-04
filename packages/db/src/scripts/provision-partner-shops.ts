@@ -12,6 +12,8 @@ import { bLaban } from '../seed/partners/b-laban.js';
 import { AJEENA_LOGO_URL, ajeena } from '../seed/partners/ajeena.js';
 import { LACASA_COVER_FILE, LACASA_LOGO_FILE, lacasa } from '../seed/partners/lacasa.js';
 import { MR_DEEK_LOGO_FILE, mrDeek } from '../seed/partners/mrdeek.js';
+import { CORNICHE_COVER_FILE, CORNICHE_LOGO_FILE, corniche } from '../seed/partners/corniche.js';
+import { WAHID_COVER_FILE, WAHID_LOGO_FILE, wahidHaditha } from '../seed/partners/wahid-haditha.js';
 import type { DemoRestaurant } from '../seed/demo-marketplace.js';
 
 /**
@@ -85,6 +87,22 @@ const PARTNERS: readonly {
     passwordEnv: 'PARTNER_MRDEEK_OWNER_PASSWORD',
     logoUrl: MR_DEEK_LOGO_FILE,
     coverUrl: MR_DEEK_LOGO_FILE,
+  },
+  {
+    label: 'Wahid Haditha',
+    build: wahidHaditha,
+    usernameEnv: 'PARTNER_WAHID_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_WAHID_OWNER_PASSWORD',
+    logoUrl: WAHID_LOGO_FILE,
+    coverUrl: WAHID_COVER_FILE,
+  },
+  {
+    label: 'Corniche Grills',
+    build: corniche,
+    usernameEnv: 'PARTNER_CORNICHE_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_CORNICHE_OWNER_PASSWORD',
+    logoUrl: CORNICHE_LOGO_FILE,
+    coverUrl: CORNICHE_COVER_FILE,
   },
 ];
 
