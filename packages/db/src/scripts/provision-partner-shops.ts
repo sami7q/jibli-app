@@ -7,7 +7,7 @@ import { shouldUseSsl } from '../ssl.js';
 import { restaurants } from '../schema/index.js';
 import { findCity, upsertDemoShop, type ShopSeedCounts } from '../seed/demo-marketplace.js';
 import { upsertImageAsset } from '../seed/demo-images.js';
-import { REST_CAFE_1010_LOGO_URL, restCafe1010 } from '../seed/partners/rest-cafe-1010.js';
+import { restCafe1010 } from '../seed/partners/rest-cafe-1010.js';
 import { bLaban } from '../seed/partners/b-laban.js';
 import { AJEENA_LOGO_URL, ajeena } from '../seed/partners/ajeena.js';
 import { LACASA_COVER_FILE, LACASA_LOGO_FILE, lacasa } from '../seed/partners/lacasa.js';
@@ -57,7 +57,9 @@ const PARTNERS: readonly {
     build: restCafe1010,
     usernameEnv: 'PARTNER_1010_OWNER_USERNAME',
     passwordEnv: 'PARTNER_1010_OWNER_PASSWORD',
-    logoUrl: REST_CAFE_1010_LOGO_URL,
+    // The TENTEN mark the restaurant sent on 2026-11-04, replacing its old logo.
+    logoUrl: new URL('../seed/partners/assets/tenten-logo.jpg', import.meta.url),
+    coverUrl: new URL('../seed/partners/assets/tenten-cover.jpg', import.meta.url),
   },
   {
     label: 'B.Laban',
