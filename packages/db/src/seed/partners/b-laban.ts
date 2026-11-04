@@ -213,8 +213,8 @@ const MENU: Menu = [
  * The platform's defaults for every Haditha shop for now (owner, 2026-11-02):
  * a 2,000 minimum, 35 minutes to prepare, and a 2,000 delivery fee — 2,500
  * with Jibli's service fee, which is what the customer sees — open noon to
- * midnight like 10:10. The shop's own phone is not known yet and is left empty
- * for the shop to set from «إعدادات المتجر».
+ * midnight like 10:10. The phone is the Haditha row of the branch list printed
+ * on the menu (07750011805, also 07850011805).
  */
 export const B_LABAN_DETAILS = {
   opensAt: '12:00',
@@ -222,7 +222,7 @@ export const B_LABAN_DETAILS = {
   minimumOrderIqd: 2000,
   deliveryFeeIqd: 2000,
   prepMinutes: 35,
-  phone: '',
+  phone: '+9647750011805',
 } as const;
 
 export function bLaban(ownerUsername: string): DemoRestaurant {
@@ -245,7 +245,7 @@ export function bLaban(ownerUsername: string): DemoRestaurant {
     prepMinutes: B_LABAN_DETAILS.prepMinutes,
     rating: null,
     ratingCount: 0,
-    address: 'حديثة',
+    address: 'حديثة - السبحاني',
     district: 'حديثة',
     phone: B_LABAN_DETAILS.phone,
     ownerUsername,
