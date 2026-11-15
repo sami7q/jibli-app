@@ -65,6 +65,21 @@ const TARGETS = {
     // Never cleans: it is written into the API's directory, after the API.
     clean: false,
   },
+  /*
+   * Partner provisioning, run from the service's shell against the live
+   * database. Their logos and photos are read from `assets/` next to the
+   * bundle, which the image copies in.
+   */
+  partners: {
+    entry: 'packages/db/src/scripts/provision-partner-shops.ts',
+    outfile: 'apps/api/build/provision-partners.mjs',
+    clean: false,
+  },
+  'partner-photos': {
+    entry: 'packages/db/src/scripts/attach-partner-photos.ts',
+    outfile: 'apps/api/build/attach-partner-photos.mjs',
+    clean: false,
+  },
 };
 
 const target = process.argv[2];

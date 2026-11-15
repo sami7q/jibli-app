@@ -14,6 +14,12 @@ import { LACASA_COVER_FILE, LACASA_LOGO_FILE, lacasa } from '../seed/partners/la
 import { MR_DEEK_LOGO_FILE, mrDeek } from '../seed/partners/mrdeek.js';
 import { CORNICHE_COVER_FILE, CORNICHE_LOGO_FILE, corniche } from '../seed/partners/corniche.js';
 import { WAHID_COVER_FILE, WAHID_LOGO_FILE, wahidHaditha } from '../seed/partners/wahid-haditha.js';
+import { AMROUSH_LOGO_FILE, amroush } from '../seed/partners/amroush.js';
+import {
+  NAR_W_FAHM_COVER_FILE,
+  NAR_W_FAHM_LOGO_FILE,
+  narWFahm,
+} from '../seed/partners/nar-w-fahm.js';
 import type { DemoRestaurant } from '../seed/demo-marketplace.js';
 
 /**
@@ -105,6 +111,22 @@ const PARTNERS: readonly {
     passwordEnv: 'PARTNER_CORNICHE_OWNER_PASSWORD',
     logoUrl: CORNICHE_LOGO_FILE,
     coverUrl: CORNICHE_COVER_FILE,
+  },
+  {
+    label: 'Amroush Falafel',
+    build: amroush,
+    usernameEnv: 'PARTNER_AMROUSH_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_AMROUSH_OWNER_PASSWORD',
+    logoUrl: AMROUSH_LOGO_FILE,
+    coverUrl: AMROUSH_LOGO_FILE,
+  },
+  {
+    label: 'Nar w Fahm',
+    build: narWFahm,
+    usernameEnv: 'PARTNER_NARWFAHM_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_NARWFAHM_OWNER_PASSWORD',
+    logoUrl: NAR_W_FAHM_LOGO_FILE,
+    coverUrl: NAR_W_FAHM_COVER_FILE,
   },
 ];
 

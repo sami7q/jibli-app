@@ -1,0 +1,14 @@
+{
+  "photos": [
+    { "name": "دجاجة على رز", "imageUrl": "narwfahm-photos/chicken-rice.jpg" },
+    { "name": "دجاجة مسحب على رز", "imageUrl": "narwfahm-photos/musahab.jpg" },
+    { "name": "نفر أجنحة على رز", "imageUrl": "narwfahm-photos/wings.jpg" },
+    { "name": "نص نفر أجنحة على رز", "imageUrl": "narwfahm-photos/wings.jpg" },
+    { "name": "نفر تكة على رز", "imageUrl": "narwfahm-photos/tikka.jpg" },
+    { "name": "نص نفر تكة على رز", "imageUrl": "narwfahm-photos/tikka.jpg" },
+    { "name": "نفر تكة بدون رز", "imageUrl": "narwfahm-photos/tikka.jpg" },
+    { "name": "نص نفر تكة بدون رز", "imageUrl": "narwfahm-photos/tikka.jpg" },
+    { "name": "رز حجم كبير", "imageUrl": "narwfahm-photos/rice-large.jpg" },
+    { "name": "رز حجم وسط", "imageUrl": "narwfahm-photos/rice-medium.jpg" }
+  ]
+}

@@ -18,6 +18,8 @@ import { upsertImageAsset } from '../seed/demo-images.js';
  *
  *     DATABASE_URL=… pnpm --filter @jibli/db exec tsx src/scripts/attach-partner-photos.ts \
  *       PARTNER-HDT-1010 photos.json
+ *
+ * An `imageUrl` that is not http(s) is a file path relative to the list.
  */
 
 interface PhotoList {
@@ -44,7 +46,16 @@ function fold(name: string): string {
     .trim();
 }
 
+/** Where relative photo paths in the list resolve from: the list's own folder. */
+let listDir = '.';
+
 async function fetchImage(url: string): Promise<{ bytes: Buffer; contentType: string }> {
+  if (!/^https?:\/\//.test(url)) {
+    // A photo we hold ourselves, cropped from what the shop published.
+    const { readFile } = await import('node:fs/promises');
+    const { resolve } = await import('node:path');
+    return { bytes: await readFile(resolve(listDir, url)), contentType: 'image/jpeg' };
+  }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url} answered ${response.status}`);
   return {
@@ -61,6 +72,7 @@ async function main(): Promise<void> {
     throw new Error('Usage: DATABASE_URL=… attach-partner-photos <PARTNER-CODE> <photos.json>');
   }
   const { readFile } = await import('node:fs/promises');
+  listDir = (await import('node:path')).dirname(listPath);
   const list = JSON.parse(await readFile(listPath, 'utf8')) as PhotoList;
 
   const { db, sql } = createDatabase({

@@ -111,6 +111,8 @@ RUN node scripts/bundle.mjs api
 RUN node scripts/bundle.mjs worker
 # Written into the API's build directory, so it ships and versions with it.
 RUN node scripts/bundle.mjs migrate
+RUN node scripts/bundle.mjs partners
+RUN node scripts/bundle.mjs partner-photos
 
 # Resolve the one external dependency into a flat, copyable tree. pnpm's
 # isolated linker uses symlinks that do not survive a COPY between stages.
@@ -136,6 +138,8 @@ WORKDIR /app
 COPY --from=build --chown=node:node /runtime-deps/node_modules ./node_modules
 COPY --from=build --chown=node:node /repo/apps/api/build ./build/api
 COPY --from=build --chown=node:node /repo/apps/worker/build ./build/worker
+# Partner logos and dish photos, read by build/api/provision-partners.mjs.
+COPY --from=build --chown=node:node /repo/packages/db/src/seed/partners/assets ./build/api/assets
 
 # Migrations travel with the image so a deploy applies the schema from the same
 # artifact as the code, never a separately-versioned one.
