@@ -20,6 +20,7 @@ import {
   NAR_W_FAHM_LOGO_FILE,
   narWFahm,
 } from '../seed/partners/nar-w-fahm.js';
+import { VIKING_LOGO_FILE, vikingBurger } from '../seed/partners/viking-burger.js';
 import type { DemoRestaurant } from '../seed/demo-marketplace.js';
 
 /**
@@ -127,6 +128,14 @@ const PARTNERS: readonly {
     passwordEnv: 'PARTNER_NARWFAHM_OWNER_PASSWORD',
     logoUrl: NAR_W_FAHM_LOGO_FILE,
     coverUrl: NAR_W_FAHM_COVER_FILE,
+  },
+  {
+    label: 'Viking Burger',
+    build: vikingBurger,
+    usernameEnv: 'PARTNER_VIKING_OWNER_USERNAME',
+    passwordEnv: 'PARTNER_VIKING_OWNER_PASSWORD',
+    logoUrl: VIKING_LOGO_FILE,
+    coverUrl: VIKING_LOGO_FILE,
   },
 ];
 
