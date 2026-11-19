@@ -7,7 +7,7 @@ import type { DemoRestaurant } from '../demo-marketplace.js';
  * owner's logo, sent on 2026-11-17. Burgers, special burgers and sandwiches
  * take an optional «اجعلها وجبة» (+1,500) as the menu offers; burgers also
  * take the printed «الإضافات». The four ريزو come in a 4,000 «ميني ريزو»
- * too, which is one item with a required flavour. No phone was printed.
+ * too, which is one item with a required flavour. Phone from the owner, 2026-11-19.
  */
 
 type Menu = DemoRestaurant['menu'];
@@ -236,7 +236,7 @@ export function vikingBurger(ownerUsername: string): DemoRestaurant {
     ratingCount: 0,
     address: 'حديثة',
     district: 'حديثة',
-    phone: '',
+    phone: '+9647779420849',
     ownerUsername,
     ownerName: 'فايكنك بركر',
     hours,
